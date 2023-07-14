@@ -5,7 +5,7 @@
 <?php
 
 if(!isset($_COOKIE['DisSugges'])) {
-  include './View/html/suggest.html';
+  include './View/html/suggest.php';
 
 }
 if(!isset($_COOKIE['DisQue'])) {

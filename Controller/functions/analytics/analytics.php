@@ -21,7 +21,7 @@ elseif(!isset($_COOKIE['userid']) && !isset($_COOKIE['noanalytics'])){
         <p style="float:left;"><b>Anonymous analytics</b>
         We use anonymous analytics to improve PriEco. Your data is always anonymous and helps us improve PriEco.
         Read more in our <a href="https://jojoyou.org/legal/" target="_blank">Privacy policy</a></p>
-        
+        <div>
         <input type="submit" name="anaaccept" value="Accept"style="background-color: #67c667;
         border: none;
         border-radius: 20px;
@@ -34,6 +34,7 @@ elseif(!isset($_COOKIE['userid']) && !isset($_COOKIE['noanalytics'])){
         font-weight: bold;
         cursor: pointer;
         padding: 10px;">
+        </div>
         </form>   
    ';
 }

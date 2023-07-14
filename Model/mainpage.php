@@ -141,10 +141,8 @@ min-width: 200px;box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);"
     /><button id="searchButton" aria-label="search button" style="width:10%;height:50px;box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);" class="searchButtonMain searchButton">
       <img src="./View/icon/search.webp" alt="‎" style="width:10px;height:10px;"></button
     >
-    <div class="autoboxMain autocom-box" style="width: calc(90% - 30px);min-width: 200px;position:absolute;margin-left: 25px;">
-        </div>
-    <br />
   </form>
+  <div class="autoboxMain autocom-box" style="width: calc(90% - 30px);min-width: 200px;position:absolute;margin-left: 25px;margin-top:0;"></div>
   <p style="padding-top: 10px;
   text-align: center;
   width: 95%;font-style:italic;">Search 🙈 privately and 🌲 ecofriendly</p>

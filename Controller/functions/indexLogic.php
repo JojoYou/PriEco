@@ -140,6 +140,12 @@ if (isset($_POST['mapBut'])) {
         $reload = true;
       }
   }
+  if(isset($_POST['sugPSave'])){
+      if($_POST['sugPDropdown'] == 'd'){setcookie('sugProvider', null, -1, '/');}
+      else{setcookie('sugProvider', $_POST['sugPDropdown'], time() + 31536000, '/');}
+    $reload = true;
+  }
+
   if (isset($_POST['hQuery'])) {
     if($_POST['hQuery'] == 'hQueryOff'){
       setcookie('hQuery', 'on', time() + 31536000, '/');

@@ -146,7 +146,7 @@ echo '</textarea>
 </div>
 </div>
 
-<br><div class="setListItem"><label for="datasaver">Data saver:</label><label class="switch">
+<br><div class="setListItem"><label for="datasaver">Cellular data saver:</label><label class="switch">
 <input type="submit" style="display:none;" name="datasave" id="datasaver" value="datasave';if (isset($_COOKIE['datasave'])){echo 'On';}else{echo 'Off';}echo '">
 <input type="checkbox" class="setCheck" ';
 if (isset($_COOKIE['datasave']))
@@ -154,7 +154,21 @@ if (isset($_COOKIE['datasave']))
     echo 'checked';
 }
 echo '><span class="slider round"></span>
-</label></div></div>
+</label></div>
+
+<br><div class="setListItem"><p>Suggestions:</p>
+<select
+  style="border: none;padding: 10px;float: right;margin-right: 10px;border-radius: 6px;"
+  name="sugPDropdown">
+
+<option value="d"';if (!isset($_COOKIE['sugProvider'])){echo 'selected';}echo '>DuckDuckGo</option>
+<option value="g"';if (isset($_COOKIE['sugProvider']) && $_COOKIE['sugProvider'] == 'g'){echo 'selected';}echo '>Google</option>
+<option value="p"';if (isset($_COOKIE['sugProvider']) && $_COOKIE['sugProvider'] == 'p'){echo 'selected';}echo '>PriEco</option>
+</select> <input type="submit" value="Save" class="langSave" name="sugPSave">
+</div>
+
+
+</div>
 <div class="setGroup"><div style="border-bottom: solid 2px grey;"class="setListItem"><h3>Data</h3></div>
 <br>
 <div class="setListItem"><label for="aCou"><p>User counter:</p><p style="font-size:12px;">Anonymous ping</p></label><label class="switch">

@@ -9,11 +9,10 @@ $i=0;
 $related = '<style>
 .relSea{
 --rel-img: url("'.$simImg.'");
-} </style>';
-$related .= '<p class="sectionTitle">🔗 Related searches</p>
+} </style>
+<p class="sectionTitle">🔗 Related searches</p>
+<div class="relSea output" style="border-radius: 20px;margin-bottom:15px;" id="output">';
 
-<div class="relSea output" style="border-radius: 20px;margin-bottom:15px;
-" id="output">';
 foreach ($rs as &$item) { 
     if($i==0){
         ++$i;

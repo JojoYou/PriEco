@@ -36,6 +36,7 @@ function wiki($infoboxData, $wikiTxt, $ddgObj, $mysql, $hideQueryCopy)
     $i=0;
     if(!isset($_COOKIE['datasave'])){
     foreach ($infoboxData['images'] as $imageUrl) {
+        if($i == 0){$ansImg = 'https://'.substr($imageUrl, 2);}
         if($i == 2){break;}
         $answer .= '<img alt="" src="/Controller/functions/proxy.php?q=' . substr($imageUrl, 2) . '" style="max-width: 50%;border-radius: 30px;max-height: 200px;height:auto;width: auto;"><br>';
         ++$i;

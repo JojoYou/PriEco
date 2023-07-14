@@ -8,7 +8,7 @@ $gTime = microtime(true);
 //Development mode (Get search results from json files in ./Controller/dev folder)
 $dev = false;
 //CSS version
-$cssver = 60;
+$cssver = 63;
 //Variable, controls reloading on settings change
 $reload = false;
 

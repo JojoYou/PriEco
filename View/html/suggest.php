@@ -1,4 +1,9 @@
   <script>
+    <?php 
+      if (!isset($_COOKIE['sugProvider'])){echo 'const sugUrl ="Controller/functions/addons/sug.php/?t=d&q=";';}
+      if (isset($_COOKIE['sugProvider']) && $_COOKIE['sugProvider'] == 'g'){echo 'const sugUrl ="Controller/functions/addons/sug.php/?t=g&q=";';}
+      if (isset($_COOKIE['sugProvider']) && $_COOKIE['sugProvider'] == 'p'){echo 'const sugUrl ="Controller/functions/addons/sug.php/?t=p&q=";';}
+    ?> 
   // Getting all required elements
 const searchWrapper = document.querySelector(".autocomplete");
 const inputBox = searchWrapper.querySelector(".searchBox");
@@ -9,22 +14,53 @@ let backUpInp = "";
 // Function to fetch suggestions from the server
 async function fetchSuggestions(userData) {
   const response = await fetch(
-    "https://cors-anywhere.jojoyou3.repl.co/ac.duckduckgo.com/ac/?type=list&callback=jsonCallback&_=1600956892202&q=" + userData
+    sugUrl + userData
   );
-  const data = await response.json();
+  let data = await response.json();
+  console.log(data);  
   let emptyArray = [];
 
   // Process the data to generate the suggestion list
-  data.forEach((item) => {
-    if (Array.isArray(item)) {
-      item.slice(0, 10).forEach((element) => {
-        emptyArray.push(
-          `<li class="suggestion" onclick="select(this)"><img loading="lazy" src="/View/icon/search.webp">${element}</li>`
-        );
-      });
-    }
-  });
-
+  <?php
+  if(!isset($_COOKIE['sugProvider'])){
+    echo '
+    data = JSON.parse(data);
+    data.forEach((item) => {
+      if (Array.isArray(item)) {
+        item.slice(0, 10).forEach((element) => {
+          emptyArray.push(
+            `<li class="suggestion" onclick="select(this)"><img loading="lazy" src="/View/icon/search.webp">${element}</li>`
+          );
+        });
+      }
+    });';
+  }
+  elseif($_COOKIE['sugProvider'] == 'g'){
+    echo 'data.slice(0, 10).forEach((element) => {
+      emptyArray.push(
+        `<li class="suggestion" onclick="select(this)"><img loading="lazy" src="/View/icon/search.webp">${element}</li>`
+      );
+    });';
+  }
+  elseif (isset($_COOKIE['sugProvider']) && $_COOKIE['sugProvider'] == 'p'){
+    echo 'data.forEach((item) => {
+      if (Array.isArray(item)) {
+        item.slice(0, 10).forEach((element) => {
+          var sug =  `<li class="suggestion"`;
+          if(element.img !== ""){ sug = sug+`style="height:70px;"`;}
+          sug = sug + `onclick="select(this)">`;
+            if(element.img !== ""){sug = sug + `<img loading="lazy" style="width:auto; height:60px;border-radius:10px;max-width:100px;filter:unset;" src="/Controller/functions/proxy.php?q=${element.img}">`;}
+            else{sug = sug + `<img loading="lazy" src="/View/icon/search.webp">`;}
+            sug = sug + `<p>${element.name}</p></li>`;
+  
+          emptyArray.push(
+           sug
+          );
+        });
+      }
+    });';
+  }
+?>
   // Show the suggestions
   showSuggestions(emptyArray);
 }

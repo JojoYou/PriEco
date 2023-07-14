@@ -58,7 +58,7 @@ $qwant[$i] .= ' output" id="output">';
                 $qwant[$i] .= 'target="_blank"';
             }
             $qwant[$i] .= 'href="'. $item['url']. '">';
-            if (strpos($item['url'], 'https://') !== false) {
+            if (strpos($item['url'], 'https://') !== false && !isset($_COOKIE['datasave'])) {
                 $qwant[$i] .= '<img loading="lazy" alt="‎" class="Outfavicon" src="/Controller/functions/proxy.php?q=https://judicial-peach-octopus.b-cdn.net/'.get_string_betweens($item['url'], 'https://', '/'). '">';
             }
             $gurl = str_replace('/',' > ',str_replace('https://','',str_replace('http://','',str_replace('www.','', $item['url']))));

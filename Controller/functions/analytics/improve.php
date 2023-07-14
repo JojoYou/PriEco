@@ -29,8 +29,7 @@ if($ImpProfiles){
         }
     }
 
-    $sql = "INSERT INTO `profiles` (`Name`, `Twitter`, `Facebook`,`IMDb`,`Tomatoes`,`Spotify`,`Apple`) VALUES ('$name', '$twitter', '$facebook', '$imdb','$tomato','$spotify','$apple');";
-    $conn->query($sql);
+    $conn->query("INSERT INTO `profiles` (`Name`, `Twitter`, `Facebook`,`IMDb`,`Tomatoes`,`Spotify`,`Apple`) VALUES ('$name', '$twitter', '$facebook', '$imdb','$tomato','$spotify','$apple');");
   }
 }
 
@@ -58,6 +57,11 @@ $conn->query($sql);
 }
 elseif(!$ImpGoogle && !isset($_COOKIE['safe']) && !isset($_COOKIE['time'])){
         $purl_escaped = mysqli_real_escape_string($conn, $purl);
-        $sql = "UPDATE `googleCache` SET `count` = `count` + 1 WHERE `query` = '$purl_escaped'";
-        $conn->query($sql);
+        $conn->query("UPDATE `googleCache` SET `count` = `count` + 1 WHERE `query` = '$purl_escaped'");
+}
+
+if($simImg != ''){
+        $purl_escaped = mysqli_real_escape_string($conn, $purl);
+        $simI_escaped = mysqli_real_escape_string($conn, $simImg);
+        $conn->query("UPDATE `suggestions` SET `img` = '$simI_escaped' WHERE `name` = '$purl_escaped'");   
 }

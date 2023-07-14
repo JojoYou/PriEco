@@ -86,6 +86,17 @@ if ($type != 'image' and $type != 'video' and $type != 'news') {
         if(isset($_SESSION[$purl.':-:wiki'])){
             $wikiobj =explode('--]|[--',$_SESSION[$purl.':-:wiki']);$wikiTxt = $wikiobj[1];$wikiobj = json_decode($wikiobj[0],true);
         }
+
+        if (strpos(strtolower($purl), 'ip') !== false) {
+            $ipCh = curl_init('https://ipapi.co/'.$_SERVER['REMOTE_ADDR'].'/json/');
+            curl_setopt($ipCh, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ipCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
+            curl_setopt($ipCh, CURLOPT_CONNECTTIMEOUT, 2);
+            curl_setopt($ipCh, CURLOPT_TIMEOUT, 2.5);
+            $ipObj = json_decode(curl_exec($ipCh),true);        
+            curl_close($ipCh);
+        }
+        
         $ImpGoogle = false;
     }
 
@@ -100,7 +111,8 @@ $curlCount = 0;
 $ch1 = curl_init($RedditFile);
 curl_setopt($ch1, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch1, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-curl_setopt($ch1, CURLOPT_CONNECTTIMEOUT, 5);
+curl_setopt($ch1, CURLOPT_CONNECTTIMEOUT, 2);
+curl_setopt($ch1, CURLOPT_TIMEOUT, 2.5);
 $curlHandles[] = $ch1;
 if(count($curlHandles) > $curlCount){
     $redditOn = true;
@@ -117,7 +129,7 @@ if($ddgObj == ''){
         'Referer: https://ac.duckduckgo.com/',
         'Accept-Language: en-US,en;q=0.9'
     ));
-    curl_setopt($ch2, CURLOPT_CONNECTTIMEOUT, 5);
+    curl_setopt($ch2, CURLOPT_CONNECTTIMEOUT, 2.5);
     curl_setopt($ch2, CURLOPT_FOLLOWLOCATION, true);
     $curlHandles[] = $ch2;
     if(count($curlHandles) > $curlCount){
@@ -140,7 +152,7 @@ if($obj == '' && !isset($g2obj)){
         curl_setopt($ch3, CURLOPT_COOKIE, $cookies);
     }
     curl_setopt($ch3, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch3, CURLOPT_CONNECTTIMEOUT, 5);
+    curl_setopt($ch3, CURLOPT_CONNECTTIMEOUT, 2.5);
     $curlHandles[] = $ch3;
     if(count($curlHandles) > $curlCount){
         $searchOn = true;
@@ -149,11 +161,11 @@ if($obj == '' && !isset($g2obj)){
 }
 
 //Related searches
-if (!isset($_COOKIE['DisSugges'])) {
-    $relatedCh = curl_init('https://cors-anywhere.jojoyou3.repl.co/ac.duckduckgo.com/ac/?type=list&callback=jsonCallback&_=1600956892202&q='.$Bpurl);
+    $relatedCh = curl_init('https://ac.duckduckgo.com/ac/?type=list&callback=jsonCallback&_=1600956892202&q='.$Bpurl);
     curl_setopt($relatedCh, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($relatedCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
     curl_setopt($relatedCh, CURLOPT_CONNECTTIMEOUT, 2);
+    curl_setopt($relatedCh, CURLOPT_TIMEOUT, 2.5);
     curl_setopt($relatedCh, CURLOPT_HTTPHEADER, array(
     'Origin: https://ac.duckduckgo.com'
 ));
@@ -162,7 +174,7 @@ if (!isset($_COOKIE['DisSugges'])) {
     $relatedOn = true;
     $curlCount = count($curlHandles);
 }
-}
+
 
 $tmp = $_COOKIE['Language'];
     if($tmp == 'all' or $tmp == null){
@@ -173,7 +185,9 @@ $tmp = $_COOKIE['Language'];
 $wikiCh = curl_init('https://search.jojoyou.org/Controller/functions/addons/wikiGet.php?lang='.$tmp.'&q=' .str_replace('+','_',urlencode(ucwords($purl))));
 curl_setopt($wikiCh, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($wikiCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-curl_setopt($wikiCh, CURLOPT_CONNECTTIMEOUT, 5);
+curl_setopt($wikiCh, CURLOPT_CONNECTTIMEOUT, 2);
+curl_setopt($wikiCh, CURLOPT_TIMEOUT, 2.5);
+
 $curlHandles[] = $wikiCh;
 if(count($curlHandles) > $curlCount){
     $wikiOn = true;
@@ -184,7 +198,9 @@ if (isset($defWords)) {
     $defCh = curl_init($WordnikFile);
     curl_setopt($defCh, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($defCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-    curl_setopt($defCh, CURLOPT_CONNECTTIMEOUT, 5);
+    curl_setopt($defCh, CURLOPT_CONNECTTIMEOUT, 2);
+    curl_setopt($defCh, CURLOPT_TIMEOUT, 2.5);
+
       $curlHandles[] = $defCh;
   if(count($curlHandles) > $curlCount){
     $defOn = true;
@@ -196,7 +212,9 @@ if ($weatherTrue) {
     $weatherCh = curl_init($OpenWeatherFile);
     curl_setopt($weatherCh, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($weatherCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-    curl_setopt($weatherCh, CURLOPT_CONNECTTIMEOUT, 5);
+    curl_setopt($weatherCh, CURLOPT_CONNECTTIMEOUT, 2);
+    curl_setopt($weatherCh, CURLOPT_TIMEOUT, 2.5);
+
       $curlHandles[] = $weatherCh;
   if(count($curlHandles) > $curlCount){
     $weatherOn = true;
@@ -206,7 +224,8 @@ if ($weatherTrue) {
     $weatherForecastCh = curl_init($OpenWeatherForecastFile);
     curl_setopt($weatherForecastCh, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($weatherForecastCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-    curl_setopt($weatherForecastCh, CURLOPT_CONNECTTIMEOUT, 5);
+    curl_setopt($weatherForecastCh, CURLOPT_CONNECTTIMEOUT, 2);
+    curl_setopt($weatherForecastCh, CURLOPT_TIMEOUT, 2.5);
       $curlHandles[] = $weatherForecastCh;
   if(count($curlHandles) > $curlCount){
     $weatherForecastOn = true;
@@ -219,14 +238,15 @@ if (strpos(strtolower($purl), 'ip') !== false) {
     $ipCh = curl_init('https://ipapi.co/'.$_SERVER['REMOTE_ADDR'].'/json/');
     curl_setopt($ipCh, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ipCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-    curl_setopt($ipCh, CURLOPT_CONNECTTIMEOUT, 5);
+    curl_setopt($ipCh, CURLOPT_CONNECTTIMEOUT, 2);
+    curl_setopt($ipCh, CURLOPT_TIMEOUT, 2.5);
       $curlHandles[] = $ipCh;
   if(count($curlHandles) > $curlCount){
     $ipOn = true;
     $curlCount = count($curlHandles);
     }
 }
-
+/*
 //Crypto
 $cryptoCh = curl_init('https://api.coingecko.com/api/v3/coins/'.$purl);
 curl_setopt($cryptoCh, CURLOPT_RETURNTRANSFER, true);
@@ -237,12 +257,13 @@ if(count($curlHandles) > $curlCount){
     $cryptoOn = true;
     $curlCount = count($curlHandles);
 }
-
+*/
 //News
 $newsCh = curl_init($WebNewsFile);
 curl_setopt($newsCh, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($newsCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-curl_setopt($newsCh, CURLOPT_CONNECTTIMEOUT, 5);
+curl_setopt($newsCh, CURLOPT_CONNECTTIMEOUT, 2);
+curl_setopt($newsCh, CURLOPT_TIMEOUT, 2.5);
 $curlHandles[] = $newsCh;
 if(count($curlHandles) > $curlCount){
     $newsOn = true;
@@ -254,6 +275,7 @@ $ytCh = curl_init($WebYoutubeFile);
 curl_setopt($ytCh, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ytCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
 curl_setopt($ytCh, CURLOPT_CONNECTTIMEOUT, 2);
+curl_setopt($ytCh, CURLOPT_TIMEOUT, 2.5);
 $curlHandles[] = $ytCh;
 if(count($curlHandles) > $curlCount){
     $ytOn = true;
@@ -336,6 +358,7 @@ else{
     include 'addons/small/ip.php';
     if(strpos(strtolower($purl), 'rand') !== false){include 'addons/small/random.php';}
     if(strpos(strtolower($purl), 'calc') !== false && !isset($_COOKIE['DisWid'])){include 'addons/small/calculator.php';}
+    if(strpos(strtolower($purl), 'color') !== false && !isset($_COOKIE['DisWid'])){include 'addons/small/color.html';}
     include 'addons/small/define.php';
     if(isset($OpenWeatherObj)){include 'addons/small/weather.php';}
     include 'addons/small/crypto.php';
@@ -458,11 +481,11 @@ else{
     //Print
         //Query URL
     if(preg_match('/^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z0-9]{2,}(:\d{2,5})?(\/\S*)*$/', preg_replace('/\s+$/u', '', $purl))){
-        echo '<div class="output" style="border-radius:20px;background-image: linear-gradient(#00ff0005, #00ff003b);margin-bottom:15px;padding: 5px;display:flex;flex-direction: column;flex-wrap: wrap;justify-content: space-around;align-items: center;">
-        <p style="text-align:center;"><b>Looks like you`re searching for a website!</b><br>
-        If you`d like us to redirect you there, simply click the button below:</p>
-        <a style="padding-bottom:5px;" href="';if(strpos($purl, 'https://') === false && strpos($purl, 'http://') === false){echo 'https://';}
-            echo $purl,'"';
+        echo "<div class='output' style='border-radius:20px;border: solid 3px green;margin-bottom:15px;padding: 5px;display:flex;flex-direction: column;flex-wrap: wrap;justify-content: space-around;align-items: center;'>
+        <p style='text-align:center;'><b>Looks like you're searching for a website!</b><br>
+        If you'd like us to redirect you there, simply click the button below:</p>
+        <a style='padding-bottom:5px;' href='";if(strpos($purl, 'https://') === false && strpos($purl, 'http://') === false){echo 'https://';}
+            echo $purl,"'";
         if(isset($_COOKIE['new'])){echo 'target="_blank"';}
         echo '><button class="redirectMe">Redirect me!</button></a>
         </div>';
@@ -537,7 +560,7 @@ if ($type === 'image') {
         $Pix = curl_init();
         curl_setopt($Pix, CURLOPT_URL, $PixabayFile);
         curl_setopt($Pix, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-        curl_setopt($Pix, CURLOPT_CONNECTTIMEOUT, 5);
+        curl_setopt($Pix, CURLOPT_CONNECTTIMEOUT, 2.5);
         curl_setopt($Pix, CURLOPT_RETURNTRANSFER, true);
 
         $PixObj = json_decode(curl_exec($Pix), true);
@@ -616,7 +639,7 @@ if ($type === 'image') {
             $bUrl = 'https://api.qwant.com/v3/search/images/?count=75&offset=' . $page * 82 . '&uiv=1&locale=en_US&size=' . $imgsize . '&color=' . $imgcolor . '&imagetype=' . $imgtype . '&freshness=' . $imgtime . '&license=' . $imgright . '&q=' . $Bpurl;
             curl_setopt($bCh, CURLOPT_URL, $bUrl);
             curl_setopt($bCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-            curl_setopt($bCh, CURLOPT_CONNECTTIMEOUT, 5);
+            curl_setopt($bCh, CURLOPT_CONNECTTIMEOUT, 2.5);
             curl_setopt($bCh, CURLOPT_RETURNTRANSFER, true);
             curl_multi_add_handle($mh, $bCh);
             $handles[] = $bCh;
@@ -658,7 +681,7 @@ if ($type === 'image') {
             $BCurl = curl_init();
             curl_setopt($BCurl, CURLOPT_URL, $bUrl);
             curl_setopt($BCurl, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-            curl_setopt($BCurl, CURLOPT_CONNECTTIMEOUT, 5);
+            curl_setopt($BCurl, CURLOPT_CONNECTTIMEOUT, 2.5);
             curl_setopt($BCurl, CURLOPT_RETURNTRANSFER, true);
             curl_multi_add_handle($mh, $BCurl);
             $handles[] = $BCurl;
@@ -801,7 +824,7 @@ if ($type == 'video') {
         $YoutubeCurl = curl_init();
         curl_setopt($YoutubeCurl, CURLOPT_URL, $YoutubeFile);
         curl_setopt($YoutubeCurl, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-        curl_setopt($YoutubeCurl, CURLOPT_CONNECTTIMEOUT, 5);
+        curl_setopt($YoutubeCurl, CURLOPT_CONNECTTIMEOUT, 2.5);
         curl_setopt($YoutubeCurl, CURLOPT_RETURNTRANSFER, true);
         $YoutubeObj = json_decode(curl_exec($YoutubeCurl), true);
         curl_close($YoutubeCurl);
@@ -834,7 +857,7 @@ if ($type == 'news') {
         $NewsCurl = curl_init();
         curl_setopt($NewsCurl, CURLOPT_URL, $NewsFile);
         curl_setopt($NewsCurl, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-        curl_setopt($NewsCurl, CURLOPT_CONNECTTIMEOUT, 5);
+        curl_setopt($NewsCurl, CURLOPT_CONNECTTIMEOUT, 2.5);
         curl_setopt($NewsCurl, CURLOPT_RETURNTRANSFER, true);
         $NewsObj = json_decode(curl_exec($NewsCurl), true);
         curl_close($NewsCurl);

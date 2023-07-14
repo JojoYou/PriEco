@@ -140,14 +140,17 @@ img {
   cursor: pointer;
   height: 30px;
   padding-left: 2%;
-  padding-top: 6px;
+  padding-top: 3px;
+  padding-bottom: 3px;
   border-radius: 20px;
   text-align: start;
+  display: flex;
+  align-items: center;
 }
 
 .suggestion img {
-  width: 22px;
-  padding-right: 10px;
+  width: 16px;
+  margin-right: 10px;
   height: auto;
 }
 
@@ -368,6 +371,11 @@ img {
   min-width: 300px;
   border: solid 1px gray;
   animation: slide-up 5s;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
 }
 
 @keyframes slide-up {
