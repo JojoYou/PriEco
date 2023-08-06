@@ -80,7 +80,7 @@ border-radius:0 0 20px 20px;
  ';
  if(!isset($_COOKIE['datasave'])){
   echo '<img class="sLogo"alt="TreeLogo"
-  src="./View/img/PriEco.webp" />';
+  src="./View/img/PriEco.webp?1" />';
  }else{
   echo '<h1 class="sLogo" style="color: #0ed794;text-decoration: none;font-size: 60px;">P</h1>';
  } 

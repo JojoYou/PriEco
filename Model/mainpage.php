@@ -74,7 +74,7 @@ echo '
     left: 50%;
     transform: translate(-50%, -125px);z-index:10;width:clamp(0px, 659px, 100%);text-align:center;">
 
-    <img id="LandSLogo" alt="PriEcoLogo" style="height: 64px;width: 29.9px;"src="./View/img/PriEco.webp" />
+    <img id="LandSLogo" alt="PriEcoLogo" style="height: 64px;width: 29.9px;"src="./View/img/PriEco.webp?1" />
     <span style="font-size: 60px;font-weight:bold;width:40%;background: -webkit-linear-gradient(#03D781, #3EDCE2);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;">PriEco</span>

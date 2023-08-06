@@ -14,7 +14,7 @@
 
   <title><?php if($purl != '' && $purl != null && !isset($_COOKIE['hQuery'])){echo str_replace('q=','',str_replace('&q=','',urldecode($purl))),' | PriEco';}else{echo'PriEco';}?></title>
   <meta name="description" content="PriEco, the Private, Secure and Ecofriendly search engine.">
-  <link rel="icon" href="./favicon.ico">
+  <link rel="icon" href="./favicon.ico?1">
   <link rel="search"
       type="application/opensearchdescription+xml"
       title="PriEco"
