@@ -10,13 +10,15 @@ $google2[]=null;
 
     switch ($i){
         case 0:
-            if(!$loaded[0] && $loaded[1]) {$google2[$i] .= ' mBorderBoth2 mBorderTop ';}
+            if($loaded[6]) {$google2[$i] .= ' mBorderBoth ';}
+            elseif(!$loaded[0] && $loaded[1]) {$google2[$i] .= ' mBorderBoth2 mBorderTop ';}
             elseif(!$loaded[0]){$google2[$i] .= ' mBorderTop ';}
             elseif($loaded[1]){$google2[$i] .= ' mBorderBottom2 ';}
             break;
         case 1:
             if($loaded[1]) {$google2[$i] .= ' mBorderTop2 ';}
             if($loaded[2]) {$google2[$i] .= ' mBorderBottom ';}
+            if($loaded[6]) {$google2[$i] .= ' mBorderTop ';}
             break;
         case 2:
             if($loaded[2]) {$google2[$i] .= ' mBorderTop ';}
@@ -39,7 +41,7 @@ $google2[]=null;
         case 8:
             if($loaded[5]) {$google2[$i] .= ' mBorderTop ';}
             break;
-        case $bottomBorder:
+        case 9:
             $google2[$i] .= ' mBorderBottom ';
             break;
     }

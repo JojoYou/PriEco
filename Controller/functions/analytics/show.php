@@ -65,6 +65,7 @@ width: 100%;
 height: 300px;
 padding: 5px;
 align-items: flex-end;
+overflow: auto;
 }
 
 .bar {

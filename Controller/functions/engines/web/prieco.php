@@ -11,7 +11,7 @@ $Pkeywords =explode(' ',mysqli_real_escape_string($conn, $siteDomain));
 
 $purlKeywords = explode(' ', strtolower($siteDomain));
 
-$PriEcoObj = $conn->query("SELECT * FROM `indexing` WHERE MATCH(title, description, url, H1) AGAINST('$purl')");
+$PriEcoObj = $conn->query("SELECT * FROM `indexing` WHERE MATCH(title, description, url, H1) AGAINST('$purl' IN BOOLEAN MODE)");
     
     $allRes[0]='';
     $jP=0;

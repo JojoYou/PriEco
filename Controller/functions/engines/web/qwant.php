@@ -19,13 +19,15 @@ foreach ($QWantObj['data']['result']['items']['mainline'] as &$items) {
 
             switch ($i){
                 case 0:
-                    if(!$loaded[0] && $loaded[1]) {$qwant[$i] .= ' mBorderBoth2 mBorderTop ';}
+                    if($loaded[6]) {$qwant[$i] .= ' mBorderBoth ';}
+                    elseif(!$loaded[0] && $loaded[1]) {$qwant[$i] .= ' mBorderBoth2 mBorderTop ';}
                     elseif(!$loaded[0]){$qwant[$i] .= ' mBorderTop ';}
                     elseif($loaded[1]){$qwant[$i] .= ' mBorderBottom2 ';}
                     break;
                 case 1:
                     if($loaded[1]) {$qwant[$i] .= ' mBorderTop2 ';}
                     if($loaded[2]) {$qwant[$i] .= ' mBorderBottom ';}
+                    if($loaded[6]) {$qwant[$i] .= ' mBorderTop ';}
                     break;
                 case 2:
                     if($loaded[2]) {$qwant[$i] .= ' mBorderTop ';}

@@ -43,6 +43,11 @@ if(isset($_POST['shortcutSubmit'])){
     $reload=true;
   }
 //Quick Settings Buttons
+if(isset($_POST['revetToGlobal'])){
+  setcookie('Language', 'all', time() + 604800, '/');
+  setcookie('Location', 'all', time() + 604800, '/');
+  $reload=true;
+}
 if (isset($_POST['allBut'])) {
   header("Location: ./?q=" . urlencode($_POST['q']), true);
   exit();
@@ -166,6 +171,16 @@ if (isset($_POST['mapBut'])) {
         $reload = true;
       }
   }
+  if (isset($_POST['dMul'])) {
+    if($_POST['dMul'] == 'dMulOff'){
+      setcookie('DisMul', 'on', time() + 31536000, '/');
+      $reload = true;
+      }
+      else {
+        setcookie('DisMul', null, -1, '/');
+        $reload = true;
+      }
+  }
   if (isset($_POST['dQue'])) {
     if($_POST['dQue'] == 'dQueOff'){
       setcookie('DisQue', 'on', time() + 31536000, '/');
@@ -272,9 +287,11 @@ if (isset($_POST['imgback'])) {
   header('Location: ./?image&q=' . $purl);
   exit();
 }
+
 //Reload
 if ($reload) {
   $purl = urlencode($purl);
+
   if(strpos($url, '?image') != false){
     header("Location: ./?image&q=" . $purl, true);
     exit();

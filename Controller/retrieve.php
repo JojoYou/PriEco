@@ -34,7 +34,7 @@ if(!$dev) {
     $EtsyFile = 'https://openapi.etsy.com/v3/application/listings/active?limit=25&keywords='.$apiPurl;
     if(isset($OpenWeatherLoc)){$OpenWeatherFile = 'https://api.openweathermap.org/data/2.5/weather?appid='.$_ENV['OPENWEATHER_API_KEY'].'&q='.$OpenWeatherLoc;
     $OpenWeatherForecastFile = 'https://api.openweathermap.org/data/2.5/forecast?appid='.$_ENV['OPENWEATHER_API_KEY'].'&q='.$OpenWeatherLoc;}
-    if(isset($defWords)){$WordnikFile = 'https://api.wordnik.com/v4/word.json/'.$defWords.'/definitions?limit=2&includeRelated=false&useCanonical=false&includeTags=false&api_key='.$_ENV['WORDNIK_API_KEY'];}
+    if(isset($defWords)){$WordnikFile = 'https://api.wordnik.com/v4/word.json/'.$defWords.'/definitions?limit=5&includeRelated=false&useCanonical=false&includeTags=false&api_key='.$_ENV['WORDNIK_API_KEY'];}
     else{$WordnikFile ='';}
     $RedditFile = 'https://api.reddit.com/r/all/search?q='.$apiPurl.'&limit=4&sort=relevance';if(!isset($_COOKIE['safe'])){$RedditFile.='&include_over_18=false';}else{$RedditFile.='&include_over_18=true';}
     $DdgFile = 'https://api.duckduckgo.com/?format=json&q='.$apiPurl;

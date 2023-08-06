@@ -74,13 +74,15 @@ foreach ($snippet as $snip) {
     $brave[$i] = '<div class="';
     switch ($i){
         case 0:
-            if(!$loaded[0] && $loaded[1]) {$brave[$i] .= ' mBorderBoth2 mBorderTop ';}
+            if($loaded[6]) {$brave[$i] .= ' mBorderBoth ';}
+            elseif(!$loaded[0] && $loaded[1]) {$brave[$i] .= ' mBorderBoth2 mBorderTop ';}
             elseif(!$loaded[0]){$brave[$i] .= ' mBorderTop ';}
             elseif($loaded[1]){$brave[$i] .= ' mBorderBottom2 ';}
             break;
         case 1:
             if($loaded[1]) {$brave[$i] .= ' mBorderTop2 ';}
             if($loaded[2]) {$brave[$i] .= ' mBorderBottom ';}
+            if($loaded[6]) {$brave[$i] .= ' mBorderTop ';}
             break;
         case 2:
             if($loaded[2]) {$brave[$i] .= ' mBorderTop ';}
@@ -103,7 +105,7 @@ foreach ($snippet as $snip) {
         case 8:
             if($loaded[5]) {$brave[$i] .= ' mBorderTop ';}
             break;
-        case $CountBraveSnippets:
+        case 9:
             $brave[$i] .= ' mBorderBottom ';
             break;
     }

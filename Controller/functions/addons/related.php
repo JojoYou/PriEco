@@ -27,7 +27,7 @@ foreach ($rs as &$item) {
                     <input type="hidden" name="q" value="'. $item .'">';
                 }
                 
-                $related .= '<button class="socialBtn" style="color:#3391ff; padding: 10px;float: left;margin-top: 10px;display:flex;align-items: center;">';
+                $related .= '<button class="socialBtn" style="  color: var(--linkColor);padding: 10px;float: left;margin-top: 10px;display: flex;align-items: center;">';
                 if(!isset($_COOKIE['datasave'])){
                 $related .= '<img loading="lazy" alt="" src="../View/icon/search.webp"class="rsImg" style="width: 15px;height:15px;margin-right: 5px;">';
                 }

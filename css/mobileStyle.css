@@ -19,7 +19,7 @@
   .sLogo {
     position: absolute;
     width: 50px;
-    height: auto;
+    height: 50px;
     left: 0;
     right: 0;
     margin-left: auto;
@@ -48,7 +48,7 @@
   }
 
   .searchBarMain {
-    margin-top: -49px;
+    margin-top: -10px !important;
   }
 
   .searchBox {
@@ -56,7 +56,6 @@
     width: calc(100% - 40px);
     max-width: unset;
     height: 45px;
-    font-size: 20px;
     margin-left: 10px;
     pointer-events: auto;
     padding-right: 50px;
@@ -71,10 +70,6 @@
 
   .allBut {
     margin-left: 5px !important;
-  }
-
-  .settingButton:nth-child(1) {
-    margin-left: 0vw;
   }
 
   .autocom-box {
@@ -107,7 +102,7 @@
   }
 
   .settingButton {
-    margin-left: 5px;
+    margin-left: 10px;
   }
 
   .setButStyle {
@@ -127,7 +122,9 @@
   .quickSettingButtons {
     top: 155px;
   }
-
+  .tDropdown{
+    margin-left: 9vw;
+  }
   @keyframes showquicksettings {
     0% {
       display: none;
@@ -206,6 +203,8 @@
     width: 50vw;
     max-width: unset;
     min-width: unset;
+    height: unset;
+    padding: 0;
   }
 
   .bigimgout {

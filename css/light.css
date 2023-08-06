@@ -1,4 +1,4 @@
-html, .copyQuery, .addShortcut {
+html, .copyQuery, #addShortcutBtn:hover {
   background-color: #f2f4f7;
   color: black;
 }
@@ -46,6 +46,9 @@ body {
 }
 .whiteAblackBg{
   background-color: white;
+}
+.addShortcut{
+  border: solid 10px #f2f4f7;
 }
 .mobileBottomBar {
   background-color: rgba(250, 251, 255, 0.75);

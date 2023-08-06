@@ -1,4 +1,16 @@
   <script>
+    function debounce(func, wait) {
+  let timeout;
+  return function() {
+    const context = this;
+    const args = arguments;
+    clearTimeout(timeout);
+    timeout = setTimeout(function() {
+      func.apply(context, args);
+    }, wait);
+  };
+}
+
     <?php 
       if (!isset($_COOKIE['sugProvider'])){echo 'const sugUrl ="Controller/functions/addons/sug.php/?t=d&q=";';}
       if (isset($_COOKIE['sugProvider']) && $_COOKIE['sugProvider'] == 'g'){echo 'const sugUrl ="Controller/functions/addons/sug.php/?t=g&q=";';}
@@ -17,7 +29,7 @@ async function fetchSuggestions(userData) {
     sugUrl + userData
   );
   let data = await response.json();
-  console.log(data);  
+
   let emptyArray = [];
 
   // Process the data to generate the suggestion list
@@ -43,22 +55,25 @@ async function fetchSuggestions(userData) {
     });';
   }
   elseif (isset($_COOKIE['sugProvider']) && $_COOKIE['sugProvider'] == 'p'){
-    echo 'data.forEach((item) => {
-      if (Array.isArray(item)) {
-        item.slice(0, 10).forEach((element) => {
-          var sug =  `<li class="suggestion"`;
-          if(element.img !== ""){ sug = sug+`style="height:70px;"`;}
-          sug = sug + `onclick="select(this)">`;
-            if(element.img !== ""){sug = sug + `<img loading="lazy" style="width:auto; height:60px;border-radius:10px;max-width:100px;filter:unset;" src="/Controller/functions/proxy.php?q=${element.img}">`;}
-            else{sug = sug + `<img loading="lazy" src="/View/icon/search.webp">`;}
+    echo '    
+      data.forEach((item) => {
+        if (Array.isArray(item)) {
+          item.slice(0, 10).forEach((element) => {
+            var sug =  `<li class="suggestion"`;
+            if (element.img !== "") { sug += `style="height:70px;"`;}
+            sug = sug + `onclick="select(this)">`;
+            if (element.img !== "") {
+              sug = sug + `<img loading="lazy" style="width:auto; height:60px;border-radius:10px;max-width:100px;filter:unset;" src="/Controller/functions/proxy.php?q=${element.img}">`;
+            } else {
+              sug = sug + `<img loading="lazy" src="/View/icon/search.webp">`;
+            }
             sug = sug + `<p>${element.name}</p></li>`;
-  
-          emptyArray.push(
-           sug
-          );
-        });
-      }
-    });';
+    
+            emptyArray.push(sug);
+          });
+        }
+      });
+    ';
   }
 ?>
   // Show the suggestions
@@ -76,6 +91,8 @@ function showSuggestions(list) {
   }
   suggBox.innerHTML = listData;
 }
+
+const debouncedFetchSuggestions = debounce(fetchSuggestions, 300);
 
 // Event handler when the user releases a key in the input box
 inputBox.onkeyup = (e) => {

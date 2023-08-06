@@ -5,25 +5,13 @@ function wiki($infoboxData, $wikiTxt, $ddgObj, $mysql, $hideQueryCopy)
     $answer = '';
     $ansImg = '';
     
+    if(!isset($wikiTxt) || str_ends_with($wikiTxt, 'may refer to: ')){return;}
+
     //title
     $answer .= '<div class="answer" id="answer"><h2>' . $infoboxData['title'] . '</h2><br>';
 
-    $wikiTxt = substr($wikiTxt,0, 600);
-    if(isset($wikiTxt)){
-        $summary = summarizeText($wikiTxt, 2);
-        $sum = '';
-        foreach($summary as &$su){
-          $sum .= ' '.$su;
-        }
-        if(strlen($sum) >= 200 && strlen($sum) <= 850){
-        $sum = '<div style="border-radius:20px 20px 0 0;padding: 10px 1% 10px 1%;"><p><b style="opacity:0.7;font-size:16px;">📑 Summarized</b></p>
-        <p style="padding: 10px;border-radius: 20px;">'.$sum.'</p></div>';
-        $loaded[0] = true;
-        }
-        else{$sum = '';}
-    }
-
-    $answer .= $sum . '<div style="display: flex;
+    if(!isset($_COOKIE['datasave']) && isset($infoboxData['images'])){
+        $answer .= $sum . '<div style="display: flex;
     flex-wrap: wrap;
     flex-direction: row;
     justify-content: space-around;
@@ -31,48 +19,62 @@ function wiki($infoboxData, $wikiTxt, $ddgObj, $mysql, $hideQueryCopy)
     background-color: #0001;
     padding: 10px;
     border-radius: 20px;">';
-
+    }
     //images
     $i=0;
     if(!isset($_COOKIE['datasave'])){
     foreach ($infoboxData['images'] as $imageUrl) {
-        if($i == 0){$ansImg = 'https://'.substr($imageUrl, 2);}
         if($i == 2){break;}
+        if($ansImg == ''){$ansImg = substr($imageUrl, 2);}
         $answer .= '<img alt="" src="/Controller/functions/proxy.php?q=' . substr($imageUrl, 2) . '" style="max-width: 50%;border-radius: 30px;max-height: 200px;height:auto;width: auto;"><br>';
         ++$i;
     }
 }
-    $answer .='</div><br>';
+if(!isset($_COOKIE['datasave']) && isset($infoboxData['images'])){$answer .='</div>';}
 
-    //Website
-    if(isset($infoboxData['Website'])){
+//Website
+ if(isset($infoboxData['Website'])){
         
-        $wurl = trim(html_entity_decode($infoboxData['Website']));
-        
-        $answer.= '<a style="color: #3391ff;text-decoration: none;"href="https://'.$infoboxData['Website'].'"';
-        if(isset($_COOKIE['new'])){$answer.= 'target="_blank"';}
-        $answer .='>';
-        $answer .= '🔗 '.str_replace('www.','', parse_url('https://'.$wurl)['host']);
-        $answer .='</a><br>';
+    $wurl = trim(html_entity_decode($infoboxData['Website']));
+    
+    $answer.= '<a style="color: #34A8AC;text-decoration: none;"href="https://'.$infoboxData['Website'].'"';
+    if(isset($_COOKIE['new'])){$answer.= 'target="_blank"';}
+    $answer .='>';
+    $answer .= '🔗 '.str_replace('www.','', parse_url('https://'.$wurl)['host']);
+    $answer .='</a>';
+}
+
+ //Description
+ $answer.='<br><br><p style="background-color: #0001;padding: 15px;border-radius: 20px;">' . substr($wikiTxt, 0, 500) . '...' . 
+ '<a style="color: #34A8AC;text-decoration: none;" href="https://'.$tmp.'.wikipedia.org/wiki/' . str_replace('+','_',urlencode(ucwords($infoboxData['title']))) . '" target="_blank">Wikipedia</a>
+ </p><br>
+ <div style="display: flex;">';
+
+//Summarized
+if(isset($wikiTxt)){
+    $wikiTxt = substr($wikiTxt,0, 600);
+    $summary = summarizeText($wikiTxt, 2);
+    foreach($summary as &$su){
+      $Tsum .= ' '.$su;
     }
-
-    //Description
-    $answer.='<p style="font-weight: bold;font-size: 12px;margin-top:15px;">Description:</p>
-    <p>' . substr($wikiTxt, 0, 500) . '...' . 
-    '<a style="color: #3391ff;text-decoration: none;" href="https://'.$tmp.'.wikipedia.org/wiki/' . str_replace('+','_',urlencode(ucwords($infoboxData['title']))) . '" target="_blank">Wikipedia</a>
-    </p><br>';
+    if(strlen($Tsum) >= 200 && strlen($Tsum) <= 850){
+    $answer .= '<input type="checkbox" id="sumMoreCheck" style="display:none">
+    <label class="sumMore" for="sumMoreCheck"><p><b style="font-size: 13px;">Summarized</b></p><p style="margin-top:10px;font-size:13px;">'.$Tsum.'</p></label>';
+    $loaded[0] = true;
+    }
+}
 
     //Infobox
     $answer .= '<input type="checkbox" id="wikiMoreCheck" style="display:none">
-    <label class="wikiMore" for="wikiMoreCheck">';
+    <label class="wikiMore" for="wikiMoreCheck" style="margin-left: 10px;"><p><b style="font-size: 13px;">Infobox</b></p>';
 foreach ($infoboxData as $name => $data) {
     if($name == 'images'){continue;}
-    $answer .= '<div style="margin-top:10px;"><p style="font-weight: bold;font-size: 12px;">'.$name . '</p><p>' . $data . '</p></div>';
+    $answer .= '<div style="margin-top:10px;font-size:13px;"><p style="font-weight: bold;font-size: 12px;">'.$name . '</p><p>' . $data . '</p></div>';
 } 
-$answer .= '</label>';
+$answer .= '</label></div>';
 
     if($answer!=''){
-        $answer .= '<br><p style="font-weight: bold;font-size: 12px;margin-top:15px;">Profiles</p>';
+        $answer .= '<p style="font-weight: bold;font-size: 12px;">Profiles</p>';
         $answer .= '<a href="https://'.$tmp.'.wikipedia.org/wiki/' . $infoboxData['title'].'"'; if (isset($_COOKIE['new'])) {
             $answer .= 'target="_blank"';
         } $answer .='><button class="socialBtn"><div>';

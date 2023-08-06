@@ -96,8 +96,7 @@ overflow-y: hidden;">
 
 <button style="';
 if ($type != 'image' and $type != 'video' and $type !='news') {
-  echo 'border-image: linear-gradient(0.25turn, rgb(51, 255, 34), rgb(2, 141, 155));
-border-image-slice: 1;color:#039103;border-bottom: #bbb solid;';
+  echo 'color: #34A8AC;border-bottom: #34A8AC solid 2px;';
 }
 echo '"class="allBut settingButton" style="margin-left:2%;"';
 if(!isset($_COOKIE['hQuery'])){
@@ -107,7 +106,7 @@ echo '>';
   if(!isset($_COOKIE['datasave'])){
     echo '<img src="./View/icon/search.webp" alt="" class="setBut" style="'; 
     if ($type != 'image' and $type != 'video' and $type !='news') {
-      echo 'filter: invert(28%) sepia(82%) saturate(4091%) hue-rotate(117deg) brightness(96%) contrast(104%);';
+      echo 'filter: invert(56%) sepia(24%) saturate(1094%) hue-rotate(133deg) brightness(97%) contrast(84%);';
     }
     echo '">';
   }
@@ -122,8 +121,7 @@ echo '>';
 <input type="hidden" name="q" value="', $purl ,'">
 <button style="';
 if ($type == 'image') {
-  echo 'border-image: linear-gradient(0.25turn, rgb(51, 255, 34), rgb(2, 141, 155));
-  border-image-slice: 1;color:#039103;color:#039103;border-bottom: #bbb solid;';
+  echo 'color: #34A8AC;border-bottom: #34A8AC solid 2px;';
 }
 echo '"class="settingButton" ';
 if(!isset($_COOKIE['hQuery'])){
@@ -131,9 +129,9 @@ if(!isset($_COOKIE['hQuery'])){
 }
 echo '>';
 if(!isset($_COOKIE['datasave'])){
-  echo '<img src="./View/icon/img.webp" alt="" class="setBut" style="'; 
+  echo '<img src="./View/icon/img.svg" alt="" class="setBut" style="'; 
   if ($type == 'image') {
-    echo 'filter: invert(28%) sepia(82%) saturate(4091%) hue-rotate(117deg) brightness(96%) contrast(104%);';
+    echo 'filter: invert(56%) sepia(24%) saturate(1094%) hue-rotate(133deg) brightness(97%) contrast(84%);';
   }
   echo '">';
 }
@@ -146,8 +144,7 @@ if(!isset($_COOKIE['datasave'])){
 <input type="hidden" name="q" value="', $purl ,'">
   <button style="';
   if ($type == 'video') {
-    echo 'border-image: linear-gradient(0.25turn, rgb(51, 255, 34), rgb(2, 141, 155));
-    border-image-slice: 1;color:#039103;color:#039103;border-bottom: #bbb solid;';
+    echo 'color: #34A8AC;border-bottom: #34A8AC solid 2px;';
   }
   echo '"class="settingButton"';
   if(!isset($_COOKIE['hQuery'])){
@@ -157,7 +154,7 @@ if(!isset($_COOKIE['datasave'])){
   if(!isset($_COOKIE['datasave'])){
     echo '<img src="./View/icon/video.webp" alt="" class="setBut" style="'; 
     if ($type == 'video') {
-      echo 'filter: invert(28%) sepia(82%) saturate(4091%) hue-rotate(117deg) brightness(96%) contrast(104%);';
+      echo 'filter: invert(56%) sepia(24%) saturate(1094%) hue-rotate(133deg) brightness(97%) contrast(84%);';
     }
     echo '">';
   }
@@ -170,8 +167,7 @@ if(!isset($_COOKIE['datasave'])){
     <input type="hidden" name="q" value="', $purl ,'">
   <button style="';
   if ($type == 'news') {
-    echo 'border-image: linear-gradient(0.25turn, rgb(51, 255, 34), rgb(2, 141, 155));
-    border-image-slice: 1;color:#039103;color:#039103;border-bottom: #bbb solid;';
+    echo 'color: #34A8AC;border-bottom: #34A8AC solid 2px;';
   }
   echo '"class="settingButton"';
   if(!isset($_COOKIE['hQuery'])){
@@ -179,9 +175,9 @@ if(!isset($_COOKIE['datasave'])){
   }
   echo '>';
   if(!isset($_COOKIE['datasave'])){
-    echo '<img src="./View/icon/news.webp" alt="" class="setBut" style="'; 
+    echo '<img src="./View/icon/news.svg" alt="" class="setBut" style="'; 
     if ($type == 'news') {
-      echo 'filter: invert(28%) sepia(82%) saturate(4091%) hue-rotate(117deg) brightness(96%) contrast(104%);';
+      echo 'filter: invert(56%) sepia(24%) saturate(1094%) hue-rotate(133deg) brightness(97%) contrast(84%);';
     }
     echo '">';
   }
@@ -495,7 +491,7 @@ echo '
     <option value="off">Off</option>
 </select>
 
-<select name="TimeDropDown" class="quickSet">
+<select name="TimeDropDown" class="tDropdown quickSet">
 <option disabled selected hidden>';
 if(isset($_COOKIE['time'])){
 switch ($_COOKIE['time']):

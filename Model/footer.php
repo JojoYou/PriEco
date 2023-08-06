@@ -40,10 +40,10 @@ margin-top: -63px;"alt="bottomTree">
     <div style="float:left;padding-left: 20px;width: 25%;word-wrap: break-word;" class="footer-content-left">
       <p>
         <br>
-        Source code: <a href="https://codeberg.org/JojoYou/PriEco/src/branch/master" target="_blank">CodeBerg</a>
+        Source code: <a href="https://codeberg.org/JojoYou/PriEco/src/branch/master" target="_blank" style="text-decoration:none;color:#34A8AC;">CodeBerg</a>
           <br>
           
-          Tor onion domain: <a href="http://ljtd3fhffeknviu7l7k2z4qdybpchmdh2arcq4wzs2jg6wpfut334mad.onion" target="_blank">Onion</a>
+          Tor onion domain: <a href="http://ljtd3fhffeknviu7l7k2z4qdybpchmdh2arcq4wzs2jg6wpfut334mad.onion" target="_blank" style="text-decoration:none;color:#34A8AC;">Onion</a>
           <br><br>
         <!-- Place for ad -->
       </p>

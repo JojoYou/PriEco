@@ -12,8 +12,6 @@ foreach ($promoobj['lang'][0] as $name => $value) {
 }
 
 if (isset($_COOKIE['auth']) && !$dev) {
-  ini_set('session.cookie_domain', '.jojoyou.org');
-  session_start();
 
   $auth = '▛' . $auth;
 
@@ -22,50 +20,6 @@ if (isset($_COOKIE['auth']) && !$dev) {
   $possibleUsr = substr($possibleUsr, 3);
 
   $authName = str_replace('▛' . $possibleUsr . ' ', '', $auth);
-
-
-  $sql = "SELECT * FROM JYS WHERE Username='$possibleUsr'";
-  $result = $conn->query($sql);
-  if ($result->num_rows > 0) {
-    $row = $result->fetch_assoc();
-    $authDB = explode(',', $row['Auth']);
-    foreach ($authDB as $a) {
-      if ($a == $authName) {
-        $usr = $row['Username'];
-        $usrSearches = $row['Searches'];
-        $_SESSION['usr'] = $usr;
-        continue;
-      }
-    }
-  }
-  $usr = $row['Username'];
-  $select_user = "SELECT * FROM JYS WHERE Username='$usr'";
-  $run_qry = mysqli_query($conn, $select_user);
-  if (mysqli_num_rows($run_qry) > 0) {
-    if ($row = mysqli_fetch_assoc($run_qry)) {
-      $usrSearches = $row['Searches'];
-      $usrSearches++;
-      $update_user = "UPDATE JYS SET Searches='$usrSearches' WHERE Username='$_SESSION[usr]'";
-      $run_qry = mysqli_query($conn, $update_user);
-    }
-  }
-}
-
-if (isset($_COOKIE['auth'])) {
-  if (!isset($_SESSION)) {
-  ini_set('session.cookie_domain', '.jojoyou.org');
-  session_start();
-  }
-
-  $auth = '▛' . $auth;
-
-  $possibleUsr = strstr($auth, '▛');
-  $possibleUsr = strstr($auth, ' ', true);
-  $possibleUsr = substr($possibleUsr, 3);
-
-  $authName = str_replace('▛' . $possibleUsr . ' ', '', $auth);
-
-
   $sql = "SELECT * FROM JYS WHERE Username='$possibleUsr'";
   $result = $conn->query($sql);
   if ($result->num_rows > 0) {
@@ -95,6 +49,8 @@ if (isset($_COOKIE['auth'])) {
 if(!isset($usr)){
   $usr = 'Guest';
 }
+
+
 include './Controller/functions/indexLogic.php';
 
 echo '
@@ -116,19 +72,18 @@ echo '
     position: absolute;
     top: 43%;
     left: 50%;
-    transform: translate(-50%, -125px);z-index:10;width:clamp(0px, 559px, 100%);text-align:center;">
+    transform: translate(-50%, -125px);z-index:10;width:clamp(0px, 659px, 100%);text-align:center;">
 
-    <img id="LandSLogo" alt="PriEcoLogo" style="height:100px;width: 83.33px;"
-      src="./View/img/PriEco.webp" />
-    <span style="font-size: 500%;font-weight:bold;width:40%;padding-right:30px;  background: -webkit-linear-gradient(#03D781, #3EDCE2);
+    <img id="LandSLogo" alt="PriEcoLogo" style="height: 64px;width: 29.9px;"src="./View/img/PriEco.webp" />
+    <span style="font-size: 60px;font-weight:bold;width:40%;background: -webkit-linear-gradient(#03D781, #3EDCE2);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;">PriEco</span>
 
-  <form id="searchForm" class="searchBarMain" method="post" style="margin-left:15px;">
+  <form id="searchForm" class="searchBarMain" method="post" style="margin-left:15px;margin-top:10px;">
     <input
     list="suggestions"
     id="searchBox"
-    placeholder="PriEco"
+    placeholder="Search privately and ecofriendly"
       value=""
       class="searchBox"
       name="q"
@@ -143,9 +98,6 @@ min-width: 200px;box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);"
     >
   </form>
   <div class="autoboxMain autocom-box" style="width: calc(90% - 30px);min-width: 200px;position:absolute;margin-left: 25px;margin-top:0;"></div>
-  <p style="padding-top: 10px;
-  text-align: center;
-  width: 95%;font-style:italic;">Search 🙈 privately and 🌲 ecofriendly</p>
 
 <div class="shortcuts">
 <?php
@@ -159,7 +111,7 @@ $sh = explode('=',$shs);
 echo '<div>
 
 <div>
-<button class="shortcutEditBtn',$i,' shortcutEditBtn">•</button>
+<div tabindex="0" class="shortcutEditBtn',$i,' shortcutEditBtn">•</div>
 <a href="',$sh[1],'" class="shortcutBtn',$i,'" style="text-decoration:none;color:black;">
 <div tabindex="0" class="shortcutElemenet" style="background-image: url(/Controller/functions/proxy.php?q=https://judicial-peach-octopus.b-cdn.net/'. parse_url($sh[1])['host']. ');"></div>
 </a>
@@ -178,7 +130,10 @@ echo '<div>
 </form>
 </div>
 <div>
-<p>',$sh[0],'</p>
+<p>';
+if(strlen($sh[0])>10){echo substr($sh[0], 0, 7).'...';}
+else{echo $sh[0];}
+echo'</p>
 </div>
 </div>
 </div>
@@ -193,7 +148,7 @@ echo '<div>
 }
 ?>
 
-<button id="addShortcutBtn" class="shortcutElemenet">+</button>
+<div tabindex="0" id="addShortcutBtn" class="shortcutElemenet">+</div>
 <div class="addShortcut shortcutForm">
 <p><b>Add shortcut</b></p>
 <form method="POST">

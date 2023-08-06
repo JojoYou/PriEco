@@ -36,8 +36,30 @@ if ($type != 'image' and $type != 'video' and $type != 'news') {
             }
             ++$i;
         }
-        
-        if(!isset($_SESSION[$purl])){
+
+        if(isset($_SESSION[$purl]) && !isset($_COOKIE['safe']) && !isset($_COOKIE['time'])){
+            if (strpos($_SESSION[$purl], 'obj +=+ ') !== false) {$obj = json_decode(str_replace('obj +=+ ', '', $_SESSION[$purl]), true);}
+            if (strpos($_SESSION[$purl], 'g2obj +=+ ') !== false) {$g2obj = json_decode(str_replace('g2obj +=+ ', '', $_SESSION[$purl]), true);}
+    
+            if(isset($_SESSION[$purl.':-:news'])){$NewsObj = json_decode($_SESSION[$purl.':-:news'],true);}
+            if(isset($_SESSION[$purl.':-:yt'])){$YoutubeObj = json_decode($_SESSION[$purl.':-:yt'], true);}
+            if(isset($_SESSION[$purl.':-:red'])){$redditObj = json_decode($_SESSION[$purl.':-:red'], true);}
+            if(isset($_SESSION[$purl.':-:wiki'])){$wikiobj =explode('--]|[--',$_SESSION[$purl.':-:wiki']);$wikiTxt = $wikiobj[1];$wikiobj = json_decode($wikiobj[0],true);}
+            if(isset($_SESSION[$purl.':-:rel'])){$related = json_decode($_SESSION[$purl.':-:rel'],true);}
+            
+            if (preg_match('/\bip\b/i', $purl)) {
+                $ipCh = curl_init('https://ipapi.co/'.$_SERVER['REMOTE_ADDR'].'/json/');
+                curl_setopt($ipCh, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ipCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
+                curl_setopt($ipCh, CURLOPT_CONNECTTIMEOUT, 2);
+                curl_setopt($ipCh, CURLOPT_TIMEOUT, 2.5);
+                $ipObj = json_decode(curl_exec($ipCh),true);        
+                curl_close($ipCh);
+            }
+            $cached = true;
+            $ImpGoogle = false;
+        }
+        else{
         //Cached Google results
         $obj = '';
         if(!isset($_COOKIE['safe']) && !isset($_COOKIE['time'])){
@@ -66,41 +88,8 @@ if ($type != 'image' and $type != 'video' and $type != 'news') {
         }
         }
     }
-    else{
-        if (strpos($_SESSION[$purl], 'obj +=+ ') !== false) {
-            $obj = json_decode(str_replace('obj +=+ ', '', $_SESSION[$purl]), true);
-        }
-        if (strpos($_SESSION[$purl], 'g2obj +=+ ') !== false) {
-            $g2obj = json_decode(str_replace('g2obj +=+ ', '', $_SESSION[$purl]), true);
-        }
 
-        if(isset($_SESSION[$purl.':-:news'])){
-            $NewsObj = json_decode($_SESSION[$purl.':-:news'],true);
-        }
-        if(isset($_SESSION[$purl.':-:yt'])){
-            $YoutubeObj = json_decode($_SESSION[$purl.':-:yt'], true);
-        }
-        if(isset($_SESSION[$purl.':-:red'])){
-            $redditObj = json_decode($_SESSION[$purl.':-:red'], true);
-        }
-        if(isset($_SESSION[$purl.':-:wiki'])){
-            $wikiobj =explode('--]|[--',$_SESSION[$purl.':-:wiki']);$wikiTxt = $wikiobj[1];$wikiobj = json_decode($wikiobj[0],true);
-        }
-
-        if (strpos(strtolower($purl), 'ip') !== false) {
-            $ipCh = curl_init('https://ipapi.co/'.$_SERVER['REMOTE_ADDR'].'/json/');
-            curl_setopt($ipCh, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ipCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-            curl_setopt($ipCh, CURLOPT_CONNECTTIMEOUT, 2);
-            curl_setopt($ipCh, CURLOPT_TIMEOUT, 2.5);
-            $ipObj = json_decode(curl_exec($ipCh),true);        
-            curl_close($ipCh);
-        }
-        
-        $ImpGoogle = false;
-    }
-
-if(!isset($_SESSION[$purl])){
+if(!isset($cached)){
         // Initialize multi-curl handle
 $multiHandle = curl_multi_init();
 
@@ -234,7 +223,7 @@ if ($weatherTrue) {
 }
 
 //IP
-if (strpos(strtolower($purl), 'ip') !== false) {
+if (preg_match('/\bip\b/i', $purl)) {
     $ipCh = curl_init('https://ipapi.co/'.$_SERVER['REMOTE_ADDR'].'/json/');
     curl_setopt($ipCh, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ipCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
@@ -353,12 +342,14 @@ else{
     include 'addons/related.php';
     include 'addons/news.php';
     include 'addons/yt.php';
+    include 'addons/pHigh.php';
     //include 'addons/etsy.php';
 
     include 'addons/small/ip.php';
-    if(strpos(strtolower($purl), 'rand') !== false){include 'addons/small/random.php';}
-    if(strpos(strtolower($purl), 'calc') !== false && !isset($_COOKIE['DisWid'])){include 'addons/small/calculator.php';}
-    if(strpos(strtolower($purl), 'color') !== false && !isset($_COOKIE['DisWid'])){include 'addons/small/color.html';}
+
+    if (preg_match('/\b(?:random|rand)\b/i', $purl)) {include 'addons/small/random.php';}
+    if (preg_match('/\b(?:calculator|calc)\b/i', $purl) && !isset($_COOKIE['DisWid'])){include 'addons/small/calculator.php';}
+    if (preg_match('/\b(?:color|col)\b/i', $purl) && !isset($_COOKIE['DisWid'])){include 'addons/small/color.html';}
     include 'addons/small/define.php';
     if(isset($OpenWeatherObj)){include 'addons/small/weather.php';}
     include 'addons/small/crypto.php';
@@ -419,7 +410,7 @@ else{
         }
     }
     
-    $loaded = array_fill(0, 6, false);
+    $loaded = array_fill(0, 7, false);
     if($page > 0){
         $results = qwant(null, $loaded, $Bpurl, $page);
         foreach($results as &$rs){
@@ -439,6 +430,8 @@ else{
     if(isset($wikiobj)){$wiki = wiki($wikiobj, $wikiTxt, $ddgObj, $ImpProfiles ?? null, $hideQueryCopy); $simImg = $wiki[1]; $wiki = $wiki[0];}
     if(isset($NewsObj)){$news = search_news($NewsObj);}
     if(isset($YoutubeObj)){$youtube = youtube($YoutubeObj);}
+
+    $privateAltOut = pHigh($purl);if($privateAltOut != ''){$loaded[6] = true;}
     $reddit = search_reddit($redditObj);
     $relatedP = related($related, $simImg);
     $elseWhere = '<div class="findelsewhere"><p style="float:left;">Search with </p>
@@ -473,11 +466,14 @@ else{
     if(isset($BraveObj) or !isset($results[0])){$results = brave($BraveObj, $loaded, $Bpurl);}
     if(!isset($results[0])){$results = qwant($QWantObj, $loaded, $Bpurl, $page);}
 
+    if(!isset($_COOKIE['safe']) && !isset($_COOKIE['time'])){
     if($obj != ''){$_SESSION[$purl] = 'obj +=+ '.json_encode($obj);}
     if($g2obj != ''){$_SESSION[$purl] = 'g2obj +=+ '.json_encode($g2obj);}
     if($news != ''){$_SESSION[$purl.':-:news'] = json_encode($NewsObj);}
     if($youtube != ''){$_SESSION[$purl.':-:yt'] = json_encode($YoutubeObj);}
     if($reddit != ''){$_SESSION[$purl.':-:red'] = json_encode($redditObj);}
+    if($related != ''){$_SESSION[$purl.':-:rel'] = json_encode($related);}
+    }
     //Print
         //Query URL
     if(preg_match('/^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z0-9]{2,}(:\d{2,5})?(\/\S*)*$/', preg_replace('/\s+$/u', '', $purl))){
@@ -492,11 +488,11 @@ else{
     }
     if(isset($results))
     {
-    echo $results[0],
+    echo $results[0], $privateAltOut,
     $wiki,
     $results[1],
     $news,
-    $results[2],$results[3],
+    $results[2], $results[3],
     $reddit,
     $results[4], $results[5],
     $youtube,
@@ -566,10 +562,10 @@ if ($type === 'image') {
         $PixObj = json_decode(curl_exec($Pix), true);
         curl_close($Pix);
 
-        echo '
-        <div style="float:left;">
+        echo '<div style="display:flex;margin-top:30px;flex-wrap:wrap;"><br>        
+        <div>
          <div tabindex="0" class="imgoutbtn">
-             <img alt="‎"src ="/View/img/pix.svg"class="imgout"><p style="color:black;padding-left: 10px;padding-right: 10px;">
+             <img src ="/View/img/pix.svg"class="imgout"><p style="color:black;padding-left: 10px;padding-right: 10px;">
          </div>
  
         
@@ -589,7 +585,7 @@ if ($type === 'image') {
             echo '
            <div class="imgoutdiv">
            <div tabindex="0"  class="imgoutbtn">
-               <img src ="/Controller/functions/proxy.php?q=', $item['webformatURL'], '"class="imgout">
+               <img style="max-height: 100%;" src="/Controller/functions/proxy.php?q=', $item['webformatURL'], '"class="imgout">
                </div>
                
            <div class="bigimgout">           
@@ -604,6 +600,7 @@ if ($type === 'image') {
          </div>
              ';
         }
+        echo '</div>';
         return;
     }
 
@@ -617,23 +614,14 @@ if ($type === 'image') {
             $handles = array();
         
             // Google request
-            $gUrl = 'https://gimg.jojoyou3.repl.co';
-            $gData = array(
-                'gapi' => $_ENV['GOOGLE_IMAGE_API_KEY'],
-                'gcx' => $_ENV['GOOGLE_IMAGE_CX_KEY'],
-                'type' => 'gimg',
-                'query' => urlencode($purl)
-            );
-        
-            $gCh = curl_init();
-            curl_setopt($gCh, CURLOPT_URL, $gUrl);
+            if($page == 0){
+            $gCh = curl_init('https://www.googleapis.com/customsearch/v1?key='.$_ENV['GOOGLE_IMAGE_API_KEY'].'&cx='.$_ENV['GOOGLE_IMAGE_CX_KEY'].'&hl=all&gl=all&safe='.$safe.'&q='.$Bpurl.'&searchType=image');
             curl_setopt($gCh, CURLOPT_POST, true);
-            curl_setopt($gCh, CURLOPT_POSTFIELDS, http_build_query($gData));
             curl_setopt($gCh, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($gCh, CURLOPT_TIMEOUT, 3);
             curl_multi_add_handle($mh, $gCh);
             $handles[] = $gCh;
-        
+            }
             // Bing request
             $bCh = curl_init();
             $bUrl = 'https://api.qwant.com/v3/search/images/?count=75&offset=' . $page * 82 . '&uiv=1&locale=en_US&size=' . $imgsize . '&color=' . $imgcolor . '&imagetype=' . $imgtype . '&freshness=' . $imgtime . '&license=' . $imgright . '&q=' . $Bpurl;
@@ -651,7 +639,7 @@ if ($type === 'image') {
             } while ($active > 0);
         
             // Get the responses
-            $gResponse = curl_multi_getcontent($gCh);
+            if($page == 0){$gResponse = curl_multi_getcontent($gCh);}
             $bResponse = curl_multi_getcontent($bCh);
         
             // Close the handles
@@ -662,7 +650,7 @@ if ($type === 'image') {
             curl_multi_close($mh);
         
             // Process the responses
-            $Gimg = json_decode($gResponse, true);
+            if($page == 0){$Gimg = json_decode($gResponse, true);}
             $Qimg = $bResponse;
         }
         
@@ -686,20 +674,9 @@ if ($type === 'image') {
             curl_multi_add_handle($mh, $BCurl);
             $handles[] = $BCurl;
         
-            if (!isset($Gimg)) {
-                $gUrl = 'https://gimg.jojoyou3.repl.co';
-        
-                $gData = array(
-                    'gapi' => $_ENV['GOOGLE_IMAGE_API_KEY'],
-                    'gcx' => $_ENV['GOOGLE_IMAGE_CX_KEY'],
-                    'type' => 'gimg',
-                    'query' => urlencode($purl)
-                );
-        
-                $gCh = curl_init();
-                curl_setopt($gCh, CURLOPT_URL, $gUrl);
+            if (!isset($Gimg) && $page == 0) {
+                $gCh = curl_init('https://www.googleapis.com/customsearch/v1?key='.$_ENV['GOOGLE_IMAGE_API_KEY'].'&cx='.$_ENV['GOOGLE_IMAGE_CX_KEY'].'&hl=all&gl=all&safe='.$safe.'&q='.$Bpurl.'&searchType=image');
                 curl_setopt($gCh, CURLOPT_POST, true);
-                curl_setopt($gCh, CURLOPT_POSTFIELDS, http_build_query($gData));
                 curl_setopt($gCh, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($gCh, CURLOPT_TIMEOUT, 3);
                 curl_multi_add_handle($mh, $gCh);
@@ -731,16 +708,19 @@ if ($type === 'image') {
             curl_multi_close($mh);
         }
     }
+    else{
+        $Qimg = file_get_contents('./Controller/dev/img.json');
+    }
         $Qimg = json_decode($Qimg, true);
         
 
-echo '<div style="margin-top:20px;"><br>';
+echo '<div style="display:flex;margin-top:30px;flex-wrap:wrap;"><br>';
 
     foreach($Gimg['items'] as &$item){
         echo '
         <div class="imgoutdiv">
          <div tabindex="0" class="imgoutbtn" style="aspect-ratio:',$item['image']['width'],'/',$item['image']['height'],';">
-             <div style="background-image: url(/Controller/functions/proxy.php?q=',$item['image']['thumbnailLink'], ');" class="imgout"></div>
+             <div style="background-image: url(/Controller/functions/proxy.php?q=',$item['image']['thumbnailLink'], ');aspect-ratio:',$item['image']['width'],'/',$item['image']['height'],';" class="imgout"></div>
              </div>
          
          
@@ -758,8 +738,8 @@ echo '<div style="margin-top:20px;"><br>';
          </div>      
        </div>
          ';
+         echo 'here';
     }
-
     foreach ($Qimg['data']['result']['items'] as &$item) {
         if (!isset($item['media']) or !isset($item['media_preview'])) {
             continue;
@@ -768,8 +748,17 @@ echo '<div style="margin-top:20px;"><br>';
         echo '
        <div class="imgoutdiv">
         <div tabindex="0" class="imgoutbtn" style="aspect-ratio:',$item['thumb_width'],'/',$item['thumb_height'],';">
-            <div style="background-image: url(https://search.jojoyou.org/Controller/functions/img_proxy.php?q=',$item['media'], ');" class="imgout"></div>
-            </div>
+            <img src="https://search.jojoyou.org/Controller/functions/img_proxy.php?q=',$item['media'], '" style="aspect-ratio:',$item['thumb_width'],'/',$item['thumb_height'],';" class="imgout">
+        </div>
+        <a style="color: var(--linkColor); cursor:pointer;text-decoration:none;" href="',$item['url'],'"';if (isset($_COOKIE['new'])) {echo 'target="_blank';}echo'>
+        <p>';
+            $pieces = parse_url($item['url']);
+            $domain = isset($pieces['host']) ? $pieces['host'] : $pieces['path'];
+            if (preg_match('/(?P<domain>[a-z0-9][a-z0-9\-]{1,63}\.[a-z\.]{2,6})$/i', $domain, $regs)) {
+                echo $regs['domain'];
+            }
+            echo '</p></a>
+            <p>',$item['title'],'</p>
         
         
 
@@ -784,10 +773,10 @@ echo '<div style="margin-top:20px;"><br>';
         <a href="',$item['media'], '"> <button class="imgtoolsOption">Go to image</button></a></div>  
         <div style="display: flex;justify-content: center;"><button class="bigimgclose imgtoolsOption">«Close</button></div>   
         </div>      
-      </div>
+        </div>
         ';
     }
-    echo '</div>';
+    echo '</div></div>';
    
     if(!isset($_COOKIE['DisHImg'])){
     echo '<script>
@@ -831,6 +820,7 @@ if ($type == 'video') {
     } else {
         $YoutubeObj =  json_decode(file_get_contents($YoutubeFile), true);
     }
+    echo '<div style="display:flex;margin-top:30px;flex-wrap:wrap;"><br>';
     foreach ($YoutubeObj['items'] as &$item) {       
         echo '
 
@@ -850,6 +840,7 @@ if ($type == 'video') {
         </div>
               ';
     }
+    echo '</div>';
 }
 
 if ($type == 'news') {

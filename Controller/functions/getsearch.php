@@ -24,14 +24,9 @@ $purl = get_string_between($url, '?', '▛');
 $type = '';
 }
 else{
-    session_start();
     if(get_string_between($url, '?', '▛') != null){
-        if(!isset($_POST['q'])){
-            $_SESSION['query'] = get_string_between($url, 'q=', '▛'); 
-        }
-        else{
-            $_SESSION['query'] = $_POST['q'];
-        }
+        if(!isset($_POST['q'])){$_SESSION['query'] = get_string_between($url, 'q=', '▛');}
+        else{$_SESSION['query'] = $_POST['q'];}
         header('Location: /');
         exit();
     }
@@ -44,8 +39,8 @@ else{
         $purl = $_SESSION['query'];
         $type = 'all';
         $page = 0;
-        session_destroy();
     }
 }
-$purl = str_replace('+',' ',$purl);
+$_SESSION['query'] = $purl;
+$purl =  urldecode($purl);
 $urlSet = '&'.$purl;

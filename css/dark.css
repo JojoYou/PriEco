@@ -1,3 +1,7 @@
+:root {
+  --linkColor: #34A8AC;
+}
+
 html, .copyQuery {
   background-color: #181a1b;
   color: white;
@@ -17,10 +21,12 @@ html, .copyQuery {
 
 .shortcutElemenet{
   background-color: #181a1b;
-  border: solid 10px #181a1b;
   color:white;
 }
-.shortcutEditBtn, .calculator button{
+.addShortcut{
+  border: solid 10px #181a1b;
+}
+.shortcutEditBtn, .calculator button, .revertLocLang{
   color: white;
 }
 .shortcutForm{

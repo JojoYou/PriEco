@@ -8,7 +8,7 @@ echo'<div class="wrapper">
     alt="icnSet"
     class="icnSet"
     src="./View/icon/gear.svg"
-    style="width: 20px; height: 20px;margin-right: -15px;"
+    style="width: 15px; height: 15px;"
 /></label>
 <nav id="sidebar">
   <label for="btn" class="close-menu-btn"
@@ -28,8 +28,9 @@ echo'<div class="wrapper">
       <br />
       <div class="setListItem">
         <p>Language:</p>
+        <div>
         <select
-          style="border: none;padding: 10px;float: right;margin-right: 10px;border-radius: 6px;"
+          style="border: none;padding: 10px;border-radius: 6px;"
           name="LangDropdown"
         >
           <option disabled hidden selected>
@@ -78,7 +79,7 @@ echo '>All languages</option>
 <option name="es" value="es">Spanish</option>
 <option name="sv" value="sv">Swedish</option>
 <option name="tr" value="tr">Turkish</option>
-</select> <input type="submit" value="Save" class="langSave" name="langSave"></div><br><div class="setListItem"><label for="newtab">Open links in New tab:</label><label class="switch">
+</select> <input type="submit" value="Save" class="langSave" name="langSave"></div></div><br><div class="setListItem"><label for="newtab">Open links in New tab:</label><label class="switch">
 <input type="submit" name="newtab" id="newtab" value="newtab';if (isset($_COOKIE['new'])){echo 'On';}else{echo 'Off';}echo '">
 <input type="checkbox" class="setCheck" ';
 if (isset($_COOKIE['new']))
@@ -157,14 +158,16 @@ echo '><span class="slider round"></span>
 </label></div>
 
 <br><div class="setListItem"><p>Suggestions:</p>
+<div>
 <select
-  style="border: none;padding: 10px;float: right;margin-right: 10px;border-radius: 6px;"
+  style="border: none;padding: 10px;border-radius: 6px;"
   name="sugPDropdown">
 
 <option value="d"';if (!isset($_COOKIE['sugProvider'])){echo 'selected';}echo '>DuckDuckGo</option>
 <option value="g"';if (isset($_COOKIE['sugProvider']) && $_COOKIE['sugProvider'] == 'g'){echo 'selected';}echo '>Google</option>
 <option value="p"';if (isset($_COOKIE['sugProvider']) && $_COOKIE['sugProvider'] == 'p'){echo 'selected';}echo '>PriEco</option>
 </select> <input type="submit" value="Save" class="langSave" name="sugPSave">
+</div>
 </div>
 
 
@@ -218,7 +221,18 @@ if (!isset($_COOKIE['DisSugges']))
 }
 echo '>
 <span class="slider round"></span>
-</label></div><br><div class="setListItem"><label for="dQue">Clear Query:</label><label class="switch">
+</label></div><br>
+<div class="setListItem"><label for="dSug">Multi Bang:</label><label class="switch">
+<input type="submit" style="display:none;" name="dMul" id="dMul" value="dMul';if (isset($_COOKIE['DisMul'])){echo 'On';}else{echo 'Off';}echo '">
+<input type="checkbox" class="setCheck" ';
+if (!isset($_COOKIE['DisMul']))
+{
+    echo 'checked';
+}
+echo '>
+<span class="slider round"></span>
+</label></div><br>
+<div class="setListItem"><label for="dQue">Clear Query:</label><label class="switch">
 <input type="submit"style="display:none;" name="dQue" id="dQue" value="dQue';if (isset($_COOKIE['DisQue'])){echo 'On';}else{echo 'Off';}echo '">
 <input type="checkbox" class="setCheck" ';
 if (!isset($_COOKIE['DisQue']))

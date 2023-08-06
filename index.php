@@ -8,7 +8,7 @@ $gTime = microtime(true);
 //Development mode (Get search results from json files in ./Controller/dev folder)
 $dev = false;
 //CSS version
-$cssver = 63;
+$cssver = 74;
 //Variable, controls reloading on settings change
 $reload = false;
 
@@ -37,7 +37,6 @@ include './Controller/database.php';
 if(!$dev){
 include 'Controller/functions/protection/cookie.php';
 include 'Controller/functions/protection/ip.php';}
-
 //Function to get string between characters
 include 'Controller/functions/getsearch.php';
 //Check for img search and for empty query
@@ -81,9 +80,7 @@ for ($i = 1; $i < count($urlSet); $i++) {
   }
 }
 
-if(!isset($page)){
-  $page = 0;
-}
+$page = isset($page) ? $page : 0;
 
 if ((isset($_POST['q']) && $_POST['q'] != $purl) && !isset($_COOKIE['hQuery'])) {
   header('Location: ./?' . $type . '&q=' . urlencode($_POST['q']));
@@ -91,35 +88,44 @@ if ((isset($_POST['q']) && $_POST['q'] != $purl) && !isset($_COOKIE['hQuery'])) 
 }
 
 //Bangs
-if (strpos($purl, '!') !== false) {
-  $bangData = file_get_contents('Controller/value/bangs.json');
-  $bangObj = json_decode($bangData, true);
-  $bangsSplit = explode(' ', $purl);
-  foreach ($bangsSplit as $bgS) {
-    if (strpos($bgS, '!') !== false) {
-      $bgS = str_replace('!', '', $bgS);
-      $i = 0;
-      foreach ($bangObj['bangs'] as $name => $value) {
-        if ($name == $bgS) {
-          $j = 0;
-          foreach ($bangObj['bangs'] as $pBang) {
-            if ($j == $i) {
-              $Rurl = str_replace('!' . $name . ' ', '', $purl);
-              header('Location: ' . $pBang . $Rurl);
-              exit();
-            } else {
-              $j++;
-            }
-          }
-        }
-        $i++;
-      }
+if(strpos($purl, '!') !== false){
+  $bangObj = json_decode(file_get_contents('Controller/value/bangs.json'), true);
+  $tmp = explode(' ', $purl);
+  
+  foreach($tmp as &$t){
+    $tmp2 = str_replace('!','',$t);
+    if(isset($bangObj['bangs'][$tmp2]) && strpos($t, '!') !== false){
+      $tmps = str_replace($t,'', $purl);
+      
+      if(isset($_COOKIE['DisMul'])){header('Location: ' . $bangObj['bangs'][$tmp2] . urlencode($tmps));exit();}
+      else{$bangs[]=$bangObj['bangs'][$tmp2];}
+    }
+    else{
+      $bangQuery .= $t.' ';
     }
   }
-}
 
+  if(!isset($_COOKIE['DisMul'])){
+    $bangQuery = urlencode(substr($bangQuery, 0, -1));
+
+    $bangScript = '
+    <script>';
+    $i=0;
+   foreach($bangs as &$ban){
+    $bangScript .= 'window.open("'.$ban.$bangQuery.'", "_blank");';
+    ++$i;
+   }
+
+   $bangScript .= '
+  </script>';
+  echo $bangScript;
+  exit();
+  }
+}
     //Set parameters for search request
-    $lang = 'all'; $loc = 'all';
+    $lang = $loc = 'all';
+    $msgLang = $msgLoc = false;
+
     if (isset($_COOKIE['Language'])) {
       $lang = $_COOKIE['Language'];
     }
@@ -127,8 +133,8 @@ if (strpos($purl, '!') !== false) {
       $loc = $_COOKIE['Location'];
     }
     
-    if (!$dev && !str_starts_with(getenv('REMOTE_ADDR'), '192.') && !str_starts_with(getenv('REMOTE_ADDR'), '127.') && (!isset($_COOKIE['Location']) || !isset($_COOKIE['Language']))) {
-     
+    if (!isset($_COOKIE['Location']) || !isset($_COOKIE['Language'])) {
+     if(!$dev && !str_starts_with(getenv('REMOTE_ADDR'), '192.') && !str_starts_with(getenv('REMOTE_ADDR'), '127.')){
     $ch = curl_init();
 
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -140,7 +146,7 @@ if (strpos($purl, '!') !== false) {
 
       if(!isset($_COOKIE['Location'])){
         if(isset($geo['country'])){
-        setcookie('Location', strtolower(strtolower($geo['country'])), time() + 604800, '/');
+        setcookie('Location', strtolower(strtolower($geo['country'])).'_3', time() + 604800, '/');
         }
         else{
           setcookie('Location', 'all', time() + 604800, '/');
@@ -162,7 +168,7 @@ if (strpos($purl, '!') !== false) {
           unset($newlang);
         }
         if(isset($newlang)){
-          setcookie('Language', strtolower($newlang), time() + 604800, '/');
+          setcookie('Language', strtolower($newlang).'_3', time() + 604800, '/');
         }
           else{
             setcookie('Language', 'all', time() + 604800, '/');
@@ -170,6 +176,36 @@ if (strpos($purl, '!') !== false) {
       }
       $reload = true;
     }
+    else{
+      setcookie('Language', 'all', time() + 604800, '/');
+      setcookie('Location', 'all', time() + 604800, '/');
+      $reload=true;
+    }
+    }
+    
+    if(strpos($lang,'_') !== false){
+      $lang = explode('_',$lang);$langNum = $lang[1]-1;$lang=$lang[0];
+      if($langNum == 0){setcookie('Language', $lang, time() + 604800, '/');}
+      else{setcookie('Language', $lang.'_'.$langNum, time() + 604800, '/');}
+      $msgLang = true;
+    }
+    if(strpos($loc,'_') !== false){
+      $loc = explode('_',$loc);$locNum = $loc[1]-1;$loc = $loc[0];
+      if($langNum == 0){setcookie('Location', $loc, time() + 604800, '/');}
+      else{setcookie('Location', $loc.'_'.$locNum, time() + 604800, '/');}
+      
+      $msgLoc = true;
+    }
+
+    if($msgLang or $msgLoc){
+      echo '<div style="display:flex;flex-wrap:wrap;position:fixed;bottom: 0;right: 0;backdrop-filter: blur(5px);padding: 5px;border-radius: 20px 20px 0 0;border: solid 1px gray;">
+        <p>Location and language have been set. </p>
+        <form method="post">
+        <input type="submit" name="revetToGlobal" value="Revert to global" class="revertLocLang" style="cursor:pointer;margin-left: 10px;background: none;border: none;font-size: 16px;">
+        </form>
+      </div>';
+    }
+
 
     $fahrenheitCountries = ['as', 'bs', 'bz', 'ca', 'fm', 'gu', 'mh', 'mp', 'pr', 'pw', 'tc', 'us', 'vi'];
     if(!isset($_COOKIE['temp']) && in_array($_COOKIE['Location'], $fahrenheitCountries)){setcookie('temp', 'f', time() + 604800, '/');}
@@ -205,7 +241,6 @@ if (strpos($purl, '!') !== false) {
   else{
     $date = '';
   }
-
     include 'Model/header.php';
 ##
 #Analytics
@@ -217,6 +252,7 @@ include 'Controller/functions/indexLogic.php';
 
 //Get style.css file and post custom settings for light and dark mode
   include 'Model/style.php';
+
   
   if ($purl != null or $purl != '') {
   include 'Controller/retrieve.php';

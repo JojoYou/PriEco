@@ -1,13 +1,13 @@
 <?php
 function youtube($YoutubeObj){
     $i =0;    
-    $rPrint = false;
+    if (!isset($YoutubeObj['items'])) {return;}
+
     $yt = '<p class="sectionTitle">📷 Videos</p>
     
     <div class="output" style="border-radius: 20px;margin-bottom:15px;background:none;
     display:flex;overflow:auto hidden; height:300px;" id="output">';
     foreach ($YoutubeObj['items'] as &$item) {  
-        $rPrint = true;
         if($i>6){break;}   
         $yt .= '
                     <div class="imgoutdiv" style="width:auto;min-width:unset;margin-right:10px;padding:0;">
@@ -48,7 +48,5 @@ function youtube($YoutubeObj){
                 }
 
               $yt .= '</div>';
-    if($rPrint){
     return $yt;
-    }
 }
