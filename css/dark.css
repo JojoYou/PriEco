@@ -1,8 +1,4 @@
-:root {
-  --linkColor: #34A8AC;
-}
-
-html, .copyQuery {
+html, .copyQuery, #addShortcutBtn:hover {
   background-color: #181a1b;
   color: white;
 }
@@ -21,6 +17,7 @@ html, .copyQuery {
 
 .shortcutElemenet{
   background-color: #181a1b;
+  border: solid 10px #181a1b;
   color:white;
 }
 .addShortcut{

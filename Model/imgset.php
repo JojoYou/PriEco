@@ -173,7 +173,7 @@ echo '<div class="imgtools">
  </div>
  <input class="imgtoolsOption"type="submit" name="imgtoolsSave" value="Save" style="
  float: right;
-background-color: var(--linkColor);
+background-color: var(--topColor);
 color: white;
 border: none;">
 

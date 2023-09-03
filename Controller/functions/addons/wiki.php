@@ -8,7 +8,7 @@ function wiki($infoboxData, $wikiTxt, $ddgObj, $mysql, $hideQueryCopy)
     if(!isset($wikiTxt) || str_ends_with($wikiTxt, 'may refer to: ')){return;}
 
     //title
-    $answer .= '<div class="answer" id="answer"><h2>' . $infoboxData['title'] . '</h2><br>';
+    $answer .= '<div class="answer" id="answer"><a href="https://'.$tmp.'.wikipedia.org/wiki/' . str_replace('+','_',urlencode(ucwords($infoboxData['title']))) . '"';if(isset($_COOKIE['new'])){$answer.= 'target="_blank"';}$answer.=' style="color: unset;text-decoration: unset;"><h2>' . $infoboxData['title'].'</h2></a><br>';
 
     if(!isset($_COOKIE['datasave']) && isset($infoboxData['images'])){
         $answer .= $sum . '<div style="display: flex;
@@ -16,7 +16,7 @@ function wiki($infoboxData, $wikiTxt, $ddgObj, $mysql, $hideQueryCopy)
     flex-direction: row;
     justify-content: space-around;
     align-items: center;
-    background-color: #0001;
+    background-color: #00000007;
     padding: 10px;
     border-radius: 20px;">';
     }
@@ -37,7 +37,7 @@ if(!isset($_COOKIE['datasave']) && isset($infoboxData['images'])){$answer .='</d
         
     $wurl = trim(html_entity_decode($infoboxData['Website']));
     
-    $answer.= '<a style="color: #34A8AC;text-decoration: none;"href="https://'.$infoboxData['Website'].'"';
+    $answer.= '<a style="color: var(--linkColor);text-decoration: none;"href="https://'.$infoboxData['Website'].'"';
     if(isset($_COOKIE['new'])){$answer.= 'target="_blank"';}
     $answer .='>';
     $answer .= '🔗 '.str_replace('www.','', parse_url('https://'.$wurl)['host']);
@@ -45,10 +45,10 @@ if(!isset($_COOKIE['datasave']) && isset($infoboxData['images'])){$answer .='</d
 }
 
  //Description
- $answer.='<br><br><p style="background-color: #0001;padding: 15px;border-radius: 20px;">' . substr($wikiTxt, 0, 500) . '...' . 
- '<a style="color: #34A8AC;text-decoration: none;" href="https://'.$tmp.'.wikipedia.org/wiki/' . str_replace('+','_',urlencode(ucwords($infoboxData['title']))) . '" target="_blank">Wikipedia</a>
+ $answer.='<br><br><p style="background-color: #00000007;padding: 15px;border-radius: 20px;">' . substr($wikiTxt, 0, 500) . '...' . 
+ '<a style="color: var(--linkColor);text-decoration: none;" href="https://'.$tmp.'.wikipedia.org/wiki/' . str_replace('+','_',urlencode(ucwords($infoboxData['title']))). '"';if(isset($_COOKIE['new'])){$answer.= 'target="_blank"';}$answer.='>Wikipedia</a>
  </p><br>
- <div style="display: flex;">';
+ <div style="display: flex;padding-left: 10px;padding-right: 10px;">';
 
 //Summarized
 if(isset($wikiTxt)){
@@ -59,14 +59,14 @@ if(isset($wikiTxt)){
     }
     if(strlen($Tsum) >= 200 && strlen($Tsum) <= 850){
     $answer .= '<input type="checkbox" id="sumMoreCheck" style="display:none">
-    <label class="sumMore" for="sumMoreCheck"><p><b style="font-size: 13px;">Summarized</b></p><p style="margin-top:10px;font-size:13px;">'.$Tsum.'</p></label>';
+    <label class="sumMore" for="sumMoreCheck" style="margin-right: 10px;"><p><b style="font-size: 13px;">Summarized</b></p><p style="margin-top:10px;font-size:13px;">'.$Tsum.'</p></label>';
     $loaded[0] = true;
     }
 }
 
     //Infobox
     $answer .= '<input type="checkbox" id="wikiMoreCheck" style="display:none">
-    <label class="wikiMore" for="wikiMoreCheck" style="margin-left: 10px;"><p><b style="font-size: 13px;">Infobox</b></p>';
+    <label class="wikiMore" for="wikiMoreCheck"><p><b style="font-size: 13px;">Infobox</b></p>';
 foreach ($infoboxData as $name => $data) {
     if($name == 'images'){continue;}
     $answer .= '<div style="margin-top:10px;font-size:13px;"><p style="font-weight: bold;font-size: 12px;">'.$name . '</p><p>' . $data . '</p></div>';

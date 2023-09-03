@@ -103,6 +103,7 @@
 
   .settingButton {
     margin-left: 10px;
+    font-size: 16px;
   }
 
   .setButStyle {
@@ -110,17 +111,17 @@
   }
 
   .topspace {
-    margin-top: 145px;
+    margin-top: 155px;
   }
 
   .labelforcheckquick {
     margin-left: 94vw;
-    margin-top: 99px;
+    margin-top: 109px;
     right: 10px;
   }
 
   .quickSettingButtons {
-    top: 155px;
+    top: 165px;
   }
   .tDropdown{
     margin-left: 9vw;
@@ -194,7 +195,6 @@
   }
 
   .imgout {
-    object-fit: unset;
     max-width: 100%;
     width: unset;
   }
@@ -204,7 +204,7 @@
     max-width: unset;
     min-width: unset;
     height: unset;
-    padding: 0;
+    padding: 10px;
   }
 
   .bigimgout {

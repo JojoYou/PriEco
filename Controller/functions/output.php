@@ -11,11 +11,16 @@ if ($type != 'image' and $type != 'video' and $type != 'news') {
     {
         $string = ' ' . $string;
         $ini = strpos($string, $start);
-        if ($ini === 0) return '';
+        if ($ini === false) {return '';}
         $ini += strlen($start);
-        $len = strpos($string, $end, $ini) - $ini;
+        $len = strpos($string, $end, $ini);
+        if ($len === false || $len <= $ini) {return '';}
+        $len -= $ini;
+        if ($len < 0) {return '';}
+        
         return substr($string, $ini, $len);
     }
+    
     
     //Initial call
     if(!$dev){
@@ -48,7 +53,7 @@ if ($type != 'image' and $type != 'video' and $type != 'news') {
             if(isset($_SESSION[$purl.':-:rel'])){$related = json_decode($_SESSION[$purl.':-:rel'],true);}
             
             if (preg_match('/\bip\b/i', $purl)) {
-                $ipCh = curl_init('https://ipapi.co/'.$_SERVER['REMOTE_ADDR'].'/json/');
+                $ipCh = curl_init('https://jojoyou.org/ipAPI/?ip='.$_SERVER['REMOTE_ADDR']);
                 curl_setopt($ipCh, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($ipCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
                 curl_setopt($ipCh, CURLOPT_CONNECTTIMEOUT, 2);
@@ -224,7 +229,7 @@ if ($weatherTrue) {
 
 //IP
 if (preg_match('/\bip\b/i', $purl)) {
-    $ipCh = curl_init('https://ipapi.co/'.$_SERVER['REMOTE_ADDR'].'/json/');
+    $ipCh = curl_init('https://jojoyou.org/ipAPI/?ip='.$_SERVER['REMOTE_ADDR']);
     curl_setopt($ipCh, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ipCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
     curl_setopt($ipCh, CURLOPT_CONNECTTIMEOUT, 2);
@@ -714,69 +719,69 @@ if ($type === 'image') {
         $Qimg = json_decode($Qimg, true);
         
 
-echo '<div style="display:flex;margin-top:30px;flex-wrap:wrap;"><br>';
 
-    foreach($Gimg['items'] as &$item){
-        echo '
-        <div class="imgoutdiv">
-         <div tabindex="0" class="imgoutbtn" style="aspect-ratio:',$item['image']['width'],'/',$item['image']['height'],';">
-             <div style="background-image: url(/Controller/functions/proxy.php?q=',$item['image']['thumbnailLink'], ');aspect-ratio:',$item['image']['width'],'/',$item['image']['height'],';" class="imgout"></div>
-             </div>
-         
-         
- 
-         <div class="bigimgout">           
-         <img src ="/Controller/functions/proxy.php?q=',$item['image']['thumbnailLink'], '" data-src="/Controller/functions/proxy.php?q=',$item['link'],'"';
-         if(!isset($_COOKIE['DisHImg'])){echo 'style="filter: blur(5px);"';}
-         echo '>
-         <br>
-         <h3>', $item['title'], '</h3><br>
-         <p>From website: ', $item['displayLink'], '</p><br>
-         <div class="bigimgbtn"><a href="https://', $item['displayLink'], '"><button class="imgtoolsOption">Go to website</button></a><br>
-         <a href="',$item['link'], '"> <button class="imgtoolsOption">Go to image</button></a></div>  
-         <div style="display: flex;justify-content: center;"><button class="bigimgclose imgtoolsOption">«Close</button></div>   
-         </div>      
-       </div>
-         ';
-         echo 'here';
-    }
-    foreach ($Qimg['data']['result']['items'] as &$item) {
-        if (!isset($item['media']) or !isset($item['media_preview'])) {
-            continue;
+        echo '<div style="display:flex;margin-top:30px;flex-wrap:wrap;justify-content:center;"><br>';
+        foreach($Gimg['items'] as &$item){
+            echo 'here';
+            echo '
+            <div class="imgoutdiv">
+             <div tabindex="0" class="imgoutbtn" style="aspect-ratio:',$item['image']['width'],'/',$item['image']['height'],';">
+                 <div style="background-image: url(/Controller/functions/proxy.php?q=',$item['image']['thumbnailLink'], ');aspect-ratio:',$item['image']['width'],'/',$item['image']['height'],';" class="imgout"></div>
+                 </div>
+             
+             
+     
+             <div class="bigimgout">           
+             <img src ="/Controller/functions/proxy.php?q=',$item['image']['thumbnailLink'], '" data-src="/Controller/functions/proxy.php?q=',$item['link'],'"';
+             if(!isset($_COOKIE['DisHImg'])){echo 'style="filter: blur(5px);"';}
+             echo '>
+             <br>
+             <h3>', $item['title'], '</h3><br>
+             <p>From website: ', $item['displayLink'], '</p><br>
+             <div class="bigimgbtn"><a href="https://', $item['displayLink'], '"><button class="imgtoolsOption">Go to website</button></a><br>
+             <a href="',$item['link'], '"> <button class="imgtoolsOption">Go to image</button></a></div>  
+             <div style="display: flex;justify-content: center;"><button class="bigimgclose imgtoolsOption">«Close</button></div>   
+             </div>      
+           </div>
+             ';
         }
-
-        echo '
-       <div class="imgoutdiv">
-        <div tabindex="0" class="imgoutbtn" style="aspect-ratio:',$item['thumb_width'],'/',$item['thumb_height'],';">
-            <img src="https://search.jojoyou.org/Controller/functions/img_proxy.php?q=',$item['media'], '" style="aspect-ratio:',$item['thumb_width'],'/',$item['thumb_height'],';" class="imgout">
-        </div>
-        <a style="color: var(--linkColor); cursor:pointer;text-decoration:none;" href="',$item['url'],'"';if (isset($_COOKIE['new'])) {echo 'target="_blank';}echo'>
-        <p>';
-            $pieces = parse_url($item['url']);
-            $domain = isset($pieces['host']) ? $pieces['host'] : $pieces['path'];
-            if (preg_match('/(?P<domain>[a-z0-9][a-z0-9\-]{1,63}\.[a-z\.]{2,6})$/i', $domain, $regs)) {
-                echo $regs['domain'];
+        foreach ($Qimg['data']['result']['items'] as &$item) {
+            if (!isset($item['media']) or !isset($item['media_preview'])) {
+                continue;
             }
-            echo '</p></a>
-            <p>',$item['title'],'</p>
-        
-        
-
-        <div class="bigimgout">           
-        <img src ="https://search.jojoyou.org/Controller/functions/img_proxy.php?q=',$item['media'], '" data-src="/Controller/functions/proxy.php?q=',$item['media'],'"';
-        if(!isset($_COOKIE['DisHImg'])){echo 'style="filter: blur(5px);"';}
-        echo '>
-        <br>
-        <h3>', $item['title'], '</h3><br>
-        <p>From website: ', $item['url'], '</p><br>
-        <div class="bigimgbtn"><a href="', $item['url'], '"><button class="imgtoolsOption">Go to website</button></a><br>
-        <a href="',$item['media'], '"> <button class="imgtoolsOption">Go to image</button></a></div>  
-        <div style="display: flex;justify-content: center;"><button class="bigimgclose imgtoolsOption">«Close</button></div>   
-        </div>      
-        </div>
-        ';
-    }
-    echo '</div></div>';
+    
+            echo '
+           <div class="imgoutdiv">
+            <div tabindex="0" class="imgoutbtn" style="aspect-ratio:',$item['thumb_width'],'/',$item['thumb_height'],';">
+                <img src="https://search.jojoyou.org/Controller/functions/img_proxy.php?q=',explode('?', $item['media'])[0], '" style="aspect-ratio:',$item['thumb_width'],'/',$item['thumb_height'],';width:',$item['thumb_width'],'px;height:',$item['thumb_height'],'px;max-width: 100%;max-height: 100%;" class="imgout">
+                <a style="color: var(--linkColor); cursor:pointer;text-decoration:none;" href="',$item['url'],'"';if (isset($_COOKIE['new'])) {echo 'target="_blank';}echo'>
+            <p>';
+                $pieces = parse_url($item['url']);
+                $domain = isset($pieces['host']) ? $pieces['host'] : $pieces['path'];
+                if (preg_match('/(?P<domain>[a-z0-9][a-z0-9\-]{1,63}\.[a-z\.]{2,6})$/i', $domain, $regs)) {
+                    echo $regs['domain'];
+                }
+                echo '</p></a>
+                <p>',$item['title'],'</p>
+            </div>
+            
+            
+    
+            <div class="bigimgout">           
+            <img src ="https://search.jojoyou.org/Controller/functions/img_proxy.php?q=',$item['media'], '" data-src="/Controller/functions/proxy.php?q=',$item['media'],'"';
+            if(!isset($_COOKIE['DisHImg'])){echo 'style="filter: blur(5px);"';}
+            echo '>
+            <br>
+            <h3>', $item['title'], '</h3><br>
+            <p>From website: ', $item['url'], '</p><br>
+            <div class="bigimgbtn"><a href="', $item['url'], '"><button class="imgtoolsOption">Go to website</button></a><br>
+            <a href="',$item['media'], '"> <button class="imgtoolsOption">Go to image</button></a></div>  
+            <div style="display: flex;justify-content: center;"><button class="bigimgclose imgtoolsOption">«Close</button></div>   
+            </div>      
+            </div>
+            ';
+        }
+        echo '</div></div>';
    
     if(!isset($_COOKIE['DisHImg'])){
     echo '<script>

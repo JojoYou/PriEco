@@ -26,16 +26,18 @@ function pHigh($purl){
         ];
     $load = false;
     $privateAltOut='<p class="sectionTitle">⚡ Alternatives</p>
-    <div class="output" style="display: flex;padding: 25px 0 15px 0;flex-wrap: wrap;flex-direction: row;justify-content: center;margin-top:15px;margin-bottom:15px;border-radius:var(--result-curve);">';
+    <div class="output" style="display: flex;padding: 15px 0 0 0;flex-wrap: wrap;flex-direction: row;justify-content: center;margin-bottom:15px;border-radius:var(--result-curve);">';
 
     foreach($privateOpen as &$pO){
         $tmp = explode(';',$pO);
         if(in_array($purlLow, explode(',',$tmp[0]))){
             $load = true;
             $privateAltOut .= '<div style="width: 120px;border-radius: 20px;text-align: center;cursor: pointer;display: flex;flex-direction: column;">
-              <a style="padding-bottom:0;margin-bottom:10px;"href="'.$tmp[3].'"';if (isset($_COOKIE['new'])) {$privateAltOut .='target="_blank"';}$privateAltOut .='>
-              <img src="View/img/privateAlt/'.$tmp[2].'" style="width: 50px;height: 50px;">
-              <p>'.$tmp[1].'</p>
+              <a style="padding-bottom:0;margin-bottom:10px;"href="'.$tmp[3].'"';if (isset($_COOKIE['new'])) {$privateAltOut .='target="_blank"';}$privateAltOut .='>';
+              if(!isset($_COOKIE['datasave'])){
+                $privateAltOut .= '<img src="View/img/privateAlt/'.$tmp[2].'" style="width: 50px;height: 50px;">';
+              }
+              $privateAltOut .='<p>'.$tmp[1].'</p>
               </a>
               
               <a style="padding-bottom:10px;"href="https://tosdr.org/en/service/'.$tmp['5'].'"';if (isset($_COOKIE['new'])) {$privateAltOut .='target="_blank"';}$privateAltOut .='>

@@ -58,7 +58,7 @@ font-weight: bold;">
 
   <h3><span style="display:inline-block;
   transform: rotate(180deg);">&copy;</span>2021-<?php echo date("Y"); ?> Roman Láncoš, JojoYou</h3>
-  <a href="https://codeberg.org/JojoYou/PriEco/src/branch/master/LICENCE" target="_blank"><button style="background: none;
+  <a href="https://codeberg.org/JojoYou/PriEco/src/branch/master/LICENCE.md" target="_blank"><button style="background: none;
 border: 3px solid #28dabe;
 border-radius: 7px;
 width: auto;

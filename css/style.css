@@ -63,7 +63,8 @@ Import font
   --sidebar-bg-color-dark: rgba(42, 44, 46, 0.9);
 
   --result-curve: 20px;
-  --linkColor: #34A8AC;
+  --linkColor: #3391ff;
+  --topColor: #34A8AC;
 }
 
 * {
@@ -369,7 +370,7 @@ img {
 #threedotsquick:checked~.quickSettingsSpace {
   animation: showquickspace 0.2s;
   display: block;
-  height: 50px;
+  height: 60px;
 }
 
 @keyframes showquickspace {
@@ -406,10 +407,10 @@ img {
   margin-left: calc(8vw + clamp(552px, 675px, 90vw));
   border: none;
   font-size: 16px;
-  background-color: var(--linkColor);
+  background-color: #34A8AC;
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;
-  margin-top: 61px;
+  margin-top: 71px;
   position: absolute;
   z-index: 10;
   cursor: pointer;
@@ -864,7 +865,7 @@ h4 {
   height: 100px;
   overflow: hidden;
   margin-bottom: 15px;
-  background-color: #0001;
+  background-color: #00000007;
   padding: 10px;
   border-radius: 20px;
   display: inline-block;
@@ -950,10 +951,11 @@ h4 {
 }
 
 .imgoutdiv {
-  height: 220px;
-  width: 12vw;
+  height: 270px;
+  width: auto;
   padding: 10px;
   text-align: center;
+  transition: all 0s ease-in-out;
 }
 
 .imgoutdiv p {
@@ -966,7 +968,6 @@ h4 {
 
 .imgout {
   border-radius: var(--result-curve);
-  object-fit: cover;
   background-position: center;
   background-size: 30px;
   min-width: 50%;
@@ -975,6 +976,7 @@ h4 {
   max-height: clamp(50%, 100%, 100%);
   background-image: url(../View/icon/img.svg);
   background-repeat: no-repeat;
+  overflow: hidden;
 }
 
 .imgout:hover {
@@ -1149,6 +1151,9 @@ h4 {
   padding-right: 1.5px;
   padding-left: 1.5px;
   white-space: nowrap;
+  border: solid 1px gray;
+  padding: 5px;
+  border-radius: 20px;
 }
 
 .setBut {
@@ -1381,7 +1386,7 @@ h4 {
 }
 
 .setCheck:checked+.slider {
-  background-color: var(--linkColor);
+  background-color: var(--topColor);
 }
 
 .setCheck:checked+.slider:before {

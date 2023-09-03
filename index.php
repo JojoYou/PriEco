@@ -6,9 +6,9 @@ include 'Controller/simple_html_dom.php';
 $gTime = microtime(true);
 
 //Development mode (Get search results from json files in ./Controller/dev folder)
-$dev = false;
+$dev = true;
 //CSS version
-$cssver = 74;
+$cssver = 87;
 //Variable, controls reloading on settings change
 $reload = false;
 
@@ -97,7 +97,7 @@ if(strpos($purl, '!') !== false){
     if(isset($bangObj['bangs'][$tmp2]) && strpos($t, '!') !== false){
       $tmps = str_replace($t,'', $purl);
       
-      if(isset($_COOKIE['DisMul'])){header('Location: ' . $bangObj['bangs'][$tmp2] . urlencode($tmps));exit();}
+      if(isset($_COOKIE['DisMul'])){header('Location: ' . $bangObj['bangs'][$tmp2] . urldecode($tmps));exit();}
       else{$bangs[]=$bangObj['bangs'][$tmp2];}
     }
     else{
@@ -106,19 +106,31 @@ if(strpos($purl, '!') !== false){
   }
 
   if(!isset($_COOKIE['DisMul'])){
-    $bangQuery = urlencode(substr($bangQuery, 0, -1));
+    $bangQuery = urldecode(substr($bangQuery, 0, -1));
 
-    $bangScript = '
-    <script>';
+    $bangOne = '';
+    $bangScript = '<script>';
     $i=0;
    foreach($bangs as &$ban){
-    $bangScript .= 'window.open("'.$ban.$bangQuery.'", "_blank");';
+    if($i == 0){
+      $bangOne = '<script>setTimeout(function(){ window.location.href = "'.$ban.$bangQuery.'"; }, 7000);</script>';
+    }
+    else{
+      $bangScript .= 'window.open("'.$ban.$bangQuery.'", "_blank");';
+    }
     ++$i;
    }
 
-   $bangScript .= '
-  </script>';
-  echo $bangScript;
+   $bangScript .= '</script>';
+   if($bangScript != '<script></script>'){
+  echo $bangScript,'<br>
+  <p>Redirecting to first bang in 7 seconds...<br>
+  If multi bang didn',"'",'t work, allow it in you browser.</p>',
+  $bangOne;
+   }
+   else{
+    header("Location: " . $ban.$bangQuery, true);
+   }
   exit();
   }
 }
@@ -139,36 +151,21 @@ if(strpos($purl, '!') !== false){
 
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 
-    curl_setopt($ch, CURLOPT_URL, 'https://ipapi.co/'.getenv('REMOTE_ADDR').'/json/');
+     curl_setopt($ch, CURLOPT_URL, 'https://jojoyou.org/ipAPI/?ip='.getenv('REMOTE_ADDR'));
     curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
 
     $geo =json_decode(curl_exec($ch), true);
-
       if(!isset($_COOKIE['Location'])){
-        if(isset($geo['country'])){
-        setcookie('Location', strtolower(strtolower($geo['country'])).'_3', time() + 604800, '/');
+        if($geo['code'] != ''){
+        setcookie('Location', $geo['code'].'_3', time() + 604800, '/');
         }
         else{
           setcookie('Location', 'all', time() + 604800, '/');
         }
       }
       if(!isset($_COOKIE['Language'])){
-        $ch = curl_init();
-
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    
-        curl_setopt($ch, CURLOPT_URL, 'https://restcountries.com/v3.1/alpha/'.$geo['country']);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-    
-        $newlang = json_decode(curl_exec($ch), true);
-        if(isset($newlang[0]['languages'])){
-        $newlang =$promoobj['lang'][0][reset($newlang[0]['languages'])];
-        }
-        else{
-          unset($newlang);
-        }
-        if(isset($newlang)){
-          setcookie('Language', strtolower($newlang).'_3', time() + 604800, '/');
+        if($geo['lang'] != ''){
+          setcookie('Language', $geo['lang'].'_3', time() + 604800, '/');
         }
           else{
             setcookie('Language', 'all', time() + 604800, '/');

@@ -88,7 +88,7 @@ border-radius:0 0 20px 20px;
 
 
 <div class="settingButtons" style="margin-top: 60px;display: flex;
-overflow-x: auto;
+overflow-x: auto;align-items: center;
 overflow-y: hidden;">
 <form method="POST" action="">
 <input type="hidden" name="search_type" value="">
@@ -96,7 +96,7 @@ overflow-y: hidden;">
 
 <button style="';
 if ($type != 'image' and $type != 'video' and $type !='news') {
-  echo 'color: #34A8AC;border-bottom: #34A8AC solid 2px;';
+  echo 'color: #34A8AC;border: #34A8AC solid 2px;';
 }
 echo '"class="allBut settingButton" style="margin-left:2%;"';
 if(!isset($_COOKIE['hQuery'])){
@@ -121,7 +121,7 @@ echo '>';
 <input type="hidden" name="q" value="', $purl ,'">
 <button style="';
 if ($type == 'image') {
-  echo 'color: #34A8AC;border-bottom: #34A8AC solid 2px;';
+  echo 'color: #34A8AC;border: #34A8AC solid 2px;';
 }
 echo '"class="settingButton" ';
 if(!isset($_COOKIE['hQuery'])){
@@ -144,7 +144,7 @@ if(!isset($_COOKIE['datasave'])){
 <input type="hidden" name="q" value="', $purl ,'">
   <button style="';
   if ($type == 'video') {
-    echo 'color: #34A8AC;border-bottom: #34A8AC solid 2px;';
+    echo 'color: #34A8AC;border: #34A8AC solid 2px;';
   }
   echo '"class="settingButton"';
   if(!isset($_COOKIE['hQuery'])){
