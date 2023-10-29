@@ -6,24 +6,26 @@ include 'Controller/simple_html_dom.php';
 $gTime = microtime(true);
 
 //Development mode (Get search results from json files in ./Controller/dev folder)
-$dev = true;
+$dev = false;
 //CSS version
-$cssver = 87;
+$cssver = 100;
 //Variable, controls reloading on settings change
 $reload = false;
 
-if(file_exists('disGoogle.txt')){
-  $tmp = file_get_contents('disGoogle.txt');
-  if($tmp < date('d') && date('H') >= 7){
-    unlink('disGoogle.txt');
+function removeDisFile($name){
+  if(file_exists($name)){
+    $tmp = file_get_contents($name);
+    if(time()>$tmp+3600){
+      unlink($name);
+    }
   }
 }
-if(file_exists('disImg.txt')){
-  $tmp = explode(' ', file_get_contents('disImg.txt'));
-  if($tmp[0] < date('d') && date('H') >= $tmp[1]){
-    unlink('disImg.txt');
-  }
-}
+removeDisFile('disGoogle.txt');
+removeDisFile('disGoogle2.txt');
+removeDisFile('disBing.txt');
+removeDisFile('disBing2.txt');
+removeDisFile('disBrave.txt');
+removeDisFile('disMojeek.txt');
 
   //Get data from $PromoFile
   $promoobj = json_decode(file_get_contents('./Controller/value/data.json'), true);
@@ -300,11 +302,94 @@ include 'Controller/functions/indexLogic.php';
   $priecoTime = -1;
   $resultTime = microtime(true);
   include 'Controller/functions/output.php';
+  if(!isset($_COOKIE['DisWid'])){
+  echo "
+  <div data-sxpr-knowledge-panel id='my-kp-container' style='display:none;'></div>
+
+  <script src='/Controller/functions/proxy.php?q=https://cdn.searchexpander.com/js/sxpr.js'></script>
+  <script>
+  sxpr({
+    se: '6o34v7kmksef',
+    'q': '$purl',
+    instantAnswers: true,
+    'instantAnswers': [
+      'smartAnswers'
+    ],
+    'enableTripadvisorPlaces': [],
+    'enableTripadvisorPlacesForLocations': [],
+    'enableWebProducts': false,
+    'enableMediaThumbBar': false,
+    'youTubeEmbed': false,
+    'youTubeResultThumbs': false,
+    'googleMapEmbed': false,
+    'wikipediaSnippetPopups': false,
+
+    apiUrlTemplate: '/Controller/functions/expander.php?sx-api-path={path}',
+    imageUrlTemplate: '/Controller/functions/proxy.php/?q={url}', 
+    assetsUrlTemplate: '/Controller/functions/proxy.php/?q={url}',
+    audioUrlTemplate: '/Controller/functions/proxy.php/?q={url}',
+    wikipediaApiUrlTemplate: '/Controller/functions/proxy.php/?q={url}',
+    
+    topBarContainer: document.querySelector('#my-top-bar-container'),
+    knowledgePanelContainer: document.querySelector('#my-kp-container'),
+    instantAnswersContainer: document.querySelector('#my-ia-container')
+});
+  </script>
+  
+  <style>
+  .sx-kp-top, .sx-kp-attributions,.sx-search-sug-header{
+    display:none !important;
+  }
+  .sx-kp, .sx-products-sidebar, .sx-tp,.sx-search-suggestions{
+    background-color: unset;
+    border:none;
+  }
+  #my-kp-container{
+    border-radius: 20px;
+  }
+.sx-search-sug-link{
+  margin-left: 15px !important;
+  padding: 5px !important;
+  height: unset !important;
+  background-color:unset !important;
+  border-color: gray !important;
+}
+.sx-search-suggestions{
+  margin:0;
+  padding:0 !important;
+}
+.sx-search-sug-items ul{
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  height: 100%;
+}
+.sx-search-sug-scroller{
+  height:100% !important;
+}
+.sx-search-sug-link span{
+  font-size:14px !important;
+}
+[data-sxpr-top-bar] [data-sxpr-shopping-bar] + [data-sxpr-search-suggestions]{
+  margin-top:unset;
+}
+.sx-link-wrap{
+  display:none;
+}
+.sx-ia-widget,.sx-ia-widget,.sx-ia-smart-answers{
+  color:unset;
+}
+.sx-ia-smart-answers{
+  border:unset;
+  background:unset;
+}
+  </style>
+  ";
+}
   $resultTime = microtime(true) - $resultTime;
   //Improve PriEco
-  if(isset($_COOKIE['improvePriEco']) && !$dev){
   include 'Controller/functions/analytics/improve.php';
-  }
   //Print footer, contains JS for Ads
   include 'Model/footer.php';
   

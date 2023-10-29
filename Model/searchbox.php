@@ -88,7 +88,8 @@ border-radius:0 0 20px 20px;
 
 
 <div class="settingButtons" style="margin-top: 60px;display: flex;
-overflow-x: auto;align-items: center;
+overflow-x: auto;align-items: center;  margin-bottom: 5px;
+
 overflow-y: hidden;">
 <form method="POST" action="">
 <input type="hidden" name="search_type" value="">
@@ -167,7 +168,7 @@ if(!isset($_COOKIE['datasave'])){
     <input type="hidden" name="q" value="', $purl ,'">
   <button style="';
   if ($type == 'news') {
-    echo 'color: #34A8AC;border-bottom: #34A8AC solid 2px;';
+    echo 'color: #34A8AC;border: #34A8AC solid 2px;';
   }
   echo '"class="settingButton"';
   if(!isset($_COOKIE['hQuery'])){
@@ -192,6 +193,11 @@ if(!isset($_COOKIE['datasave'])){
   else{echo $promoobj['Map'][0][$lang];}
   echo '</button></a>
   </form>
+
+  <div data-sxpr-top-bar id="my-top-bar-container">
+  <!-- Top bar, including search suggestions, will render here -->
+</div>
+
 <a href="/feedback.php" target="_blank" class="feedbackMenuLabel">';
 if(!isset($_COOKIE['datasave'])){
 echo '<img src="./View/icon/feedback.webp" alt="feedback" >';
@@ -201,8 +207,10 @@ else{
 }
 echo '</a>
 
-
+<label for="threedotsquick" class="labelforcheckquick feedbackMenuLabel"><img alt="quick settings" src="./View/icon/sliders.svg"></label>
   </div>
+  
+ 
 </div>
 </form>
 <button class="tree-btn" id="tree-btn"><img alt="icntree" src="./View/icon/user.svg" style="width:20px;height:20px;"><p style="font-weight:bold;">'
@@ -214,7 +222,6 @@ include 'settings.php';
 
 echo '
 <input type="checkbox" id="threedotsquick" hidden>
-<label for="threedotsquick" class="labelforcheckquick">...</label>
 <div class="topspace"></div>
 <form method="post" action="" class="quickSettingButtons">
 <select style="margin-left:9vw;" name="LocDropDown" class="quickSet">
@@ -491,7 +498,7 @@ echo '
     <option value="off">Off</option>
 </select>
 
-<select name="TimeDropDown" class="tDropdown quickSet">
+<select name="TimeDropDown" class="quickSet">
 <option disabled selected hidden>';
 if(isset($_COOKIE['time'])){
 switch ($_COOKIE['time']):
@@ -520,7 +527,7 @@ echo '
 
 </select>
 
-<input type="submit" name="savequicksetting" class="quickSet" value="Save">
+<input type="submit" name="savequicksetting" class="quickSet" style="margin-right:9vw;" value="Save">
 </form>
 <div class="quickSettingsSpace"></div>
 ';

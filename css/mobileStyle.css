@@ -19,7 +19,7 @@
   .sLogo {
     position: absolute;
     width: 50px;
-    height: 50px;
+    height: 45px;
     left: 0;
     right: 0;
     margin-left: auto;
@@ -38,7 +38,7 @@
   .delQueryBtn {
     position: absolute;
     top: 30px;
-    right: 47px;
+    right: 57px;
     margin-right: 0;
   }
 
@@ -64,7 +64,7 @@
   .searchButton {
     margin-top: 30px;
     height: 45px;
-    width: 30px;
+    width: 40px;
     pointer-events: auto;
   }
 
@@ -88,11 +88,10 @@
   }
 
   .settingButtons {
-    width: calc(100% - 20px);
     margin-top: 99px !important;
     padding: 0 3px 3px 0;
-    margin-left: 20px;
-    width: 85%;
+    margin-left: 10px;
+    width: 95%;
   }
 
   @-moz-document url-prefix() {
@@ -111,21 +110,34 @@
   }
 
   .topspace {
-    margin-top: 155px;
+    margin-top: 160px;
   }
 
   .labelforcheckquick {
-    margin-left: 94vw;
-    margin-top: 109px;
-    right: 10px;
+    margin-left: 10px;
+    margin-right: 10px;
+  }
+
+  #my-kp-container {
+    height: 100px;
+  }
+  #moreMoreCheck:checked ~#my-kp-container {
+    height: 100%;
+  }
+  .moreMoreCheck{
+    width: 100%;
+text-align: center;
+display: inline-block;
+background-color: #00000007;
+padding: 3px;
+border-radius: 20px;
+cursor: pointer;
   }
 
   .quickSettingButtons {
-    top: 165px;
+    top: 175px;
   }
-  .tDropdown{
-    margin-left: 9vw;
-  }
+
   @keyframes showquicksettings {
     0% {
       display: none;
@@ -138,7 +150,7 @@
 
     100% {
       display: block;
-      top: 155px;
+      top: 165px;
     }
   }
 
@@ -156,16 +168,6 @@
     top: 9px;
     left: 10px;
     right: unset;
-  }
-
-  .feedbackMenuLabelMobile {
-    display: block;
-    position: fixed;
-    cursor: pointer;
-    bottom: 5px;
-    display: block;
-    z-index: 13;
-    left: 30px;
   }
 
   /*Output*/
@@ -200,7 +202,7 @@
   }
 
   .imgoutdiv {
-    width: 50vw;
+    width: 50vw !important;
     max-width: unset;
     min-width: unset;
     height: unset;
@@ -229,7 +231,7 @@
   .hQuery {
     margin-top: 0px;
   }
-
+  
   .findelsewhere {
     margin-left: 0;
   }

@@ -3,6 +3,109 @@
 <!--  SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <?php
+function getSearchQueryComplexity($purl) {
+    $words = explode(' ', $purl);
+    $uniqueWords = count($words);
+    $averageWordLength = array_sum(array_map('strlen', $words)) / $uniqueWords;
+    $specialCharacterCount = 1;
+    foreach ($words as $word) {$specialCharacterCount += (strpos($word, '[^a-zA-Z0-9]') !== false);}
+    return $complexityScore = $uniqueWords * $averageWordLength * $specialCharacterCount;  
+  }
+function apiRandom($apis = array()){
+    shuffle($apis);
+    return $apis[0];
+}
+function chooseAPI($disabled, &$complex){
+    if($complex >= 20){
+        $apis = [];
+        if($disabled[0]==0){$apis[]=0;}
+        if($disabled[1]==0){$apis[]=1;}
+        
+        if(empty($apis)){$complex = 19;}
+        else{$searchId = apiRandom($apis);}
+    }
+    
+    if($complex >= 10 && $complex < 20){
+        $apis = [];
+        if($disabled[1]==0){$apis[]=1;}
+        if($disabled[2]==0){$apis[]=2;}
+    
+        if(empty($apis)){$complex = 9;}
+        else{$searchId = apiRandom($apis);}
+    }
+    if($complex >= 10 && $complex < 10){
+        $apis = [];
+        if($disabled[2]==0){$apis[]=2;}
+        if($disabled[3]==0){$apis[]=3;}
+        
+        if(empty($apis)){$complex = 9;}
+        else{$searchId = apiRandom($apis);}
+    }
+    if($complex < 10){
+        $apis = [];
+        if($disabled[3]==0){$apis[]=3;}
+        if($disabled[4]==0){$apis[]=4;}
+        
+        if(empty($apis)){$complex = 5;}
+        $searchId = apiRandom($apis);
+    }
+    if($complex <= 5){
+        if($disabled[4]==0){$apis[]=4;}
+        if($disabled[5]==0){$apis[]=5;}
+
+        $searchId = apiRandom($apis);
+    }
+    return $searchId;
+}
+function backupCall($searchId, $disabled, &$complex, $Bpurl, $MojeekFile, $lang){
+    if($complex >= 30){$complex=29;}
+    elseif($complex >= 20){$complex=19;}
+    else{$complex=9;}
+    $searchId = chooseAPI($disabled, $complex);
+
+    $ch3 = curl_init();
+
+    if($searchId==1){
+        $ch3 = curl_init('https://librex.jojoyou3.repl.co/api.php?p=0&t=0&q='.$Bpurl);
+        $tmp = $lang;
+        if($lang = 'all'){$tmp = 'en';}
+        $cookies = 'google_language_results='.$tmp.';google_number_of_results=20;google_language_site='.$tmp.';';
+        if(!isset($_COOKIE['safe'])){$cookies.='safe_search=on;';} 
+        curl_setopt($ch3, CURLOPT_COOKIE, $cookies);
+    }
+    elseif($searchId==2){
+        $ch3 = curl_init('https://api.qwant.com/v3/search/web/?count=10&offset='.$page.'0&uiv=1&locale=en_us&q=' . $Bpurl);
+        curl_setopt($ch3, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
+    }
+    elseif($searchId==3){
+        $ch3 = curl_init('https://bing2.jojoyou3.repl.co/?q=' . $Bpurl);
+        curl_setopt($ch3, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
+    }
+    elseif($searchId==4){
+        $ch3 = curl_init('https://search.brave.com/search?q='.$Bpurl);
+        curl_setopt($ch3, CURLOPT_CUSTOMREQUEST, 'GET');
+        $headers = array(
+            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language: en-US,en;q=0.8',
+            'Cache-Control: max-age=0',
+            'Connection: keep-alive',
+            'Upgrade-Insecure-Requests: 1',
+            'User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36',
+        );
+        curl_setopt($ch3, CURLOPT_HTTPHEADER, $headers);
+    }
+    elseif($searchId==5){$ch3 = curl_init($MojeekFile);}
+
+    curl_setopt($ch3, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch3, CURLOPT_CONNECTTIMEOUT, 2.5);
+
+    if($searchId == 4){$response = curl_exec($ch3);}
+    else{$response = json_decode(curl_exec($ch3),true);}
+    
+    curl_close($ch3);
+    return [$response, $searchId];
+}  
+  
 $Bpurl = urlencode($purl);
 
 if ($type != 'image' and $type != 'video' and $type != 'news') {
@@ -23,35 +126,27 @@ if ($type != 'image' and $type != 'video' and $type != 'news') {
     
     
     //Initial call
+    $indexY = true;
+    
     if(!$dev){
         $ImpProfiles = false;
         $ImpGoogle = true;
-        
-        //Profiles from PriEco
         $name = mysqli_real_escape_string($conn, strtolower($purl));  
-        $sql = "SELECT * FROM `profiles` WHERE `Name` = '$name'";
-        $tmp = $conn->query($sql);
-        $tmp = $tmp->fetch_assoc();
+        if(isset($_SESSION[$purl.$lang.$loc.$safeS.$_COOKIE['time']])){
 
-        $i=1;
-        $ddgObj='';
-        foreach($tmp as &$ddg){
-            if($i>2){
-                $ddgObj .= $ddg. ' ';
-            }
-            ++$i;
-        }
-
-        if(isset($_SESSION[$purl]) && !isset($_COOKIE['safe']) && !isset($_COOKIE['time'])){
-            if (strpos($_SESSION[$purl], 'obj +=+ ') !== false) {$obj = json_decode(str_replace('obj +=+ ', '', $_SESSION[$purl]), true);}
-            if (strpos($_SESSION[$purl], 'g2obj +=+ ') !== false) {$g2obj = json_decode(str_replace('g2obj +=+ ', '', $_SESSION[$purl]), true);}
-    
-            if(isset($_SESSION[$purl.':-:news'])){$NewsObj = json_decode($_SESSION[$purl.':-:news'],true);}
-            if(isset($_SESSION[$purl.':-:yt'])){$YoutubeObj = json_decode($_SESSION[$purl.':-:yt'], true);}
-            if(isset($_SESSION[$purl.':-:red'])){$redditObj = json_decode($_SESSION[$purl.':-:red'], true);}
-            if(isset($_SESSION[$purl.':-:wiki'])){$wikiobj =explode('--]|[--',$_SESSION[$purl.':-:wiki']);$wikiTxt = $wikiobj[1];$wikiobj = json_decode($wikiobj[0],true);}
-            if(isset($_SESSION[$purl.':-:rel'])){$related = json_decode($_SESSION[$purl.':-:rel'],true);}
+            if (strpos($_SESSION[$purl.$lang.$loc.$safeS.$_COOKIE['time']], 'obj +=+ ') !== false) {$obj = json_decode(str_replace('obj +=+ ', '', $_SESSION[$purl.$lang.$loc.$safeS.$_COOKIE['time']]), true);}
+            if (strpos($_SESSION[$purl.$lang.$loc.$safeS.$_COOKIE['time']], 'g2obj +=+ ') !== false) {$g2obj = json_decode(str_replace('g2obj +=+ ', '', $_SESSION[$purl.$lang.$loc.$safeS.$_COOKIE['time']]), true);}
+            if (strpos($_SESSION[$purl.$lang.$loc.$safeS.$_COOKIE['time']], 'qwant +=+ ') !== false) {$QWantObj = json_decode(str_replace('qwant +=+ ', '', $_SESSION[$purl.$lang.$loc.$safeS.$_COOKIE['time']]), true);}
+            if (strpos($_SESSION[$purl.$lang.$loc.$safeS.$_COOKIE['time']], 'brave +=+ ') !== false) {$BraveObj = str_replace('brave +=+ ', '', $_SESSION[$purl.$lang.$loc.$safeS.$_COOKIE['time']]);}
+            if (strpos($_SESSION[$purl.$lang.$loc.$safeS.$_COOKIE['time']], 'mojeek +=+ ') !== false) {$MojeekObj = json_decode(str_replace('mojeek +=+ ', '', $_SESSION[$purl.$lang.$loc.$safeS.$_COOKIE['time']]), true);}
             
+            if(isset($_SESSION[$purl.':-:shop'])){$ShopObj = json_decode($_SESSION[$purl.':-:shop'],true);}
+            if(isset($_SESSION[$purl.':-:wiki'])){$wikiobj = explode('--]|[--',$_SESSION[$purl.':-:wiki']);$wikiTxt=$wikiobj[1];$ddgObj = json_decode($wikiobj[2],true);$wikiobj=json_decode($wikiobj[0],true);}
+            if(isset($_SESSION[$purl.':-:new'])){$NewsObj = $_SESSION[$purl.':-:new'];}
+            if(isset($_SESSION[$purl.':-:red'])){$redditObj = $_SESSION[$purl.':-:red'];}
+            if(isset($_SESSION[$purl.':-:yt'])){$YoutubeObj = $_SESSION[$purl.':-:yt'];}
+            if(isset($_SESSION[$purl.':-:rel'])){$related = $_SESSION[$purl.':-:rel'];}
+
             if (preg_match('/\bip\b/i', $purl)) {
                 $ipCh = curl_init('https://jojoyou.org/ipAPI/?ip='.$_SERVER['REMOTE_ADDR']);
                 curl_setopt($ipCh, CURLOPT_RETURNTRANSFER, true);
@@ -66,6 +161,7 @@ if ($type != 'image' and $type != 'video' and $type != 'news') {
         }
         else{
         //Cached Google results
+      
         $obj = '';
         if(!isset($_COOKIE['safe']) && !isset($_COOKIE['time'])){
         if(!isset($loc)){
@@ -84,14 +180,120 @@ if ($type != 'image' and $type != 'video' and $type != 'news') {
             if($tmp['official'] == 1){
             $ImpGoogle = false;
             $obj = json_decode($obj, true);
+            $searchId = 0;
             }
             else{
                 $ImpGoogle = false;
                 $g2obj = json_decode($obj, true);
                 $obj = '';
+                $searchId=1;
             }
         }
         }
+
+        //Wiki
+    $name = str_replace('+',' ',urlencode(ucwords($purl)));
+    $result = $conn->query("SELECT * FROM `wikipedia` WHERE '$name' LIKE CONCAT(title, '%');");
+
+    if ($result->num_rows > 0) {
+        $closestTitle = null;
+        $closestDistance = PHP_INT_MAX;
+
+        while ($row = $result->fetch_assoc()) {
+            $title = $row['title'];
+            $distance = levenshtein($name, $title);
+
+            if ($distance < $closestDistance && $distance < 5) {
+                $closestDistance = $distance;
+                $closestTitle = $title;
+                $wikiobj = json_decode($row['infobox'], true);
+                $wikiTxt = $row['paragraph'];
+                $ddgObj = $row['profiles'];
+            }
+        }
+    }
+    
+     //Reddit
+     $redditObj = array();
+     $result = $conn->query("SELECT * FROM `reddit` WHERE `title` LIKE '%$purl%' LIMIT 200");
+     if ($result->num_rows > 0) {
+         while ($row = $result->fetch_assoc()) {
+             $redditObj[] = $row;
+         }
+     }
+
+     //News
+     $NewsObj = array();
+     $result = $conn->query("SELECT * FROM `news` WHERE `title` LIKE '%$purl%' OR `description` LIKE '%$purl%' LIMIT 200");
+     if ($result->num_rows > 0) {
+         while ($row = $result->fetch_assoc()) {
+             $NewsObj[] = $row;
+         }
+     }
+     usort($NewsObj, function ($a, $b) {
+         $timestampA = strtotime($a['date']);
+         $timestampB = strtotime($b['date']);
+     
+         if ($timestampA === $timestampB) {return 0;}
+         return ($timestampA > $timestampB) ? -1 : 1;
+     });
+     if(count($NewsObj)<3){$indexN = false;}
+     else{$indexN = true;}
+
+      //YouTube
+    $YoutubeObj = array();
+    $result = $conn->query("SELECT * FROM `youtube` WHERE `title` LIKE '%$purl%' OR `description` LIKE '%$purl%' LIMIT 200");
+    if ($result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $YoutubeObj[] = $row;
+        }
+    }
+    usort($YoutubeObj, function ($a, $b) {
+        $timestampA = strtotime($a['date']);
+        $timestampB = strtotime($b['date']);
+    
+        if ($timestampA === $timestampB) {return 0;}
+        return ($timestampA > $timestampB) ? -1 : 1;
+    });
+    if(count($YoutubeObj)<3){$indexY = false;unset($YoutubeObj);}
+    
+    //Related
+    $result = $conn->query("SELECT * FROM `suggestions` WHERE MATCH(name) AGAINST('$purl*') LIMIT 200");
+
+$suggestions = [];
+if ($result->num_rows > 0) {
+    while ($row = $result->fetch_assoc()) {
+        $suggestions[] = [
+            'name' => $row['name'],
+            'img' => $row['img']
+        ];
+    }
+}
+
+$similarityScores = [];
+foreach ($suggestions as $suggestion) {
+    if (substr($suggestion['name'], 0, 1) === "!" && substr($purl, 0, 1) !== "!") {
+        continue;
+    }
+    if (strlen($suggestion['name']) < strlen($purl)) {
+        continue;
+    }
+
+    $similarityScores[$suggestion['name']] = similar_text($purl, $suggestion['name']) + (10 - strlen($suggestion['name']));
+}
+
+arsort($similarityScores);
+
+$topSuggestions = array_keys(array_slice($similarityScores, 0, 6));
+$related = [];
+foreach ($topSuggestions as $suggestion) {
+    foreach ($suggestions as $item) {
+        if ($item['name'] === $suggestion) {
+            $related[] = $item;
+            break;
+        }
+    }
+}
     }
 
 if(!isset($cached)){
@@ -101,43 +303,26 @@ $multiHandle = curl_multi_init();
 // Initialize curl handles for each request
 $curlHandles = array();
 $curlCount = 0;
-// Request 1: RedditFile
-$ch1 = curl_init($RedditFile);
-curl_setopt($ch1, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch1, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-curl_setopt($ch1, CURLOPT_CONNECTTIMEOUT, 2);
-curl_setopt($ch1, CURLOPT_TIMEOUT, 2.5);
-$curlHandles[] = $ch1;
-if(count($curlHandles) > $curlCount){
-    $redditOn = true;
-    $curlCount = count($curlHandles);
-}
-
-// Request 2: DdgFile
-if($ddgObj == ''){
-    $ImpProfiles = true;
-    $ch2 = curl_init($DdgFile);
-    curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch2, CURLOPT_HTTPHEADER, array(
-        'Origin: https://ac.duckduckgo.com',
-        'Referer: https://ac.duckduckgo.com/',
-        'Accept-Language: en-US,en;q=0.9'
-    ));
-    curl_setopt($ch2, CURLOPT_CONNECTTIMEOUT, 2.5);
-    curl_setopt($ch2, CURLOPT_FOLLOWLOCATION, true);
-    $curlHandles[] = $ch2;
-    if(count($curlHandles) > $curlCount){
-        $ddgOn = true;
-        $curlCount = count($curlHandles);
-    }
-}
+$disabled =array_fill(0,6,1);
+    $disabled[4]=0;
 
 // Request 3: Googlefile, Brave or Qwant
-if($obj == '' && !isset($g2obj)){
-    if(!file_exists('disGoogle.txt')){
-        $ch3 = curl_init($Googlefile);
-    }
-    else{
+if($obj == '' && ($g2obj == '' or $g2obj['status']=='error')){
+    $complex = getSearchQueryComplexity($purl);
+    $searchId = -1;
+    
+    $disabled =array_fill(0,6,0);
+    if(file_exists('disGoogle.txt')){$disabled[0]=1;}
+    if(file_exists('disGoogle2.txt')){$disabled[1]=1;}
+    if(file_exists('disBing.txt')){$disabled[2]=1;}
+    if(file_exists('disBing2.txt')){$disabled[3]=1;}
+    if(file_exists('disBrave.txt')){$disabled[4]=1;}
+    if(file_exists('disMojeek.txt')){$disabled[5]=1;}
+    
+    $searchId = chooseAPI($disabled,$complex);
+
+    if($searchId==0){$ch3 = curl_init($Googlefile);}
+    elseif($searchId==1){
         $ch3 = curl_init('https://librex.jojoyou3.repl.co/api.php?p=0&t=0&q='.$Bpurl);
         $tmp = $lang;
         if($lang = 'all'){$tmp = 'en';}
@@ -145,6 +330,32 @@ if($obj == '' && !isset($g2obj)){
         if(!isset($_COOKIE['safe'])){$cookies.='safe_search=on;';} 
         curl_setopt($ch3, CURLOPT_COOKIE, $cookies);
     }
+    elseif($searchId==2){
+        $ch3 = curl_init('https://api.qwant.com/v3/search/web/?count=10&offset='.$page.'0&uiv=1&locale=en_us&q=' . $Bpurl);
+        curl_setopt($ch3, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
+    }
+    elseif($searchId==3){
+        $ch3 = curl_init('https://bing2.jojoyou3.repl.co/?q=' . $Bpurl);
+        curl_setopt($ch3, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
+    }
+    elseif($searchId==4){
+        $ch3 = curl_init('https://search.brave.com/search?q='.$Bpurl);
+        curl_setopt($ch3, CURLOPT_CUSTOMREQUEST, 'GET');
+        $headers = array(
+            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language: en-US,en;q=0.8',
+            'Cache-Control: max-age=0',
+            'Connection: keep-alive',
+            'Upgrade-Insecure-Requests: 1',
+            'User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36',
+        );
+        curl_setopt($ch3, CURLOPT_HTTPHEADER, $headers);
+        if($loc != 'all'){curl_setopt($ch3, CURLOPT_COOKIE, 'country='.$loc.';');}
+    }
+    elseif($searchId==5){
+        $ch3 = curl_init($MojeekFile);
+    }
+
     curl_setopt($ch3, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch3, CURLOPT_CONNECTTIMEOUT, 2.5);
     $curlHandles[] = $ch3;
@@ -154,39 +365,12 @@ if($obj == '' && !isset($g2obj)){
     }
 }
 
-//Related searches
-    $relatedCh = curl_init('https://ac.duckduckgo.com/ac/?type=list&callback=jsonCallback&_=1600956892202&q='.$Bpurl);
-    curl_setopt($relatedCh, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($relatedCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-    curl_setopt($relatedCh, CURLOPT_CONNECTTIMEOUT, 2);
-    curl_setopt($relatedCh, CURLOPT_TIMEOUT, 2.5);
-    curl_setopt($relatedCh, CURLOPT_HTTPHEADER, array(
-    'Origin: https://ac.duckduckgo.com'
-));
-   $curlHandles[] = $relatedCh;
-   if(count($curlHandles) > $curlCount){
-    $relatedOn = true;
-    $curlCount = count($curlHandles);
-}
-
 
 $tmp = $_COOKIE['Language'];
     if($tmp == 'all' or $tmp == null){
         $tmp = 'en';
     }
 
-//Wikipedia
-$wikiCh = curl_init('https://search.jojoyou.org/Controller/functions/addons/wikiGet.php?lang='.$tmp.'&q=' .str_replace('+','_',urlencode(ucwords($purl))));
-curl_setopt($wikiCh, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($wikiCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-curl_setopt($wikiCh, CURLOPT_CONNECTTIMEOUT, 2);
-curl_setopt($wikiCh, CURLOPT_TIMEOUT, 2.5);
-
-$curlHandles[] = $wikiCh;
-if(count($curlHandles) > $curlCount){
-    $wikiOn = true;
-    $curlCount = count($curlHandles);
-}
 //Define
 if (isset($defWords)) {
     $defCh = curl_init($WordnikFile);
@@ -252,20 +436,10 @@ if(count($curlHandles) > $curlCount){
     $curlCount = count($curlHandles);
 }
 */
-//News
-$newsCh = curl_init($WebNewsFile);
-curl_setopt($newsCh, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($newsCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-curl_setopt($newsCh, CURLOPT_CONNECTTIMEOUT, 2);
-curl_setopt($newsCh, CURLOPT_TIMEOUT, 2.5);
-$curlHandles[] = $newsCh;
-if(count($curlHandles) > $curlCount){
-    $newsOn = true;
-    $curlCount = count($curlHandles);
-}
 
 //YouTube
-$ytCh = curl_init($WebYoutubeFile);
+if(!$indexY){
+$ytCh = curl_init($YoutubeFile);
 curl_setopt($ytCh, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ytCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
 curl_setopt($ytCh, CURLOPT_CONNECTTIMEOUT, 2);
@@ -275,7 +449,22 @@ if(count($curlHandles) > $curlCount){
     $ytOn = true;
     $curlCount = count($curlHandles);
 }
+}
 
+//Shop Ads
+$tmp = ($lang == 'all') ? 'us' : $loc;
+
+$shopCh = curl_init('https://api.yadore.com/v2/offer?market='.$tmp.'&keyword='.urlencode($purl).'&precision=fuzzy&sort=rel_desc&limit=20');
+    curl_setopt($shopCh, CURLOPT_RETURNTRANSFER, true);
+
+    $headers = ['API-Key: '. $_ENV['SHOP_API_KEY'],];
+    curl_setopt($shopCh, CURLOPT_HTTPHEADER, $headers);
+    $curlHandles[] = $shopCh;
+    if(count($curlHandles) > $curlCount){
+        $shopOn = true;
+        $curlCount = count($curlHandles);
+    }
+    
 // Execute multi-curl requests
 foreach ($curlHandles as $handle) {
     curl_multi_add_handle($multiHandle, $handle);
@@ -295,16 +484,12 @@ foreach ($curlHandles as $handle) {
     if (curl_error($handle) === '') {
         $response = curl_multi_getcontent($handle);
 
-        if(isset($redditOn) && !isset($redditObj)){$redditObj = json_decode($response, true);unset($redditOn);}
-        elseif(isset($ddgOn) && $ddgObj == ''){$ddgObj = json_decode($response, true);unset($ddgOn);}
-
-        elseif(isset($searchOn) && $obj == '' && !isset($g2obj)){
-            if (!file_exists('disGoogle.txt')) {$obj = json_decode($response, true);}
-            else{$g2obj = json_decode($response, true);}
-        }
-        elseif(isset($relatedOn) && !isset($related)){$related = json_decode($response, true);unset($relatedOn);}
-
-        elseif(isset($wikiOn) && !isset($wikiobj)){$_SESSION[$purl.':-:wiki'] = $response;$wikiobj =explode('--]|[--',$response);$wikiTxt = $wikiobj[1];$wikiobj = json_decode($wikiobj[0],true); unset($wikiOn);}
+        if(isset($searchOn) && $searchId == 0){$obj = json_decode($response, true);unset($searchOn);}
+        elseif(isset($searchOn) && $searchId == 1){$g2obj = json_decode($response, true);unset($searchOn);}
+        elseif(isset($searchOn) && $searchId == 2){$QWantObj = json_decode($response, true); unset($searchOn);}
+        elseif(isset($searchOn) && $searchId==3){$QWantObj = json_decode($response, true); unset($searchOn);}
+        elseif(isset($searchOn) && $searchId==4){$BraveObj = $response; unset($searchOn);}
+        elseif(isset($searchOn) && $searchId==5){$MojeekObj = json_decode($response, true); unset($searchOn);}
 
         elseif(isset($defOn) && !isset($WordnikObj)){$WordnikObj = json_decode($response, true);unset($defOn);}
         elseif(isset($weatherOn) && !isset($OpenWeatherObj)){$OpenWeatherObj = json_decode($response, true);unset($weatherOn);}
@@ -312,8 +497,22 @@ foreach ($curlHandles as $handle) {
         elseif(isset($ipOn) && !isset($ipObj)){$ipObj = json_decode($response,true); unset($ipOn);}
         elseif(isset($cryptoOn) && !isset($cryptoData)){$cryptoData = json_decode($response,true);unset($cryptoOn);}
 
-        elseif(isset($newsOn) && !isset($NewsObj)){$NewsObj = json_decode($response,true); unset($newsOn);}
-        elseif(isset($ytOn) && !isset($YoutubeObj)){$YoutubeObj = json_decode($response,true); unset($ytOn);}
+        elseif(isset($ytOn) && !isset($YoutubeObj)){$YoutubeObj = array(); $YoutubeObjN = json_decode($response,true); 
+            foreach ($YoutubeObjN['items'] as $item) {
+                $title = substr($item['snippet']['title'], 0, 47);
+                $description = substr($item['snippet']['description'], 0, 47);
+    
+                $YoutubeObj[] = array(
+                    'title' => $title,
+                    'description' => $description,
+                    'url' => $item['id']['videoId'],
+                    'thumb' => str_replace('https://i.ytimg.com/vi/','',$item['snippet']['thumbnails']['medium']['url']),
+                    'date' => $item['snippet']['publishTime']
+                );
+            }        
+            unset($ytOn);}
+
+        elseif(isset($shopOn) && !isset($ShopObj)){$ShopObj = json_decode($response,true); unset($shopOn);}
     }    
     curl_multi_remove_handle($multiHandle, $handle);
     }
@@ -331,6 +530,8 @@ else{
     $NewsObj = json_decode(file_get_contents('./Controller/dev/news.json'), true);
     $YoutubeObj = json_decode(file_get_contents('./Controller/dev/yt.json'),true);
     $WordnikObj = json_decode(file_get_contents('./Controller/dev/def.json'), true);
+
+    $wikiobj =explode('--]|[--',file_get_contents('./Controller/dev/wiki.txt'));$wikiTxt = $wikiobj[1];$wikiobj = json_decode($wikiobj[0],true);
 }
 
     //Engines
@@ -338,6 +539,7 @@ else{
     include 'engines/web/google2.php';
     include 'engines/web/qwant.php';
     include 'engines/web/brave.php';
+    include 'engines/web/mojeek.php';
     include 'engines/web/promo.php';
     include 'engines/web/prieco.php';
     //Addons
@@ -345,10 +547,12 @@ else{
     include 'addons/hideQuery.php';
     include 'addons/reddit.php';
     include 'addons/related.php';
+    
     include 'addons/news.php';
     include 'addons/yt.php';
+
     include 'addons/pHigh.php';
-    //include 'addons/etsy.php';
+    include 'addons/shop.php';
 
     include 'addons/small/ip.php';
 
@@ -358,7 +562,7 @@ else{
     include 'addons/small/define.php';
     if(isset($OpenWeatherObj)){include 'addons/small/weather.php';}
     include 'addons/small/crypto.php';
-    //include 'addons/small/convert.php';
+    include 'addons/small/convert.php';
     //include 'addons/small/didyoumean.php';
     include 'addons/summarizer/sum.php';
 
@@ -432,9 +636,10 @@ else{
     $simImg = $wiki = $news = $reddit = $youtube = $relatedP = '';
     if(isset($_COOKIE['hQuery'])){$hideQueryCopy = hideQuery($Bpurl);}
     else{$hideQueryCopy = null;}
-    if(isset($wikiobj)){$wiki = wiki($wikiobj, $wikiTxt, $ddgObj, $ImpProfiles ?? null, $hideQueryCopy); $simImg = $wiki[1]; $wiki = $wiki[0];}
+    if(isset($wikiobj)){$wiki = wiki($purl, $wikiobj, $wikiTxt, $ddgObj, $ImpProfiles ?? null, $hideQueryCopy); $simImg = $wiki[1]; $wiki = $wiki[0];}
     if(isset($NewsObj)){$news = search_news($NewsObj);}
     if(isset($YoutubeObj)){$youtube = youtube($YoutubeObj);}
+    if(isset($ShopObj)){$shop = shop($ShopObj);}
 
     $privateAltOut = pHigh($purl);if($privateAltOut != ''){$loaded[6] = true;}
     $reddit = search_reddit($redditObj);
@@ -450,35 +655,83 @@ else{
 
     //Check which addons loaded
     if($wiki != ''){$loaded[1] = true;}
-    if($news != ''){$loaded[2] = true;}
-    if($reddit != ''){$loaded[3] = true;}
-    if($youtube != ''){$loaded[4] = true;}
-    if($related != ''){$loaded[5] = true;}
+    if($shop != ''){$loaded[2] = true;}
+    if($news != ''){$loaded[3] = true;}
+    if($reddit != ''){$loaded[4] = true;}
+    if($youtube != ''){$loaded[5] = true;}
+    if($relatedP != ''){$loaded[6] = true;}
 
-    //Turn of Google if rate limite
-    if(str_starts_with(json_encode($obj), '{"error":{"code":429,')){
-        if(date('H') >= 7){
-        file_put_contents('disGoogle.txt',date('d'));
+    //Backup call and turn off API
+    $apiErrors = ['{"error":{"code":','{"response":{"status":"OK"','{"status":"error",'];
+    $apiFailed = true;
+    
+    function disFile($name){
+        file_put_contents($name,time());
+        return true;
+    }
+    while($apiFailed){
+        $newCall = false;
+
+        if($searchId==0 && strpos(json_encode($obj), $apiErrors[0]) !== false){
+            $newCall=disFile('disGoogle.txt');
+            $disabled[0]=1;
         }
-        else{
-            file_put_contents('disGoogle.txt',date('d')-1);
+        elseif($searchId==1 && ($g2obj['status']=='error' || empty($g2obj))){
+            $newCall=disFile('disGoogle2.txt');
+            $disabled[1]=1;
+        }
+        elseif($searchId==2 && strpos(json_encode($QWantObj), $apiErrors[2]) !== false){
+            $newCall=disFile('disBing.txt');
+            $disabled[2]=1;
+        }
+        elseif($searchId==3 && strpos(json_encode($QWantObj), $apiErrors[2]) !== false){
+            $newCall=disFile('disBing2.txt');
+            $disabled[3]=1;
+        }
+        //Add Brave
+        elseif($searchId==5 && strpos(json_encode($MojeekObj), $apiErrors[1]) === false){
+            $newCall=disFile('disMojeek.txt');
+            $disabled[5]=1;
+        }
+
+
+        if(!$newCall){$apiFailed=false;}
+
+        if($newCall){
+        $returnCall = backupCall($searchId, $disabled, $complex, $Bpurl, $MojeekFile, $lang);
+        $searchId = $returnCall[1];
+
+        switch($returnCall[1]){
+            case 1:$g2obj = $returnCall[0];break;
+            case 2:case 3:$QWantObj = $returnCall[0];break;
+            case 4:$BraveObj = $returnCall[0];break;
+            case 5:$MojeekObj = $returnCall[0];break;
+        }
         }
     }
 
     //Engines
     if($obj != ''){$results = google($obj, $loaded);}
     if(!isset($results[0]) && isset($g2obj)){$results = google2($g2obj, $loaded);}
-    if(isset($BraveObj) or !isset($results[0])){$results = brave($BraveObj, $loaded, $Bpurl);}
-    if(!isset($results[0])){$results = qwant($QWantObj, $loaded, $Bpurl, $page);}
-
+   if(!isset($results[0]) && isset($QWantObj)){$results = qwant($QWantObj, $loaded, $Bpurl, $page);}
+   if(!isset($results[0]) && isset($BraveObj)){$results = brave($BraveObj, $loaded, $Bpurl);}
+   if(!isset($results[0]) && isset($MojeekObj)){$results = mojeek($MojeekObj, $loaded);}
+    
     if(!isset($_COOKIE['safe']) && !isset($_COOKIE['time'])){
-    if($obj != ''){$_SESSION[$purl] = 'obj +=+ '.json_encode($obj);}
-    if($g2obj != ''){$_SESSION[$purl] = 'g2obj +=+ '.json_encode($g2obj);}
-    if($news != ''){$_SESSION[$purl.':-:news'] = json_encode($NewsObj);}
-    if($youtube != ''){$_SESSION[$purl.':-:yt'] = json_encode($YoutubeObj);}
-    if($reddit != ''){$_SESSION[$purl.':-:red'] = json_encode($redditObj);}
-    if($related != ''){$_SESSION[$purl.':-:rel'] = json_encode($related);}
+    if($obj != ''){$_SESSION[$purl.$lang.$loc.$safeS.$_COOKIE['time']] = 'obj +=+ '.json_encode($obj);}
+    if(isset($g2obj)){$_SESSION[$purl.$lang.$loc.$safeS.$_COOKIE['time']] = 'g2obj +=+ '.json_encode($g2obj);}
+    if(isset($QWantObj)){$_SESSION[$purl.$lang.$loc.$safeS.$_COOKIE['time']] = 'qwant +=+ '.json_encode($QWantObj);}
+    if(isset($BraveObj)){$_SESSION[$purl.$lang.$loc.$safeS.$_COOKIE['time']] = 'brave +=+ '.$BraveObj;}
+    if(isset($MojeekObj)){$_SESSION[$purl.$lang.$loc.$safeS.$_COOKIE['time']] = 'mojeek +=+ '.json_encode($MojeekObj);}
+
+    if(isset($ShopObj)){$_SESSION[$purl.':-:shop'] = json_encode($ShopObj);}
+    if(isset($wikiobj)){$_SESSION[$purl.':-:wiki'] = json_encode($wikiobj).'--]|[--'.$wikiTxt.'--]|[--'.json_encode($ddgObj);}
+    if(isset($NewsObj)){$_SESSION[$purl.':-:new'] = $NewsObj;}
+    if(isset($redditObj)){$_SESSION[$purl.':-:red'] = $redditObj;}
+    if(isset($YoutubeObj)){$_SESSION[$purl.':-:yt'] = $YoutubeObj;}
+    if(isset($related)){$_SESSION[$purl.':-:rel'] = $related;}
     }
+    
     //Print
         //Query URL
     if(preg_match('/^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z0-9]{2,}(:\d{2,5})?(\/\S*)*$/', preg_replace('/\s+$/u', '', $purl))){
@@ -491,26 +744,30 @@ else{
         echo '><button class="redirectMe">Redirect me!</button></a>
         </div>';
     }
+
+    $insAnswer = (!isset($_COOKIE['DisWid'])) ? "<div data-sxpr-instant-answers id='my-ia-container' class='output' style='border-radius:20px;margin-bottom:10px;'></div>
+    <script>setTimeout(function() {var container = document.getElementById('my-ia-container');if (container) {if (container.textContent.trim() === '') {container.style.display = 'none';}}}, 5000);</script>" : '';
+
     if(isset($results))
     {
-    echo $results[0], $privateAltOut,
+    echo $insAnswer, $results[0], $privateAltOut,
     $wiki,
     $results[1],
-    $news,
+    $shop,
     $results[2], $results[3],
-    $reddit,
+    $news,
     $results[4], $results[5],
-    $youtube,
+    $reddit,
     $results[6], $results[7],
+    $youtube,$results[8],
     $relatedP;
-    if(count($results)>7){
-        for ($i = 8; $i < count($results); $i++) {
+    if(count($results)>8){
+        for ($i = 9; $i < count($results); $i++) {
             echo $results[$i];
           }
     }
     echo $elseWhere;
    if(!$dev){
-
     $priecoTime = microtime(true);
     if(isset($_SESSION[$purl.':-:pri'])){$priecoResults = explode('-<+>-', $_SESSION[$purl.':-:pri']);}
     else{$priecoResults = prieco($purl, $conn, $loc, $lang);}
@@ -612,139 +869,59 @@ if ($type === 'image') {
     include './Model/imgset.php';
 
     if(!$dev){
-        $Qimg = '{"status":"error","data":{"error_code":24}}';
+        function imgCall($Bpurl, $page, $imgsize, $imgcolor, $imgtype, $imgtime, $imgright){
+            $Qimg[0] = '{"status":"error","data":{"error_code":24}}';
 
-        if (!file_exists('disImg.txt')) {
-            $mh = curl_multi_init();
-            $handles = array();
-        
-            // Google request
-            if($page == 0){
-            $gCh = curl_init('https://www.googleapis.com/customsearch/v1?key='.$_ENV['GOOGLE_IMAGE_API_KEY'].'&cx='.$_ENV['GOOGLE_IMAGE_CX_KEY'].'&hl=all&gl=all&safe='.$safe.'&q='.$Bpurl.'&searchType=image');
-            curl_setopt($gCh, CURLOPT_POST, true);
-            curl_setopt($gCh, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($gCh, CURLOPT_TIMEOUT, 3);
-            curl_multi_add_handle($mh, $gCh);
-            $handles[] = $gCh;
-            }
-            // Bing request
-            $bCh = curl_init();
-            $bUrl = 'https://api.qwant.com/v3/search/images/?count=75&offset=' . $page * 82 . '&uiv=1&locale=en_US&size=' . $imgsize . '&color=' . $imgcolor . '&imagetype=' . $imgtype . '&freshness=' . $imgtime . '&license=' . $imgright . '&q=' . $Bpurl;
-            curl_setopt($bCh, CURLOPT_URL, $bUrl);
-            curl_setopt($bCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-            curl_setopt($bCh, CURLOPT_CONNECTTIMEOUT, 2.5);
-            curl_setopt($bCh, CURLOPT_RETURNTRANSFER, true);
-            curl_multi_add_handle($mh, $bCh);
-            $handles[] = $bCh;
-        
-            // Execute the requests concurrently
-            $active = null;
-            do {
-                curl_multi_exec($mh, $active);
-            } while ($active > 0);
-        
-            // Get the responses
-            if($page == 0){$gResponse = curl_multi_getcontent($gCh);}
-            $bResponse = curl_multi_getcontent($bCh);
-        
-            // Close the handles
-            foreach ($handles as $handle) {
-                curl_multi_remove_handle($mh, $handle);
-                curl_close($handle);
-            }
-            curl_multi_close($mh);
-        
-            // Process the responses
-            if($page == 0){$Gimg = json_decode($gResponse, true);}
-            $Qimg = $bResponse;
-        }
-        
-        // Bing failed
-        if ($Qimg == '{"status":"error","data":{"error_code":24}}' || $Qimg == '{"status":"error","data":{"error_code":20}}') {
-            if (!file_exists('disImg.txt')) {
-                file_put_contents('disImg.txt', date('d') . ' ' . date('H'));
-            }
-        
-            $mh = curl_multi_init();
-            $handles = array();
-        
-            // Bing request
-            $bUrl = 'https://librex.jojoyou3.repl.co/qwant.php?offset=' . $page * 82 . '&imgsize=' . $imgsize . '&imgcolor=' . $imgcolor . '&imgtype=' . $imgtype . '&imgtime=' . $imgtime . '&imgright=' . $imgright . '&q=' . $Bpurl;
-        
-            $BCurl = curl_init();
-            curl_setopt($BCurl, CURLOPT_URL, $bUrl);
-            curl_setopt($BCurl, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-            curl_setopt($BCurl, CURLOPT_CONNECTTIMEOUT, 2.5);
-            curl_setopt($BCurl, CURLOPT_RETURNTRANSFER, true);
-            curl_multi_add_handle($mh, $BCurl);
-            $handles[] = $BCurl;
-        
-            if (!isset($Gimg) && $page == 0) {
-                $gCh = curl_init('https://www.googleapis.com/customsearch/v1?key='.$_ENV['GOOGLE_IMAGE_API_KEY'].'&cx='.$_ENV['GOOGLE_IMAGE_CX_KEY'].'&hl=all&gl=all&safe='.$safe.'&q='.$Bpurl.'&searchType=image');
-                curl_setopt($gCh, CURLOPT_POST, true);
-                curl_setopt($gCh, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($gCh, CURLOPT_TIMEOUT, 3);
-                curl_multi_add_handle($mh, $gCh);
-                $handles[] = $gCh;
-            }
-        
-            $active = null;
-        
-            do {
-                curl_multi_exec($mh, $active);
-            } while ($active);
-        
-            $Qimg = curl_multi_getcontent($BCurl);
-            if (!isset($Gimg)) {$Gimg = json_decode(curl_multi_getcontent($gCh), true);}
+            $apis = array();
+            if(!file_exists('disBing.txt')){$apis[] = 'https://api.qwant.com/v3/search/images/?count=75&offset=' . $page * 82 . '&uiv=1&locale=en_US&size=' . $imgsize . '&color=' . $imgcolor . '&imagetype=' . $imgtype . '&freshness=' . $imgtime . '&license=' . $imgright . '&q=' . $Bpurl;}
+            if (!file_exists('disBing2.txt')) {$apis[] = 'https://librex.jojoyou3.repl.co/qwant.php?offset=' . $page * 82 . '&imgsize=' . $imgsize . '&imgcolor=' . $imgcolor . '&imgtype=' . $imgtype . '&imgtime=' . $imgtime . '&imgright=' . $imgright . '&q=' . $Bpurl;}
+            
+            $imgUrl='';
+            if(count($apis)>1){$imgUrl = $apis[array_rand($apis)];}
+            else{$imgUrl =  $apis[0];}
 
-            foreach ($handles as $handle) {
-                curl_multi_remove_handle($mh, $handle);
-                curl_close($handle);
-            }
-        
-            curl_multi_close($mh);
-        
-            $active = null;
-        
-            do {
-                curl_multi_exec($mh, $active);
-            } while ($active);
-        
-            curl_multi_close($mh);
+            $qCh = curl_init();
+            curl_setopt($qCh, CURLOPT_URL, $imgUrl);
+            curl_setopt($qCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
+            curl_setopt($qCh, CURLOPT_CONNECTTIMEOUT, 2.5);
+            curl_setopt($qCh, CURLOPT_RETURNTRANSFER, true);
+            
+            $qResponse = curl_exec($qCh);
+            
+            curl_close($qCh);
+
+            $Qimg[0] = $qResponse;
+            $Qimg[1] = $imgUrl;
+            
+            return $Qimg;
         }
-    }
+
+        if(!isset($_SESSION[$Bpurl.$page.$imgsize.$imgcolor.$imgtype.$imgtime.$imgright.':-:img'])){
+        $Qimg = imgCall($Bpurl, $page, $imgsize, $imgcolor, $imgtype, $imgtime, $imgright);
+        }
+        else{
+            $Qimg = $_SESSION[$Bpurl.$page.$imgsize.$imgcolor.$imgtype.$imgtime.$imgright.':-:img'];
+        }
+
+if ($Qimg[0] == '{"status":"error","data":{"error_code":24}}' || $Qimg[0] == '{"status":"error","data":{"error_code":20}}') {
+    if (!file_exists('disBing.txt') && parse_url($Qimg[1])['host'] == 'api.qwant.com') {file_put_contents('disBing.txt', time());}
+    if (!file_exists('disBing2.txt') && parse_url($Qimg[1])['host'] == 'librex.jojoyou3.repl.co') {file_put_contents('disBing2.txt', time());}
+    
+    $Qimg = imgCall($Bpurl, $page, $imgsize, $imgcolor, $imgtype, $imgtime, $imgright);
+}
+        }
     else{
         $Qimg = file_get_contents('./Controller/dev/img.json');
     }
+    if(!isset($_SESSION[$Bpurl.$page.$imgsize.$imgcolor.$imgtype.$imgtime.$imgright.':-:img'])){
+        $_SESSION[$Bpurl.$page.$imgsize.$imgcolor.$imgtype.$imgtime.$imgright.':-:img'] = $Qimg[0];
+        $Qimg = json_decode($Qimg[0], true);
+    }
+    else{
         $Qimg = json_decode($Qimg, true);
+    }
         
-
-
         echo '<div style="display:flex;margin-top:30px;flex-wrap:wrap;justify-content:center;"><br>';
-        foreach($Gimg['items'] as &$item){
-            echo 'here';
-            echo '
-            <div class="imgoutdiv">
-             <div tabindex="0" class="imgoutbtn" style="aspect-ratio:',$item['image']['width'],'/',$item['image']['height'],';">
-                 <div style="background-image: url(/Controller/functions/proxy.php?q=',$item['image']['thumbnailLink'], ');aspect-ratio:',$item['image']['width'],'/',$item['image']['height'],';" class="imgout"></div>
-                 </div>
-             
-             
-     
-             <div class="bigimgout">           
-             <img src ="/Controller/functions/proxy.php?q=',$item['image']['thumbnailLink'], '" data-src="/Controller/functions/proxy.php?q=',$item['link'],'"';
-             if(!isset($_COOKIE['DisHImg'])){echo 'style="filter: blur(5px);"';}
-             echo '>
-             <br>
-             <h3>', $item['title'], '</h3><br>
-             <p>From website: ', $item['displayLink'], '</p><br>
-             <div class="bigimgbtn"><a href="https://', $item['displayLink'], '"><button class="imgtoolsOption">Go to website</button></a><br>
-             <a href="',$item['link'], '"> <button class="imgtoolsOption">Go to image</button></a></div>  
-             <div style="display: flex;justify-content: center;"><button class="bigimgclose imgtoolsOption">«Close</button></div>   
-             </div>      
-           </div>
-             ';
-        }
         foreach ($Qimg['data']['result']['items'] as &$item) {
             if (!isset($item['media']) or !isset($item['media_preview'])) {
                 continue;
@@ -752,8 +929,8 @@ if ($type === 'image') {
     
             echo '
            <div class="imgoutdiv">
-            <div tabindex="0" class="imgoutbtn" style="aspect-ratio:',$item['thumb_width'],'/',$item['thumb_height'],';">
-                <img src="https://search.jojoyou.org/Controller/functions/img_proxy.php?q=',explode('?', $item['media'])[0], '" style="aspect-ratio:',$item['thumb_width'],'/',$item['thumb_height'],';width:',$item['thumb_width'],'px;height:',$item['thumb_height'],'px;max-width: 100%;max-height: 100%;" class="imgout">
+            <div tabindex="0" class="imgoutbtn">
+                <img src="https://search.jojoyou.org/Controller/functions/proxy.php?q=http',urldecode(str_replace('&q=0&b=1&p=0&a=0','', explode('?u=http',$item['thumbnail'])[1])), '" class="imgout">
                 <a style="color: var(--linkColor); cursor:pointer;text-decoration:none;" href="',$item['url'],'"';if (isset($_COOKIE['new'])) {echo 'target="_blank';}echo'>
             <p>';
                 $pieces = parse_url($item['url']);
@@ -768,7 +945,7 @@ if ($type === 'image') {
             
     
             <div class="bigimgout">           
-            <img src ="https://search.jojoyou.org/Controller/functions/img_proxy.php?q=',$item['media'], '" data-src="/Controller/functions/proxy.php?q=',$item['media'],'"';
+            <img src ="https://search.jojoyou.org/Controller/functions/proxy.php?q=http',urldecode(str_replace('&q=0&b=1&p=0&a=0','', explode('?u=http',$item['thumbnail'])[1])), '" data-src="/Controller/functions/proxy.php?q=',$item['media'],'"';
             if(!isset($_COOKIE['DisHImg'])){echo 'style="filter: blur(5px);"';}
             echo '>
             <br>
@@ -815,30 +992,64 @@ if ($type === 'image') {
 }
 if ($type == 'video') {
     if (!$dev) {
+        $YoutubeObj = array();
+        $result = $conn->query("SELECT * FROM `youtube` WHERE `title` LIKE '%$purl%' OR `description` LIKE '%$purl%' LIMIT 200");
+        if ($result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $YoutubeObj[] = $row;
+            }
+        }
+        usort($YoutubeObj, function ($a, $b) {
+            $timestampA = strtotime($a['date']);
+            $timestampB = strtotime($b['date']);
+        
+            if ($timestampA === $timestampB) {return 0;}
+            return ($timestampA > $timestampB) ? -1 : 1;
+        });
+        if(count($YoutubeObj)<3){$indexY = false;unset($YoutubeObj);}
+        else{$indexY = true;}
+    if(!$indexY){
         $YoutubeCurl = curl_init();
         curl_setopt($YoutubeCurl, CURLOPT_URL, $YoutubeFile);
         curl_setopt($YoutubeCurl, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
         curl_setopt($YoutubeCurl, CURLOPT_CONNECTTIMEOUT, 2.5);
         curl_setopt($YoutubeCurl, CURLOPT_RETURNTRANSFER, true);
-        $YoutubeObj = json_decode(curl_exec($YoutubeCurl), true);
+        $YoutubeObjN = json_decode(curl_exec($YoutubeCurl), true);
         curl_close($YoutubeCurl);
+       
+        foreach ($YoutubeObjN['items'] as $item) {
+            $title = substr($item['snippet']['title'], 0, 47);
+            $description = substr($item['snippet']['description'], 0, 47);
+
+            $YoutubeObj[] = array(
+                'title' => $title,
+                'description' => $description,
+                'url' => $item['id']['videoId'],
+                'thumb' => str_replace('https://i.ytimg.com/vi/','',$item['snippet']['thumbnails']['medium']['url']),
+                'date' => $item['snippet']['publishTime']
+            );
+        }        
+    }
     } else {
         $YoutubeObj =  json_decode(file_get_contents($YoutubeFile), true);
     }
-    echo '<div style="display:flex;margin-top:30px;flex-wrap:wrap;"><br>';
-    foreach ($YoutubeObj['items'] as &$item) {       
+    echo '<div style="display:flex;margin-top:30px;flex-wrap:wrap;justify-content: center;"><br>';
+
+    foreach ($YoutubeObj as &$item) {   
+
         echo '
 
                     <div class="imgoutdiv">
-                    <a style="text-decoration: none;" href="https://www.youtube.com/watch?v=' . $item['id']['videoId'] . '"'; if (isset($_COOKIE['new'])) {
+                    <a style="text-decoration: none;" href="https://www.youtube.com/watch?v=' . $item['url'] . '"';
+                    if (isset($_COOKIE['new'])) {
                         echo 'target="_blank"';
                     }
                     echo'>
                     <button class="imgoutbtn" style="flex-direction: column;align-items: center;">
-            <img alt="ㅤ"src ="/Controller/functions/proxy.php?q=',  $item['snippet']['thumbnails']['medium']['url'], '"class="imgout" style="border-radius:20px;"loading="lazy">
+            <img src ="/Controller/functions/proxy.php?q=https://i.ytimg.com/vi/',  $item['thumb'], '"class="imgout" loading="lazy">
             <div class="imgoutlink">
-            <p style="font-size:12px;font-weight:bold;">',  substr($item['snippet']['title'], 0, 20) . '...</p>
-            <p style="font-size:10px;">', substr($item['snippet']['description'], 0, 20) . '...</p>
+            <p style="font-size:12px;font-weight:bold;">', $item['title'],'</p>
+            <p style="font-size:10px;">', $item['description'],'</p>
             </div>
             </button>
         </a>
@@ -850,45 +1061,62 @@ if ($type == 'video') {
 
 if ($type == 'news') {
     if (!$dev) {
-        $NewsCurl = curl_init();
-        curl_setopt($NewsCurl, CURLOPT_URL, $NewsFile);
-        curl_setopt($NewsCurl, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-        curl_setopt($NewsCurl, CURLOPT_CONNECTTIMEOUT, 2.5);
-        curl_setopt($NewsCurl, CURLOPT_RETURNTRANSFER, true);
-        $NewsObj = json_decode(curl_exec($NewsCurl), true);
-        curl_close($NewsCurl);
+        $NewsObj = array();
+     $result = $conn->query("SELECT * FROM `news` WHERE `title` LIKE '%$purl%' OR `description` LIKE '%$purl%'");
+     if ($result->num_rows > 0) {
+         while ($row = $result->fetch_assoc()) {
+             $NewsObj[] = $row;
+         }
+     }
+     usort($NewsObj, function ($a, $b) {
+         $timestampA = strtotime($a['date']);
+         $timestampB = strtotime($b['date']);
+     
+         if ($timestampA === $timestampB) {return 0;}
+         return ($timestampA > $timestampB) ? -1 : 1;
+     });
+     if(count($NewsObj)<3){$indexN = false;}
+     else{$indexN = true;}
+        
     } else {
         $NewsObj =  json_decode(file_get_contents($NewsFile), true);
     }
-    $did = false;
-    foreach ($NewsObj['articles'] as &$news) {
+
+    $i = 0;
+    foreach ($NewsObj as &$news) {
         $title = str_replace('<', '', $news['title']);
         $title = str_replace('>', '', $title);
         $desc = str_replace('<', '', $news['description']);
         $desc = str_replace('>', '', $desc);
         echo '<div class="output"';
-        if (!$did) {
+        if ($i==0) {
             echo 'style="border-top-left-radius: 20px;
-            border-top-right-radius: 20px;"';
-            $did = true;
+            border-top-right-radius: 20px;padding-top: 18px;"';
+        }
+        elseif($i == count($NewsObj)-1){
+            echo 'style="border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;"';
         }
         echo ' id="output">';
-        if ($news['urlToImage'] != '' and !isset($_COOKIE['datasave'])) {
-            echo '<img loading="lazy" alt="‎" src="/Controller/functions/proxy.php?q=', $news['urlToImage'], '" class="OutSideImg">';
+        if ($news['img'] != '' and !isset($_COOKIE['datasave'])) {
+            echo '<img loading="lazy" src="/Controller/functions/proxy.php?q=', $news['img'], '" class="OutSideImg">';
         }
         echo '<a ';
         if (isset($_COOKIE['new'])) {
             echo 'target="_blank"';
         }
-        echo 'href="', $news['url'], '">
-    <p style="color: gray;
-    font-size: 14px;">', $news['source']['name'], '</p>
-    <p class="OutTitle" style="font-size:16px;padding-top:0;padding-bottom: 5px;">', $title, '</p></a>
-    <p class="snippet"style="font-size:12px;padding-bottom: 18px;">--', $desc, '</p>
+        echo 'href="', $news['url'], '">';
+        if (strpos($news['url'], 'https://') !== false && !isset($_COOKIE['datasave'])) {
+            echo '<img class="Outfavicon" style="margin-top:unset;" loading="lazy" src="/Controller/functions/proxy.php?q=https://judicial-peach-octopus.b-cdn.net/'. parse_url($news['url'])['host']. '">';
+        }
+    echo '<p class="OutTitle" style="font-size:16px;padding-top:0;padding-bottom: 5px;">', $title, '</p></a>
+    <p class="snippet"style="font-size:12px;padding-bottom: 18px;">', $desc, '</p>
     ';
         if ($providers == 'on') {
             echo '<p class="resProvider">Newsapi</p>';
         }
         echo '</div>';
+
+        ++$i;
     }
 }

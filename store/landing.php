@@ -29,7 +29,7 @@
 </a>
 </div>
 
-<a href="creator.php" style="width: 100vw;
+<a href="store/creator.php" style="width: 100vw;
     float: left;
     display: block;
     text-align: center;"><button>Create your own theme</button></a>

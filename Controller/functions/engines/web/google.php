@@ -8,15 +8,13 @@ function google($obj, $loaded)
 
 switch ($i){
     case 0:
-        if($loaded[6]) {$google[$i] .= ' mBorderBoth ';}
-        elseif(!$loaded[0] && $loaded[1]) {$google[$i] .= ' mBorderBoth2 mBorderTop ';}
+        if(!$loaded[0] && $loaded[1]) {$google[$i] .= ' mBorderBoth2 mBorderTop ';}
         elseif(!$loaded[0]){$google[$i] .= ' mBorderTop ';}
         elseif($loaded[1]){$google[$i] .= ' mBorderBottom2 ';}
         break;
     case 1:
         if($loaded[1]) {$google[$i] .= ' mBorderTop2 ';}
         if($loaded[2]) {$google[$i] .= ' mBorderBottom ';}
-        if($loaded[6]) {$google[$i] .= ' mBorderTop ';}
         break;
     case 2:
         if($loaded[2]) {$google[$i] .= ' mBorderTop ';}
@@ -38,8 +36,10 @@ switch ($i){
         break;
     case 8:
         if($loaded[5]) {$google[$i] .= ' mBorderTop ';}
+        if($loaded[6]) {$google[$i] .= ' mBorderBottom ';}
         break;
     case 9:
+        if($loaded[6]) {$google[$i] .= ' mBorderTop ';}
         $google[$i] .= ' mBorderBottom ';
         break;
 }
@@ -61,7 +61,7 @@ $google[$i] .= '<a ';
 if (isset($_COOKIE['new'])) {
 $google[$i] .= 'target="_blank"';
 }
-$google[$i] .= 'href="'. $item['link']. '">';
+$google[$i] .= 'href="'. $item['link']. '" data-sxpr-link>';
 $google[$i] .= '<p class="OutTitle">'.strip_tags($item['title']). '</p></a>
 <p class="resLink">'. $gurl. '</p>';
 

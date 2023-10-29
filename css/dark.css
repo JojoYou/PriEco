@@ -1,8 +1,11 @@
+:root{
+  --linkColor: #8ab4f8;
+}
 html, .copyQuery, #addShortcutBtn:hover {
   background-color: #181a1b;
   color: white;
 }
-.settingButton {
+.settingButton,.sx-search-sug-link span,.sx-kp-tab-content {
   color: white;
 }
 .output {
@@ -14,7 +17,9 @@ html, .copyQuery, #addShortcutBtn:hover {
 .answer {
   background-color: #2a2c2d;
 }
-
+.ad{
+  filter: brightness(0.2);
+}
 .shortcutElemenet{
   background-color: #181a1b;
   border: solid 10px #181a1b;
@@ -216,4 +221,7 @@ html, .copyQuery, #addShortcutBtn:hover {
 }
 .videossearch {
   background-color: #2a2c2d;
+}
+.sx-overflow-gradient{
+  display: none;
 }

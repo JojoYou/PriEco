@@ -2,7 +2,7 @@
 //Homepage
 if(isset($_POST['shortcutSubmit'])){
   $shURL = $_POST['shortcutURL'];
-  if (strpos($shURL, "http://") !== 0 && strpos($shURL, "https://") !== 0) {$shURL = 'https://'.$shURL;}
+  if (strpos($shURL, "http://") !== 0 && strpos($shURL, "https://") !== 0 && strpos($shURL, "file://") !== 0) {$shURL = 'https://'.$shURL;}
   setcookie('shortcuts', $_COOKIE['shortcuts'].','. $_POST['shortcutName'].'='.$shURL, time() + 31536000, '/');
   $reload=true;
   }
@@ -223,16 +223,7 @@ if (isset($_POST['mapBut'])) {
       $reload = true;
     }
   }
-  if(isset($_POST['imP'])){
-    if($_POST['imP'] == 'imPOff'){
-      setcookie('improvePriEco',  'on', time() + 31536000, '/');
-      $reload = true;
-    }
-    else {
-      setcookie('improvePriEco', null, -1, '/');
-      $reload = true;
-    }
-  }
+  
 if (isset($_POST['savequicksetting'])) {
 
   if (isset($_POST['LocDropDown'])) {

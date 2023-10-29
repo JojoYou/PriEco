@@ -40,13 +40,14 @@ margin-top: -63px;"alt="bottomTree">
     <div style="float:left;padding-left: 20px;width: 25%;word-wrap: break-word;" class="footer-content-left">
       <p>
         <br>
-        Source code: <a href="https://codeberg.org/JojoYou/PriEco/src/branch/master" target="_blank" style="text-decoration:none;color:#34A8AC;">CodeBerg</a>
+        Privacy Policy and TOS: <a href="https://jojoyou.org/legal/" target="_blank" style="text-decoration:none;color:#34A8AC;">Legal</a>
+          <br>
+          Source code: <a href="https://codeberg.org/JojoYou/PriEco/src/branch/master" target="_blank" style="text-decoration:none;color:#34A8AC;">CodeBerg</a>
           <br>
           
-          Tor onion domain: <a href="http://ljtd3fhffeknviu7l7k2z4qdybpchmdh2arcq4wzs2jg6wpfut334mad.onion" target="_blank" style="text-decoration:none;color:#34A8AC;">Onion</a>
+          <!--Tor onion domain: <a href="http://ljtd3fhffeknviu7l7k2z4qdybpchmdh2arcq4wzs2jg6wpfut334mad.onion" target="_blank" style="text-decoration:none;color:#34A8AC;">Onion</a>-->
           <br><br>
-        <!-- Place for ad -->
-      </p>
+        </p>
     </div>
     <div style="text-align: center;width: 50%;float: left;" class="footer-content-center">
       <h2 style="background: -webkit-linear-gradient(#03D781, #3EDCE2);
@@ -55,7 +56,8 @@ margin-top: -63px;"alt="bottomTree">
 font-weight: bold;">
         PriEco
       </h2>
-
+  <p>1.0.0</p>
+  
   <h3><span style="display:inline-block;
   transform: rotate(180deg);">&copy;</span>2021-<?php echo date("Y"); ?> Roman Láncoš, JojoYou</h3>
   <a href="https://codeberg.org/JojoYou/PriEco/src/branch/master/LICENCE.md" target="_blank"><button style="background: none;

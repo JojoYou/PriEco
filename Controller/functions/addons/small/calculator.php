@@ -2,7 +2,7 @@
 
     <div class="calculator output" style="border-radius:20px;padding:10px;margin-bottom:15px;">
         <div class="display">
-            <input id="screen" type="text" placeholder="0">
+            <input id="screen" type="text" placeholder=":)">
         </div>
         <input type="radio" id="calcFx" name="calcGroup" style="display:none;">
 
@@ -155,5 +155,3 @@ screen.value="";
         screen.value = screen.value.substr(0, screen.value.length - 1);
     }
 </script>
-
-</html>

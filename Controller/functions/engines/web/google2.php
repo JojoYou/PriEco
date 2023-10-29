@@ -10,15 +10,13 @@ $google2[]=null;
 
     switch ($i){
         case 0:
-            if($loaded[6]) {$google2[$i] .= ' mBorderBoth ';}
-            elseif(!$loaded[0] && $loaded[1]) {$google2[$i] .= ' mBorderBoth2 mBorderTop ';}
+            if(!$loaded[0] && $loaded[1]) {$google2[$i] .= ' mBorderBoth2 mBorderTop ';}
             elseif(!$loaded[0]){$google2[$i] .= ' mBorderTop ';}
             elseif($loaded[1]){$google2[$i] .= ' mBorderBottom2 ';}
             break;
         case 1:
             if($loaded[1]) {$google2[$i] .= ' mBorderTop2 ';}
             if($loaded[2]) {$google2[$i] .= ' mBorderBottom ';}
-            if($loaded[6]) {$google2[$i] .= ' mBorderTop ';}
             break;
         case 2:
             if($loaded[2]) {$google2[$i] .= ' mBorderTop ';}
@@ -40,11 +38,13 @@ $google2[]=null;
             break;
         case 8:
             if($loaded[5]) {$google2[$i] .= ' mBorderTop ';}
+            if($loaded[6]) {$google2[$i] .= ' mBorderBottom ';}
             break;
         case 9:
-            $google2[$i] .= ' mBorderBottom ';
+            if($loaded[6]) {$google2[$i] .= ' mBorderTop ';}
             break;
     }
+    if($bottomBorder == $i){$google2[$i] .= ' mBorderBottom ';}
     
     
 $gurl = str_replace('/',' > ',str_replace('https://','',str_replace('http://','',str_replace('www.','', $item['url']))));
@@ -61,7 +61,7 @@ $google2[$i] .= '<a ';
 if (isset($_COOKIE['new'])) {
 $google2[$i] .= 'target="_blank"';
 }
-$google2[$i] .= 'href="'. $item['url']. '">';
+$google2[$i] .= 'href="'. $item['url']. '" data-sxpr-link>';
 $google2[$i] .= '<p class="OutTitle">'. $item['title']. '</p></a>
 <p class="resLink">'. $gurl. '</p>';
 

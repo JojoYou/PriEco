@@ -63,7 +63,7 @@ Import font
   --sidebar-bg-color-dark: rgba(42, 44, 46, 0.9);
 
   --result-curve: 20px;
-  --linkColor: #3391ff;
+  --linkColor: #1a0dab;
   --topColor: #34A8AC;
 }
 
@@ -309,8 +309,9 @@ img {
 }
 
 .feedbackMenuLabel {
-  margin-left: 20px;
+  margin-left: 10px;
   cursor: pointer;
+  padding: 0 10px 0 10px;
 }
 
 .feedbackMenuLabel img {
@@ -349,7 +350,10 @@ img {
 .quickSettingButtons {
   display: none;
   position: absolute;
-  top: 125px;
+  top: 135px;
+  width: 100%;
+  overflow-x: auto;
+
 }
 
 .quickSettingsSpace {
@@ -364,13 +368,13 @@ img {
 
 #threedotsquick:checked~.quickSettingButtons {
   animation: showquicksettings 0.4s;
-  display: block;
+  display: flex;
 }
 
 #threedotsquick:checked~.quickSettingsSpace {
   animation: showquickspace 0.2s;
   display: block;
-  height: 60px;
+  height: 40px;
 }
 
 @keyframes showquickspace {
@@ -379,7 +383,7 @@ img {
   }
 
   100% {
-    height: 50px;
+    height: 40px;
   }
 }
 
@@ -395,29 +399,24 @@ img {
 
   100% {
     display: block;
-    top: 125px;
+    top: 135px;
   }
 }
 
 .topspace {
-  margin-top: 105px;
+  margin-top: 120px;
 }
 
 .labelforcheckquick {
-  margin-left: calc(8vw + clamp(552px, 675px, 90vw));
   border: none;
   font-size: 16px;
-  background-color: #34A8AC;
-  border-top-left-radius: 10px;
-  border-top-right-radius: 10px;
-  margin-top: 71px;
-  position: absolute;
-  z-index: 10;
   cursor: pointer;
-  width: 13px;
   text-align: center;
 }
-
+.labelforcheckquick img{
+  width: 13px;
+  height: 13px;
+}
 .tree-btn {
   display: none;
   top: 33px;
@@ -440,7 +439,7 @@ img {
   left: 20px;
   min-width: 300px;
   border: solid 1px gray;
-  animation: slide-up 5s;
+  animation: slide-up 2s;
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
@@ -562,6 +561,7 @@ h4 {
   float: left;
   clear: left;
   line-height: 21px;
+  overflow: hidden;
 }
 
 .outputTab {
@@ -798,9 +798,8 @@ h4 {
   cursor: pointer;
   border: none;
   width: 220px;
-  height: 115px;
-  border-radius: var(--result-curve) var(--result-curve) 0 0;
   height: 140px;
+  border-radius: var(--result-curve) var(--result-curve) 0 0;
   background-color: #0002;
   background-position: center;
   background-size: cover;
@@ -873,11 +872,31 @@ h4 {
 }
 
 #wikiMoreCheck:checked~.wikiMore,
-#sumMoreCheck:checked~.sumMore {
+#sumMoreCheck:checked~.sumMore{
   height: 100%;
   width: 1000%;
 }
-
+.moreMoreCheck{
+  display: none;
+}
+#my-kp-container {
+  width: 100%;
+  overflow: hidden;
+  margin-bottom: 15px;
+  background-color: #00000007;
+  padding: 10px;
+  border-radius: 20px;
+  display: inline-block;
+  cursor: pointer;
+}
+.ad{
+  border: 0px;
+  max-width: 250px;
+  width: 100%;
+  max-height: 50px;
+  height: 100%;
+  border-radius: 20px;
+}
 .hQuery {
   top: calc(100% + 20px);
   margin-left: -30px !important;
@@ -951,8 +970,8 @@ h4 {
 }
 
 .imgoutdiv {
-  height: 270px;
-  width: auto;
+  height: 370px;
+  width: calc(100%/8);
   padding: 10px;
   text-align: center;
   transition: all 0s ease-in-out;
@@ -962,7 +981,6 @@ h4 {
   width: 90%;
   margin-left: 5%;
   font-size: 12px;
-  white-space: nowrap;
   overflow: hidden;
 }
 
@@ -973,7 +991,7 @@ h4 {
   min-width: 50%;
   min-height: 50%;
   width: clamp(50%, 100%, 100%);
-  max-height: clamp(50%, 100%, 100%);
+  max-height: 270px;
   background-image: url(../View/icon/img.svg);
   background-repeat: no-repeat;
   overflow: hidden;
@@ -981,6 +999,7 @@ h4 {
 
 .imgout:hover {
   box-shadow: 0 0 5px 5px #7773;
+  transform: scale(1.1);
 }
 
 @keyframes tree-container-active {

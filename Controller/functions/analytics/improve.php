@@ -1,39 +1,5 @@
 <?php
-if($ImpProfiles){
-    $twitter='';
-    $facebook='';
-    $imdb='';
-    $tomato='';
-    $spotify='';
-    $apple='';
-
-    if(isset($ddgObj['Infobox']['content'])){
-    foreach($ddgObj['Infobox']['content'] as &$item){
-        if($item['data_type'] == 'twitter_profile'){
-            $twitter = $item['value'];
-        }
-        if($item['data_type'] == 'facebook_profile'){
-                $facebook = $item['value'];
-        }   
-        if($item['data_type'] == 'imdb_id'){
-                $imdb = $item['value'];
-        }   
-        if($item['data_type'] == 'rotten_tomatoes'){
-                $tomato = $item['value'];
-        }   
-        if($item['data_type'] == 'spotify_artist_id'){
-                $spotify = $item['value'];
-        }
-        if($item['data_type'] == 'itunes_artist_id'){
-                $apple = $item['value'];
-        }
-    }
-
-    $conn->query("INSERT INTO `profiles` (`Name`, `Twitter`, `Facebook`,`IMDb`,`Tomatoes`,`Spotify`,`Apple`) VALUES ('$name', '$twitter', '$facebook', '$imdb','$tomato','$spotify','$apple');");
-  }
-}
-
-if((($obj != '' && str_starts_with(json_encode($obj), '{"kind":"'))or isset($g2obj)) && $ImpGoogle && !isset($_COOKIE['safe']) && !isset($_COOKIE['time'])){
+if((($obj != '' && str_starts_with(json_encode($obj), '{"kind":"') && $searchId == 0) or (isset($g2obj) && !empty($g2obj) && $searchId == 1)) && $ImpGoogle && !isset($_COOKIE['safe']) && !isset($_COOKIE['time'])){
 
 $purl_escaped = strtolower(mysqli_real_escape_string($conn, $purl));
 
@@ -46,7 +12,7 @@ else{$lang_escaped = 'all';}
 if(isset($_COOKIE['Location'])){$loc_escaped = $_COOKIE['Location'];}
 else{$loc_escaped = 'all';}
 
-if(!isset($g2obj)){
+if(empty($g2obj) || $obj != ''){
         $sql = "INSERT INTO `googleCache`(`query`, `results`, `lang`, `loc`, `count`, `official`) VALUES ('$purl_escaped','$gCache_escaped', '$lang_escaped', '$loc_escaped', 1, 1);";
 }
 else{
@@ -64,4 +30,24 @@ if($simImg != ''){
         $purl_escaped = mysqli_real_escape_string($conn, $purl);
         $simI_escaped = mysqli_real_escape_string($conn, $simImg);
         $conn->query("UPDATE `suggestions` SET `img` = '$simI_escaped' WHERE `name` = '$purl_escaped'");   
+}
+
+if(!$indexY && isset($YoutubeObj)){
+$rows = [];
+
+foreach ($YoutubeObj as $item) {
+    $title = $conn->real_escape_string($item['title']);
+    $description = $conn->real_escape_string($item['description']);
+    $url = $conn->real_escape_string($item['url']);
+    $thumb = $conn->real_escape_string($item['thumb']);
+    $date = $conn->real_escape_string($item['date']);
+
+    $rows[] = "('$title', '$description', '$url', '$thumb', '$date')";
+}
+
+if (!empty($rows)) {
+    $values = implode(',', $rows);
+    $conn->query("INSERT INTO `youtube` (`title`, `description`, `url`, `thumb`, `date`) 
+    VALUES $values");
+} 
 }

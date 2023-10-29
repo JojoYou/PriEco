@@ -14,27 +14,6 @@ function getBetween($string, $start = "", $end = ""){
 }
 
 function brave($BraveObj, $loaded, $Bpurl){
-
-//add headers
-if(file_exists('disGoogle.txt') && !isset($BraveObj)){
-    $ch = curl_init();
-$headers = array(
-    'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-    'Accept-Language: en-US,en;q=0.8',
-    'Cache-Control: max-age=0',
-    'Connection: keep-alive',
-    'Upgrade-Insecure-Requests: 1',
-    'User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36',
-);
-curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-curl_setopt($ch, CURLOPT_URL, 'https://search.brave.com/search?q='.$Bpurl);
-curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-
-$BraveObj = curl_exec($ch);
-curl_close($ch);
-}
-if(!isset($BraveObj)){return;}
 $snippet = str_get_html($BraveObj)->find('div.snippet');
 
 if(isset($snippet)){
@@ -54,13 +33,12 @@ if($CountBraveSnippets >= 20){
 else{
     $CountBraveSnippets -= 1;
 }
+
 $i = 0;
 $brave[] = null;
 foreach ($snippet as $snip) {
     $href = $snip->find('a', 0);
-    if($href == null){
-        break;
-    }
+    if($href == null){continue;}
 
     if($href->find('div.favicon-wrapper', 0)->outertext != null){
     $href->find('div.favicon-wrapper', 0)->outertext = '';
@@ -69,20 +47,25 @@ foreach ($snippet as $snip) {
     if(!filter_var($url, FILTER_VALIDATE_URL)){
         continue;
     }
-    $description = $snip->find('p.snippet-description', 0);
-    
+
+    $description = strip_tags($snip->find('div.snippet-description', 0));
+    $description = strlen($description)>150 ? substr($description,0,150).'...' : $description;
+
+    $href= strip_tags($href);
+    if(strpos($href,' › ') !== false){
+        $href=explode(' › ',$href)[0];
+        $href = str_replace(str_replace('www.','',parse_url($url)['host']),'',$href);
+    }
     $brave[$i] = '<div class="';
     switch ($i){
         case 0:
-            if($loaded[6]) {$brave[$i] .= ' mBorderBoth ';}
-            elseif(!$loaded[0] && $loaded[1]) {$brave[$i] .= ' mBorderBoth2 mBorderTop ';}
+            if(!$loaded[0] && $loaded[1]) {$brave[$i] .= ' mBorderBoth2 mBorderTop ';}
             elseif(!$loaded[0]){$brave[$i] .= ' mBorderTop ';}
             elseif($loaded[1]){$brave[$i] .= ' mBorderBottom2 ';}
             break;
         case 1:
             if($loaded[1]) {$brave[$i] .= ' mBorderTop2 ';}
             if($loaded[2]) {$brave[$i] .= ' mBorderBottom ';}
-            if($loaded[6]) {$brave[$i] .= ' mBorderTop ';}
             break;
         case 2:
             if($loaded[2]) {$brave[$i] .= ' mBorderTop ';}
@@ -104,11 +87,13 @@ foreach ($snippet as $snip) {
             break;
         case 8:
             if($loaded[5]) {$brave[$i] .= ' mBorderTop ';}
+            if($loaded[6]) {$brave[$i] .= ' mBorderBottom ';}
             break;
         case 9:
-            $brave[$i] .= ' mBorderBottom ';
+            if($loaded[6]) {$brave[$i] .= ' mBorderTop ';}
             break;
     }
+    if($CountBraveSnippets == $i){$brave[$i] .= ' mBorderBottom ';}
 
         $brave[$i] .= ' output" id="output">';
 
@@ -121,10 +106,10 @@ foreach ($snippet as $snip) {
             if ( substr_compare($gurl, ' > ', -3) === 0 ) {
             $gurl = substr($gurl, 0, -3);
             }
-        $brave[$i] .= 'href="' . $url . '">';
-        $brave[$i] .= '<p class="OutTitle">' . $href . '</p></a>
-    <p class="resLink">' . $gurl . '</p>
-    <p class="snippet">--' . $description->innertext . '</p>
+        $brave[$i] .= 'href="' . $url . '" data-sxpr-link>';
+        $brave[$i] .= '<p class="OutTitle">'.$href.'</p></a>
+    <p class="resLink">' . strip_tags($gurl) . '</p>
+    <p class="snippet">' . strip_tags($description) . '</p>
     ';
     if (isset($_COOKIE['providers'])) {
         $brave[$i] .= '<p class="resProvider">Brave</p>';

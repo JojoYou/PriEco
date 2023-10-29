@@ -1,5 +1,5 @@
 <?php
-function wiki($infoboxData, $wikiTxt, $ddgObj, $mysql, $hideQueryCopy)
+function wiki($purl, $infoboxData, $wikiTxt, $ddgObj, $mysql, $hideQueryCopy)
 {
     $tmp = ($_COOKIE['Language'] == 'all') ? 'en' : $_COOKIE['Language'];
     $answer = '';
@@ -11,7 +11,8 @@ function wiki($infoboxData, $wikiTxt, $ddgObj, $mysql, $hideQueryCopy)
     $answer .= '<div class="answer" id="answer"><a href="https://'.$tmp.'.wikipedia.org/wiki/' . str_replace('+','_',urlencode(ucwords($infoboxData['title']))) . '"';if(isset($_COOKIE['new'])){$answer.= 'target="_blank"';}$answer.=' style="color: unset;text-decoration: unset;"><h2>' . $infoboxData['title'].'</h2></a><br>';
 
     if(!isset($_COOKIE['datasave']) && isset($infoboxData['images'])){
-        $answer .= $sum . '<div style="display: flex;
+        $answer .= $sum . '<a aria-label="Search for images" href="/?image&q='.urlencode($purl).'"';if(isset($_COOKIE['new'])){$answer.= 'target="_blank"';}
+        $answer.='><div style="display: flex;
     flex-wrap: wrap;
     flex-direction: row;
     justify-content: space-around;
@@ -30,14 +31,14 @@ function wiki($infoboxData, $wikiTxt, $ddgObj, $mysql, $hideQueryCopy)
         ++$i;
     }
 }
-if(!isset($_COOKIE['datasave']) && isset($infoboxData['images'])){$answer .='</div>';}
+if(!isset($_COOKIE['datasave']) && isset($infoboxData['images'])){$answer .='</div></a>';}
 
 //Website
  if(isset($infoboxData['Website'])){
         
     $wurl = trim(html_entity_decode($infoboxData['Website']));
     
-    $answer.= '<a style="color: var(--linkColor);text-decoration: none;"href="https://'.$infoboxData['Website'].'"';
+    $answer.= '<br><a style="color: var(--linkColor);text-decoration: none;"href="https://'.$infoboxData['Website'].'"';
     if(isset($_COOKIE['new'])){$answer.= 'target="_blank"';}
     $answer .='>';
     $answer .= '🔗 '.str_replace('www.','', parse_url('https://'.$wurl)['host']);
@@ -52,8 +53,8 @@ if(!isset($_COOKIE['datasave']) && isset($infoboxData['images'])){$answer .='</d
 
 //Summarized
 if(isset($wikiTxt)){
-    $wikiTxt = substr($wikiTxt,0, 600);
     $summary = summarizeText($wikiTxt, 2);
+    $wikiTxt = substr($wikiTxt,0, 600);
     foreach($summary as &$su){
       $Tsum .= ' '.$su;
     }
@@ -73,6 +74,19 @@ foreach ($infoboxData as $name => $data) {
 } 
 $answer .= '</label></div>';
 
+if(!isset($_COOKIE['DisWid'])){
+$answer .= '
+<div id="searEInfo">
+<input type="checkbox" id="moreMoreCheck" style="display:none">
+<div data-sxpr-knowledge-panel id="my-kp-container"></div>
+<label for="moreMoreCheck" class="moreMoreCheck">
+Show More/Less
+</label><br><br>
+</div>
+<script>setTimeout(function() {var container = document.getElementById("searEInfo");if (container) {if (container.textContent.trim() === "") {container.style.display = "none";}}}, 5000);</script>
+';
+}
+
     if($answer!=''){
         $answer .= '<p style="font-weight: bold;font-size: 12px;">Profiles</p>';
         $answer .= '<a href="https://'.$tmp.'.wikipedia.org/wiki/' . $infoboxData['title'].'"'; if (isset($_COOKIE['new'])) {
@@ -87,38 +101,15 @@ $answer .= '</label></div>';
         $tomato='';
         $spotify='';
         $apple='';
-        if(!$mysql && gettype($ddgObj) == 'string'){
-            $ddgObj = explode(' ', $ddgObj);
-            $twitter = $ddgObj[0];
-            $facebook = $ddgObj[1];
-            $imdb = $ddgObj[2];
-            $tomato = $ddgObj[3];
-            $spotify = $ddgObj[4];
-            $apple = $ddgObj[5];
-        }
-        else{
-            if(isset($ddgObj['Infobox']['content'])){
-            foreach($ddgObj['Infobox']['content'] as &$item){
-                if($item['data_type'] == 'twitter_profile'){
-                    $twitter = $item['value'];
-                }
-                if($item['data_type'] == 'facebook_profile'){
-                    $facebook = $item['value'];
-                }
-                if($item['data_type'] == 'imdb_id'){
-                    $imdb = $item['value'];
-                }
-                if($item['data_type'] == 'rotten_tomatoes'){
-                    $tomato = $item['value'];
-                }
-                if($item['data_type'] == 'spotify_artist_id'){
-                    $spotify = $item['value'];
-                }
-                if($item['data_type'] == 'itunes_artist_id'){
-                    $apple = $item['value'];
-                }
-            }
-        }
+        
+        if(is_string($ddgObj)){
+        $ddgObj=json_decode($ddgObj,true);
+        $twitter = $ddgObj['Tiwtter'];
+        $facebook = $ddgObj['Facebook'];
+        $imdb = $ddgObj['IMDb'];
+        $tomato = $ddgObj['Tomatoes'];
+        $spotify = $ddgObj['Spotify'];
+        $apple = $ddgObj['Apple'];
         }
 
         if($twitter != ''){
@@ -168,7 +159,10 @@ $answer .= '</label></div>';
             $answer .= '<p>Apple Music</p></div></button></a>';
         }
     
-    $answer .= '<br>'. $hideQueryCopy .'</div>';// Place for ad after <br>
+    $answer .= '<br><br><p style="font-size: 12px;">Ad</p><iframe class="ad" title="ad" data-aa="2183924" src="//acceptable.a-ads.com/2183924?size=Adaptive&title_color=3391ff&link_color=3391ff"></iframe>'. $hideQueryCopy .'
+    
+    
+   </div>';// Place for ad after <br>
    
     $ret[] = $answer;
     $ret[1] = $ansImg;

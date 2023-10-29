@@ -1,24 +1,25 @@
 <?php
 function youtube($YoutubeObj){
     $i =0;    
-    if (!isset($YoutubeObj['items'])) {return;}
+    $rPrint = false;
 
     $yt = '<p class="sectionTitle">📷 Videos</p>
     
     <div class="output" style="border-radius: 20px;margin-bottom:15px;background:none;
     display:flex;overflow:auto hidden; height:300px;" id="output">';
-    foreach ($YoutubeObj['items'] as &$item) {  
+    foreach ($YoutubeObj as &$item) {  
         if($i>6){break;}   
+        $rPrint=true;
         $yt .= '
-                    <div class="imgoutdiv" style="width:auto;min-width:unset;margin-right:10px;padding:0;">
-                    <a href="https://www.youtube.com/watch?v=' . $item['id']['videoId'] . '"'; 
+                    <div class="imgoutdiv" style="width:auto;min-width:unset;margin-right:30px;padding:0;">
+                    <a href="https://www.youtube.com/watch?v=' . $item['url'] . '"'; 
                     if (isset($_COOKIE['new'])) {
                         $yt .=  'target="_blank"';
                     }
                     $yt .= '>
                     <button title="YouTube video button" class="ytvideobtn"';
             if(!isset($_COOKIE['datasave'])) {
-                $yt .= 'style="background-image: url(/Controller/functions/proxy.php?q='.$item['snippet']['thumbnails']['medium']['url'].');"';
+                $yt .= 'style="background-image: url(/Controller/functions/proxy.php?q=https://i.ytimg.com/vi/'.$item['thumb'].');"';
             }
             $yt .= '></button>
             <div class="imgoutlink videossearch">
@@ -30,16 +31,16 @@ function youtube($YoutubeObj){
                 $yt .= '<p style="font-size:10px;padding-left:5px;">YouTube</p></div>
                 <p style="font-size:10px;padding-right:5px;">';
                 $currentDate = new DateTime();
-                $specifiedDate = new DateTime($item['snippet']['publishTime']);
+                $specifiedDate = new DateTime($item['date']);
                 $yt .=$currentDate->diff($specifiedDate)->format('%a').' days ago</p>
               </div>
-                <p class="ytTitle">'.substr($item['snippet']['title'], 0, 47).'...</p>
+                <p class="ytTitle">'.$item['title'].'</p>
         <p style="font-size:10px;padding: 0 5px 0px 5px;
         display: -webkit-box;
         -webkit-line-clamp: 3;
         line-height:14px;
         -webkit-box-orient: vertical;
-        overflow: hidden;">'.substr(strip_tags($item['snippet']['description']), 0, 120) . '...</p>
+        overflow: hidden;">'.strip_tags($item['description']).'</p>
         </div>
         </a>
         </div>
@@ -48,5 +49,7 @@ function youtube($YoutubeObj){
                 }
 
               $yt .= '</div>';
-    return $yt;
+              if($rPrint){
+                return $yt;
+                }
 }

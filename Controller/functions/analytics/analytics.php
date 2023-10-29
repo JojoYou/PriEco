@@ -2,8 +2,6 @@
 
    if(isset($_POST['anaaccept'])){
     setcookie('userid', rand(1000000, 1000000000000), time() + (86400 * 364), '/');
-    setcookie('improvePriEco', 'on', time() + (86400 * 364), '/');
-
     header('refresh:0');
     exit();
    }

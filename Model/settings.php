@@ -184,17 +184,7 @@ if (isset($_COOKIE['userid']))
 echo '>
 <span class="slider round"></span>
 </label></div>
-<br>
-<div class="setListItem"><label for="imP"><p>Improve PriEco:</p><p style="font-size:12px;">Caches results</p></label><label class="switch">
-<input type="submit" style="display:none;" name="imP" id="imP" value="imP';if (isset($_COOKIE['improvePriEco'])){echo 'On';}else{echo 'Off';}echo '">
-<input type="checkbox" class="setCheck" ';
-if (isset($_COOKIE['improvePriEco']))
-{
-    echo 'checked';
-}
-echo '>
-<span class="slider round"></span>
-</label></div></div>
+</div>
 
 <div class="setGroup"><div style="border-bottom: solid 2px grey;"class="setListItem"><h3>Privacy</h3></div>
 <br>

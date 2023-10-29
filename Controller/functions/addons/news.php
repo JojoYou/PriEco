@@ -6,11 +6,13 @@ function search_news($NewsObj){
     
     <div class="output" style="border-radius: 20px;margin-bottom:15px;background:none;
     display:flex;overflow:auto hidden; height:300px;" id="output">';
-    foreach ($NewsObj['articles'] as &$item) {  
+    foreach ($NewsObj as &$item) {  
         $rPrint = true;
-        if($i>6){break;}   
+        if($i>6){break;}
+        $domain = str_replace('www.','', parse_url($item['url'])['host']);
+
         $news .= '
-                    <div class="imgoutdiv" style="width:auto;min-width:unset;margin-right:10px;padding:0;">
+                    <div class="imgoutdiv" style="width:auto;min-width:unset;margin-right:30px;padding:0;">
                     <a href="'.$item['url'].'"'; 
                     if (isset($_COOKIE['new'])) {
                         $news .=  'target="_blank"';
@@ -18,7 +20,7 @@ function search_news($NewsObj){
                     $news .= '>
                     <button title="News button" class="ytvideobtn"';
             if(!isset($_COOKIE['datasave'])) {
-                $news .= 'style="background-image: url(Controller/functions/proxy.php?q='.$item['urlToImage'].');"';
+                $news .= 'style="background-image: url(Controller/functions/proxy.php?q='.$item['img'].');"';
             }
             $news .= '></button>
             <div class="imgoutlink videossearch">
@@ -27,10 +29,10 @@ function search_news($NewsObj){
                 if(!isset($_COOKIE['datasave'])) {
                   $news .= '<img alt="" style="width: 20px;height: 20px;border-radius: 20px;"src="/Controller/functions/proxy.php?q=https://judicial-peach-octopus.b-cdn.net/'. get_string_betweens($item['url'], 'https://', '/').'">';
                 }
-                $news .= '<p style="font-size:10px;padding-left:5px;">'.$item['source']['name'].'</p></div>
+                $news .= '<p style="font-size:10px;padding-left:5px;">'.$domain.'</p></div>
                 <p style="font-size:10px;padding-right:5px;">';
                 $currentDate = new DateTime();
-                $specifiedDate = new DateTime($item['publishedAt']);
+                $specifiedDate = new DateTime($item['date']);
                 $news .=$currentDate->diff($specifiedDate)->format('%a').' days ago</p>
               </div>
                 <p class="ytTitle">'.substr($item['title'], 0, 47).'...</p>
@@ -39,7 +41,7 @@ function search_news($NewsObj){
         -webkit-line-clamp: 3;
         line-height:14px;
         -webkit-box-orient: vertical;
-        overflow: hidden;">'.substr(strip_tags($item['content']), 0, 120) . '...</p>
+        overflow: hidden;">'.substr(strip_tags($item['description']), 0, 120) . '...</p>
         </div>
         </a>
         </div>

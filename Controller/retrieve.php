@@ -30,22 +30,16 @@ if($tmp==null or $tmp == 'all'){
 if(!$dev) {
     //API keys ($_ENV variables loaded in database.php file) 
     $Googlefile = 'https://www.googleapis.com/customsearch/v1?key='.$_ENV['GOOGLE_API_KEY'].'&cx='.$_ENV['GOOGLE_CX_KEY'].'&hl='.$lang.'&gl='.$loc.'&dateRestrict='.$date.'&safe='.$safe.'&q='.$apiPurl;
-
-    $EtsyFile = 'https://openapi.etsy.com/v3/application/listings/active?limit=25&keywords='.$apiPurl;
+    $MojeekFile = 'https://www.mojeek.com/search?api_key='.$_ENV['MOJEEK_API_KEY'].'&lb='.$lang.'&lbb=50'.'&rb='.$loc.'&rbb=50&fmt=json&q='.$apiPurl;
+    
     if(isset($OpenWeatherLoc)){$OpenWeatherFile = 'https://api.openweathermap.org/data/2.5/weather?appid='.$_ENV['OPENWEATHER_API_KEY'].'&q='.$OpenWeatherLoc;
     $OpenWeatherForecastFile = 'https://api.openweathermap.org/data/2.5/forecast?appid='.$_ENV['OPENWEATHER_API_KEY'].'&q='.$OpenWeatherLoc;}
     if(isset($defWords)){$WordnikFile = 'https://api.wordnik.com/v4/word.json/'.$defWords.'/definitions?limit=5&includeRelated=false&useCanonical=false&includeTags=false&api_key='.$_ENV['WORDNIK_API_KEY'];}
     else{$WordnikFile ='';}
-    $RedditFile = 'https://api.reddit.com/r/all/search?q='.$apiPurl.'&limit=4&sort=relevance';if(!isset($_COOKIE['safe'])){$RedditFile.='&include_over_18=false';}else{$RedditFile.='&include_over_18=true';}
-    $DdgFile = 'https://api.duckduckgo.com/?format=json&q='.$apiPurl;
 
     $PixabayFile = 'https://pixabay.com/api/?key='.$_ENV['PIXABAY_API_KEY'].'&per_page=200&q='.$apiPurl;
     $YoutubeFile = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=50&key='.$_ENV['YOUTUBE_API_KEY'].'&q='.$apiPurl;
-    $NewsFile = 'https://newsapi.org/v2/everything?apiKey='.$_ENV['NEWS_API_KEY'].'&from='.date('Y-m-d', $newsdate).'&searchIn=title&sortBy=popularity&language='.$tmp.'&q='.$apiPurl;
     
-    $WebNewsFile = 'https://newsapi.org/v2/everything?apiKey='.$_ENV['WEB_NEWS_API_KEY'].'&from='.date('Y-m-d', $newsdate).'&searchIn=title&sortBy=popularity&language='.$tmp.'&q='.$apiPurl;
-    $WebYoutubeFile = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&key='.$_ENV['WEB_YOUTUBE_API_KEY'].'&q='.$apiPurl;
-
 }
 else{
     //Null API keys    

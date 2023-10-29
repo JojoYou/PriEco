@@ -1,7 +1,6 @@
 <?php
 
-function request($url)
-{
+function printimg($url) {
     $ch = curl_init($url);
     curl_setopt_array($ch, array(
         CURLOPT_RETURNTRANSFER => true,
@@ -14,47 +13,22 @@ function request($url)
         CURLOPT_MAXREDIRS => 3,
         CURLOPT_TIMEOUT => 8,
         CURLOPT_VERBOSE => false,
-        CURLOPT_FOLLOWLOCATION => true
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_HEADER => 0,
     ));
-    return curl_exec($ch);
+
+    $response = curl_exec($ch);
+    $content_type = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($http_code === 200) {
+        header("Content-Type: $content_type");
+        echo $response;
+    }
 }
 
-function printimg($url){
-  $image_src = request($url);
-
-  $img_info = getimagesize('data://application/octet-stream;base64,' . base64_encode($image_src));
-  $mime_type = $img_info['mime'];
-
-  if ($mime_type == 'image/svg+xml') {
-    header("Content-Type: $mime_type");
-  } else {
-    header("Content-Type: " . $img_info['mime']);
-  }
-
-  echo $image_src;
+if (isset($_GET['q'])) {
+    $url = urldecode($_GET['q']);
+    printimg($url);
 }
-//Get url
-if(isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on')
-     $url = "https://";
-else
-     $url = "http://";
-$url.= $_SERVER['HTTP_HOST'];
-$url.= $_SERVER['REQUEST_URI'];
-$url .= "▛";
-
-//Get query from url
-function get_string_between($string, $start, $end){
-    $string = ' ' . $string;
-    $ini = strpos($string, $start);
-    if ($ini == 0) return '';
-    $ini += strlen($start);
-    $len = strpos($string, $end, $ini) - $ini;
-    return substr($string, $ini, $len);
-}
-$purl = get_string_between($url, '?', '▛');
-$urlSet = '&'.$purl;
-$purl = urldecode($purl);
-$purl = '▛'.$purl;
-$purl = $purl.'▛';
-$url = get_string_between($purl, 'q=', '▛');
-printimg($url);
