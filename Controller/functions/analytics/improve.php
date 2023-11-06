@@ -32,7 +32,24 @@ if($simImg != ''){
         $conn->query("UPDATE `suggestions` SET `img` = '$simI_escaped' WHERE `name` = '$purl_escaped'");   
 }
 
-if(!$indexY && isset($YoutubeObj)){
+if(!$indexN && !empty($NewsObj)){
+        $rows = [];
+        foreach ($NewsObj as $item) {
+            $title = $conn->real_escape_string($item['title']);
+            $description = $conn->real_escape_string($item['description']);
+            $url = $conn->real_escape_string($item['url']);
+            $thumb = $conn->real_escape_string($item['img']);
+            $date = $conn->real_escape_string($item['date']);
+        
+            $rows[] = "('$title', '$description', '$url', '$thumb', '$date')";
+        }
+        if (!empty($rows)) {
+            $values = implode(',', $rows);
+            $conn->query("INSERT IGNORE INTO `news` (`title`, `description`, `url`, `img`, `date`) VALUES $values");
+        } 
+}
+
+if(!$indexY && !empty($YoutubeObj)){
 $rows = [];
 
 foreach ($YoutubeObj as $item) {
@@ -47,7 +64,6 @@ foreach ($YoutubeObj as $item) {
 
 if (!empty($rows)) {
     $values = implode(',', $rows);
-    $conn->query("INSERT INTO `youtube` (`title`, `description`, `url`, `thumb`, `date`) 
-    VALUES $values");
+    $conn->query("INSERT IGNORE INTO `youtube` (`title`, `description`, `url`, `thumb`, `date`) VALUES $values");
 } 
 }

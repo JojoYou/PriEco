@@ -1,4 +1,5 @@
 <?php
+ini_set('session.cookie_httponly', 1);
 ini_set('session.cookie_domain', '.jojoyou.org');
 session_start();
 include 'Controller/simple_html_dom.php';
@@ -8,7 +9,7 @@ $gTime = microtime(true);
 //Development mode (Get search results from json files in ./Controller/dev folder)
 $dev = false;
 //CSS version
-$cssver = 100;
+$cssver = 102;
 //Variable, controls reloading on settings change
 $reload = false;
 

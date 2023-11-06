@@ -38,8 +38,9 @@ if(!$dev) {
     else{$WordnikFile ='';}
 
     $PixabayFile = 'https://pixabay.com/api/?key='.$_ENV['PIXABAY_API_KEY'].'&per_page=200&q='.$apiPurl;
+
+    $NewsFile = 'https://newsapi.org/v2/everything?apiKey='.$_ENV['NEWS_API_KEY'].'&from='.date('Y-m-d', $newsdate).'&sortBy=popularity&language='.$tmp.'&q='.$apiPurl;
     $YoutubeFile = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=50&key='.$_ENV['YOUTUBE_API_KEY'].'&q='.$apiPurl;
-    
 }
 else{
     //Null API keys    

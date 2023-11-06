@@ -437,6 +437,19 @@ if(count($curlHandles) > $curlCount){
 }
 */
 
+//News
+if(!$indexN){
+$newsCh = curl_init($NewsFile);
+curl_setopt($newsCh, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($newsCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
+curl_setopt($newsCh, CURLOPT_CONNECTTIMEOUT, 2);
+curl_setopt($newsCh, CURLOPT_TIMEOUT, 2.5);
+$curlHandles[] = $newsCh;
+if(count($curlHandles) > $curlCount){
+    $newsOn = true;
+    $curlCount = count($curlHandles);
+}
+}
 //YouTube
 if(!$indexY){
 $ytCh = curl_init($YoutubeFile);
@@ -497,7 +510,22 @@ foreach ($curlHandles as $handle) {
         elseif(isset($ipOn) && !isset($ipObj)){$ipObj = json_decode($response,true); unset($ipOn);}
         elseif(isset($cryptoOn) && !isset($cryptoData)){$cryptoData = json_decode($response,true);unset($cryptoOn);}
 
-        elseif(isset($ytOn) && !isset($YoutubeObj)){$YoutubeObj = array(); $YoutubeObjN = json_decode($response,true); 
+        elseif(isset($newsOn) && empty($NewsObj)){$NewsObj = array(); $NewsObjN = json_decode($response,true);
+            foreach ($NewsObjN['articles'] as $article) {
+                $NewsObj[] = [
+                    'title' => $article['title'],
+                    'description' => $article['description'],
+                    'img' => $article['urlToImage'],
+                    'url' => $article['url'],
+                    'date' => $article['publishedAt']
+                ];
+            }
+            usort($NewsObj, function($a, $b) {
+                return strtotime($b['date']) - strtotime($a['date']);
+            });
+            
+            unset($newsOn);}
+        elseif(isset($ytOn) && empty($YoutubeObj)){$YoutubeObj = array(); $YoutubeObjN = json_decode($response,true); 
             foreach ($YoutubeObjN['items'] as $item) {
                 $title = substr($item['snippet']['title'], 0, 47);
                 $description = substr($item['snippet']['description'], 0, 47);
@@ -1077,7 +1105,27 @@ if ($type == 'news') {
      });
      if(count($NewsObj)<3){$indexN = false;}
      else{$indexN = true;}
-        
+     if(!$indexN){
+        $newsCh = curl_init($NewsFile);
+        curl_setopt($newsCh, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($newsCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
+        curl_setopt($newsCh, CURLOPT_CONNECTTIMEOUT, 2);
+        curl_setopt($newsCh, CURLOPT_TIMEOUT, 2.5);
+        $NewsObj = array(); $NewsObjN = json_decode(curl_exec($newsCh),true);
+            foreach ($NewsObjN['articles'] as $article) {
+                $NewsObj[] = [
+                    'title' => $article['title'],
+                    'description' => $article['description'],
+                    'img' => $article['urlToImage'],
+                    'url' => $article['url'],
+                    'date' => $article['publishedAt']
+                ];
+            }
+            usort($NewsObj, function($a, $b) {
+                return strtotime($b['date']) - strtotime($a['date']);
+            });
+        curl_close($newsCh);
+    }
     } else {
         $NewsObj =  json_decode(file_get_contents($NewsFile), true);
     }

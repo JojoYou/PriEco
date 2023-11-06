@@ -45,7 +45,7 @@ margin-top: -63px;"alt="bottomTree">
           Source code: <a href="https://codeberg.org/JojoYou/PriEco/src/branch/master" target="_blank" style="text-decoration:none;color:#34A8AC;">CodeBerg</a>
           <br>
           
-          <!--Tor onion domain: <a href="http://ljtd3fhffeknviu7l7k2z4qdybpchmdh2arcq4wzs2jg6wpfut334mad.onion" target="_blank" style="text-decoration:none;color:#34A8AC;">Onion</a>-->
+          Tor onion domain: <a href="http://priecovk7jsuh3tvkh62c6j4oep3l5bldigpzmay26rdpqz357t5dmad.onion/" target="_blank" style="text-decoration:none;color:#34A8AC;">Onion</a>
           <br><br>
         </p>
     </div>

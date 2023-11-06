@@ -14,5 +14,6 @@ include_once 'envFunc.php';
     else{$auth = null;} 
 if($_ENV['HOST_NAME'] != "" or $_ENV['AUTH_NAME'] != "" or $_ENV['DATABASE_PASS'] != "" or $_ENV['DATABASE_NAME'] != ""){
    $conn=new mysqli($_ENV['HOST_NAME'],$_ENV['AUTH_NAME'],$_ENV['DATABASE_PASS'],$_ENV['DATABASE_NAME']);
+   $conn->set_charset("utf8");
 }
 }
