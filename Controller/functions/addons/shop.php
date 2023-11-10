@@ -16,6 +16,7 @@ function shop($ShopObj)
       return ($amountA > $amountB) ? -1 : 1;
   });
     $shop = '<p class="sectionTitle">👕 Products</p>
+    <p class="sectionTitle" style="font-size: 12px;clear: unset;margin-left: 10px;margin-top: 17px;">Ads</p>
     
     <div class="output" style="border-radius: 20px;margin-bottom:15px;background:none;
     display:flex;overflow:auto hidden; height:270px;padding-left:0;" id="output">';

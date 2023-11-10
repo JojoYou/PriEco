@@ -65,7 +65,9 @@ $google2[$i] .= 'href="'. $item['url']. '" data-sxpr-link>';
 $google2[$i] .= '<p class="OutTitle">'. $item['title']. '</p></a>
 <p class="resLink">'. $gurl. '</p>';
 
-if(isset($item['description'])){$google2[$i] .= '<p class="snippet">'. $item['description']. '</p>';}
+if(isset($item['description'])){$google2[$i] .= '<p class="snippet">'. $item['description']. '</p>
+<p class="sumOpen resProvider" id="sumRes" data-url="'.$item['url'].'">V</p>
+<p id="sumResOut" class="sumOut snippet"></p>';}
 if (isset($_COOKIE['providers'])) {
 $google2[$i] .= '<p class="resProvider">Google</p>';
 }

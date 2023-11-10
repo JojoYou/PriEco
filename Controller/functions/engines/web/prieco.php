@@ -68,7 +68,9 @@ LIMIT 1000;
             $pres .= 'href="' . $PriEcoUrl . '" data-sxpr-link>';
             $pres .= '<p class="OutTitle">' . $row['title'] . '</p></a>
         <p class="resLink">' . $gurl . '</p>
-        <p class="snippet">' . $row['description'] . '</p>';
+        <p class="snippet">' . $row['description'] . '</p>
+        <p class="sumOpen resProvider" id="sumRes" data-url="'.$PriEcoUrl.'">V</p>
+        <p id="sumResOut" class="sumOut snippet"></p>';
         if($row['tab']!=null and $row['tab'] != ''){
             $tmp = explode('<===>',$row['tab']);
             foreach($tmp as $rt){

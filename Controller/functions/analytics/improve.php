@@ -32,6 +32,19 @@ if($simImg != ''){
         $conn->query("UPDATE `suggestions` SET `img` = '$simI_escaped' WHERE `name` = '$purl_escaped'");   
 }
 
+if(!$indexW && !empty($wikiTxt)){
+        $title = $conn->real_escape_string($wikiobj['title']);
+        $paragraph = $conn->real_escape_string($wikiTxt);
+        
+        $json = [];
+        foreach ($wikiobj as $name => $data) {$json[$name] = $data;}
+        $infobox = $conn->real_escape_string(json_encode($json));
+        
+        $tmp = ($lang == 'all') ? 'en' : $lang;
+
+        $conn->query("INSERT IGNORE INTO `wikipedia`(`title`, `paragraph`, `infobox`, `profiles`, `lang`) VALUES ('$title','$paragraph','$infobox', '[]','$tmp')");                
+}
+
 if(!$indexN && !empty($NewsObj)){
         $rows = [];
         foreach ($NewsObj as $item) {

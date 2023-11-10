@@ -9,10 +9,12 @@ $gTime = microtime(true);
 //Development mode (Get search results from json files in ./Controller/dev folder)
 $dev = false;
 //CSS version
-$cssver = 102;
+$cssver = 105;
 //Variable, controls reloading on settings change
 $reload = false;
 
+//Values
+$onion = 'http://priecovk7jsuh3tvkh62c6j4oep3l5bldigpzmay26rdpqz357t5dmad.onion/';
 function removeDisFile($name){
   if(file_exists($name)){
     $tmp = file_get_contents($name);
@@ -21,6 +23,8 @@ function removeDisFile($name){
     }
   }
 }
+$sumPath = '';
+
 removeDisFile('disGoogle.txt');
 removeDisFile('disGoogle2.txt');
 removeDisFile('disBing.txt');
@@ -31,9 +35,20 @@ removeDisFile('disMojeek.txt');
   //Get data from $PromoFile
   $promoobj = json_decode(file_get_contents('./Controller/value/data.json'), true);
 
-
+//Suggest tor
+/*
+if (strpos(file_get_contents('Controller/value/tor.txt'), $_SERVER['REMOTE_ADDR']) !== false) {
+  echo '<div style="position: fixed;
+  right: 0;
+  background-color: red;
+  padding: 5px;
+  border-radius: 0 0 0 20px;
+  "><p>Using TOR?<br>Consider using our onion PriEco.</p><button>No</button></div>';
+}
+*/
 //Prepare for search request with search engine APIs
 include './Controller/database.php';
+include 'Controller/functions/func.php';
 ##
 #Protection
 ##
@@ -307,6 +322,38 @@ include 'Controller/functions/indexLogic.php';
   echo "
   <div data-sxpr-knowledge-panel id='my-kp-container' style='display:none;'></div>
 
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const sumResElements = document.querySelectorAll('p#sumRes');
+
+  sumResElements.forEach(element => {
+    element.addEventListener('click', () => {
+      const sumResOutElement = element.nextElementSibling;
+      if (sumResOutElement.textContent === '') {
+        sumResOutElement.textContent = 'Loading...';
+      const url = element.getAttribute('data-url');
+      const text = fetch('https://search.jojoyou.org/api/summarize.php/?url='+url).then(responseData => responseData.text());
+      text.then((value) => {
+        if (value === '') {
+          sumResOutElement.textContent = 'Couldn\'t summarize';
+        } else {
+          sumResOutElement.textContent = value;
+        }
+      });
+      
+    }
+      if (sumResOutElement.style.display === 'block') {
+        sumResOutElement.style.display = 'none';
+      } else {
+        sumResOutElement.style.display = 'block';
+      }
+    });
+  });
+});
+
+</script>
+
   <script src='/Controller/functions/proxy.php?q=https://cdn.searchexpander.com/js/sxpr.js'></script>
   <script>
   sxpr({
@@ -388,6 +435,7 @@ include 'Controller/functions/indexLogic.php';
   </style>
   ";
 }
+  
   $resultTime = microtime(true) - $resultTime;
   //Improve PriEco
   include 'Controller/functions/analytics/improve.php';

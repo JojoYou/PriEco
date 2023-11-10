@@ -46,7 +46,7 @@ if(!isset($_COOKIE['datasave']) && isset($infoboxData['images'])){$answer .='</d
 }
 
  //Description
- $answer.='<br><br><p style="background-color: #00000007;padding: 15px;border-radius: 20px;">' . substr($wikiTxt, 0, 500) . '...' . 
+ $answer.='<br><br><p style="background-color: #00000007;padding: 15px;border-radius: 20px;">' .cutString($wikiTxt,500) . 
  '<a style="color: var(--linkColor);text-decoration: none;" href="https://'.$tmp.'.wikipedia.org/wiki/' . str_replace('+','_',urlencode(ucwords($infoboxData['title']))). '"';if(isset($_COOKIE['new'])){$answer.= 'target="_blank"';}$answer.='>Wikipedia</a>
  </p><br>
  <div style="display: flex;padding-left: 10px;padding-right: 10px;">';
@@ -159,10 +159,7 @@ Show More/Less
             $answer .= '<p>Apple Music</p></div></button></a>';
         }
     
-    $answer .= '<br><br><p style="font-size: 12px;">Ad</p><iframe class="ad" title="ad" data-aa="2183924" src="//acceptable.a-ads.com/2183924?size=Adaptive&title_color=3391ff&link_color=3391ff"></iframe>'. $hideQueryCopy .'
-    
-    
-   </div>';// Place for ad after <br>
+    $answer .= '<br><br>'. $hideQueryCopy .'</div>';// Place for ad after <br>
    
     $ret[] = $answer;
     $ret[1] = $ansImg;

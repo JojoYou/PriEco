@@ -172,7 +172,9 @@ if ($type != 'image' and $type != 'video' and $type != 'news') {
         }
         $sql = "SELECT * FROM `googleCache` WHERE `query` = '$name' AND `loc` = '$loc' AND `lang` = '$lang'";
         $tmp = $conn->query($sql);
+        if ($tmp !== false) {
         $tmp = $tmp->fetch_assoc();
+        }
 
         $obj = isset($tmp['results']) ? $tmp['results'] : '';
 
@@ -194,7 +196,7 @@ if ($type != 'image' and $type != 'video' and $type != 'news') {
         //Wiki
     $name = str_replace('+',' ',urlencode(ucwords($purl)));
     $result = $conn->query("SELECT * FROM `wikipedia` WHERE '$name' LIKE CONCAT(title, '%');");
-
+    $indexW = false;
     if ($result->num_rows > 0) {
         $closestTitle = null;
         $closestDistance = PHP_INT_MAX;
@@ -209,6 +211,7 @@ if ($type != 'image' and $type != 'video' and $type != 'news') {
                 $wikiobj = json_decode($row['infobox'], true);
                 $wikiTxt = $row['paragraph'];
                 $ddgObj = $row['profiles'];
+                $indexW = true;
             }
         }
     }
@@ -437,6 +440,20 @@ if(count($curlHandles) > $curlCount){
 }
 */
 
+//Wikipedia
+if(!$indexW){
+$wikiCh = curl_init('https://search.jojoyou.org/Controller/functions/addons/wikiGet.php?lang='.$tmp.'&q=' .str_replace('+','_',urlencode(ucwords($purl))));
+curl_setopt($wikiCh, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($wikiCh, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
+curl_setopt($wikiCh, CURLOPT_CONNECTTIMEOUT, 2);
+curl_setopt($wikiCh, CURLOPT_TIMEOUT, 2.5);
+
+$curlHandles[] = $wikiCh;
+if(count($curlHandles) > $curlCount){
+    $wikiOn = true;
+    $curlCount = count($curlHandles);
+}
+}
 //News
 if(!$indexN){
 $newsCh = curl_init($NewsFile);
@@ -510,6 +527,7 @@ foreach ($curlHandles as $handle) {
         elseif(isset($ipOn) && !isset($ipObj)){$ipObj = json_decode($response,true); unset($ipOn);}
         elseif(isset($cryptoOn) && !isset($cryptoData)){$cryptoData = json_decode($response,true);unset($cryptoOn);}
 
+        elseif(isset($wikiOn) && empty($wikiobj)){$_SESSION[$purl.':-:wiki'] = $response;$wikiobj =explode('--]|[--',$response);$wikiTxt = $wikiobj[1];$wikiobj = json_decode($wikiobj[0],true); unset($wikiOn);}
         elseif(isset($newsOn) && empty($NewsObj)){$NewsObj = array(); $NewsObjN = json_decode($response,true);
             foreach ($NewsObjN['articles'] as $article) {
                 $NewsObj[] = [
@@ -664,7 +682,7 @@ else{
     $simImg = $wiki = $news = $reddit = $youtube = $relatedP = '';
     if(isset($_COOKIE['hQuery'])){$hideQueryCopy = hideQuery($Bpurl);}
     else{$hideQueryCopy = null;}
-    if(isset($wikiobj)){$wiki = wiki($purl, $wikiobj, $wikiTxt, $ddgObj, $ImpProfiles ?? null, $hideQueryCopy); $simImg = $wiki[1]; $wiki = $wiki[0];}
+    if(isset($wikiobj)){if(empty($wikiobj['title'])){$wikiobj['title']=$purl;} $wiki = wiki($purl, $wikiobj, $wikiTxt, $ddgObj, $ImpProfiles ?? null, $hideQueryCopy); $simImg = $wiki[1]; $wiki = $wiki[0];}
     if(isset($NewsObj)){$news = search_news($NewsObj);}
     if(isset($YoutubeObj)){$youtube = youtube($YoutubeObj);}
     if(isset($ShopObj)){$shop = shop($ShopObj);}

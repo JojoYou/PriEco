@@ -66,7 +66,9 @@ $mojeek[$i] .= 'href="'. $item['url']. '" data-sxpr-link>';
 $mojeek[$i] .= '<p class="OutTitle">'. $item['title']. '</p></a>
 <p class="resLink">'. $gurl. '</p>';
 
-if(isset($item['desc'])){$mojeek[$i] .= '<p class="snippet">'. $item['desc']. '</p>';}
+if(isset($item['desc'])){$mojeek[$i] .= '<p class="snippet">'. $item['desc']. '</p>
+<p class="sumOpen resProvider" id="sumRes" data-url="'.$item['url'].'">V</p>
+<p id="sumResOut" class="sumOut snippet"></p>';}
 if (isset($_COOKIE['providers'])) {
 $mojeek[$i] .= '<p class="resProvider">Mojeek</p>';
 }

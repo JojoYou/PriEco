@@ -110,6 +110,8 @@ foreach ($snippet as $snip) {
         $brave[$i] .= '<p class="OutTitle">'.$href.'</p></a>
     <p class="resLink">' . strip_tags($gurl) . '</p>
     <p class="snippet">' . strip_tags($description) . '</p>
+    <p class="sumOpen resProvider" id="sumRes" data-url="'.$url.'">V</p>
+    <p id="sumResOut" class="sumOut snippet"></p>
     ';
     if (isset($_COOKIE['providers'])) {
         $brave[$i] .= '<p class="resProvider">Brave</p>';

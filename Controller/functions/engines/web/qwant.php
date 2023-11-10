@@ -63,7 +63,9 @@ $qwant[$i] .= ' output" id="output">';
 
             $qwant[$i] .= '<p class="OutTitle">'. $item['title']. '</p></a>
                     <p class="resLink">'. $gurl .'</p>
-                    <p class="snippet">'.$description . '</p>';
+                    <p class="snippet">'.$description . '</p>
+                    <p class="sumOpen resProvider" id="sumRes" data-url="'.$item['url'].'">V</p>
+                    <p id="sumResOut" class="sumOut snippet"></p>';
                     if (isset($_COOKIE['providers'])) {
                         $qwant[$i] .= '<p class="resProvider">Bing</p>';
                     }
