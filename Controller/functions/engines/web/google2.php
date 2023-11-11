@@ -52,8 +52,7 @@ if ( substr_compare($gurl, ' > ', -3) === 0 ) {
 $gurl = substr($gurl, 0, -3);
 }
 
-$google2[$i] .= ' output"';
-$google2[$i] .= ' id="output">'  ;
+$google2[$i] .= ' output" id="output"><div class="outContent" style="display:block;">';
 if (strpos($item['url'], 'https://') !== false && !isset($_COOKIE['datasave'])) {
 $google2[$i] .= '<img class="Outfavicon" alt="‎" loading="lazy" src="/Controller/functions/proxy.php?q=https://judicial-peach-octopus.b-cdn.net/'. get_string_betweens($item['url'], 'https://', '/'). '">';
 }
@@ -65,13 +64,14 @@ $google2[$i] .= 'href="'. $item['url']. '" data-sxpr-link>';
 $google2[$i] .= '<p class="OutTitle">'. $item['title']. '</p></a>
 <p class="resLink">'. $gurl. '</p>';
 
-if(isset($item['description'])){$google2[$i] .= '<p class="snippet">'. $item['description']. '</p>
-<p class="sumOpen resProvider" id="sumRes" data-url="'.$item['url'].'">V</p>
-<p id="sumResOut" class="sumOut snippet"></p>';}
+if(isset($item['description'])){$google2[$i] .= '<p class="snippet">'. $item['description']. '</p>';}
 if (isset($_COOKIE['providers'])) {
 $google2[$i] .= '<p class="resProvider">Google</p>';
 }
-$google2[$i] .= '</div>';
+$google2[$i] .= '</div>
+<p class="sumOpen resProvider" id="sumRes" data-url="'.$item['url'].'"></p>
+<p id="sumResOut" class="sumOut snippet"></p>
+</div>';
 ++$i;
     }
 return $google2;

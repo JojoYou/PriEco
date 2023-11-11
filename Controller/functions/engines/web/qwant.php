@@ -44,7 +44,7 @@ foreach ($QWantObj['data']['result']['items']['mainline'] as &$items) {
                     $qwant[$i] .= ' mBorderBottom ';
                     break;
             }
-$qwant[$i] .= ' output" id="output">';
+$qwant[$i] .= ' output" id="output"><div class="outContent" style="display:block;">';
             $qwant[$i] .= '<a ';
             if (isset($_COOKIE['new'])) {
                 $qwant[$i] .= 'target="_blank"';
@@ -63,13 +63,14 @@ $qwant[$i] .= ' output" id="output">';
 
             $qwant[$i] .= '<p class="OutTitle">'. $item['title']. '</p></a>
                     <p class="resLink">'. $gurl .'</p>
-                    <p class="snippet">'.$description . '</p>
-                    <p class="sumOpen resProvider" id="sumRes" data-url="'.$item['url'].'">V</p>
-                    <p id="sumResOut" class="sumOut snippet"></p>';
+                    <p class="snippet">'.$description . '</p>';
                     if (isset($_COOKIE['providers'])) {
                         $qwant[$i] .= '<p class="resProvider">Bing</p>';
                     }
-                    $qwant[$i] .='</div>';
+                    $qwant[$i] .='</div>
+                    <p class="sumOpen resProvider" id="sumRes" data-url="'.$item['url'].'"></p>
+                    <p id="sumResOut" class="sumOut snippet"></p>
+                    </div>';
             ++$i;
         }
     }

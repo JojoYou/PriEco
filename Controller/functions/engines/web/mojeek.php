@@ -53,8 +53,7 @@ if ( substr_compare($gurl, ' > ', -3) === 0 ) {
 $gurl = substr($gurl, 0, -3);
 }
 
-$mojeek[$i] .= ' output"';
-$mojeek[$i] .= ' id="output">'  ;
+$mojeek[$i] .= ' output" id="output"><div class="outContent" style="display:block;">';
 if (strpos($item['url'], 'https://') !== false && !isset($_COOKIE['datasave'])) {
 $mojeek[$i] .= '<img class="Outfavicon" alt="‎" loading="lazy" src="/Controller/functions/proxy.php?q=https://judicial-peach-octopus.b-cdn.net/'. get_string_betweens($item['url'], 'https://', '/'). '">';
 }
@@ -66,13 +65,14 @@ $mojeek[$i] .= 'href="'. $item['url']. '" data-sxpr-link>';
 $mojeek[$i] .= '<p class="OutTitle">'. $item['title']. '</p></a>
 <p class="resLink">'. $gurl. '</p>';
 
-if(isset($item['desc'])){$mojeek[$i] .= '<p class="snippet">'. $item['desc']. '</p>
-<p class="sumOpen resProvider" id="sumRes" data-url="'.$item['url'].'">V</p>
-<p id="sumResOut" class="sumOut snippet"></p>';}
+if(isset($item['desc'])){$mojeek[$i] .= '<p class="snippet">'. $item['desc']. '</p>';}
 if (isset($_COOKIE['providers'])) {
 $mojeek[$i] .= '<p class="resProvider">Mojeek</p>';
 }
-$mojeek[$i] .= '</div>';
+$mojeek[$i] .= '</div>
+<p class="sumOpen resProvider" id="sumRes" data-url="'.$item['url'].'"></p>
+<p id="sumResOut" class="sumOut snippet"></p>
+</div>';
 ++$i;
     }
 return $mojeek;

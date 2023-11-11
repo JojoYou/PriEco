@@ -49,7 +49,7 @@ if ( substr_compare($gurl, ' > ', -3) === 0 ) {
 $gurl = substr($gurl, 0, -3);
 }
 
-$google[$i] .= ' output" id="output">';
+$google[$i] .= ' output" id="output"><div class="outContent" style="display:block;">';
 if (isset($item['pagemap']['cse_thumbnail'][0]['src']) && !isset($_COOKIE['datasave'])) {
 $google[$i] .= '<img loading="lazy" alt="‎" src="/Controller/functions/proxy.php?q='. $item['pagemap']['cse_thumbnail'][0]['src']. '" class="OutSideImg">';
 }
@@ -64,13 +64,14 @@ $google[$i] .= 'href="'. $item['link']. '" data-sxpr-link>';
 $google[$i] .= '<p class="OutTitle">'.strip_tags($item['title']). '</p></a>
 <p class="resLink">'. $gurl. '</p>';
 
-if(isset($item['snippet'])){$google[$i] .= '<p class="snippet">'.strip_tags($item['snippet']). '</p>
-<p class="sumOpen resProvider" id="sumRes" data-url="'.$item['link'].'">V</p>
-<p id="sumResOut" class="sumOut snippet"></p>';}
+if(isset($item['snippet'])){$google[$i] .= '<p class="snippet">'.strip_tags($item['snippet']). '</p>';}
 if (isset($_COOKIE['providers'])) {
 $google[$i] .= '<p class="resProvider">Google</p>';
 }
-$google[$i] .= '</div>';
+$google[$i] .= '</div>
+<p class="sumOpen resProvider" id="sumRes" data-url="'.$item['link'].'"></p>
+<p id="sumResOut" class="sumOut snippet"></p>
+</div>';
 ++$i;
     }
 return $google;

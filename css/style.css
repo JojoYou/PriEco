@@ -487,6 +487,7 @@ img {
   float: left;
   padding: 5px 0 15px 1%;
   margin-left: 9vw;
+  position: relative;
 }
 
 .mBorderBoth {
@@ -588,12 +589,31 @@ h4 {
   font-size: 10px;
 }
 
+.out3D{
+  animation: rotRes 1s;
+}
+@keyframes rotRes {
+  0% {
+    transform: rotateY(0deg);
+  }
+  50%{
+    transform: rotateY(90deg);
+  }
+  100% {
+    transform: rotateY(0deg);
+  }
+}
 .sumOpen {
-  background-color: #00000007;
+  background-color: #34A8AC;
   font-size: 13px;
   padding: 10px;
   border-radius: 20px 0;
   cursor: pointer;
+  position: absolute;
+  bottom: 0;
+  right: -10px;
+  width: 25px;
+  height: 25px;
 }
 .sumOut {
   background-color: #00000007;

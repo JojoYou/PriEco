@@ -9,7 +9,7 @@ $gTime = microtime(true);
 //Development mode (Get search results from json files in ./Controller/dev folder)
 $dev = false;
 //CSS version
-$cssver = 105;
+$cssver = 107;
 //Variable, controls reloading on settings change
 $reload = false;
 
@@ -343,11 +343,32 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       
     }
-      if (sumResOutElement.style.display === 'block') {
-        sumResOutElement.style.display = 'none';
-      } else {
-        sumResOutElement.style.display = 'block';
-      }
+
+    const parent = element.parentElement;
+  const sibling = element.previousElementSibling;
+
+  if (sibling.style.display == 'block') {
+    parent.classList.add('out3D');
+    setTimeout(function() {
+      sibling.style.display = 'none';
+      sumResOutElement.style.display = 'block';
+  }, 500);
+  setTimeout(function() {
+    parent.classList.remove('out3D');
+  }, 1010);
+
+  } else {
+    parent.classList.add('out3D');
+    setTimeout(function() {
+      sumResOutElement.style.display = 'none';
+      sibling.style.display = 'block';
+  }, 500);
+  setTimeout(function() {
+    parent.classList.remove('out3D');
+  }, 1010);
+
+  }
+     
     });
   });
 });

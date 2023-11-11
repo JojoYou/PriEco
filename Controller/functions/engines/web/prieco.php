@@ -50,7 +50,7 @@ LIMIT 1000;
             if (strpos($PriEcoUrl, 'https://') !== false) {
                 $doma = get_string_betweens($PriEcoUrl, 'https://', '/');
             }
-            $pres = '<div class="output" id="output">';
+            $pres = '<div class="output" id="output"><div class="outContent" style="display:block;">';
             if ($row['img'] != '' && !isset($_COOKIE['datasave'])) {
                 $pres .= '<img loading="lazy" alt="‎" src="/Controller/functions/proxy.php?q=' . $row['img'] . '" class="OutSideImg">';
             }
@@ -68,9 +68,7 @@ LIMIT 1000;
             $pres .= 'href="' . $PriEcoUrl . '" data-sxpr-link>';
             $pres .= '<p class="OutTitle">' . $row['title'] . '</p></a>
         <p class="resLink">' . $gurl . '</p>
-        <p class="snippet">' . $row['description'] . '</p>
-        <p class="sumOpen resProvider" id="sumRes" data-url="'.$PriEcoUrl.'">V</p>
-        <p id="sumResOut" class="sumOut snippet"></p>';
+        <p class="snippet">' . $row['description'] . '</p>';
         if($row['tab']!=null and $row['tab'] != ''){
             $tmp = explode('<===>',$row['tab']);
             foreach($tmp as $rt){
@@ -178,7 +176,10 @@ LIMIT 1000;
       }
   }
             ##END Sort by likeable##
-           $pres .= '</div>';
+           $pres .= '</div>
+           <p class="sumOpen resProvider" id="sumRes" data-url="'.$PriEcoUrl.'"></p>
+           <p id="sumResOut" class="sumOut snippet"></p>
+           </div>';
            $PriEcoData[$i] = $pres;
             ++$i;
             $pres = null;

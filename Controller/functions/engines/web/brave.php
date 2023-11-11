@@ -95,7 +95,7 @@ foreach ($snippet as $snip) {
     }
     if($CountBraveSnippets == $i){$brave[$i] .= ' mBorderBottom ';}
 
-        $brave[$i] .= ' output" id="output">';
+        $brave[$i] .= ' output" id="output"><div class="outContent" style="display:block;">';
 
     if(strpos($url, 'https://') !== false){$brave[$i] .= '<img class="Outfavicon" alt="‎" loading="lazy" src="https://judicial-peach-octopus.b-cdn.net/'.get_string_betweens($url, 'https://', '/').'">';}
         $brave[$i] .= '<a ';
@@ -109,14 +109,14 @@ foreach ($snippet as $snip) {
         $brave[$i] .= 'href="' . $url . '" data-sxpr-link>';
         $brave[$i] .= '<p class="OutTitle">'.$href.'</p></a>
     <p class="resLink">' . strip_tags($gurl) . '</p>
-    <p class="snippet">' . strip_tags($description) . '</p>
-    <p class="sumOpen resProvider" id="sumRes" data-url="'.$url.'">V</p>
-    <p id="sumResOut" class="sumOut snippet"></p>
-    ';
+    <p class="snippet">' . strip_tags($description) . '</p>';
     if (isset($_COOKIE['providers'])) {
         $brave[$i] .= '<p class="resProvider">Brave</p>';
     }
-    $brave[$i] .= '</div>';
+    $brave[$i] .= '</div>
+    <p class="sumOpen resProvider" id="sumRes" data-url="'.$url.'"></p>
+    <p id="sumResOut" class="sumOut snippet"></p>
+    </div>';
     ++$i;
 }
 }
