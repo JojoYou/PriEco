@@ -10,13 +10,14 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="
+  <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+  <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self' 'unsafe-inline' https://unpkg.com;
     style-src 'self' 'unsafe-inline' https://unpkg.com;
     img-src 'self' data:;
     connect-src 'self' https://nominatim.openstreetmap.org;
-    frame-src 'self' https://acceptable.a-ads.com;
+    frame-src 'self';
     object-src 'none';
     child-src https://tile.openstreetmap.org;">
 

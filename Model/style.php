@@ -27,5 +27,3 @@ else{
       echo '<style>', $_COOKIE['theme'], '</style>';
 }
 ?>
-</body>
-</html>

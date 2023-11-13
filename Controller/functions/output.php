@@ -976,7 +976,7 @@ if ($Qimg[0] == '{"status":"error","data":{"error_code":24}}' || $Qimg[0] == '{"
             echo '
            <div class="imgoutdiv">
             <div tabindex="0" class="imgoutbtn">
-                <img src="https://search.jojoyou.org/Controller/functions/proxy.php?q=http',urldecode(str_replace('&q=0&b=1&p=0&a=0','', explode('?u=http',$item['thumbnail'])[1])), '" class="imgout">
+                <img src="Controller/functions/proxy.php?q=http',urldecode(str_replace('&q=0&b=1&p=0&a=0','', explode('?u=http',$item['thumbnail'])[1])), '" class="imgout">
                 <a style="color: var(--linkColor); cursor:pointer;text-decoration:none;" href="',$item['url'],'"';if (isset($_COOKIE['new'])) {echo 'target="_blank';}echo'>
             <p>';
                 $pieces = parse_url($item['url']);
@@ -991,7 +991,7 @@ if ($Qimg[0] == '{"status":"error","data":{"error_code":24}}' || $Qimg[0] == '{"
             
     
             <div class="bigimgout">           
-            <img src ="https://search.jojoyou.org/Controller/functions/proxy.php?q=http',urldecode(str_replace('&q=0&b=1&p=0&a=0','', explode('?u=http',$item['thumbnail'])[1])), '" data-src="/Controller/functions/proxy.php?q=',$item['media'],'"';
+            <img src ="Controller/functions/proxy.php?q=http',urldecode(str_replace('&q=0&b=1&p=0&a=0','', explode('?u=http',$item['thumbnail'])[1])), '" data-src="/Controller/functions/proxy.php?q=',$item['media'],'"';
             if(!isset($_COOKIE['DisHImg'])){echo 'style="filter: blur(5px);"';}
             echo '>
             <br>
