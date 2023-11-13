@@ -3,6 +3,8 @@ $ip = hash('sha256',$_SERVER['REMOTE_ADDR']);
 $attackid = hash('sha256',$_SERVER['REMOTE_ADDR'].$_SERVER['HTTP_USER_AGENT']);
 $tmp = date('H');
 
+$wasnt = false;
+
 $sql = "SELECT * FROM `ip` WHERE `ip` = '$ip'";
 $result = $conn->query($sql);
 
@@ -16,6 +18,7 @@ if($ipcount == 0){
     $conn->query($sql);
     $sql = "INSERT INTO `ip` (`ip`, `devices`, `searches`, `date`) VALUES ('$ip','$attackid',0,$tmp)";
     $conn->query($sql);
+    $wasnt = true;
 }
 
 $ipdate = $ipsearches['date'];
@@ -32,7 +35,7 @@ if(!in_array($attackid, $ipallow)){
 $sql = "UPDATE `ip` SET `searches` = '$ipsearches' WHERE `ip` = '$ip';";
 $conn->query($sql);
 }
-if($ipsearches >= $ipcount*20 && !in_array($attackid, $ipallow)){
+if($ipsearches >= $ipcount*20 && !in_array($attackid, $ipallow) && !$wasnt){
 
 if(isset($_POST['submit'])){ 
     if(!empty($_POST['h-captcha-response'])){ 
