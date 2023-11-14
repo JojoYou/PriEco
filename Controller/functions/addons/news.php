@@ -20,7 +20,7 @@ function search_news($NewsObj){
                     $news .= '>
                     <button title="News button" class="ytvideobtn"';
             if(!isset($_COOKIE['datasave'])) {
-                $news .= 'style="background-image: url(Controller/functions/proxy.php?q='.$item['img'].');"';
+                $news .= 'style="background-image: url(Controller/functions/img_proxy.php?q='.urlencode($item['img']).');"';
             }
             $news .= '></button>
             <div class="imgoutlink videossearch">

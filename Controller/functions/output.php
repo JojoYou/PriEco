@@ -839,6 +839,145 @@ else{
     filter:brightness(0)invert(0.5);"><h1>No results found!</h1><img src="/View/icon/no_link.svg"
     style="width:100px;height:auto;"></div>';
 }
+
+if(!isset($_COOKIE['DisWid'])){
+    echo "
+    <div data-sxpr-knowledge-panel id='my-kp-container' style='display:none;'></div>
+  
+  
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const sumResElements = document.querySelectorAll('p#sumRes');
+  
+    sumResElements.forEach(element => {
+      element.addEventListener('click', () => {
+        const sumResOutElement = element.nextElementSibling;
+        if (sumResOutElement.textContent === '') {
+          sumResOutElement.textContent = 'Loading...';
+        const url = element.getAttribute('data-url');
+        const text = fetch('https://search.jojoyou.org/api/summarize.php/?url='+url).then(responseData => responseData.text());
+        text.then((value) => {
+          if (value === '') {
+            sumResOutElement.textContent = 'Couldn\'t summarize';
+          } else {
+            sumResOutElement.textContent = value;
+          }
+        });
+        
+      }
+  
+      const parent = element.parentElement;
+    const sibling = element.previousElementSibling;
+  
+    if (sibling.style.display == 'block') {
+      parent.classList.add('out3D');
+      setTimeout(function() {
+        sibling.style.display = 'none';
+        sumResOutElement.style.display = 'block';
+    }, 500);
+    setTimeout(function() {
+      parent.classList.remove('out3D');
+    }, 1010);
+  
+    } else {
+      parent.classList.add('out3D');
+      setTimeout(function() {
+        sumResOutElement.style.display = 'none';
+        sibling.style.display = 'block';
+    }, 500);
+    setTimeout(function() {
+      parent.classList.remove('out3D');
+    }, 1010);
+  
+    }
+       
+      });
+    });
+  });
+  
+  </script>
+  
+    <script src='/Controller/functions/proxy.php?q=https://cdn.searchexpander.com/js/sxpr.js'></script>
+    <script>
+    sxpr({
+      se: '6o34v7kmksef',
+      'q': '$purl',
+      instantAnswers: true,
+      'instantAnswers': [
+        'smartAnswers'
+      ],
+      'enableTripadvisorPlaces': [],
+      'enableTripadvisorPlacesForLocations': [],
+      'enableWebProducts': false,
+      'enableMediaThumbBar': false,
+      'youTubeEmbed': false,
+      'youTubeResultThumbs': false,
+      'googleMapEmbed': false,
+      'wikipediaSnippetPopups': false,
+  
+      apiUrlTemplate: '/Controller/functions/expander.php?sx-api-path={path}',
+      imageUrlTemplate: '/Controller/functions/proxy.php/?q={url}', 
+      assetsUrlTemplate: '/Controller/functions/proxy.php/?q={url}',
+      audioUrlTemplate: '/Controller/functions/proxy.php/?q={url}',
+      wikipediaApiUrlTemplate: '/Controller/functions/proxy.php/?q={url}',
+      
+      topBarContainer: document.querySelector('#my-top-bar-container'),
+      knowledgePanelContainer: document.querySelector('#my-kp-container'),
+      instantAnswersContainer: document.querySelector('#my-ia-container')
+  });
+    </script>
+    
+    <style>
+    .sx-kp-top, .sx-kp-attributions,.sx-search-sug-header{
+      display:none !important;
+    }
+    .sx-kp, .sx-products-sidebar, .sx-tp,.sx-search-suggestions{
+      background-color: unset;
+      border:none;
+    }
+    #my-kp-container{
+      border-radius: 20px;
+    }
+  .sx-search-sug-link{
+    margin-left: 15px !important;
+    padding: 5px !important;
+    height: unset !important;
+    background-color:unset !important;
+    border-color: gray !important;
+  }
+  .sx-search-suggestions{
+    margin:0;
+    padding:0 !important;
+  }
+  .sx-search-sug-items ul{
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    height: 100%;
+  }
+  .sx-search-sug-scroller{
+    height:100% !important;
+  }
+  .sx-search-sug-link span{
+    font-size:14px !important;
+  }
+  [data-sxpr-top-bar] [data-sxpr-shopping-bar] + [data-sxpr-search-suggestions]{
+    margin-top:unset;
+  }
+  .sx-link-wrap{
+    display:none;
+  }
+  .sx-ia-widget,.sx-ia-widget,.sx-ia-smart-answers{
+    color:unset;
+  }
+  .sx-ia-smart-answers{
+    border:unset;
+    background:unset;
+  }
+    </style>
+    ";
+  }
 }
 if ($type === 'image') {
 
