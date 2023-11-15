@@ -35,7 +35,7 @@ if(!in_array($attackid, $ipallow)){
 $sql = "UPDATE `ip` SET `searches` = '$ipsearches' WHERE `ip` = '$ip';";
 $conn->query($sql);
 }
-if($ipsearches >= $ipcount*20 && !in_array($attackid, $ipallow) && !$wasnt){
+if($ipsearches >= $ipcount*40 && !in_array($attackid, $ipallow) && !$wasnt){
 
 if(isset($_POST['submit'])){ 
     if(!empty($_POST['h-captcha-response'])){ 
