@@ -49,14 +49,9 @@ if (strpos(file_get_contents('Controller/value/tor.txt'), $_SERVER['REMOTE_ADDR'
 //Prepare for search request with search engine APIs
 include './Controller/database.php';
 include 'Controller/functions/func.php';
-##
-#Protection
-##
-if(!$dev){
-include 'Controller/functions/protection/cookie.php';
-include 'Controller/functions/protection/ip.php';}
 //Function to get string between characters
 include 'Controller/functions/getsearch.php';
+
 //Check for img search and for empty query
 $urlSet = explode('&', $urlSet);
 for ($i = 1; $i < count($urlSet); $i++) {
@@ -105,6 +100,13 @@ if ((isset($_POST['q']) && $_POST['q'] != $purl) && !isset($_COOKIE['hQuery'])) 
   exit();
 }
 
+##
+#Protection
+##
+if(!$dev){
+  include 'Controller/functions/protection/cookie.php';
+  include 'Controller/functions/protection/shield.php';}
+  
 //Bangs
 if(strpos($purl, '!') !== false){
   $bangObj = json_decode(file_get_contents('Controller/value/bangs.json'), true);
