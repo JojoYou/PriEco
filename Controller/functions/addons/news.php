@@ -65,10 +65,18 @@ function search_news($NewsObj)
             $domain .
             '</p></div>
                 <p>';
+
         $currentDate = new DateTime();
-        $specifiedDate = new DateTime($item["date"]);
+
+        if (!empty($item["date"])) {
+            $specifiedDate = DateTime::createFromFormat("Y-m-d", $item["date"]);
+
+            if ($specifiedDate !== false) {
+                $news .= $currentDate->diff($specifiedDate)->format("%a");
+            }
+        }
+
         $news .=
-            $currentDate->diff($specifiedDate)->format("%a") .
             ' days ago</p>
               </div>
                 <p class="ytTitle">' .
