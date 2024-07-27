@@ -72,12 +72,14 @@ function search_news($NewsObj)
             $specifiedDate = DateTime::createFromFormat("Y-m-d", $item["date"]);
 
             if ($specifiedDate !== false) {
-                $news .= $currentDate->diff($specifiedDate)->format("%a");
+                $news .=
+                    $currentDate->diff($specifiedDate)->format("%a") .
+                    "days ago";
             }
         }
 
         $news .=
-            ' days ago</p>
+            '</p>
               </div>
                 <p class="ytTitle">' .
             substr(strip_tags($item["title"]), 0, 47) .
