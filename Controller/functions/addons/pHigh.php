@@ -4,7 +4,6 @@ function pHigh($purl){
     $privateOpen = [
         'twitter;Mastodon;mastodon.webp;https://joinmastodon.org/;C;639',
         'instagram;Pixelfed;pixelfed.webp;https://pixelfed.org/',
-        'instagram,twitter;Momenel;momenel.svg;https://www.momenel.com/',
 
         'windows,macos,mac os;Ubuntu;ubuntu.webp;https://ubuntu.com/',
         'windows,macos,mac os;VanillaOS;vanillaos.svg;https://vanillaos.org',
@@ -26,40 +25,40 @@ function pHigh($purl){
         ];
     $load = false;
     $privateAltOut='<p class="sectionTitle">⚡ Alternatives</p>
-    <div class="output" style="display: flex;padding: 15px 0 0 0;flex-wrap: wrap;flex-direction: row;justify-content: center;margin-bottom:15px;border-radius:var(--result-curve);">';
+    <div class="redditCon flex wrap justConC flexDRow output">';
 
     foreach($privateOpen as &$pO){
         $tmp = explode(';',$pO);
         if(in_array($purlLow, explode(',',$tmp[0]))){
             $load = true;
-            $privateAltOut .= '<div style="width: 120px;border-radius: 20px;text-align: center;cursor: pointer;display: flex;flex-direction: column;">
-              <a style="padding-bottom:0;margin-bottom:10px;"href="'.$tmp[3].'"';if (isset($_COOKIE['new'])) {$privateAltOut .='target="_blank"';}$privateAltOut .='>';
+            $privateAltOut .= '<div class="centerTxt flex flexDColumn width100">
+              <a href="'.$tmp[3].'"';if (isset($_COOKIE['new'])) {$privateAltOut .='target="_blank"';}$privateAltOut .='>';
               if(!isset($_COOKIE['datasave'])){
-                $privateAltOut .= '<img src="View/img/privateAlt/'.$tmp[2].'" style="width: 50px;height: 50px;">';
+                $privateAltOut .= '<img src="View/img/privateAlt/'.$tmp[2].'" class="wh50">';
               }
               $privateAltOut .='<p>'.$tmp[1].'</p>
               </a>
               
-              <a style="padding-bottom:10px;"href="https://tosdr.org/en/service/'.$tmp['5'].'"';if (isset($_COOKIE['new'])) {$privateAltOut .='target="_blank"';}$privateAltOut .='>
-              <p style="background-color:';
+              <a href="https://tosdr.org/en/service/'.$tmp['5'].'"';if (isset($_COOKIE['new'])) {$privateAltOut .='target="_blank"';}$privateAltOut .='>
+              <p class="';
               switch($tmp[4]){
                 case 'A':
-                    $privateAltOut .= '#198754';
+                    $privateAltOut .= 'darkGreenBtn';
                     break;
                 case 'B':
-                    $privateAltOut .= '#79b752';
+                    $privateAltOut .= 'greenBtn';
                     break;
                 case 'C':
-                    $privateAltOut .= '#ffc107';
+                    $privateAltOut .= 'orangeRedBtn';
                     break;
                 case 'D':
-                    $privateAltOut .= '#d66f2c';
+                    $privateAltOut .= 'orangeBtn';
                     break;
                 case 'E':
-                    $privateAltOut .= '#dc3545';
+                    $privateAltOut .= 'redBtn';
                     break;
             }
-              $privateAltOut .= ';margin:0 2.5px;color:white;font-weight:bold;border-radius:var(--result-curve);">'.$tmp[4].'</p>
+              $privateAltOut .= ' colorWhite curve"><b>'.$tmp[4].'</b></p>
               </a>
             </div>';
         }

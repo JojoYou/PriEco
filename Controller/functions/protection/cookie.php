@@ -4,14 +4,14 @@ if(isset($_COOKIE['searchNum'])){
     $num = $_COOKIE['searchNum']+1;
 }
 
-setcookie('searchNum', $num, time() + 4, '/');
+setcookie('searchNum', $num, time() + 4, '/',null,true,true);
 
 if($num >= 50){
 
-    setcookie('searchNum', $num, time() + 21600, '/');
+    setcookie('searchNum', $num, time() + 21600, '/',null,true,true);
 
     if(isset($_POST['stop'])){ 
-        setcookie('searchNum', 47, time() + 3600, '/');
+        setcookie('searchNum', 47, time() + 3600, '/',null,true,true);
         header("Refresh:0");
         exit();
     }
@@ -27,7 +27,7 @@ if($num >= 50){
     }
 }
 elseif($num >= 25){
-    setcookie('searchNum', $num, time() + 3600, '/');
+    setcookie('searchNum', $num, time() + 3600, '/',null,true,true);
 
 if(isset($_POST['submit'])){ 
         if(!empty($_POST['h-captcha-response'])){ 
@@ -50,7 +50,7 @@ if(isset($_POST['submit'])){
             curl_close($ch); 
             $responseData = json_decode($response); 
             if($responseData->success){ 
-                setcookie('searchNum', $num, time() - 1, '/');
+                setcookie('searchNum', $num, time() - 1, '/',null,true,true);
                 header('refresh:0');
             }
 } }

@@ -15,23 +15,24 @@ if ($timezone !== null) {
 
 if ($weatherTrue && $OpenWeatherObj['main']['temp']!=0) {
 
-  echo '<div class="output"style="margin-bottom: 15px;border-radius: 20px;padding: 10px;">
+  echo '<div class="redditCon output">
 
-    <div style="width:100%;display:flex;">
-      <div style="margin-bottom: 20px;display: flex;justify-content: space-between;border-bottom: solid gray 1px;width:100%;padding: 0 10px;">
-        <p style="font-weight: bold;">',$OpenWeatherObj['name'],', ', $OpenWeatherObj['sys']['country'],'</p>
+    <div class="width100P flex">
+      <div class="flex justContSpace-Between borderBottom width100P paddingL10 paddingR10">
+        <p><b>',$OpenWeatherObj['name'],', ', $OpenWeatherObj['sys']['country'],'</b></p>
         <p>',date('l') ,'</p>
       </div>
+      <br>
     </div>
     
-  <div style="width:100%;display:flex;align-items: center;justify-content: space-between;margin-bottom:10px;">
-    <div style="display: flex;align-items: center;">';
+  <div class="width100p flex justContSpace-Between alignC">
+    <div class="flex alignC">';
     if(!isset($_COOKIE['datasave'])){
-      echo '<img style="width:100px;height:100px;"src="/Controller/functions/proxy.php?q=https://openweathermap.org/img/wn/',$OpenWeatherObj['weather'][0]['icon'],'@2x.png">';
+      echo '<img class="wh100" src="/Controller/functions/proxy.php?q=https://openweathermap.org/img/wn/',$OpenWeatherObj['weather'][0]['icon'],'@2x.png">';
     }
     echo'
       <div> 
-        <p style="font-size: 36px;" id="temp">';
+        <p class="txt32" id="temp">';
           if(!isset($_COOKIE['temp'])){echo round($OpenWeatherObj['main']['temp']-273.15, 2), ' °C';} 
           elseif($_COOKIE['temp'] == 'f'){echo round(($OpenWeatherObj['main']['temp']- 273.15) * 9/5 + 32, 2), ' °F';}
           else{echo round($OpenWeatherObj['main']['temp'], 2),' K';} 
@@ -48,17 +49,18 @@ if ($weatherTrue && $OpenWeatherObj['main']['temp']!=0) {
         }*/
       echo'</div>
     </div>
+    <br>
     <div>
-      <p style="font-weight:bold;">',ucfirst($OpenWeatherObj['weather'][0]['main']),'</p>
-      <p style="font-size: 12px;margin-bottom: 5px;">',ucfirst($OpenWeatherObj['weather'][0]['description']),'</p>
-      <p style="font-size: 12px;">Humidity: ',$OpenWeatherObj['main']['humidity'],'%</p>
-      <p style="font-size: 12px;">Pressure: ',$OpenWeatherObj['main']['pressure'],'P</p>
-      <p style="font-size: 12px;">Wind: ',round($OpenWeatherObj['wind']['speed']*3.6, 2),'k/h</p>';
+      <p><b>',ucfirst($OpenWeatherObj['weather'][0]['main']),'</b></p>
+      <p class="txt12">',ucfirst($OpenWeatherObj['weather'][0]['description']),'</p><br>
+      <p class="txt12">Humidity: ',$OpenWeatherObj['main']['humidity'],'%</p>
+      <p class="txt12">Pressure: ',$OpenWeatherObj['main']['pressure'],'P</p>
+      <p class="txt12">Wind: ',round($OpenWeatherObj['wind']['speed']*3.6, 2),'k/h</p>';
 
       if($timezone !== null){
       echo '<br>
-      <p style="font-size: 12px;">☀️Sunrise: ',date('H:i', $OpenWeatherObj['sys']['sunrise']),'</p>
-      <p style="font-size: 12px;">🌑Sunset: ',date('H:i', $OpenWeatherObj['sys']['sunset']),'</p>';
+      <p class="txt12">☀️Sunrise: ',date('H:i', $OpenWeatherObj['sys']['sunrise']),'</p>
+      <p class="txt12">🌑Sunset: ',date('H:i', $OpenWeatherObj['sys']['sunset']),'</p>';
       }
     echo '</div>
 
@@ -75,8 +77,8 @@ if ($weatherTrue && $OpenWeatherObj['main']['temp']!=0) {
 
 
 
-        echo '<input type="radio" id="weatherRadio',$weatherNum,'" name="weatherRadio" style="display:none;"';if($weatherNum==0){echo'checked';}echo'>
-        <div class="weatherChart',$weatherNum,' weatherChart">';
+        echo '<div><input type="radio" id="weatherRadio',$weatherNum,'" name="weatherRadio" class="weatherRadio none"';if($weatherNum==0){echo'checked';}echo'>
+        <div class="weatherChart weatherChart">';
         ++$weatherNum;
   foreach($OpenWeatherForecastObj['list'] as &$owfo2)
   {
@@ -147,14 +149,14 @@ foreach ($dataPoints as $index => $point) {
     echo '<text x="' , $textX , '" y="' , $textY , '" text-anchor="middle" fill="gray">' , $text , '</text>';
 }
 
-echo '</svg></div>';
+echo '</svg></div></div>';
 unset($temperatures);
 unset($times);
       }
     }
     echo '<div class="weatherForecastList">';
 
-    $weatherNum = 0;
+    $weatherNum =0;
     $cday = -1;
     foreach($OpenWeatherForecastObj['list'] as &$owfo){
       if($cday != date("d", strtotime($owfo['dt_txt']))){
@@ -170,35 +172,29 @@ unset($times);
         <label for="weatherRadio',$weatherNum,'" class="weatherLabel">
         <p>', date("l", strtotime($owfo['dt_txt'])),'</p>';
         if(!isset($_COOKIE['datasave'])){
-        echo'<img style="width:60px;height:60px;"src="/Controller/functions/proxy.php?q=https://openweathermap.org/img/wn/',$owfo['weather'][0]['icon'],'@2x.png">';
+        echo'<img class="wh60" src="/Controller/functions/proxy.php?q=https://openweathermap.org/img/wn/',$owfo['weather'][0]['icon'],'@2x.png">';
         }
         else{
-          echo '<div style="height:60px;width:60px;"></div>';
+          echo '<div class="wh60"></div>';
         }
         echo '<div>';
           if(!isset($_COOKIE['temp'])){echo round(max($temp)-273.15, 2).'°';}
           elseif($_COOKIE['temp'] == 'f'){echo round((max($temp) -  273.15) * 9/5 + 32,2).'°';}
           else{echo round(max($temp),2).'°';}
-        echo '<p style="opacity:0.7;">';
+        echo '<p class="opacity7">';
           if(!isset($_COOKIE['temp'])){echo round(min($temp)-273.15, 2).'°';}
         elseif($_COOKIE['temp'] == 'f'){echo round((min($temp) -  273.15) * 9/5 + 32,2).'°';}
         else{echo round(min($temp),2).'°';}
         echo'</p></div>
       </label>
-      <style>
-      #weatherRadio',$weatherNum,':checked~.weatherChart',$weatherNum,' {
-        visibility: visible;
-        height:220px;
-      }
-      </style>
       ';
       ++$weatherNum;
       unset($temp);
       }
     }
 echo '</div>
-  <div style="float: right;">
-    <a href ="https://openweathermap.org/" style="font-size: 12px;font-weight: bold;opacity:0.5;"><p>Data from OpenWeatherMap</p></a>
+  <div class="float-right">
+    <a href ="https://openweathermap.org/" class="txt12 opacity7"><p><b>Data from OpenWeatherMap</b></p></a>
     </div>
   </div>';
 }

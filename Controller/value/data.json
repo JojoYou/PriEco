@@ -10,7 +10,7 @@
         "2": "money"
       },
       "htmlTitle": "Pawns: Passive income online",
-      "link": "https://pawns.app?r=1158165",
+      "link": "https://discoverpawns.eu/1158165",
       "displayLink": "pawns.app",
       "snippet": "Pawns.app enables you to make money instantly. All you need to do to start generating income is to create a free account and install our app."
     },
@@ -25,9 +25,6 @@
       "snippet": "Since our launch in 2008, GreenGeeks has been the industry's leading eco-friendly green web hosting provider putting back 3 times the power we consume into..."
     }
   ],
-
-
-  
   "lang": [
     {
       "Arabic": "ar",
@@ -450,6 +447,42 @@
       "sr": "Vesti",
       "sv": "Nyheter",
       "tr": "Haberler"
+    }
+  ],
+  "Shopping": [
+    {
+      "ar": "متجر",
+      "bg": "Пазаруване",
+      "ca": "Compra",
+      "cs": "Nakupování",
+      "da": "Shopping",
+      "de": "Einkaufen",
+      "el": "Κοσμήματα",
+      "es": "Compras",
+      "et": "Ostlemine",
+      "fi": "Ostokset",
+      "fr": "Achats",
+      "hr": "Šoping",
+      "hu": "Vásárlás",
+      "id": "Belanja",
+      "is": "Einkaup",
+      "it": "Acquisti",
+      "iw": "קניות",
+      "ja": "買い物",
+      "ko": "쇼핑",
+      "lt": "Apsipirkimas",
+      "lv": "Iepirkšanās",
+      "nl": "Winkelen",
+      "no": "Shopping",
+      "pl": "Zakupy",
+      "pt": "Compras",
+      "ro": "Cumpărături",
+      "ru": "Покупки",
+      "sk": "Nakupovanie",
+      "sl": "Nakupovanje",
+      "sr": "Шопинг",
+      "sv": "Shopping",
+      "tr": "Alışveriş"
     }
   ],
   "Map": [

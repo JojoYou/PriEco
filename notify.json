@@ -1,0 +1,14 @@
+[
+    {
+        "body": "We would like to ask you for <b>fully anonymous telemetry</b> to improve PriEco.<br><form method='post' class='flex justConR alignC'><input type='submit' name='telemetry' value='Accept' class='bgTop colorWhite analyticsBtn mr-10 padding7-14 txt11'><input type='submit' name='telemetry' value='Deny' class='padding7-14 weight100 borderRed white txt11 bgNone analyticsBtn'></form>",
+        "url": "web/privacypolicy.php#telemetry",
+        "icon": "View/img/notifications/p.svg",
+        "date": "telemetry"
+    },
+    {
+        "body": "Introducing notifications!",
+        "url": "",
+        "icon": "View/img/notifications/not.svg",
+        "date": "1"
+    }
+]

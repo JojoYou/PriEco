@@ -3,12 +3,12 @@
   <ShortName>PriEco</ShortName>
   <Description>Search Privately, Securely and EcoFriendly</Description>
   <InputEncoding>UTF-8</InputEncoding>
-  <Url type="text/html" method="GET" template="https://search.jojoyou.org/?q={searchTerms}"/>
+  <Url type="text/html" method="GET" template="https://prieco.net/?q={searchTerms}"/>
   <Autodiscovery>
-    <Url type="application/opensearchdescription+xml" rel="self" template="https://search.jojoyou.org/osd.xml"/>
-    <Url type="text/html" template="https://search.jojoyou.org/?q={searchTerms}"/>
+    <Url type="application/opensearchdescription+xml" rel="self" template="https://prieco.net/osd.xml"/>
+    <Url type="text/html" template="https://prieco.net/?q={searchTerms}"/>
   </Autodiscovery>
   <InputEncoding>UTF-8</InputEncoding>
-  <SearchForm>https://search.jojoyou.org/</SearchForm>
-  <Url rel="suggestions" type="application/x-suggestions+json" method="GET" template="https://search.jojoyou.org/sug.php?q={searchTerms}"/>
+  <SearchForm>https://prieco.net/</SearchForm>
+  <Url rel="suggestions" type="application/x-suggestions+json" method="GET" template="https://prieco.net/sug.php?q={searchTerms}"/>
 </OpenSearchDescription>

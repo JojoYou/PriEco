@@ -24,8 +24,14 @@ if(isset($_POST['fedsubmit'])){
         curl_close($ch); 
         $responseData = json_decode($response); 
         if($responseData->success){ 
-              mail('team@jojoyou.org', 'PriEco Feedback', 'Email: ' . $_POST['fedEmail'] . '
-Feedback: ' . $_POST['fedsug']);
+            $subject = 'PriEco Feedback';
+            $body = 'Email: ' . $_POST['fedEmail'] . "\nFeedback: " . $_POST['fedsug'];
+            $sender = "roman@send.prieco.net";
+            $recipient = "team@jojoyou.org";
+            $headers = "From: $sender";
+
+            if (mail($recipient, $subject, $body, $headers)) {
+            }
               
             echo '<h1>Thank you for your feedback!';
             header('refresh:2;url=/');
@@ -43,45 +49,23 @@ Feedback: ' . $_POST['fedsug']);
     <title>Feedback | PriEco</title>
 </head>
 <body>
-<div style="
-    width: 100vw;
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-">
-<form method="POST" action="" style="
-padding: 20px;
-border: solid 7px gray;
-border-radius: 20px;
-">
-<h4 style="font-size:32px;">Thank you for helping improve PriEco</h4>
-<input type="text" name="fedEmail" placeholder="Email" class="fedimp" style="border-radius: 20px;
-padding: 5px;
-width: 100%;
-height: 50px;
-border: none;">
-<p style="font-style: italic;font-size: 12px;"><b>Not required</b> just if you want us to contact you back</p>
-<br><textarea name="fedsug" style="border-radius: 20px;
-border: none;padding: 10px;
-width: 100%;
-height: 100px;margin-bottom:7px;" placeholder="Feedback*" class="fedimp" required></textarea>
+<div class="width100V height100V flex justConC alignC">
+<form method="POST" action="" class="padding20 curve">
+<h4 class="txt32">Thank you for helping improve PriEco</h4>
+<input type="text" name="fedEmail" placeholder="Email" class="fedimp curve padding10 width100P height50 borderNone">
+<p class="txt12"><i><b>Not required</b> just if you want us to contact you back</i></p>
+<br><textarea name="fedsug" class="fedimp curve borderNone padding10 width100P min-height100 mb-10" placeholder="Feedback*" required></textarea>
 
 <?php
  echo '<div class="h-captcha" data-sitekey="',$_ENV['hCaptcha_Site'],'"></div>';
 if(isset($_POST['fedsubmit'])){ 
  if(empty($_POST['h-captcha-response'])){ 
-     echo '<p style="color:red;margin:0;">Fill up hCaptcha!</p>';
+     echo '<p class="colorRed">Fill up hCaptcha!</p>';
  }
 }
 ?>
-<div style="text-align:center;">
-<input type="submit" name="fedsubmit"value="Submit" style="border: solid 2px lightgray;
-padding: 10px;
-border-radius: 20px;
-cursor: pointer;
-font-weight: normal;display:inline;
-margin-top: 10px;">
+<div class="centerTxt">
+<input type="submit" name="fedsubmit" value="Submit" class="padding10 curve Pointer inline mt-10 borderNone whiteAblackBg">
 </form>
 </div>
 <br>

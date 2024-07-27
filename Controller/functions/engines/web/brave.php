@@ -1,124 +1,48 @@
 <?php
-function getBetween($string, $start = "", $end = ""){
-    if (strpos($string, $start)) { // required if $start not exist in $string
-        $startCharCount = strpos($string, $start) + strlen($start);
-        $firstSubStr = substr($string, $startCharCount, strlen($string));
-        $endCharCount = strpos($firstSubStr, $end);
-        if ($endCharCount == 0) {
-            $endCharCount = strlen($firstSubStr);
-        }
-        return substr($firstSubStr, 0, $endCharCount);
-    } else {
-        return '';
-    }
-}
-
 function brave($BraveObj, $loaded, $Bpurl){
-$snippet = str_get_html($BraveObj)->find('div.snippet');
-
-if(isset($snippet)){
-$i=0;
-$CountBraveSnippets = count($snippet);
-if($CountBraveSnippets >= 20){
-    $j=0;
-    foreach ($snippet as $snip) {
-        $href = $snip->find('a', 0);
-        if($href == null){
-            break;
+    if(!isset($BraveObj['web']['results'])){return '';}
+    $CountBraveSnippets = count($BraveObj['web']['results'])-1;
+    $i=0;
+    foreach($BraveObj['web']['results'] as &$item){
+        $brave[$i] = '<div class="output" id="output">';
+        
+        $burl = str_replace('/',' > ',str_replace('https://','',str_replace('http://','',str_replace('www.','', $item['url']))));
+        if ( substr_compare($burl, ' > ', -3) === 0 ) {
+        $burl = substr($burl, 0, -3);
         }
-        ++$j;
-    }
-    $CountBraveSnippets = $j-1;
-}
-else{
-    $CountBraveSnippets -= 1;
-}
-
-$i = 0;
-$brave[] = null;
-foreach ($snippet as $snip) {
-    $href = $snip->find('a', 0);
-    if($href == null){continue;}
-
-    if($href->find('div.favicon-wrapper', 0)->outertext != null){
-    $href->find('div.favicon-wrapper', 0)->outertext = '';
-    }
-    $url = $href->href;
-    if(!filter_var($url, FILTER_VALIDATE_URL)){
-        continue;
-    }
-
-    $description = strip_tags($snip->find('div.snippet-description', 0));
-    $description = strlen($description)>150 ? substr($description,0,150).'...' : $description;
-
-    $href= strip_tags($href);
-    if(strpos($href,' › ') !== false){
-        $href=explode(' › ',$href)[0];
-        $href = str_replace(str_replace('www.','',parse_url($url)['host']),'',$href);
-    }
-    $brave[$i] = '<div class="';
-    switch ($i){
-        case 0:
-            if(!$loaded[0] && $loaded[1]) {$brave[$i] .= ' mBorderBoth2 mBorderTop ';}
-            elseif(!$loaded[0]){$brave[$i] .= ' mBorderTop ';}
-            elseif($loaded[1]){$brave[$i] .= ' mBorderBottom2 ';}
-            break;
-        case 1:
-            if($loaded[1]) {$brave[$i] .= ' mBorderTop2 ';}
-            if($loaded[2]) {$brave[$i] .= ' mBorderBottom ';}
-            break;
-        case 2:
-            if($loaded[2]) {$brave[$i] .= ' mBorderTop ';}
-           break;
-        case 3:
-            if($loaded[3]) {$brave[$i] .= ' mBorderBottom ';}
-            break;
-        case 4:
-            if($loaded[3]) {$brave[$i] .= ' mBorderTop ';}
-            break;
-        case 5:
-            if($loaded[4]) {$brave[$i] .= ' mBorderBottom ';}
-            break;
-        case 6:
-            if($loaded[4]) {$brave[$i] .= ' mBorderTop ';}
-            break;
-        case 7:
-            if($loaded[5]) {$brave[$i] .= ' mBorderBottom ';}
-            break;
-        case 8:
-            if($loaded[5]) {$brave[$i] .= ' mBorderTop ';}
-            if($loaded[6]) {$brave[$i] .= ' mBorderBottom ';}
-            break;
-        case 9:
-            if($loaded[6]) {$brave[$i] .= ' mBorderTop ';}
-            break;
-    }
-    if($CountBraveSnippets == $i){$brave[$i] .= ' mBorderBottom ';}
-
-        $brave[$i] .= ' output" id="output"><div class="outContent" style="display:block;">';
-
-    if(strpos($url, 'https://') !== false){$brave[$i] .= '<img class="Outfavicon" alt="‎" loading="lazy" src="https://judicial-peach-octopus.b-cdn.net/'.get_string_betweens($url, 'https://', '/').'">';}
+        
+        if (isset($item['thumbnail']['src']) && !isset($_COOKIE['datasave'])) {
+        $brave[$i] .= '<img loading="lazy" alt="‎" src="/Controller/functions/proxy.php?q='. $item['thumbnail']['src']. '" class="OutSideImg">';
+        }
+        if (strpos($item['url'], 'https://') !== false && !isset($_COOKIE['datasave'])) {
+        $brave[$i] .= '<img class="Outfavicon" alt="‎" loading="lazy" src="/Controller/functions/proxy.php?q=https://judicial-peach-octopus.b-cdn.net/'. get_string_betweens($item['url'], 'https://', '/'). '">';
+        }
         $brave[$i] .= '<a ';
         if (isset($_COOKIE['new'])) {
-            $brave[$i] .= 'target="_blank"';
+        $brave[$i] .= 'target="_blank"';
         }
-        $gurl = str_replace('/',' > ',str_replace('https://','',str_replace('http://','',str_replace('www.','', $url))));
-            if ( substr_compare($gurl, ' > ', -3) === 0 ) {
-            $gurl = substr($gurl, 0, -3);
-            }
-        $brave[$i] .= 'href="' . $url . '" data-sxpr-link>';
-        $brave[$i] .= '<p class="OutTitle">'.$href.'</p></a>
-    <p class="resLink">' . strip_tags($gurl) . '</p>
-    <p class="snippet">' . strip_tags($description) . '</p>';
-    if (isset($_COOKIE['providers'])) {
-        $brave[$i] .= '<p class="resProvider">Brave</p>';
-    }
-    $brave[$i] .= '</div>
-    <p class="sumOpen resProvider" id="sumRes" data-url="'.$url.'"></p>
-    <p id="sumResOut" class="sumOut snippet"></p>
+        $brave[$i] .= 'href="'. $item['url']. '" rel="noopener noreferrer" data-sxpr-url>';
+        $brave[$i] .= '<p class="OutTitle">'.$item['title']. '</p></a>
+        <div class="resLink">'. $burl . '<img src="View/icon/dots_vertical.svg" class="filterImage resOptions">';
+        if (!isset($_COOKIE['DisWid'])) {
+            $brave[$i] .= '<div class="resOptionsGroup">
+            <a href="https://web.archive.org/web/*/'.$item['url'].'" rel="noopener noreferrer"';if (isset($_COOKIE['new'])) {$brave[$i] .= 'target="_blank"';}$brave[$i].='><img class="filterImage sumOpen width32" src="View/icon/archive.svg"></a>
+            <a href="proxy/?url='.$item['url'].'" ';if (isset($_COOKIE['new'])) {$brave[$i] .= 'target="_blank"';}$brave[$i].='><img class="filterImage sumOpen opacity10 blueIcon" src="View/icon/mask.svg"></a>
+            <img class="filterImage width33 sumOpen" id="sumRes" data-url="'.$item['url'].'" src="View/icon/circle-info.svg">
+            </div>';
+        }
+        $brave[$i] .= '</div>
+        <div id="sumResOut" class="sumOut snippet">
+        <blockquote id="sumOut"></blockquote>
     </div>';
-    ++$i;
-}
-}
-return $brave;
+        
+        if(isset($item['description'])){$brave[$i] .= '<p class="snippet" id="snippet">'.$item['description']. '</p>';}
+        if (isset($_COOKIE['providers'])) {
+        $brave[$i] .= '<p class="resProvider">Brave</p>';
+        }
+        $brave[$i] .= '</div>';
+        ++$i;
+    }
+
+    return $brave;
 }

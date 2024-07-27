@@ -2,37 +2,28 @@
 echo'<div class="wrapper">
 <input type="checkbox" id="btn" hidden /><label
   for="btn"
-  class="menu-btn"
-  style="width: 20px;height: 20px;cursor:pointer;"
-  ><img
+  class="menu-btn">
+  <img
     alt="icnSet"
     class="icnSet"
     src="./View/icon/gear.svg"
-    style="width: 15px; height: 15px;"
 /></label>
 <nav id="sidebar">
-  <label for="btn" class="close-menu-btn"
-    ><img style="cursor:pointer;position: absolute; width:35px;padding:10px;right: 15px;top: 5px;"
+  <label for="btn"><img class="filterImage close-menu-btn"
     alt="icnCross" src="./View/icon/cross.svg"></label
   >
-  <div class="title"><img alt="" style="width: 15px;
-  height: 15px;
-  margin-right: 5px;
-  margin-left: 5px;"src="./View/icon/gear.svg">Settings</div>
+  <div class="sidebarTitle flex"><img src="./View/icon/gear.svg" alt="Settings icon">Settings</div>
   <div class="list-items">
     <form method="post" class="form-items" action="">
       <div class="setGroup">
-      <div style="border-bottom: solid 2px grey;" class="setListItem">
+      <div class="setListItem">
         <h3>General</h3>
       </div>
       <br />
       <div class="setListItem">
         <p>Language:</p>
         <div>
-        <select
-          style="border: none;padding: 10px;border-radius: 6px;"
-          name="LangDropdown"
-        >
+        <select class="setSelect" name="LangDropdown">
           <option disabled hidden selected>
 ';
 if (isset($lang) && $lang !== 'all')
@@ -89,26 +80,26 @@ if (isset($_COOKIE['new']))
 echo '>
 <span class="slider round"></span>
 </label></div><br><div class="setListItem"><p>Theme:</p>
-<div class="themeMenu" style="padding: 10px;padding-bottom:0;border-radius: 20px;">
-<div style="width: 100%;display: flex;justify-content: space-between;">
+<div class="themeMenu">
+<div>
 
 
-<input type="radio" style="display:none;"';
+<input type="radio" class="none"';
 if(!isset($_COOKIE['mode'])){
 echo ' checked ';
 }
 echo '>
-<input type="submit" id="systemTheme" name="systemTheme" style="display:none;">
+<input type="submit" id="systemTheme" name="systemTheme" class="none">
 <label class="';if(!isset($_COOKIE['mode'])){echo 'setChooseChecked ';}echo 'unitTemp" for="systemTheme">🌓</label>
 
-<input type="submit" id="light" name="light" style="display:none;">
+<input type="submit" id="light" name="light" class="none">
 <label class="';if(isset($_COOKIE['mode']) && $_COOKIE['mode'] == 1){echo 'setChooseChecked ';}echo 'unitTemp" for="light">☀️</label>
 
-<input type="submit" id="dark" name="dark" style="display:none;">
+<input type="submit" id="dark" name="dark" class="none">
 <label class="';if(isset($_COOKIE['mode']) && $_COOKIE['mode'] == 2){echo 'setChooseChecked ';}echo 'unitTemp" for="dark">🌑</label>
 
 <label class="labCustom" for="custom">🌈</label></div>
-<input type="checkbox" class="showCustomThemeBox" aria-label="Open custom editor" style="float:right;"><textarea name="customTheme" class="';
+<input type="checkbox" class="showCustomThemeBox" aria-label="Open custom editor" class="float-right"><textarea name="customTheme" class="';
 if (isset($_COOKIE['mode']) && $_COOKIE['mode'] == 3)
 {
     echo 'CustomThemeShow';
@@ -119,27 +110,27 @@ if (isset($_COOKIE['theme']))
     echo $_COOKIE['theme'];
 }
 echo '</textarea>
-<div style="display:grid;grid-template-columns: auto auto auto;text-align:center;width:calc(100% - 5px);">
-<label for="systemTheme" style="font-size:12px;margin-bottom: 5px;cursor:pointer;">System</label>
-<label for="light" style="font-size:12px;cursor:pointer;">Light</label>
-<label for="dark" style="font-size:12px;cursor:pointer;">Dark</label>
+<div class="themeSetText">
+<label for="systemTheme">System</label>
+<label for="light">Light</label>
+<label for="dark">Dark</label>
 </div>
 
 </div>
 </div>
 
 <br><div class="setListItem"><p>Units:</p>
-<div class="themeMenu" style="padding: 10px;border-radius: 20px;">
-<div style="width: 100%;display: flex;justify-content: space-between;">
+<div class="themeMenu">
+<div>
 
 
-<input type="submit" id="tempC" name="tempC" style="display:none;">
+<input type="submit" id="tempC" name="tempC" class="none">
 <label class="';if(!isset($_COOKIE['temp'])){echo 'setChooseChecked ';}echo 'unitC unitTemp" for="tempC">°C</label>
 
-<input type="submit" id="tempF" name="tempF" style="display:none;">
+<input type="submit" id="tempF" name="tempF" class="none">
 <label class="';if(isset($_COOKIE['temp']) && $_COOKIE['temp'] == 'f'){echo 'setChooseChecked ';}echo 'unitF unitTemp" for="tempF">°F</label>
 
-<input type="submit" id="tempK" name="tempK" style="display:none;">
+<input type="submit" id="tempK" name="tempK" class="none">
 <label class="';if(isset($_COOKIE['temp']) && $_COOKIE['temp'] == 'k'){echo 'setChooseChecked ';}echo 'unitK unitTemp" for="tempK">K</label>
 </div>
 
@@ -148,7 +139,7 @@ echo '</textarea>
 </div>
 
 <br><div class="setListItem"><label for="datasaver">Cellular data saver:</label><label class="switch">
-<input type="submit" style="display:none;" name="datasave" id="datasaver" value="datasave';if (isset($_COOKIE['datasave'])){echo 'On';}else{echo 'Off';}echo '">
+<input type="submit" class="none" name="datasave" id="datasaver" value="datasave';if (isset($_COOKIE['datasave'])){echo 'On';}else{echo 'Off';}echo '">
 <input type="checkbox" class="setCheck" ';
 if (isset($_COOKIE['datasave']))
 {
@@ -159,9 +150,7 @@ echo '><span class="slider round"></span>
 
 <br><div class="setListItem"><p>Suggestions:</p>
 <div>
-<select
-  style="border: none;padding: 10px;border-radius: 6px;"
-  name="sugPDropdown">
+<select name="sugPDropdown">
 
 <option value="d"';if (!isset($_COOKIE['sugProvider'])){echo 'selected';}echo '>DuckDuckGo</option>
 <option value="g"';if (isset($_COOKIE['sugProvider']) && $_COOKIE['sugProvider'] == 'g'){echo 'selected';}echo '>Google</option>
@@ -171,11 +160,12 @@ echo '><span class="slider round"></span>
 </div>
 
 
-</div>
-<div class="setGroup"><div style="border-bottom: solid 2px grey;"class="setListItem"><h3>Data</h3></div>
+</div>';
+/*
+<div class="setGroup"><div class="setListItem"><h3>Data</h3></div>
 <br>
-<div class="setListItem"><label for="aCou"><p>User counter:</p><p style="font-size:12px;">Anonymous ping</p></label><label class="switch">
-<input type="submit" style="display:none;" name="aCou" id="aCou" value="aCou';if (isset($_COOKIE['userid'])){echo 'On';}else{echo 'Off';}echo '">
+<div class="setListItem"><label for="aCou"><p>User counter:</p></label><label class="switch">
+<input type="submit" class="none" name="aCou" id="aCou" value="aCou';if (isset($_COOKIE['userid'])){echo 'On';}else{echo 'Off';}echo '">
 <input type="checkbox" class="setCheck" ';
 if (isset($_COOKIE['userid']))
 {
@@ -185,11 +175,22 @@ echo '>
 <span class="slider round"></span>
 </label></div>
 </div>
-
-<div class="setGroup"><div style="border-bottom: solid 2px grey;"class="setListItem"><h3>Privacy</h3></div>
+*/
+echo '<div class="setGroup"><div class="setListItem"><h3>Privacy</h3></div>
+<br>
+<div class="setListItem"><a href="web/privacypolicy.php#telemetry" target="_blank" class="link">Telemetry:</a><label class="switch">
+<input type="submit" class="none" name="telemetry" id="telemetry" value="telemetry';if (isset($_COOKIE['telemetry']) && $_COOKIE['telemetry'] == 'on'){echo 'On';}else{echo 'Off';}echo '">
+<input type="checkbox" class="setCheck" ';
+if (isset($_COOKIE['telemetry']) && $_COOKIE['telemetry'] == 'on')
+{
+    echo 'checked';
+}
+echo '>
+<span class="slider round"></span>
+</label></div>
 <br>
 <div class="setListItem"><label for="hQuery">Hide query:</label><label class="switch">
-<input type="submit" style="display:none;" name="hQuery" id="hQuery" value="hQuery';if (isset($_COOKIE['hQuery'])){echo 'On';}else{echo 'Off';}echo '">
+<input type="submit" class="none" name="hQuery" id="hQuery" value="hQuery';if (isset($_COOKIE['hQuery'])){echo 'On';}else{echo 'Off';}echo '">
 <input type="checkbox" class="setCheck" ';
 if (isset($_COOKIE['hQuery']))
 {
@@ -198,12 +199,35 @@ if (isset($_COOKIE['hQuery']))
 echo '>
 <span class="slider round"></span>
 </label></div>
+
+<br>
+<div class="setListItem">
+<input type="checkbox" id="proxySet" class="none">
+<label for="proxySet" class="flex alignC Pointer">Instances <img src="View/icon/dropdown.svg" class="width15 height15 filterImage ml-10" alt="Show instances"></label>
+<br><br>
+<div id="openCheckSettings">
+<a href="https://docs.invidious.io/instances/" target="_blank" class="link">Video instance</a>
+<div class="flex justContSpace-Between">
+<input type="url" class="langSave" name="vidURL" placeholder="https://yewtu.be/watch?v="';if(isset($_COOKIE['vidURL'])){echo 'value="',$_COOKIE['vidURL'],'"';}echo'>
+<input type="submit" value="Save" class="langSave" name="vidSave">
 </div>
 
-<div class="setGroup"><div style="border-bottom: solid 2px grey;"class="setListItem"><h3>JavaScript</h3></div>
+<br><br>
+<a href="https://github.com/redlib-org/redlib-instances/blob/main/instances.md" target="_blank" class="link">Reddit instance:</a>
+<div class="flex justContSpace-Between">
+    <input type="url" class="langSave" name="redURL" placeholder="https://safereddit.com/"';if(isset($_COOKIE['redURL'])){echo 'value="',$_COOKIE['redURL'],'"';}echo'>
+    <input type="submit" value="Save" class="langSave" name="redSave">
+    </div>
+</div>
+</div>
 <br>
+<div class="setListItem">
+<input type="checkbox" id="jsSet" class="none">
+<label for="jsSet" class="flex alignC Pointer">JavaScript <img src="View/icon/dropdown.svg" class="width15 height15 filterImage ml-10" alt="Show JavaScript settings"></label>
+<br><br>
+<div id="openCheckSettings">
 <div class="setListItem"><label for="dSug">Suggestions:</label><label class="switch">
-<input type="submit" style="display:none;" name="dSug" id="dSug" value="dSug';if (isset($_COOKIE['DisSugges'])){echo 'On';}else{echo 'Off';}echo '">
+<input type="submit" class="none" name="dSug" id="dSug" value="dSug';if (isset($_COOKIE['DisSugges'])){echo 'On';}else{echo 'Off';}echo '">
 <input type="checkbox" class="setCheck" ';
 if (!isset($_COOKIE['DisSugges']))
 {
@@ -213,7 +237,7 @@ echo '>
 <span class="slider round"></span>
 </label></div><br>
 <div class="setListItem"><label for="dSug">Multi Bang:</label><label class="switch">
-<input type="submit" style="display:none;" name="dMul" id="dMul" value="dMul';if (isset($_COOKIE['DisMul'])){echo 'On';}else{echo 'Off';}echo '">
+<input type="submit" class="none" name="dMul" id="dMul" value="dMul';if (isset($_COOKIE['DisMul'])){echo 'On';}else{echo 'Off';}echo '">
 <input type="checkbox" class="setCheck" ';
 if (!isset($_COOKIE['DisMul']))
 {
@@ -223,7 +247,7 @@ echo '>
 <span class="slider round"></span>
 </label></div><br>
 <div class="setListItem"><label for="dQue">Clear Query:</label><label class="switch">
-<input type="submit"style="display:none;" name="dQue" id="dQue" value="dQue';if (isset($_COOKIE['DisQue'])){echo 'On';}else{echo 'Off';}echo '">
+<input type="submit"class="none" name="dQue" id="dQue" value="dQue';if (isset($_COOKIE['DisQue'])){echo 'On';}else{echo 'Off';}echo '">
 <input type="checkbox" class="setCheck" ';
 if (!isset($_COOKIE['DisQue']))
 {
@@ -233,7 +257,7 @@ echo '>
 <span class="slider round"></span>
 </label></div>
 <br><div class="setListItem"><label for="dWid">Widgets:</label><label class="switch">
-<input type="submit" style="display:none;" name="dWid" id="dWid" value="dWid';if (isset($_COOKIE['DisWid'])){echo 'On';}else{echo 'Off';}echo '">
+<input type="submit" class="none" name="dWid" id="dWid" value="dWid';if (isset($_COOKIE['DisWid'])){echo 'On';}else{echo 'Off';}echo '">
 <input type="checkbox" class="setCheck" ';
 if (!isset($_COOKIE['DisWid']))
 {
@@ -244,7 +268,7 @@ echo '>
 </label></div>
 
 <br><div class="setListItem"><label for="DisHImg">High res img:</label><label class="switch">
-<input type="submit" style="display:none;" name="DisHImg" id="DisHImg" value="DisHImg';if (isset($_COOKIE['DisHImg'])){echo 'On';}else{echo 'Off';}echo '">
+<input type="submit" class="none" name="DisHImg" id="DisHImg" value="DisHImg';if (isset($_COOKIE['DisHImg'])){echo 'On';}else{echo 'Off';}echo '">
 <input type="checkbox" class="setCheck" ';
 if (!isset($_COOKIE['DisHImg']))
 {
@@ -252,13 +276,62 @@ if (!isset($_COOKIE['DisHImg']))
 }
 echo '>
 <span class="slider round"></span>
-</label></div>
-
+</label>
+</div>
+</div>
+</div>
 </div>
 
-<div class="setGroup"><div style="border-bottom: solid 2px grey;"class="setListItem"><h3>Dev</h3></div>
+<div class="setGroup"><div class="setListItem"><h3>Dev</h3></div>
+<br><div class="setListItem"><label for="index">Use PriEco index:</label> <label class="switch">
+<input type="submit" class="none" name="index" id="index" value="index';if (isset($_COOKIE['index'])){echo 'On';}else{echo 'Off';}echo '">
+<input type="checkbox" class="setCheck" ';
+if (isset($_COOKIE['index']))
+{
+    echo 'checked';
+}
+echo '>
+<span class="slider round"></span>
+</label></div>
+
+<br>
+<div class="setListItem">
+<input type="checkbox" id="rankingSet" class="none">
+<label for="rankingSet" class="flex alignC Pointer">Ranking <img src="View/icon/dropdown.svg" class="width15 height15 filterImage ml-10" alt="Show JavaScript settings"></label>
+<br><br>
+<div id="openCheckSettings">
+<input type="submit" value="Save" class="width100P langSave" name="rankSave">
+<div class="setListItem">
+<p class="mt-10">Title points</p>
+<input type="number" name="rankTitle" class="width100P langSave" placeholder="Title points" value="', (isset($_COOKIE['rankTitle']) ? $_COOKIE['rankTitle'] : 200),'">
+
+<p class="mt-10">H1 points</p>
+<input type="number" name="rankSecTitle" class="width100P langSave" placeholder="H1 points" value="', (isset($_COOKIE['rankSecTitle']) ? $_COOKIE['rankSecTitle'] : 100),'">
+
+<p class="mt-10">Description points</p>
+<input type="number" name="rankDesc" class="width100P langSave" placeholder="Description points" value="', (isset($_COOKIE['rankDesc']) ? $_COOKIE['rankDesc'] : 50),'">
+
+<p class="mt-10">URL points</p>
+<input type="number" name="rankURL" class="width100P langSave" placeholder="URL points" value="', (isset($_COOKIE['rankURL']) ? $_COOKIE['rankURL'] : 100),'">
+
+<p class="mt-10">Domain points</p>
+<input type="number" name="rankDomain" class="width100P langSave" placeholder="URL points" value="', (isset($_COOKIE['rankDomain']) ? $_COOKIE['rankDomain'] : 50),'">
+
+<p class="mt-10">Language points</p>
+<input type="number" name="rankLang" class="width100P langSave" placeholder="URL points" value="', (isset($_COOKIE['rankLang']) ? $_COOKIE['rankLang'] : 100),'">
+
+<p class="mt-10">Location points</p>
+<input type="number" name="rankLoc" class="width100P langSave" placeholder="URL points" value="', (isset($_COOKIE['rankLoc']) ? $_COOKIE['rankLoc'] : 100),'">
+
+<p class="mt-10">Most used keyword points</p>
+<input type="number" name="rankMas" class="width100P langSave" placeholder="URL points" value="', (isset($_COOKIE['rankMas']) ? $_COOKIE['rankMas'] : 250),'">
+
+</div>
+</div>
+</div>
+
 <br><div class="setListItem"><label for="providers">Show providers:</label> <label class="switch">
-<input type="submit" style="display:none;" name="providers" id="providers" value="providers';if (isset($_COOKIE['providers'])){echo 'On';}else{echo 'Off';}echo '">
+<input type="submit" class="none" name="providers" id="providers" value="providers';if (isset($_COOKIE['providers'])){echo 'On';}else{echo 'Off';}echo '">
 <input type="checkbox" class="setCheck" ';
 if (isset($_COOKIE['providers']))
 {
@@ -267,8 +340,9 @@ if (isset($_COOKIE['providers']))
 echo '>
 <span class="slider round"></span>
 </label></div>
+
 <br><div class="setListItem"><label for="showtime">Show time:</label> <label class="switch">
-<input type="submit" style="display:none;" name="showtime" id="showtime" value="showtime';if (isset($_COOKIE['showtime'])){echo 'On';}else{echo 'Off';}echo '">
+<input type="submit" class="none" name="showtime" id="showtime" value="showtime';if (isset($_COOKIE['showtime'])){echo 'On';}else{echo 'Off';}echo '">
 <input type="checkbox" class="setCheck" ';
 if (isset($_COOKIE['showtime']))
 {
@@ -278,5 +352,5 @@ echo '>
 <span class="slider round"></span>
 </label></div>
 </div>
-<div style="height:70px;"></div>
+<div class="empty"></div>
 </div></form></nav></div>';

@@ -3,57 +3,15 @@ function mojeek($mojeekObj, $loaded){
 $mojeek[]=null;
 
     $i = 0;
-    $bottomBorder = count($mojeekObj['response']['results'])-1;
 
     foreach ($mojeekObj['response']['results'] as &$item) {
-        if(!isset($item['url'])){--$bottomBorder;continue;}
-    $mojeek[$i] = '<div class="';
-
-    switch ($i){
-        case 0:
-            if(!$loaded[0] && $loaded[1]) {$mojeek[$i] .= ' mBorderBoth2 mBorderTop ';}
-            elseif(!$loaded[0]){$mojeek[$i] .= ' mBorderTop ';}
-            elseif($loaded[1]){$mojeek[$i] .= ' mBorderBottom2 ';}
-            break;
-        case 1:
-            if($loaded[1]) {$mojeek[$i] .= ' mBorderTop2 ';}
-            if($loaded[2]) {$mojeek[$i] .= ' mBorderBottom ';}
-            break;
-        case 2:
-            if($loaded[2]) {$mojeek[$i] .= ' mBorderTop ';}
-           break;
-        case 3:
-            if($loaded[3]) {$mojeek[$i] .= ' mBorderBottom ';}
-            break;
-        case 4:
-            if($loaded[3]) {$mojeek[$i] .= ' mBorderTop ';}
-            break;
-        case 5:
-            if($loaded[4]) {$mojeek[$i] .= ' mBorderBottom ';}
-            break;
-        case 6:
-            if($loaded[4]) {$mojeek[$i] .= ' mBorderTop ';}
-            break;
-        case 7:
-            if($loaded[5]) {$mojeek[$i] .= ' mBorderBottom ';}
-            break;
-        case 8:
-            if($loaded[5]) {$mojeek[$i] .= ' mBorderTop ';}
-            if($loaded[6]) {$mojeek[$i] .= ' mBorderBottom ';}
-            break;
-        case 9:
-            if($loaded[6]) {$mojeek[$i] .= ' mBorderTop ';}
-            break;
-    }
-    if($bottomBorder == $i){$mojeek[$i] .= ' mBorderBottom ';}
-
+    $mojeek[$i] = '<div class="output" id="output">';
     
 $gurl = str_replace('/',' > ',str_replace('https://','',str_replace('http://','',str_replace('www.','', $item['url']))));
 if ( substr_compare($gurl, ' > ', -3) === 0 ) {
 $gurl = substr($gurl, 0, -3);
 }
 
-$mojeek[$i] .= ' output" id="output"><div class="outContent" style="display:block;">';
 if (strpos($item['url'], 'https://') !== false && !isset($_COOKIE['datasave'])) {
 $mojeek[$i] .= '<img class="Outfavicon" alt="‎" loading="lazy" src="/Controller/functions/proxy.php?q=https://judicial-peach-octopus.b-cdn.net/'. get_string_betweens($item['url'], 'https://', '/'). '">';
 }
@@ -61,18 +19,27 @@ $mojeek[$i] .= '<a ';
 if (isset($_COOKIE['new'])) {
 $mojeek[$i] .= 'target="_blank"';
 }
-$mojeek[$i] .= 'href="'. $item['url']. '" data-sxpr-link>';
+$mojeek[$i] .= 'href="'. $item['url']. '" rel="noopener noreferrer" data-sxpr-link>';
 $mojeek[$i] .= '<p class="OutTitle">'. $item['title']. '</p></a>
-<p class="resLink">'. $gurl. '</p>';
+<div class="resLink">'. $gurl. '<img src="View/icon/dots_vertical.svg" class="filterImage resOptions">';
+if (!isset($_COOKIE['DisWid'])) {
+    $mojeek[$i] .= '<div class="resOptionsGroup">
+    <a href="https://web.archive.org/web/*/'.$item['url'].'" rel="noopener noreferrer"';if (isset($_COOKIE['new'])) {$mojeek[$i] .= 'target="_blank"';}$mojeek[$i].='><img class="filterImage sumOpen width32" src="View/icon/archive.svg"></a>
+    <a href="proxy/?url='.$item['url'].'" ';if (isset($_COOKIE['new'])) {$mojeek[$i] .= 'target="_blank"';}$mojeek[$i].='><img class="filterImage sumOpen opacity10 blueIcon" src="View/icon/mask.svg"></a>
+    <img class="filterImage width33 sumOpen" id="sumRes" data-url="'.$item['url'].'" src="View/icon/circle-info.svg">
+    </div>';
+}
+$mojeek[$i] .= '</div>
+<div id="sumResOut" class="sumOut snippet">
+        <blockquote id="sumOut"></blockquote>
+    </div>
+    ';
 
-if(isset($item['desc'])){$mojeek[$i] .= '<p class="snippet">'. $item['desc']. '</p>';}
+if(isset($item['desc'])){$mojeek[$i] .= '<p class="snippet" id="snippet">'. $item['desc']. '</p>';}
 if (isset($_COOKIE['providers'])) {
 $mojeek[$i] .= '<p class="resProvider">Mojeek</p>';
 }
-$mojeek[$i] .= '</div>
-<p class="sumOpen resProvider" id="sumRes" data-url="'.$item['url'].'"></p>
-<p id="sumResOut" class="sumOut snippet"></p>
-</div>';
+$mojeek[$i] .= '</div>';
 ++$i;
     }
 return $mojeek;

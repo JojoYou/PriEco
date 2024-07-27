@@ -44,6 +44,7 @@ a {
   border-radius: 200px;
   cursor: pointer;
 }
+
 .tile {
   width: 100%;
   background-color: #282b2b;
@@ -75,4 +76,9 @@ a {
   margin: 4px 8px;
   width: 44px;
   height: 44px;
+}
+
+.imgIcon {
+  width: 45px;
+  height: 45px;
 }

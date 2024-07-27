@@ -18,204 +18,171 @@ foreach ($promoobj['loc'][0] as $name => $value) {
 
 
 echo '
+<div class="topbg" id="topbg">
+<a href="/" class="link">', (isset($_COOKIE['datasave']) ? '<h1 class="sLogo">P</h1>' : '<img class="sLogo" alt="TreeLogo" src="./View/img/PriEco.webp">'),'</a>
+  <div class="searchM">
+  <form class="searchForm" id="searchForm" method="post" >
 
-<div
-class="scrollSearchBackground" 
-style="backdrop-filter: blur(20px);
-width:100%; height:80px; position:fixed; z-index:9;
-border-radius:0 0 20px 20px;
-">
-</div>
-
-
-<form class="searchForm" id="searchForm" method="post" >
-
-<input type="hidden" name="search_type" value="'.$type.'">
-<div class="searchM">
-
-  <div class="autocomplete">
-  
-  <div class="searchBar">
-  <input list="suggestions"
-   id="searchBox"
-   value="' , htmlspecialchars($purl, ENT_QUOTES | ENT_HTML5, 'UTF-8'), '"
-   class="searchBox"
-   name="q"
-   size="21"
-   placeholder="PriEco"
-   autocomplete="off"
-/>
-';
-
-if(!isset($_COOKIE['DisQue'])){
-echo '<button class="delQueryBtn" onclick="delFuc()" type="button">X</button>';
-}
-
-echo '
-<button id="searchButton" class="searchButton">';
-  if(!isset($_COOKIE['datasave'])){
-    echo '<img alt="icnSearch" src="./View/icon/search.webp" style="width:10px; height:10px;">';
-  }
-  else{
-    echo '<p>➤</p>';
-  }
-  echo '</button></div><div class="autocom-box">
-        </div>
- </div>
- 
- </div>
-
-</form>
-
-<div class="topbg" id="topbg" style="
-position: absolute;
-width: 100%;
-z-index: 10;
-backdrop-filter: blur(20px);
-border-radius:0 0 20px 20px;
-">
-<br>
-<a href="/" style="text-decoration:none;"
- >
- ';
- if(!isset($_COOKIE['datasave'])){
-  echo '<img class="sLogo"alt="TreeLogo"
-  src="./View/img/PriEco.webp?1" />';
- }else{
-  echo '<h1 class="sLogo" style="color: #0ed794;text-decoration: none;font-size: 60px;">P</h1>';
- } 
- echo '</a>
-
-
-<div class="settingButtons" style="margin-top: 60px;display: flex;
-overflow-x: auto;align-items: center;  margin-bottom: 5px;
-
-overflow-y: hidden;">
+  <div class="flex">
+    <button id="searchButton" class="searchButton">', (isset($_COOKIE['datasave']) ? '<p>➤</p>' : '<img alt="icnSearch" src="./View/icon/search.webp" width="13" height="13">'),'</button>
+    <input type="hidden" name="search_type" value="'.$type.'">
+      <input list="suggestions"
+       id="searchBox"
+       value="' , htmlspecialchars($purl, ENT_QUOTES | ENT_HTML5, 'UTF-8'), '"
+       class="searchBox"
+       name="q"
+       size="21"
+       placeholder="PriEco"
+       autocomplete="off">
+    ', (isset($_COOKIE['DisQue']) ? '' : '<button class="delQueryBtn" type="button"><img src="View/icon/cross.svg" class="width10 height10 opacity7"></button>'),
+  '</div>
+  <div class="autocom-box"></div>
+  </form>
+<div class="settingButtons">
 <form method="POST" action="">
 <input type="hidden" name="search_type" value="">
 <input type="hidden" name="q" value="', $purl ,'">
-
-<button style="';
-if ($type != 'image' and $type != 'video' and $type !='news') {
-  echo 'color: #34A8AC;border: #34A8AC solid 2px;';
+<button class="';
+if ($type != 'image' && $type != 'video' && $type !='news' && $type != 'shop') {
+  echo 'settingBtnsActive ';
 }
-echo '"class="allBut settingButton" style="margin-left:2%;"';
+echo 'allBut settingButton" ';
 if(!isset($_COOKIE['hQuery'])){
   echo 'name="allBut" id="allbut"';
 }
 echo '>';
   if(!isset($_COOKIE['datasave'])){
-    echo '<img src="./View/icon/search.webp" alt="" class="setBut" style="'; 
-    if ($type != 'image' and $type != 'video' and $type !='news') {
-      echo 'filter: invert(56%) sepia(24%) saturate(1094%) hue-rotate(133deg) brightness(97%) contrast(84%);';
-    }
-    echo '">';
+    echo '<img src="./View/icon/earth.svg" class="setBut">';
   }
+  echo '<p>';
   if($lang == null || $lang == 'en' || $lang == 'all'){echo 'All';}
   else{echo $promoobj['All'][0][$lang];}
-  echo '</button>
+  echo '</p></button>
   </form>  
 
 
   <form method="POST" action="">
 <input type="hidden" name="search_type" value="image">
 <input type="hidden" name="q" value="', $purl ,'">
-<button style="';
+<button class="';
 if ($type == 'image') {
-  echo 'color: #34A8AC;border: #34A8AC solid 2px;';
+  echo 'settingBtnsActive ';
 }
-echo '"class="settingButton" ';
+echo 'settingButton" ';
 if(!isset($_COOKIE['hQuery'])){
   echo 'name="imgBut" id="imgbut"';
 }
 echo '>';
 if(!isset($_COOKIE['datasave'])){
-  echo '<img src="./View/icon/img.svg" alt="" class="setBut" style="'; 
-  if ($type == 'image') {
-    echo 'filter: invert(56%) sepia(24%) saturate(1094%) hue-rotate(133deg) brightness(97%) contrast(84%);';
-  }
-  echo '">';
+  echo '<img src="./View/icon/image.svg" alt="" class="setBut">';
 }
+echo '<p>';
   if($lang == null || $lang == 'en' || $lang == 'all'){echo 'Images';}
   else{echo $promoobj['Images'][0][$lang];}
-  echo '</button></form>
+  echo '</p></button></form>
 
   <form method="POST" action="">
 <input type="hidden" name="search_type" value="video">
 <input type="hidden" name="q" value="', $purl ,'">
-  <button style="';
+  <button class="';
   if ($type == 'video') {
-    echo 'color: #34A8AC;border: #34A8AC solid 2px;';
+    echo 'settingBtnsActive ';
   }
-  echo '"class="settingButton"';
+  echo ' settingButton"';
   if(!isset($_COOKIE['hQuery'])){
     echo 'name="videoBut"';
   }
   echo '>';
   if(!isset($_COOKIE['datasave'])){
-    echo '<img src="./View/icon/video.webp" alt="" class="setBut" style="'; 
-    if ($type == 'video') {
-      echo 'filter: invert(56%) sepia(24%) saturate(1094%) hue-rotate(133deg) brightness(97%) contrast(84%);';
-    }
-    echo '">';
+    echo '<img src="./View/icon/video.svg" alt="" class="setBut">';
   }
+  echo '<p>';
     if($lang == null || $lang == 'en' || $lang == 'all'){echo 'Videos';}
     else{echo $promoobj['Videos'][0][$lang];}
-    echo '</button></form>
+    echo '</p></button></form>
 
     <form method="POST" action="">
     <input type="hidden" name="search_type" value="news">
     <input type="hidden" name="q" value="', $purl ,'">
-  <button style="';
-  if ($type == 'news') {
-    echo 'color: #34A8AC;border: #34A8AC solid 2px;';
+      <button class="';
+      if ($type == 'news') {
+        echo 'settingBtnsActive ';
+      }
+      echo 'settingButton"';
+      if(!isset($_COOKIE['hQuery'])){
+        echo 'name="newsBut"';
+      }
+      echo '>';
+      if(!isset($_COOKIE['datasave'])){
+        echo '<img src="./View/icon/news.svg" alt="" class="setBut">';
+      }
+        if($lang == null || $lang == 'en' || $lang == 'all'){echo 'News';}
+        else{echo $promoobj['News'][0][$lang];}
+        echo '</button></form>
+
+    <form method="POST" action="">
+    <input type="hidden" name="search_type" value="shop">
+    <input type="hidden" name="q" value="', $purl ,'">
+  <button class="';
+  if ($type == 'shop') {
+    echo 'settingBtnsActive ';
   }
-  echo '"class="settingButton"';
+  echo 'settingButton"';
   if(!isset($_COOKIE['hQuery'])){
-    echo 'name="newsBut"';
+    echo 'name="shopBut"';
   }
   echo '>';
   if(!isset($_COOKIE['datasave'])){
-    echo '<img src="./View/icon/news.svg" alt="" class="setBut" style="'; 
-    if ($type == 'news') {
-      echo 'filter: invert(56%) sepia(24%) saturate(1094%) hue-rotate(133deg) brightness(97%) contrast(84%);';
-    }
-    echo '">';
+    echo '<img src="./View/icon/shop.svg" alt="" class="setBut">';
   }
-    if($lang == null || $lang == 'en' || $lang == 'all'){echo 'News';}
-    else{echo $promoobj['News'][0][$lang];}
+    if($lang == null || $lang == 'en' || $lang == 'all'){echo 'Shopping';}
+    else{echo $promoobj['Shopping'][0][$lang];}
     echo '</button></form>
-<a style="text-decoration: none;" href="map.php?q=',$purl,'"><button class="settingButton" id="mapbut">';
+<a class="link" href="map.php?q=',$purl,'"><button class="settingButton" id="mapbut">';
 if(!isset($_COOKIE['datasave'])){
-  echo '<img src="./View/icon/map.webp" alt="" class="setBut">';
+  echo '<img src="./View/icon/map.svg" alt="" class="setBut">';
 }
   if($lang == null || $lang == 'en' || $lang == 'all'){echo 'Map';}
   else{echo $promoobj['Map'][0][$lang];}
   echo '</button></a>
   </form>
 
-  <div data-sxpr-top-bar id="my-top-bar-container">
-  <!-- Top bar, including search suggestions, will render here -->
-</div>
-
 <a href="/feedback.php" target="_blank" class="feedbackMenuLabel">';
 if(!isset($_COOKIE['datasave'])){
 echo '<img src="./View/icon/feedback.webp" alt="feedback" >';
 }
 else{
-  echo '<p class="settingButton" style="margin-left: 0;">Feedback</p>';
+  echo '<p class="settingButton">Feedback</p>';
 }
+
+$notifications = json_decode(file_get_contents('notify.json'), true);
+$j = count($notifications);
+
+$t = isset($_COOKIE['notify']) ? $_COOKIE['notify'] : 0;
+
+$not = false;
+foreach($notifications as $date){
+  if (is_numeric($date['date']) && $date['date'] > $t) {
+    $t = $date['date'];
+    $not = true;
+    break;
+  }
+}
+
 echo '</a>
 
 <label for="threedotsquick" class="labelforcheckquick feedbackMenuLabel"><img alt="quick settings" src="./View/icon/sliders.svg"></label>
   </div>
-  
+  </div>
  
+  <label for="notify" class="notify">
+  <div class="Pointer filterImage width15 height15 absolute right60 top10">
+  <img src="View/icon/bell.svg" class="width100P height100P">';
+  if($not){echo '<section></section>';}
+  echo '</div>
+  </label>
 </div>
 </form>
-<button class="tree-btn" id="tree-btn"><img alt="icntree" src="./View/icon/user.svg" style="width:20px;height:20px;"><p style="font-weight:bold;">'
-, $usr , '</p></button>
-  <br>
 ';
 
 include 'settings.php';
@@ -223,8 +190,8 @@ include 'settings.php';
 echo '
 <input type="checkbox" id="threedotsquick" hidden>
 <div class="topspace"></div>
-<form method="post" action="" class="quickSettingButtons">
-<select style="margin-left:9vw;" name="LocDropDown" class="quickSet">
+<form method="post" class="quickSettingButtons">
+<select name="LocDropDown" class="left9vw quickSet">
 <option disabled selected hidden>';
 if ($loc !== null) {
   $i = array_search($loc, $locVal);
@@ -527,7 +494,45 @@ echo '
 
 </select>
 
-<input type="submit" name="savequicksetting" class="quickSet" style="margin-right:9vw;" value="Save">
+<input type="submit" name="savequicksetting" class="right9vw quickSet" value="Save">
 </form>
 <div class="quickSettingsSpace"></div>
+
+<input type="checkbox" id="notify" class="notificationCheckbox none" '; if(!isset($_COOKIE['telemetry'])){echo 'checked';}echo '>
+  
+<div class="notifications scrollDown flexDColumn max-height250 fixed right60 top30 whiteAblackBg padding20 curve">
+<label for="notify" id="notifyHandle" class="width150 block height30 bgGray absolute curve top-15 left50PM74"></label>';
+
+  if($not){
+  echo '<form method="POST">
+    <input type="text" value="',$t,'" class="none" name="markasreadValue">
+    <input type="submit" name="markasread" value="mark as read" class="link float-right borderNone bgNone mt--10">
+  </form>';
+  }
+  $i = 1;
+  foreach($notifications as $notify) {
+    if(!is_numeric($notify['date']) && isset($_COOKIE[$notify['date']])) {--$j;continue;}
+
+    if(!isset($_COOKIE['telemetry']) && $notify['date'] != 'telemetry') {continue;}
+
+    echo '<div class="max-width500';
+    if($i < $j && isset($_COOKIE['telemetry'])) {echo ' borderBottom';}
+    echo '">';
+    if(!empty($notify['url'])) {
+      echo '<a href="', $notify['url'], '" target="_blank"';
+    }
+    else{
+      echo '<div ';
+    }
+    echo ' class="clearLink flex flexDRow alignC">
+    <img src="',$notify['icon'],'" class="width80 padding10 mr-10">
+    <div>
+    <p>',$notify['body'],'</p></div>';
+    if(!empty($notify['url'])) {echo '</a>';}
+    else{echo '</div>';}
+    echo '</div>';
+    ++$i;
+  }
+
+echo '</div>
 ';

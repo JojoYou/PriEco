@@ -1,301 +1,374 @@
 /*Mobile*/
 @media (max-width: 890px) {
+    /* Universal */
+    .paddingL20PBoth {
+        padding-left: unset;
+    }
 
-  /*TopBar*/
-  .topbg {
-    padding-bottom: 2px;
-  }
+    .paddingR20PBoth {
+        padding-right: unset;
+    }
 
-  .searchM {
-    display: flex;
-    position: absolute;
-    justify-content: center;
-    height: 50px;
-    width: 100vw;
-    margin-left: 0;
-    margin-top: 40px;
-  }
+    /*TopBar*/
+    .topbg {
+        position: absolute;
+        padding-bottom: 2px;
+        height: 135px;
+    }
 
-  .sLogo {
-    position: absolute;
-    width: 50px;
-    height: 45px;
-    left: 0;
-    right: 0;
-    margin-left: auto;
-    margin-right: auto;
-  }
+    .searchM {
+        display: flex;
+        position: absolute;
+        justify-content: center;
+        height: 50px;
+        width: 100vw;
+        left: 0;
+        top: 45px;
+        margin-left: 0;
+    }
 
-  .scrollLogo {
-    display: none;
-  }
+    .sLogo {
+        position: absolute;
+        width: 50px;
+        height: 45px;
+        left: 0;
+        right: 0;
+        top: 5px;
+        margin-left: auto;
+        margin-right: auto;
+    }
 
-  .sLogoA {
-    justify-content: center;
-    display: flex;
-  }
+    .scrollLogo {
+        display: none;
+    }
 
-  .delQueryBtn {
-    position: absolute;
-    top: 30px;
-    right: 57px;
-    margin-right: 0;
-  }
+    .sLogoA {
+        justify-content: center;
+        display: flex;
+    }
 
-  .searchBar {
-    align-items: unset;
-    width: 100%;
-  }
+    .delQueryBtn {
+        position: absolute;
+        top: 13px;
+        right: 27px;
+        margin-right: 0;
+    }
 
-  .searchBarMain {
-    margin-top: -10px !important;
-  }
+    .searchBar {
+        align-items: unset;
+        width: 100%;
+    }
 
-  .searchBox {
-    margin-top: 30px;
-    width: calc(100% - 40px);
-    max-width: unset;
-    height: 45px;
-    margin-left: 10px;
-    pointer-events: auto;
-    padding-right: 50px;
-  }
+    .searchBox {
+        width: calc(100% - 40px);
+        max-width: unset;
+        height: 45px;
+        pointer-events: auto;
+        padding-right: 50px;
+        margin-right: 10px;
+    }
 
-  .searchButton {
-    margin-top: 30px;
-    height: 45px;
-    width: 40px;
-    pointer-events: auto;
-  }
+    .searchButton {
+        height: 45px;
+        width: 40px;
+        pointer-events: auto;
+    }
 
-  .allBut {
-    margin-left: 5px !important;
-  }
+    .autocom-box {
+        width: calc(100% - 20px);
+        position: absolute;
+        pointer-events: auto;
+    }
 
-  .autocom-box {
-    width: 90%;
-    margin-top: 70px;
-    position: absolute;
-    pointer-events: auto;
-  }
+    .autoboxMain {
+        margin-top: 310px;
+    }
 
-  .autoboxMain {
-    margin-top: 310px;
-  }
+    .scrollSearchBackground {
+        display: none;
+    }
 
-  .scrollSearchBackground {
-    display: none;
-  }
-
-  .settingButtons {
-    margin-top: 99px !important;
-    padding: 0 3px 3px 0;
-    margin-left: 10px;
-    width: 95%;
-  }
-
-  @-moz-document url-prefix() {
     .settingButtons {
-      margin-top: 100px !important;
-    }
-  }
-
-  .settingButton {
-    margin-left: 10px;
-    font-size: 16px;
-  }
-
-  .setButStyle {
-    margin: 0 auto;
-  }
-
-  .topspace {
-    margin-top: 160px;
-  }
-
-  .labelforcheckquick {
-    margin-left: 10px;
-    margin-right: 10px;
-  }
-
-  #my-kp-container {
-    height: 100px;
-  }
-  #moreMoreCheck:checked ~#my-kp-container {
-    height: 100%;
-  }
-  .moreMoreCheck{
-    width: 100%;
-text-align: center;
-display: inline-block;
-background-color: #00000007;
-padding: 3px;
-border-radius: 20px;
-cursor: pointer;
-  }
-
-  .quickSettingButtons {
-    top: 175px;
-  }
-
-  @keyframes showquicksettings {
-    0% {
-      display: none;
-      top: 0;
+        margin-top: 99px !important;
+        padding: 0 3px 3px 0;
+        margin-left: 10px;
+        width: 95%;
+        position: absolute;
     }
 
-    50% {
-      top: 0;
+    @-moz-document url-prefix() {
+        .settingButtons {
+            margin-top: 100px !important;
+        }
     }
 
-    100% {
-      display: block;
-      top: 165px;
+    .settingButton {
+        margin-left: 10px;
+        font-size: 16px;
     }
-  }
 
-  .wrapper {
-    top: 0;
-    right: 0px;
-  }
+    .setButStyle {
+        margin: 0 auto;
+    }
 
-  .menu-btn {
-    position: absolute;
-    top: 14px;
-  }
+    .mobile-visible {
+        visibility: visible;
+    }
 
-  .tree-btn {
-    top: 9px;
-    left: 10px;
-    right: unset;
-  }
+    .topspace {
+        margin-top: 160px;
+    }
 
-  /*Output*/
-  .output {
-    width: 95vw;
-    margin-left: 2.5vw;
-  }
+    .labelforcheckquick {
+        margin-left: 10px;
+        margin-right: 10px;
+    }
 
-  .mBorderBoth2 {
-    border-radius: var(--result-curve);
-  }
+    #my-kp-container {
+        height: 100px;
+    }
 
-  .mBorderTop2 {
-    border-top-left-radius: var(--result-curve);
-    border-top-right-radius: var(--result-curve);
-  }
+    #moreMoreCheck:checked ~ #my-kp-container {
+        height: 100%;
+    }
 
-  .mBorderBottom2 {
-    border-bottom-left-radius: var(--result-curve);
-    border-bottom-right-radius: var(--result-curve);
-  }
+    .moreMoreCheck {
+        width: 100%;
+        text-align: center;
+        display: inline-block;
+        background-color: #00000007;
+        padding: 3px;
+        border-radius: 20px;
+        cursor: pointer;
+    }
 
-  .imgtools {
-    padding-left: 0vw;
-    width: 100vw;
-    max-width: 100vw;
-  }
+    .quickSettingButtons {
+        top: 155px;
+    }
 
-  .imgout {
-    max-width: 100%;
-    width: unset;
-  }
+    @keyframes showquicksettings {
+        0% {
+            display: none;
+            top: 0;
+        }
 
-  .imgoutdiv {
-    width: 50vw !important;
-    max-width: unset;
-    min-width: unset;
-    height: unset;
-    padding: 10px;
-  }
+        50% {
+            top: 0;
+        }
 
-  .bigimgout {
-    width: 100vw;
-    margin-right: unset;
-  }
+        100% {
+            display: block;
+            top: 155px;
+        }
+    }
 
-  .bigimgclose {
-    display: block;
-  }
+    .wrapper {
+        top: 0;
+        right: 0px;
+    }
 
-  .answer {
-    clear: none;
-    float: left;
-    margin-bottom: 15px;
-    margin-top: 15px;
-    width: 95vw;
-    position: static;
-    margin-left: 2.5vw;
-  }
+    .menu-btn {
+        position: absolute;
+        right: 15px;
+        top: 10px;
+    }
 
-  .hQuery {
-    margin-top: 0px;
-  }
-  
-  .findelsewhere {
-    margin-left: 0;
-  }
+    .tree-btn {
+        top: 9px;
+        left: 10px;
+        right: unset;
+    }
 
-  .findelsewhere button {
-    margin-top: 0;
-  }
+    /*Output*/
+    .output {
+        width: 96vw;
+        margin-left: 2vw;
+        padding-top: 18px;
+    }
 
-  .nextPage {
-    margin-left: 0 !important;
-    float: right;
-  }
+    .imgtools {
+        padding-left: 0vw;
+        width: 100vw;
+        max-width: 100vw;
+    }
 
-  #halfCalculator1,
-  #halfCalculator2 {
-    width: 100%;
-  }
+    .imgContainer {
+        gap: 8px;
+        padding: unset;
+    }
+    .imgout {
+        max-width: 100%;
+        width: unset;
+    }
 
-  #halfCalculator2 {
-    display: none;
-  }
+    .imgoutbtn {
+        justify-content: center;
+        display: flex;
+    }
 
-  #calcFx:checked~#halfCalculator2 {
-    display: block;
-  }
+    .imgoutdiv {
+        width: 49vw !important;
+        max-width: unset;
+        min-width: unset;
+        height: unset;
+        padding: 10px;
+    }
 
-  #calcFx:checked~#halfCalculator1 {
-    display: none;
-  }
+    .bigimgout {
+        width: 100vw;
+        margin-right: unset;
+    }
 
-  .calcMobile {
-    display: block;
-  }
+    .bigimgclose {
+        display: block;
+    }
 
-  /*other*/
-  .share-container {
-    display: none;
-  }
+    .answer {
+        clear: none;
+        float: left;
+        margin-bottom: 15px;
+        margin-top: 15px;
+        width: 96vw;
+        position: static;
+        margin-left: 2vw;
+    }
 
-  .autocomplete {
-    display: flex;
-    justify-content: center;
-    height: 50px;
-    width: 100%;
-    margin-top: -20px;
-  }
+    .hQuery {
+        margin-top: 0px;
+    }
 
-  .autocomplete-items {
-    margin-top: 68px;
-  }
+    .addonImgOut {
+        margin-right: 40px !important;
+    }
 
-  #sidebar {
-    position: fixed;
-    height: 101vh;
-    width: 100vw;
-    right: -110vw;
-    transition: all 0.7s ease;
-    z-index: 999;
-  }
+    .findelsewhere {
+        margin-left: 0;
+    }
 
-  .showtime {
-    bottom: 0;
-    top: unset;
-    border-radius: var(--result-curve) var(--result-curve) 0 0;
-    width: 100vw;
-  }
+    .findelsewhere button {
+        margin-top: 0;
+    }
+
+    .nextPage {
+        margin-left: 0 !important;
+        float: right;
+    }
+
+    #halfCalculator1,
+    #halfCalculator2 {
+        width: 100%;
+    }
+
+    #halfCalculator2 {
+        display: none;
+    }
+
+    #calcFx:checked ~ #halfCalculator2 {
+        display: block;
+    }
+
+    #calcFx:checked ~ #halfCalculator1 {
+        display: none;
+    }
+
+    .calcMobile {
+        display: block;
+    }
+
+    #sumResOut {
+        font-size: 12px;
+    }
+
+    .resOptionsGroup {
+        opacity: 1;
+    }
+
+    /*other*/
+    .share-container {
+        display: none;
+    }
+
+    .topImgCon {
+        flex-wrap: nowrap;
+    }
+
+    .topImgCon img {
+        height: 250px;
+        width: auto;
+        overflow: unset;
+    }
+
+    #sidebar {
+        position: fixed;
+        height: 101vh;
+        width: 100vw;
+        right: -110vw;
+        transition: all 0.3s ease;
+        z-index: 999;
+    }
+
+    .notifications {
+        width: 100vw;
+        right: 0;
+        box-shadow: 0 0 3px 3px #00000007;
+        height: 100vh !important;
+        max-height: unset !important;
+        top: 110vh;
+        position: fixed;
+        transition: all 0.3s ease;
+        display: block;
+    }
+
+    .notifications div {
+        max-width: unset;
+    }
+
+    .notifications p {
+        font-size: 12px;
+    }
+
+    .notifications img {
+        width: 50px;
+    }
+
+    .analyticsBtn {
+        font-size: 8px;
+    }
+
+    .notifications label {
+        display: block;
+    }
+
+    .notificationCheckbox:checked ~ .notifications {
+        top: 20%;
+    }
+
+    .notifications div {
+        margin: 10px 0 10px 0;
+    }
+
+    .showtime {
+        bottom: 0;
+        top: unset;
+        border-radius: var(--result-curve) var(--result-curve) 0 0;
+        width: 100vw;
+    }
+
+    .footer {
+        margin: 70px 10px 0 10px;
+    }
+
+    .footer-content-right {
+        border-radius: 20px !important;
+        margin: 20px 20px 20px 0 !important;
+        overflow: hidden;
+    }
+
+    .footer div {
+        margin: 0;
+        min-width: 10px;
+        flex: 1;
+        flex-basis: 100%;
+        border-radius: 0;
+    }
 }

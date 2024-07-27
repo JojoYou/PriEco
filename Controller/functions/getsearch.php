@@ -20,12 +20,12 @@ function get_string_between($string, $start, $end){
 }
 
 if(!isset($_COOKIE['hQuery'])){
-$purl = get_string_between($url, '?', '▛');
+$purl = $_GET['q'];
 $type = '';
 }
 else{
     if(get_string_between($url, '?', '▛') != null){
-        if(!isset($_POST['q'])){$_SESSION['query'] = get_string_between($url, 'q=', '▛');}
+        if(!isset($_POST['q'])){$_SESSION['query'] = $_GET['q'];}
         else{$_SESSION['query'] = $_POST['q'];}
         header('Location: /');
         exit();
@@ -42,5 +42,3 @@ else{
     }
 }
 $_SESSION['query'] = $purl;
-$purl =  urldecode($purl);
-$urlSet = '&'.$purl;

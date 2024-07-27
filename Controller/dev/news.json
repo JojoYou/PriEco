@@ -1,296 +1,234 @@
-{
-  "status": "ok",
-  "totalResults": 29,
-  "articles": [
-    {
-      "source": { "id": null, "name": "The Guardian" },
-      "author": "Hettie Judah",
-      "title": "‘I thought it was over for me’: Manuel Solano on painting after going blind",
-      "description": "The transgender Mexican artist lost their sight to an HIV-related illness – and their art blossomed. As a major exhibition opens in Dundee, they explain their defiance of illness and gender normsManuel Solano is remembering trying to paint for the first time …",
-      "url": "https://amp.theguardian.com/artanddesign/2022/aug/25/i-thought-it-was-over-for-me-manuel-solano-on-painting-after-going-blind",
-      "urlToImage": "https://i.guim.co.uk/img/media/570ff45d23ba66b61e6b7fb2166e88332f41a0e1/883_1390_7226_4335/master/7226.jpg?width=1200&height=630&quality=85&auto=format&fit=crop&overlay-align=bottom%2Cleft&overlay-width=100p&overlay-base64=L2ltZy9zdGF0aWMvb3ZlcmxheXMvdGctZGVmYXVsdC5wbmc&enable=upscale&s=eeb212314c4600aeff7164cf19ed46ae",
-      "publishedAt": "2022-08-25T10:45:33Z",
-      "content": "Manuel Solano is remembering trying to paint for the first time after going blind. I thought it was a joke: I thought it was over for me, as a painter.\r\nTheir work from that period is harsh and urgen… [+4863 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Forbes" },
-      "author": "Dan Runkevicius, Senior Contributor, \n Dan Runkevicius, Senior Contributor\n https://www.forbes.com/sites/danrunkevicius/",
-      "title": "‘Little Evidence’ Of Easing Inflation—the Fed Triggers Massive Crypto Liquidations As the Price Of Bitcoin, Ethereum, BNB, XRP, Solana, Cardano, Luna, Shiba Inu, And Dogecoin Crash",
-      "description": "There’s one telltale sign that hints at the culprit of this flash crypto sale. Meanwhile, the price of bitcoin, ethereum, BNB, XRP, solana, cardano, luna, shiba inu, and dogecoin crash.",
-      "url": "https://www.forbes.com/sites/danrunkevicius/2022/08/25/little-evidence-of-easing-inflation-the-fed-triggers-massive-crypto-liquidations-as-the-price-of-bitcoin-ethereum-bnb-xrp-solana-cardano-luna-shiba-inu-and-dogecoin-crash/",
-      "urlToImage": "https://imageio.forbes.com/specials-images/imageserve/6307599015437a326d1b5fd5/0x0.jpg?format=jpg&width=1200",
-      "publishedAt": "2022-08-25T11:16:50Z",
-      "content": "Chairman of the Federal Reserve nominee Jerome Powell \r\nGetty Images\r\nCrypto has been on one hell of a rollercoaster lately.\r\nSince the end of July, the crypto market attracted $200 billion and grew … [+2179 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Forbes" },
-      "author": "Billy Bambrough, Senior Contributor, \n Billy Bambrough, Senior Contributor\n https://www.forbes.com/sites/billybambrough/",
-      "title": "‘The Future Is Here’—Visa, Mastercard And Binance Are Suddenly Making Bitcoin, Ethereum, XRP, Solana, Cardano And Tether Payments A Reality Despite Price Crash",
-      "description": "Payments giant Mastercard﻿﻿ has announced a partnership with world’s biggest crypto exchange Binance to launch bitcoin and crypto payments in-store and online—while Mastercard rival Visa﻿﻿ has also seen a ramping up of its crypto payments cards...",
-      "url": "https://www.forbes.com/sites/billybambrough/2022/08/25/the-future-is-here-visa-mastercard-and-binance-are-suddenly-making-bitcoin-ethereum-xrp-solana-cardano-and-tether-payments-a-reality-despite-price-crash/",
-      "urlToImage": "https://imageio.forbes.com/specials-images/imageserve/6307391916278baed77d1fd9/0x0.jpg?format=jpg&width=1200",
-      "publishedAt": "2022-08-25T11:20:24Z",
-      "content": "BitcoinBTC\r\n, ethereum and other major cryptocurrencies are suffering through the beginnings of what could be a brutal crypto winter in which one crypto exchange CEO fears \"anything could happen.\"\r\nS… [+3788 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Forbes" },
-      "author": "Arnav Sahu, Forbes Councils Member, \n Arnav Sahu, Forbes Councils Member\n https://www.forbes.com/sites/forbesfinancecouncil/people/arnavsahu/",
-      "title": "The Unique Cybersecurity Challenges In Blockchain",
-      "description": "For blockchain solutions to achieve their potential, regulators, fintech and financial institutions must address its flaws through better security standards and policies.",
-      "url": "https://www.forbes.com/sites/forbesfinancecouncil/2022/08/25/the-unique-cybersecurity-challenges-in-blockchain/",
-      "urlToImage": "https://imageio.forbes.com/specials-images/imageserve/630668c375df90397b7d1fdb/0x0.jpg?format=jpg&width=1200",
-      "publishedAt": "2022-08-25T11:45:00Z",
-      "content": "I am an investor at Y Combinator, where I invest and partner with startups in B2B software, in cybersecurity and enterprise infrastructure.\r\ngetty\r\nWhile digital currencies have shown early promise i… [+3939 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Yahoo Entertainment" },
-      "author": "Lachlan Keller",
-      "title": "Markets: Bitcoin treads water, Ether Classic gets a bump, Cosmos gains on Kujira news",
-      "description": "Bitcoin and Ether were little changed in Asia on Thursday morning, though Ether Classic rose. Solana and Cardano lost ground along with most other top 10...",
-      "url": "https://finance.yahoo.com/news/markets-bitcoin-treads-water-ether-010551684.html",
-      "urlToImage": "https://s.yimg.com/ny/api/res/1.2/IgTxPS6dnIpieL13SLpriw--/YXBwaWQ9aGlnaGxhbmRlcjt3PTEyMDA7aD04MDA-/https://media.zenfs.com/en/forkast_news_articles_672/7dd07340697729a91a7ee9ff5aadf607",
-      "publishedAt": "2022-08-25T01:05:51Z",
-      "content": "Bitcoin and Ether were little changed in Asia on Thursday morning, though Ether Classic rose. Solana and Cardano lost ground along with most other top 10 tokens by capitalization, though the global c… [+1675 chars]"
-    },
-    {
-      "source": { "id": null, "name": "International Business Times" },
-      "author": "Parth Dubey",
-      "title": "Crypto On Aug. 25: Bitcoin, Ether Turn Slightly Bullish",
-      "description": "The crypto market turned green, with Ether (ETH) outperforming Bitcoin (BTC).",
-      "url": "https://www.ibtimes.com/crypto-aug-25-bitcoin-ether-turn-slightly-bullish-3605613",
-      "urlToImage": "https://d.ibtimes.com/en/full/3537521/crypto-winter-has-arrived.jpg",
-      "publishedAt": "2022-08-25T06:54:32Z",
-      "content": "KEY POINTS\r\n<ul><li>The best performers in the market include ATOM, ETC, FLOW and APE</li><li>The worst performers in the market were EOS, CHZ, XMR and BCH</li><li>Ether outperformed Bitcoin as its d… [+1547 chars]"
-    },
-    {
-      "source": { "id": null, "name": "International Business Times" },
-      "author": "Dawn Geske",
-      "title": "Long COVID Is Keeping 4.1M People Out Of Work, Study Shows",
-      "description": "About 16 million Americans aged 18 to 65 have long COVID symptoms.",
-      "url": "https://www.ibtimes.com/long-covid-keeping-41m-people-out-work-study-shows-3605848",
-      "urlToImage": "https://d.ibtimes.com/en/full/3487832/help-wanted-sign-shown-fast-food-restaurant-solana-beach-california-us-november-9-2021.jpg",
-      "publishedAt": "2022-08-25T17:35:37Z",
-      "content": "A help wanted sign is shown at a fast food restaurant in Solana Beach, California, U.S. November, 9, 2021. Reuters / MIKE BLAKE\r\nLong COVID symptoms may be preventing as many as 4.1 million people fr… [+1707 chars]"
-    },
-    {
-      "source": { "id": null, "name": "newsBTC" },
-      "author": "NewsBTC",
-      "title": "Here’s How Chingari Raises the Bar For NFT Marketplaces With Creator Cuts",
-      "description": "Powered by blockchain and non-fungible token technology, Web3 stands poised to disrupt the way content creators monetize their work, pulling the rug from under the corporations that previously called the shots. Leading the charge is India’s fastest-growing on…",
-      "url": "https://www.newsbtc.com/news/company/heres-how-chingari-raises-the-bar-for-nft-marketplaces-with-creator-cuts/",
-      "urlToImage": "https://www.newsbtc.com/wp-content/uploads/2022/08/Picture279.png",
-      "publishedAt": "2022-08-25T09:44:06Z",
-      "content": "Powered by blockchain and non-fungible token technology, Web3 stands poised to disrupt the way content creators monetize their work, pulling the rug from under the corporations that previously called… [+4822 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Bitcoinist" },
-      "author": "Bitcoinist",
-      "title": "Build, build and build: “India’s TikTok” Chingari Launches NFT Video Marketplace",
-      "description": "Having already shaken up the video-sharing landscape, India’s hottest young social media app Chingari has set its sights on Web3. The platform, affectionately known as the nation’s TikTok, has just released a video NFT (vNFT) marketplace called Creator Cuts. …",
-      "url": "https://bitcoinist.com/build-build-and-build-indias-tiktok-chingari-launches-nft-video-marketplace/",
-      "urlToImage": "https://bitcoinist.com/wp-content/uploads/2022/08/Picture278.png",
-      "publishedAt": "2022-08-25T09:39:25Z",
-      "content": "Having already shaken up the video-sharing landscape, India’s hottest young social media app Chingari has set its sights on Web3. The platform, affectionately known as the nation’s TikTok, has just r… [+4257 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Bitcoinist" },
-      "author": "Jet Encila",
-      "title": "Tron Uses Nearly 100% Less Energy Than Bitcoin and Ethereum, Study Shows",
-      "description": "Tron beats top cryptocurrencies Bitcoin and Ethereum in the energy saving department, new research shows. Web3 has gained a very poor reputation in the field of environmental protection and sustainable development. This is mostly attributable to blockchains l…",
-      "url": "https://bitcoinist.com/tron-uses-100-less-energy-than-btc-eth/",
-      "urlToImage": "https://bitcoinist.com/wp-content/uploads/2022/08/Tron.png",
-      "publishedAt": "2022-08-25T13:16:14Z",
-      "content": "Tron beats top cryptocurrencies Bitcoin and Ethereum in the energy saving department, new research shows.\r\nWeb3 has gained a very poor reputation in the field of environmental protection and sustaina… [+2935 chars]"
-    },
-    {
-      "source": { "id": "the-times-of-india", "name": "The Times of India" },
-      "author": "Pawan Nahar",
-      "title": "Crypto Price Today Live: Bitcoin holds $21,500; Ethereum & Solana jump up to 3%",
-      "description": "The global cryptocurrency market cap was trading at the $1.04 trillion mark, rising about 2 per cent in the last 24 hours. However, the total trading volume dropped more than 7 per cent close to $65.46 billion.",
-      "url": "https://economictimes.indiatimes.com/markets/cryptocurrency/crypto-prices-today-live-news-bitcoin-dogecoin-ethereum-shibha-inu-cryptocurrency-latest-updates-25-august-2022/articleshow/93767768.cms",
-      "urlToImage": "https://img.etimg.com/thumb/msid-93767797,width-1070,height-580,imgsize-46096,overlay-etmarkets/photo.jpg",
-      "publishedAt": "2022-08-25T04:41:19Z",
-      "content": "New Delhi: Crypto tokens found some lost ground on Thursday ahead of the much-awaited Jackson Hole Symposium.\r\nAfter plunging late last week, bitcoin and ether traded sideways. Along with the cues fr… [+404 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Gadgets360.com" },
-      "author": "Radhika Parashar",
-      "title": "BTC, ETH Rise With Significant Gains, Stablecoins See Losses",
-      "description": "The global crypto market cap rose by 1.41 percent over the last day as majority cryptocurrencies saw gains on Thursday, August 25. Along with BTC and ETH, Cardano, Solana, and Polkadot saw gains. Small losses did strike stablecoins like Binance USD and Tether…",
-      "url": "https://gadgets360.com/cryptocurrency/news/btc-eth-price-today-significant-gains-stablecoins-see-losses-3284652",
-      "urlToImage": "https://i.gadgets360cdn.com/large/crypto_pixabay_worldspectrum_large_1647840432595.jpg",
-      "publishedAt": "2022-08-25T05:32:40Z",
-      "content": "After struggling with volatility for the past couple of days, the crypto price chart reflected more greens than reds on Thursday, August 25. Bitcoin, after having risen by 1.23 percent, is currently … [+1755 chars]"
-    },
-    {
-      "source": { "id": null, "name": "The Daily Hodl" },
-      "author": "Daily Hodl Staff",
-      "title": "Crypto Trader Predicts Bitcoin Rally, Updates Outlook on Solana and Chiliz – Here Are His Targets",
-      "description": "A widely followed crypto trader is analyzing three crypto assets amid sideway market movement. Starting with Bitcoin (BTC), pseudonymous analyst Altcoin Sherpa tells his 181,600 Twitter followers that he is anticipating the flagship digital asset to appreciat…",
-      "url": "https://dailyhodl.com/2022/08/25/crypto-trader-predicts-bitcoin-rally-updates-outlook-on-solana-and-chiliz-here-are-his-targets/",
-      "urlToImage": "https://dailyhodl.com/wp-content/uploads/2022/08/bitcoin-rally-chiliz-.jpg",
-      "publishedAt": "2022-08-25T18:05:55Z",
-      "content": "A widely followed crypto trader is analyzing three crypto assets amid sideway market movement.\r\nStarting with Bitcoin (BTC), pseudonymous analyst Altcoin Sherpa tells his 181,600 Twitter followers th… [+1768 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Forkast.news" },
-      "author": "Lachlan Keller",
-      "title": "Markets: Bitcoin treads water, Ether Classic gets a bump, Cosmos gains on Kujira news",
-      "description": "Bitcoin and Ether were little changed in Asia on Thursday morning, though Ether Classic rose. Solana and Cardano lost ground along with most other top 10 tokens by capitalization, though the global cryptocurrency market cap edged up 0.23% to US$1.03 trillion.…",
-      "url": "https://forkast.news/headlines/markets-bitcoin-treads-ether-classic-cosmos/",
-      "urlToImage": "https://forkast.news/wp-content/uploads/2022/08/Greyscale-1260x840.jpg",
-      "publishedAt": "2022-08-25T01:05:51Z",
-      "content": "Bitcoin and Ether were little changed in Asia on Thursday morning, though Ether Classic rose. Solana and Cardano lost ground along with most other top 10 tokens by capitalization, though the global c… [+1850 chars]"
-    },
-    {
-      "source": { "id": null, "name": "U.Today" },
-      "author": "U.Today",
-      "title": "BTC Maxi Mike Alfred Reveals 10 Million ADA Holdings Bought in 2018",
-      "description": "Mike Alfred turns spotlight once again on Cardano",
-      "url": "https://u.today/btc-maxi-mike-alfred-reveals-10-million-ada-holdings-bought-in-2018",
-      "urlToImage": "https://u.today/sites/default/files/styles/twitter/public/2022-08/22058.jpg",
-      "publishedAt": "2022-08-25T10:35:00Z",
-      "content": "Disclaimer: The opinion expressed here is not investment advice it is provided for informational purposes only. It does not necessarily reflect the opinion of U.Today. Every investment and all tradin… [+2128 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Forkast.news" },
-      "author": "Danny Park",
-      "title": "Markets: Bitcoin, Ether bounce back; XRP climbs, Ether Classic jumps, Ankr gains on staking",
-      "description": "Bitcoin and Ether staged a rebound Thursday afternoon in Asia, with most other tokens in the top 10 cryptocurrencies by market capitalization following them higher in a tentative recovery from last week’s slump. See related article: Markets: Bitcoin treads wa…",
-      "url": "https://forkast.news/headlines/markets-bitcoin-ether-bounce-back-xrp-climbs-ether-classic-jumps-ankr-gains-on-staking/",
-      "urlToImage": "https://forkast.news/wp-content/uploads/2022/08/cryptocurrency-and-business-2021-12-14-19-35-28-utc-1260x840.jpg",
-      "publishedAt": "2022-08-25T09:42:26Z",
-      "content": "Bitcoin and Ether staged a rebound Thursday afternoon in Asia, with most other tokens in the top 10 cryptocurrencies by market capitalization following them higher in a tentative recovery from last w… [+1918 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Coinjournal.net" },
-      "author": "Crispus Nyaga",
-      "title": "Skale Network price crawls back as user growth stats soar",
-      "description": "Skale Network price bounced back slightly on Thursday as investors waited for Jerome Powell’s…\nThe post Skale Network price crawls back as user growth stats soar appeared first on CoinJournal.",
-      "url": "https://coinjournal.net/news/skale-network-price-crawls-back-as-user-growth-stats-soar/",
-      "urlToImage": "https://coinjournal.net/wp-content/uploads/2022/04/1648800460150-deb59361-3da9-46ef-bbbf-e6cadb2b624d.jpg",
-      "publishedAt": "2022-08-25T09:32:01Z",
-      "content": "Skale Network price bounced back slightly on Thursday as investors waited for Jerome Powell’s statement at the Jackson Hole Symposium. The SKL price rose to a high of $0.063, which was the highest po… [+2085 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Crypto Briefing" },
-      "author": "Chris Williams",
-      "title": "Cosmos Ecosystem Rallies on Market Bounce",
-      "description": "Cosmos ATOM token is up 40.6% over the past 30 days. Cosmos Ecosystem Outperforms Market The Cosmos ecosystem is soaring. Several tokens affiliated with the Layer 0 network have rallied...",
-      "url": "https://cryptobriefing.com/cosmos-ecosystem-rallies-market-bounce/",
-      "urlToImage": "https://static.cryptobriefing.com/wp-content/uploads/2022/08/25064637/cosmos-cover-1-768x403.jpg",
-      "publishedAt": "2022-08-25T10:47:15Z",
-      "content": "Key Takeaways\r\n<ul><li>Cosmos' ATOM token is trading at $12.72 after a Thursday surge. It's up over 40% over the past 30 days. </li><li>Evmos, Osmosis, and JUNO have also rallied on the latest market… [+2080 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Decrypt" },
-      "author": "Jason Nelson",
-      "title": "Cybercriminals Have Stolen Over $100 Million in NFTs: Report",
-      "description": "Thieves looking to score expensive JPEGs have been busy over the last twelve months.",
-      "url": "https://decrypt.co/108186/cybercriminals-stole-over-100-million-in-nfts-elliptic",
-      "urlToImage": "https://cdn.decrypt.co/resize/1024/height/512/wp-content/uploads/2022/08/Scammers-and-NFTs-gID_5.png",
-      "publishedAt": "2022-08-25T00:17:28Z",
-      "content": "Over $100 million in NFTs have been stolen in the last year, according to a new report by blockchain analysis firm Elliptic. The report released on Wednesday, \"NFTs and Financial Crime,\" covers nefar… [+3403 chars]"
-    },
-    {
-      "source": { "id": null, "name": "U.Today" },
-      "author": "U.Today",
-      "title": "Cardano Aiming for Bounce from Fundamental 200-Week Support Level: Crypto Market Review, August 25",
-      "description": "Cardano is in good position against BTC and other cryptocurrencies as asset reaches important resistance",
-      "url": "https://u.today/cardano-aiming-for-bounce-from-fundamental-200-week-support-level-crypto-market-review-august-25",
-      "urlToImage": "https://u.today/sites/default/files/styles/twitterwithoutlogo/public/2022-08/22070.jpg",
-      "publishedAt": "2022-08-25T15:12:00Z",
-      "content": "Disclaimer: The opinion expressed here is not investment advice it is provided for informational purposes only. It does not necessarily reflect the opinion of U.Today. Every investment and all tradin… [+3061 chars]"
-    },
-    {
-      "source": { "id": null, "name": "The Daily Hodl" },
-      "author": "Daily Hodl Staff",
-      "title": "Coinbase CEO Brian Armstrong Makes Big Crypto Prediction As BlackRock and Meta Enter Space",
-      "description": "The head of the biggest crypto exchange in the US is sharing his thoughts about the industry’s present and future. In a new interview with CNBC’s Crypto World, Coinbase CEO Brian Armstrong tells host Kate Rooney that he believes Big Tech companies like BlackR…",
-      "url": "https://dailyhodl.com/2022/08/25/coinbase-ceo-brian-armstrong-makes-big-crypto-prediction-as-blackrock-and-meta-enter-space/",
-      "urlToImage": "https://dailyhodl.com/wp-content/uploads/2022/08/Armstrong-Makes-Big-Crypto.jpg",
-      "publishedAt": "2022-08-25T07:04:33Z",
-      "content": "The head of the biggest crypto exchange in the US is sharing his thoughts about the industrys present and future.\r\nIn a new interview with CNBCs Crypto World, Coinbase CEO Brian Armstrong tells host … [+3266 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Ambcrypto.com" },
-      "author": "Suzuki Shillsalot",
-      "title": "What does Ethereum’s Buterin think about ‘underrated’ crypto-payments",
-      "description": "Ethereum co-founder Vitalik Buterin recently tweeted that cryptocurrency payments are superior because of censorship resistance and convenience. This change has given a significant boost to international businesses, charities, and payments within countries, h…",
-      "url": "https://ambcrypto.com/what-does-ethereums-buterin-think-about-underrated-crypto-payments/",
-      "urlToImage": "https://statics.ambcrypto.com/wp-content/uploads/2022/08/business-7304257_1280-1000x600.jpg",
-      "publishedAt": "2022-08-25T13:30:44Z",
-      "content": "Ethereum co-founder Vitalik Buterin recently tweeted that cryptocurrency payments are superior because of censorship resistance and convenience. This change has given a significant boost to internati… [+3593 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Blockworks.co" },
-      "author": "Ornella Hernandez",
-      "title": "Web3 Watch: Metaverse Madness In The Sandbox and Decentraland",
-      "description": "From music to poetry and art, can the metaverse have it all? Plus: “There's no looming NFT lending crisis,” says lending protocol Arcade CEO\nThe post Web3 Watch: Metaverse Madness In The Sandbox and Decentraland appeared first on Blockworks.",
-      "url": "http://blockworks.co/web3-watch-metaverse-madness-in-the-sandbox-and-decentraland/",
-      "urlToImage": "https://blockworks.co/wp-content/uploads/2022/08/2022-08-25-Jadu-AVAs.png",
-      "publishedAt": "2022-08-25T11:00:00Z",
-      "content": "<ul><li>Pudgy Penguins NFT collection is rising in popularity with its biggest NFT sale ever of 400 ETH, or $630K</li><li>Magic Eden marketplace opened the sale of its first cross-chain mintable Sola… [+6416 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Business Standard" },
-      "author": "David Pan | Bloomberg",
-      "title": "Cryptos' volatility seen leading to purge of 'Merge Frontrunners'",
-      "description": "Speculators have scooped up Ether call options with traders waging the token's price could rise to around $2,200 in September in the past few weeks",
-      "url": "https://www.business-standard.com/article/markets/cryptos-volatility-seen-leading-to-purge-of-merge-frontrunners-122082501425_1.html",
-      "urlToImage": "https://bsmedia.business-standard.com/_media/bs/img/article/2022-08/25/full/1661449909-3009.jpg",
-      "publishedAt": "2022-08-25T17:52:00Z",
-      "content": "Ether is outperforming Bitcoin for a third consecutive day amid expectations that the intermittent bouts of optimism over the pending upgrade of the Ethereum blockchain will finally take root. \r\nThe … [+3300 chars]"
-    },
-    {
-      "source": { "id": null, "name": "City A.M." },
-      "author": "Darren Parkin",
-      "title": "Keeping one step ahead of the NFT pack",
-      "description": "Nick Vale, co-founder of reNFT, speaks to Jillian Godsill about his gaming background and how it helped shape his future.\nThe post Keeping one step ahead of the NFT pack appeared first on CityAM.",
-      "url": "https://www.cityam.com/keeping-one-step-ahead-of-the-nft-pack/",
-      "urlToImage": "https://www.cityam.com/wp-content/uploads/2022/08/nick-vale-cityam.png",
-      "publishedAt": "2022-08-25T14:17:44Z",
-      "content": "Thursday 25 August 2022 3:17 pm\r\nSome ideas make sense, especially once you hear them, like the infamous luggage-on-wheels for instance. Why did no one think of that before 1972?\r\nOthers require a bi… [+5443 chars]"
-    },
-    {
-      "source": { "id": null, "name": "KPBS" },
-      "author": "https://www.kpbs.org/staff/julia-dixon-evans",
-      "title": "San Diego weekend arts events: Carolina Caycedo, 'The Lion King,' Tchaikovsky and more",
-      "description": "This weekend in the arts: Carolina Caycedo at ICA San Diego North; Broadway's \"The Lion King\"; Tchaikovsky at The Shell; Gideon Sawyer and beck haberstroh at ICA San Diego Central; David White's Park Social project; and \"Sunblock 5000\" at Oolong Gallery.",
-      "url": "https://www.kpbs.org/news/local/2022/08/25/san-diego-weekend-arts-events-carolina-caycedo-lion-king-tchaikovsky",
-      "urlToImage": "https://cdn.kpbs.org/dims4/default/423a315/2147483647/strip/true/crop/2000x1050+0+245/resize/1200x630!/quality/90/?url=http%3A%2F%2Fkpbs-brightspot.s3.amazonaws.com%2F92%2F38%2Faca59cfe4e5d807ec9a1f5e1e58a%2F1-carolinacaycedo1.jpg",
-      "publishedAt": "2022-08-25T17:36:23Z",
-      "content": "Carolina Caycedo: 'Aesthetics of Commodity'\r\nVisual artThe scope of artist Carolina Caycedo's work is broad and often touches on environmental and social justice, with complicated sculptures, perform… [+5551 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Barron's" },
-      "author": "Jack Denton",
-      "title": "Bitcoin Prices Are Rising. A Jump Past $24,000 Is Now a Coin Flip.",
-      "description": "Like stock investors, crypto traders are anticipating Federal Reserve Chairman Jerome Powell's speech Friday at the Jackson Hole economic conference.",
-      "url": "https://www.barrons.com/articles/bitcoin-crypto-market-today-51661420010",
-      "urlToImage": "https://images.barrons.com/im-435920/social",
-      "publishedAt": "2022-08-25T09:41:34Z",
-      "content": "Bitcoin\r\n and other cryptocurrencies were rising Thursday alongside stocks, with investors continuing to eye Federal Reserve Chairman Jerome Powells speech Friday at the Jackson Hole economic confere… [+2517 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Business Insider India" },
-      "author": "BI India Partner",
-      "title": "BITS Pilani’s startup accelerator Conquest hosts its Demo Day in Bangalore - Business Insider India",
-      "description": "Conquest is a student-run startup accelerator run by 30 engineering students of BITS Pilani. It started as a B-plan competition by the founders of GreyOrange",
-      "url": "https://www.businessinsider.in/business/startups/news/bits-pilanis-startup-accelerator-conquest-hosts-its-demo-day-in-bangalore/articleshow/93774156.cms",
-      "urlToImage": "https://www.businessinsider.in/photo/93774156/bits-pilanis-startup-accelerator-conquest-hosts-its-demo-day-in-bangalore.jpg?imgsize=42524",
-      "publishedAt": "2022-08-25T10:03:00Z",
-      "content": "In India, the era of fast-moving tech startups was ushered in post the 2000s, with the launch of smartphones, cheaper access to the Internet, and positive regulations in the space. Since then, the st… [+7300 chars]"
-    },
-    {
-      "source": { "id": null, "name": "Biztoc.com" },
-      "author": "bizpoke",
-      "title": "Coinbase CEO Brian Armstrong Makes Big Crypto Prediction As BlackRock and Meta Enter Space",
-      "description": "Coinbase CEO Brian Armstrong believes Big Tech companies like BlackRock and Meta will all participate in the next phase of the crypto-powered internet. “We want every company in the world to... #assetmanager #brianarmstrong #blackrock #arbitrum #lightningnetw…",
-      "url": "https://biztoc.com/p/zi2n7xm2?ref=rss",
-      "urlToImage": "https://cdn.biztoc.com/og/zi2n7xm2.jpg",
-      "publishedAt": "2022-08-25T10:02:06Z",
-      "content": "Coinbase CEO Brian Armstrong believes Big Tech companies like BlackRock and Meta will all participate in the next phase of the crypto-powered internet. We want every company in the world to integrate… [+1144 chars]"
-    }
-  ]
-}
+[
+  {
+    "id": 85431,
+    "title": "Discord will soon offer more games and apps inside its chats",
+    "description": "Discord has been experimenting with embedding apps and games directly in chats for a while, via the Activities feature. Now the company is set to launch a dedicated SDK\r\n for developers to join the chat-based fun. The Embedded App SDK rolls out on March 18 an\u2026",
+    "img": "",
+    "url": "https:\/\/consent.yahoo.com\/v2\/collectConsent?sessionId=1_cc-session_07110dbe-bcec-4f88-812b-46d69df20ebd",
+    "date": "2024-03-12T18:25:40Z"
+  },
+  {
+    "id": 84608,
+    "title": "What Do the Different Emoji Hearts Mean?",
+    "description": "The other day while chatting on Discord, I paused to pick out an emoji to apply to a friend\u2019s comment. I wanted to use a h",
+    "img": "https:\/\/kottke.org\/plus\/misc\/images\/emojihearts2copy.jpg",
+    "url": "https:\/\/kottke.org\/24\/03\/what-do-the-different-emoji-hearts-mean",
+    "date": "2024-03-05T22:49:07Z"
+  },
+  {
+    "id": 78203,
+    "title": "Facebook, Instagram, Threads See Widespread Outages on Super Tuesday",
+    "description": "Meta's social media platforms go dark simultaneously; YouTube, Discord also experiencing problems\nThe post Facebook, Instagram, Threads See Widespread Outages on Super Tuesday appeared first on TheWrap.",
+    "img": "https:\/\/www.thewrap.com\/wp-content\/uploads\/2023\/11\/meta-e1699373741847.jpg",
+    "url": "https:\/\/www.thewrap.com\/facebook-instagram-threads-see-widespread-outages-on-super-tuesday\/",
+    "date": "2024-03-05T16:37:57Z"
+  },
+  {
+    "id": 74998,
+    "title": "Helldivers 2, burdened by its own success yet again, calls out Discord for blocking its community manager for \"sending too many DMs too fast\"",
+    "description": "Guess they mistook her for an Automaton",
+    "img": "https:\/\/cdn.mos.cms.futurecdn.net\/MjuUkXGAWdNrdN3bgyDRsM-1200-80.jpg",
+    "url": "https:\/\/www.gamesradar.com\/helldivers-2-burdened-by-its-own-success-yet-again-calls-out-discord-for-blocking-its-community-manager-for-sending-too-many-dms-too-fast\/",
+    "date": "2024-02-23T23:55:44Z"
+  },
+  {
+    "id": 56613,
+    "title": "My Visit to Deep Springs College (2009)",
+    "description": "You should neither trust outward appearances, nor let them intimidate you. There is always a discord between the appearance that a person or organization projects, and their actual nature. For this reason, always be careful about the people and organizations \u2026",
+    "img": "",
+    "url": "https:\/\/www.harrisonbarnes.com\/do-not-trust-appearances-my-visit-to-deep-springs-college\/",
+    "date": "2024-02-12T12:00:46Z"
+  },
+  {
+    "id": 55256,
+    "title": "Les patrons des r\u00e9seaux sociaux auditionn\u00e9s par le S\u00e9nat am\u00e9ricain",
+    "description": "Les dirigeants de X, anciennement Twitter, TikTok, Meta, Discord et Snapchat ont \u00e9t\u00e9 auditionn\u00e9s par le S\u00e9nat des \u00c9tats-Unis, le 31 janvier. L\u2019occasion pour les \u00e9lus am\u00e9ricains d\u2019aborder un sujet de taille, \u00e0 savoir l\u2019exploitation sexuelle des mineurs et la p\u2026",
+    "img": "https:\/\/siecledigital.fr\/wp-content\/uploads\/2024\/02\/image-33.jpg",
+    "url": "https:\/\/siecledigital.fr\/2024\/02\/02\/les-patrons-des-reseaux-sociaux-auditionnes-par-le-senat-americain\/",
+    "date": "2024-02-02T07:24:31Z"
+  },
+  {
+    "id": 30911,
+    "title": "Ubuntu developers: Stuart Langridge: Making a Discord bot with PHP",
+    "description": "Discord have changed the way bots work quite a few times. Recently, though, they built a system that lets you create and register \u201cslash commands\u201d \u2014 commands that you can type into the Discord chat and which do things, like \/hello \u2014 and which are powered by \u201c\u2026",
+    "img": "https:\/\/www.kryogenix.org\/days\/2024\/01\/14\/making-a-discord-bot-with-php\/index.html.og_image.png",
+    "url": "https:\/\/www.kryogenix.org\/days\/2024\/01\/14\/making-a-discord-bot-with-php\/",
+    "date": "2024-01-14T21:57:00Z"
+  },
+  {
+    "id": 70897,
+    "title": "Discord Shows a Notification but No Message? Here\u2019s How to Fix It",
+    "description": "Seeing a message notification on Discord, but there\u2019s no unread message to read? Your Discord app may be experiencing an issue, causing unwanted ...",
+    "img": "https:\/\/www.online-tech-tips.com\/wp-content\/uploads\/2024\/01\/discord-shows-a-notification-but-no-message-heres-how-to-fix-it-7-compressed.png",
+    "url": "https:\/\/www.online-tech-tips.com\/computer-tips\/discord-shows-a-notification-but-no-message-heres-how-to-fix-it\/",
+    "date": "2024-01-14T06:00:00+00:00"
+  },
+  {
+    "id": 66165,
+    "title": "Discord lays off 17 percent of employees in second round of job cuts - TechStartups",
+    "description": "Discord is laying off 17 percent of its workforce, or about 170 people, the largest to date after the messaging app laid off 4 percent of staff las...",
+    "img": "https:\/\/techstartups.com\/wp-content\/uploads\/2024\/02\/BRIA-raises-24-million-Series-A-for-ethical-visual-generative-AI-platform-700x466.png",
+    "url": "https:\/\/techstartups.com\/2024\/01\/12\/discord-lays-off-17-percent-of-employees-in-second-round-of-job-cuts\/",
+    "date": "2024-01-12T08:52:54-05:00"
+  },
+  {
+    "id": 68458,
+    "title": "Discord lays off 17 percent of employees - The Verge",
+    "description": "In an internal memo, CEO Jason Citron said the company\u2019s cuts were needed to\u00a0\u201csharpen our focus and improve the way we work together to bring ...",
+    "img": "https:\/\/duet-cdn.vox-cdn.com\/thumbor\/0x0:2040x1360\/2400x1600\/filters:focal(1020x680:1021x681):format(webp)\/cdn.vox-cdn.com\/uploads\/chorus_asset\/file\/23985722\/acastro_STK062_02.jpg",
+    "url": "https:\/\/www.theverge.com\/2024\/1\/11\/24034705\/discord-layoffs-17-percent-employees",
+    "date": "2024-01-11T18:32:02.814Z"
+  },
+  {
+    "id": 29044,
+    "title": "Discord Serves 15M Users on One Server",
+    "description": "Measuring GenAI Code\u2019s Impact: Free Workshop (Sponsored) How is GenAI impacting software development? Join LinearB and ThoughtWorks\u2019 Global Lead for AI Software Delivery to explore the metrics showing AI\u2019s impact, unpack best practices for leveraging AI in so\u2026",
+    "img": "https:\/\/substackcdn.com\/image\/fetch\/w_1200,h_600,c_fill,f_jpg,q_auto:good,fl_progressive:steep,g_auto\/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F1e42a2b9-cbe9-4724-a1ec-b22d4fb4391b_1600x940.png",
+    "url": "https:\/\/blog.bytebytego.com\/p\/how-discord-serves-15-million-users",
+    "date": "2024-01-09T17:12:31Z"
+  },
+  {
+    "id": 61299,
+    "title": "Discord User Volume Keeps Resetting? 7 Ways to Fix",
+    "description": "Discord is the gamer\u2019s favorite chat app. It supports voice, text, and video communication, which friends and friends alike can use to get togeth...",
+    "img": "https:\/\/www.online-tech-tips.com\/wp-content\/uploads\/2024\/01\/discord-user-volume-keeps-resetting-7-ways-to-fix-18-compressed.png",
+    "url": "https:\/\/www.online-tech-tips.com\/computer-tips\/discord-user-volume-keeps-resetting-7-ways-to-fix\/",
+    "date": "2024-01-09T06:00:00+00:00"
+  },
+  {
+    "id": 29537,
+    "title": "ICYMI Python on Microcontrollers Newsletter: MicroPython 1.22.1 Patch Release, Pi vs. Cray and Much More! #CircuitPython #Python #micropython #ICYMI @Raspberry_Pi",
+    "description": "Welcome to the latest Python on Microcontrollers newsletter! 2024 is full of possibilities for the electronics industry and for Python running on hardware. Check out this week\u2019s crop of articles and projects. \u2013 Anne Barela, Ed.We\u2019re on Discord, Twitter, and f\u2026",
+    "img": "https:\/\/cdn-blog.adafruit.com\/uploads\/2024\/01\/January-ICYMI-1.jpg",
+    "url": "https:\/\/blog.adafruit.com\/2024\/01\/09\/icymi-python-on-microcontrollers-newsletter-micropython-1-22-1-patch-release-pi-vs-cray-and-much-more-circuitpython-python-micropython-icymi-raspberry_pi\/",
+    "date": "2024-01-08T22:28:46Z"
+  },
+  {
+    "id": 28805,
+    "title": "The Case Against Progressive Utopia",
+    "description": "For the utopian leftist, all actions are permissible, as the end justifies the means. Everyone wants to live in a place where all needs are met, where there is no anxiety, discord, or strife. Whether by legislation or brute force, those who call themselves pr\u2026",
+    "img": "",
+    "url": "https:\/\/freerepublic.com\/focus\/f-chat\/4208205\/posts",
+    "date": "2024-01-06T15:45:11Z"
+  },
+  {
+    "id": 52754,
+    "title": "I am begging Discord to stop bombarding me with pointless new features | PC Gamer",
+    "description": "Discord, I love you, but oh boy do I hate you at the same time. I&amp;apos;ve been using the platform for eight years now, and in that time I&amp;a...",
+    "img": "https:\/\/cdn.mos.cms.futurecdn.net\/i4EzpKXkVtdyzJHZtDBmC5.gif",
+    "url": "https:\/\/www.pcgamer.com\/i-am-begging-discord-to-stop-bombarding-me-with-pointless-new-features\/",
+    "date": "2024-01-02T15:00:06+00:00"
+  },
+  {
+    "id": 28593,
+    "title": "Geoguessr Nepal Discord Community",
+    "description": "Are you passionate about discovering new places or testing your geographical knowledge. If so, you might already know about [Geoguessr](https:\/\/www.geoguessr.com\/) or [this gu](https:\/\/www.tiktok.com\/@georainbolt\/video\/7108167886681771310?lang=en)y , the onli\u2026",
+    "img": "https:\/\/i0.wp.com\/nep123.com\/wp-content\/uploads\/2024\/01\/l9NdBfe9XffOwL1hJ4GH904DwrqH47NC907hm6v0lUI.jpg",
+    "url": "https:\/\/nep123.com\/geoguessr-nepal-discord-community\/",
+    "date": "2024-01-02T02:38:55Z"
+  },
+  {
+    "id": 27104,
+    "title": "Discord Keeps Crashing: 8 Proven Fixes",
+    "description": "Don\u2019t know what to do when Discord keeps crashing? This guide aims to help you address the issue and enjoy the app without disruptions. Below, you\u2019ll find proven fixes and workarounds that you can implement: 1. End Discord Process in Task Manager The Discord \u2026",
+    "img": "https:\/\/mspoweruser.com\/wp-content\/uploads\/2023\/12\/Discord-Keeps-Crashing.png",
+    "url": "https:\/\/mspoweruser.com\/discord-keeps-crashing\/",
+    "date": "2023-12-27T12:27:54Z"
+  },
+  {
+    "id": 46389,
+    "title": "18 Interesting Discord Servers to Join (And Where You Can Find More) - Make Tech Easier",
+    "description": "There are plenty of Discord servers waiting for you to join. If you&#039;re not sure which is for you, check out our list of the best Discord servers",
+    "img": "https:\/\/www.maketecheasier.com\/assets\/uploads\/2022\/06\/interesting-discord-servers-search-discord.jpg",
+    "url": "https:\/\/www.maketecheasier.com\/best-discord-servers\/",
+    "date": "2023-12-25T16:25:00+00:00"
+  },
+  {
+    "id": 35099,
+    "title": "Five Nights at Freddy's Roblox game debuts by accident because series' creator 'approved a skin'&mdash;devs say it was a beta, then nuke its Discord over unholy NSFW content | PC Gamer",
+    "description": "Five Nights at Freddy&amp;apos;s, a cultural gaming giant big enough to have its own movie (that was apparently Just Okay, according to critics) ha...",
+    "img": "https:\/\/cdn.mos.cms.futurecdn.net\/i4EzpKXkVtdyzJHZtDBmC5.gif",
+    "url": "https:\/\/www.pcgamer.com\/five-nights-at-freddys-roblox-game-debuts-by-accident-because-series-creator-approved-a-skindevs-say-it-was-a-beta-then-nuke-its-discord-over-unholy-nsfw-content\/",
+    "date": "2023-12-22T12:05:39+00:00"
+  },
+  {
+    "id": 24376,
+    "title": "The Protocol: Blockchain Tech Predictions for 2024, Er\u2026 Best Guesses",
+    "description": "Why not try? At least? Check out The Protocol's FIRST ANNUAL list of blockchain tech predictions for the coming year. ALSO: Ledger hack sows DeFi discord while Ordinals \"NFTs on Bitcoin\" activity produces Bitcoin fee spike and a lucrative surprise at Sotheby'\u2026",
+    "img": "https:\/\/www.coindesk.com\/resizer\/si7jgjjez95-UbuGoylfFamsZDk=\/1200x628\/center\/middle\/cloudfront-us-east-1.images.arcpublishing.com\/coindesk\/PXPNQYWTM5HUFDDYZ24ZL2VF4Q.jpg",
+    "url": "https:\/\/www.coindesk.com\/tech\/2023\/12\/20\/the-protocol-blockchain-tech-predictions-for-2024-er-best-guesses\/",
+    "date": "2023-12-20T18:51:16Z"
+  },
+  {
+    "id": 37428,
+    "title": "Audiotool &amp; DreamHack Announce A Gaming And Music Collab Competition - Attack Magazine",
+    "description": "Find a musical partner and enter a production competition via Audiotool&#039;s Discord or at the event next week in Atlanta.",
+    "img": "https:\/\/www.attackmagazine.com\/wp-content\/uploads\/2023\/12\/2-2-800x497.jpg",
+    "url": "https:\/\/www.attackmagazine.com\/news\/audiotool-dreamhack-announce-a-gaming-and-music-collab-competition\/",
+    "date": "2023-12-14T20:17:53+00:00"
+  },
+  {
+    "id": 20488,
+    "title": "Major Discord overhaul for Android and iOS makes it easier to chat, search, and more",
+    "description": "Discord started rolling out its major UI redesign on Android and iOS, bringing better texting, replying, and searching functions.",
+    "img": "https:\/\/cdn.mos.cms.futurecdn.net\/4PDwJLtX6qTXCeXpQAU9VA-1200-80.jpg",
+    "url": "https:\/\/www.androidcentral.com\/apps-software\/major-discord-mobile-ui-update-rollout",
+    "date": "2023-12-05T21:33:09Z"
+  },
+  {
+    "id": 20489,
+    "title": "The Discord mobile app has 4 new upgrades we've all been waiting for",
+    "description": "The Discord app has received some much-needed updates, and more upgrades are on the way in the future.",
+    "img": "https:\/\/cdn.mos.cms.futurecdn.net\/qCD8ADikc4vvQU6BPHwPR3-1200-80.jpg",
+    "url": "https:\/\/www.techradar.com\/computing\/software\/the-discord-mobile-app-has-4-new-upgrades-weve-all-been-waiting-for",
+    "date": "2023-12-05T17:06:54Z"
+  },
+  {
+    "id": 20613,
+    "title": "Beeper Mini is an iMessage-for-Android app that doesn\u2019t require any Apple device at all",
+    "description": "Beeper has been offering a unified messaging platform for a few years, allowing users to open a single app to communicate with contacts via SMS, Google Chat, Facebook Messenger, Slack, Discord, WhatsApp, and perhaps most significantly, iMessage. Up until this\u2026",
+    "img": "https:\/\/liliputing.com\/wp-content\/uploads\/2023\/12\/beeper-mini.jpg",
+    "url": "https:\/\/liliputing.com\/beeper-mini-is-an-imessage-for-android-app-that-doesnt-require-any-apple-device-at-all\/",
+    "date": "2023-12-05T16:31:06Z"
+  },
+  {
+    "id": 17887,
+    "title": "Ransomware Gang Takes Down MMORPG On Steam Destroying Player Accounts",
+    "description": "The developer of Ethyrial: Echoes of Yore,\u00a0Gellyberry Studios, has been hit by a ransomware attack, leading to the loss of 17,000 player accounts, the studio announced on their Discord server. The game is described as \u201ca hardcore old-school MMORPG for players\u2026",
+    "img": "https:\/\/images.hothardware.com\/contentimages\/newsitem\/63201\/content\/mmorpg-ransomware-hero.jpg",
+    "url": "https:\/\/hothardware.com\/news\/ransomware-gang-takes-down-mmorpg-on-steam",
+    "date": "2023-11-28T18:01:00Z"
+  },
+  {
+    "id": 13965,
+    "title": "Build a powerful Discord Bot using OpenAI Assistants API",
+    "description": "The OpenAI Assistants API is a potent tool that provides developers with the means to create AI assistants within their applications. These AI assistants are designed to respond to user queries effectively, using a variety of models, tools, and knowledge base\u2026",
+    "img": "https:\/\/www.geeky-gadgets.com\/wp-content\/uploads\/2023\/11\/Build-a-Discord-Bot-using-GPT-Assistants-API.jpg",
+    "url": "https:\/\/www.geeky-gadgets.com\/build-a-powerful-discord-bot-using-openai-assistants-api\/",
+    "date": "2023-11-16T14:07:38Z"
+  },
+  {
+    "id": 14010,
+    "title": "Malware operators using common attack methods on Discord",
+    "description": "Discord users do not necessarily realize the risks they face when using the platform.",
+    "img": "https:\/\/cdn.mos.cms.futurecdn.net\/U7obpBQMXzHRuNVEkuKh7-1200-80.jpg",
+    "url": "https:\/\/www.techradar.com\/pro\/malware-operators-using-common-attack-methods-on-discord",
+    "date": "2023-11-13T15:23:59Z"
+  },
+  {
+    "id": 65748,
+    "title": "Best Skype Alternatives: 10 Picks You Can Use in 2024",
+    "description": "There are many high quality Skype alternatives out there that outshine Skype from famous apps like Discord to lesser known ones like Viber.",
+    "img": "https:\/\/cdn.windowsreport.com\/wp-content\/uploads\/2024\/02\/Lenovo-Legion-Go.png",
+    "url": "https:\/\/windowsreport.com\/skype-alternatives\/",
+    "date": "2023-05-04T16:00:00+00:00"
+  },
+  {
+    "id": 61345,
+    "title": "Michael Massing | The Nation",
+    "description": "Michael Massing is the author of\u00a0Now They Tell Us: The American Press and Iraq\u00a0and\u00a0Fatal Discord: Erasmus, Luther, and the Fight for the Western...",
+    "img": "https:\/\/www.thenation.com\/wp-content\/uploads\/2024\/02\/cover0224.jpg",
+    "url": "https:\/\/www.thenation.com\/authors\/michael-massing\/",
+    "date": "2010-04-02T12:14:37+00:00"
+  }
+]

@@ -1,0 +1,22 @@
+{
+    "short_name": "PriEco",
+    "name": "PriEco: Private, Ecofriendly search engine",
+    "icons": [
+      {
+        "src": "https://prieco.net/View/img/PWA_192.png",
+        "type": "image/png",
+        "sizes": "192x192"
+      },
+      {
+        "src": "https://prieco.net/View/img/PWA_512.png",
+        "type": "image/png",
+        "sizes": "512x512"
+      }
+    ],
+    "start_url": "https://prieco.net/?tabs",
+    "theme_color": "#34A8AC",
+    "background_color": "#34A8AC",
+    "prefer_related_applications": true,
+    "display": "standalone"
+  }
+  
