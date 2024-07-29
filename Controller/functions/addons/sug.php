@@ -10,12 +10,15 @@ if ($_GET["t"] == "p") {
         "http://127.0.0.1:8000/api/sug/?q=" . urlencode($purl) . "&lang=all"
     );
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     $rows = json_decode(curl_exec($ch), true);
     if (curl_errno($ch)) {
         echo "cURL error: " . curl_error($ch);
         exit();
     }
     curl_close($ch);
+
 
     $suggestions = [];
     foreach ($rows as $row) {

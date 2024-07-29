@@ -74,7 +74,7 @@ function search_news($NewsObj)
             if ($specifiedDate !== false) {
                 $news .=
                     $currentDate->diff($specifiedDate)->format("%a") .
-                    "days ago";
+                    'days ago';
             }
         }
 
