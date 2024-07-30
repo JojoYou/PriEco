@@ -31,7 +31,7 @@ $beforePathFooter = isset($beforePathFooter) ? $beforePathFooter : '';
 
   <div class="flex mr-50 footer-content-right">
             <div class="legal">
-                <a class="clearLink" href="web/privacypolicy.php">Privacy Policy</a><br>
+                <a class="clearLink" href="web/privacy">Privacy Policy</a><br>
                 <a class="clearLink" href="https://codeberg.org/JojoYou/PriEco/src/branch/master/LICENCE.md">License</a><br>
                 <a class="clearLink" href="https://codeberg.org/JojoYou/PriEco/src/branch/master">Source code</a><br>
                 <a class="clearLink" href="http://priecovk7jsuh3tvkh62c6j4oep3l5bldigpzmay26rdpqz357t5dmad.onion/">Tor onion domain</a><br>

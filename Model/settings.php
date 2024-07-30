@@ -1,4 +1,4 @@
-<?php 
+<?php
 echo'<div class="wrapper">
 <input type="checkbox" id="btn" hidden /><label
   for="btn"
@@ -178,7 +178,7 @@ echo '>
 */
 echo '<div class="setGroup"><div class="setListItem"><h3>Privacy</h3></div>
 <br>
-<div class="setListItem"><a href="web/privacypolicy.php#telemetry" target="_blank" class="link">Telemetry:</a><label class="switch">
+<div class="setListItem"><a href="web/privacy#telemetry" target="_blank" class="link">Telemetry:</a><label class="switch">
 <input type="submit" class="none" name="telemetry" id="telemetry" value="telemetry';if (isset($_COOKIE['telemetry']) && $_COOKIE['telemetry'] == 'on'){echo 'On';}else{echo 'Off';}echo '">
 <input type="checkbox" class="setCheck" ';
 if (isset($_COOKIE['telemetry']) && $_COOKIE['telemetry'] == 'on')

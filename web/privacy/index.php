@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privacy Policy | PriEco</title>
     <?php
-        $beforePathStyle = "../";
-        include '../Model/style.php';
+        $beforePathStyle = "../../";
+        include '../../Model/style.php';
     ?>
-    <link rel="stylesheet" href="../css/web.css">
+    <link rel="stylesheet" href="../../css/web.css">
 </head>
 
 <body>
     <div class="ppTop">
         <div class="absolute width32 ml-20 mt-20 left0 top0 flex alignC flexDRow">
-            <img src="../View/img/PriEco.webp" alt="logo" class="width100P height40">
+            <img src="../../View/img/PriEco.webp" alt="logo" class="width100P height40">
             <p class="txt32 ml-10">PriEco</p>
         </div>
 
@@ -78,7 +78,7 @@
                 <b id="telemetry">2. Telemetry:</b> Telemetry helps us improve our Service and provide fast and reliable experiences for everyone. Telemetry includes:<br>
                 • Caching results: When you use external index providers in PriEco, we cache their response for decrease in loading time and eliminating the need to call them again. Caching collects: <b>hashed query</b>, preferred <b>encrypted location</b>, preferred <b>encrypted  language</b> and <b>encrypted results</b><br><br>
                 <b>3. Daily search count:</b> We count the number of times users, including you, searched using PriEco. This data includes purely search count and can't be used to identify you.<br><br>
-                <b>4. IP address:</b> We never store nor log Your IP address, but we use our own <i>IP to location</i> API to automatically set for you, preferred location and language.  
+                <b>4. IP address:</b> We never store nor log Your IP address, but we use our own <i>IP to location</i> API to automatically set for you, preferred location and language.
             </p>
             <br>
             <p><b>Cookies or Browser Cookies.</b> Cookies are small pieces of text sent to Your browser by a website you visit. They help that website to remember information about Your visit, which can both make it easier to visit the site again and make the site more useful to you.
@@ -111,7 +111,7 @@
             <p>If you use any of the external index providers in PriEco, it is necessary for us to send them your query, preferred location and preferred language so that they can provide us with results for you.</p>
 
             <br>
-            
+
             <h3>Transfer of Your Personal Data</h3>
             <p>Your information is processed in the Company's servers and in any
                 other
@@ -129,7 +129,7 @@
 
             <h2>Children's Privacy</h2>
             <p>Our Service does not address anyone under the age of 13. We do not knowingly collect any information from anyone under the age of 13. If You are a parent or guardian, please review our privacy policy and Service before allowing your child to use our Service.</p>
-    
+
             <br><br>
 
             <h2>Changes to this Privacy Policy</h2>
@@ -140,7 +140,7 @@
                 are effective when they are posted on this page.</p>
 
             <br><br>
-            
+
             <h2>Contact Us</h2>
             <p>If you have any questions about this Privacy Policy, You can contact us:</p>
 
@@ -154,8 +154,8 @@
     </div>
 
     <?php
-        $beforePathFooter = '../';
-        include '../Model/footer.php';
+        $beforePathFooter = '../../';
+        include '../../Model/footer.php';
     ?>
 
 </body>
