@@ -207,7 +207,7 @@
   }
 
   .imgoutdiv {
-    width: 49vw !important;
+    flex: 1 1 45%;
     max-width: unset;
     min-width: unset;
     height: unset;
