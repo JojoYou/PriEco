@@ -1,847 +1,847 @@
 :root {
-    --sidebar-bg-color-light: rgb(250, 251, 255);
-    --sidebar-bg-color-dark: rgb(42, 44, 46);
+  --sidebar-bg-color-light: rgb(250, 251, 255);
+  --sidebar-bg-color-dark: rgb(42, 44, 46);
 
-    --result-curve: 20px;
-    --result-bg: #fafbff;
-    --linkColor: #1a0dab;
-    --topColor: #34a8ac;
+  --result-curve: 20px;
+  --result-bg: #fafbff;
+  --linkColor: #1a0dab;
+  --topColor: #34a8ac;
 }
 
 * {
-    margin: 0;
-    padding: 0;
-    font-family: arial, sans-serif;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: arial, sans-serif;
+  box-sizing: border-box;
 }
 
 html,
 body {
-    max-width: 100%;
-    overflow-x: hidden;
-    transition: none;
-    scroll-behavior: smooth;
+  max-width: 100%;
+  overflow-x: hidden;
+  transition: none;
+  scroll-behavior: smooth;
 }
 
 img {
-    object-fit: contain;
+  object-fit: contain;
 }
 
 .imgCover {
-    object-fit: cover;
+  object-fit: cover;
 }
 
 .scrollBar {
-    scrollbar-width: 10px;
+  scrollbar-width: 10px;
 }
 
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track-piece {
-    background-color: transparent;
+  background-color: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-    background-color: #7c7c7e;
-    -webkit-border-radius: 20px;
+  background-color: #7c7c7e;
+  -webkit-border-radius: 20px;
 }
 
 /* Universal */
 .link {
-    text-decoration: none;
-    color: var(--linkColor);
-    cursor: pointer;
+  text-decoration: none;
+  color: var(--linkColor);
+  cursor: pointer;
 }
 
 .curve {
-    border-radius: var(--result-curve);
+  border-radius: var(--result-curve);
 }
 
 .clearLink {
-    color: unset;
-    text-decoration: unset;
-    cursor: pointer;
+  color: unset;
+  text-decoration: unset;
+  cursor: pointer;
 }
 
 .removeULink::after {
-    background: none !important;
+  background: none !important;
 }
 
 .scroll {
-    overflow: auto hidden;
-    display: flex;
+  overflow: auto hidden;
+  display: flex;
 }
 
 .scrollDown {
-    overflow: hidden auto;
-    display: flex;
+  overflow: hidden auto;
+  display: flex;
 }
 
 /* Display */
 .inline {
-    display: inline;
+  display: inline;
 }
 
 .none {
-    display: none;
+  display: none;
 }
 
 .flex {
-    display: flex;
+  display: flex;
 }
 
 .block {
-    display: block;
+  display: block;
 }
 
 .grid {
-    display: grid;
+  display: grid;
 }
 
 /* Position */
 .absolute {
-    position: absolute;
+  position: absolute;
 }
 
 .relative {
-    position: relative;
+  position: relative;
 }
 
 .fixed {
-    position: fixed;
+  position: fixed;
 }
 
 /* Flex */
 
 .justContSpace-Between {
-    justify-content: space-between;
+  justify-content: space-between;
 }
 
 .flex-start {
-    justify-content: flex-start;
+  justify-content: flex-start;
 }
 
 .alignConS {
-    align-content: flex-start;
+  align-content: flex-start;
 }
 
 .alignC {
-    align-items: center;
+  align-items: center;
 }
 
 .justConC {
-    justify-content: center;
+  justify-content: center;
 }
 
 .justConR {
-    justify-content: right;
+  justify-content: right;
 }
 
 .flexDRow {
-    flex-direction: row;
+  flex-direction: row;
 }
 
 .flexDColumn {
-    flex-direction: column;
+  flex-direction: column;
 }
 
 .wrap {
-    flex-wrap: wrap;
+  flex-wrap: wrap;
 }
 
 .flexSpaceWrap {
-    display: flex;
-    justify-content: space-between;
-    flex-wrap: wrap;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
 }
 
 .flexSpaceWrapRow {
-    display: flex;
-    flex-wrap: wrap;
-    flex-direction: row;
-    justify-content: space-around;
+  display: flex;
+  flex-wrap: wrap;
+  flex-direction: row;
+  justify-content: space-around;
 }
 
 /* Grid */
 .columns2 {
-    grid-template-columns: 50% 50%;
+  grid-template-columns: 50% 50%;
 }
 
 .imgCover {
-    object-fit: cover;
+  object-fit: cover;
 }
 
 /* Size */
 .width100P {
-    width: 100%;
+  width: 100%;
 }
 
 .width95P {
-    width: 95%;
+  width: 95%;
 }
 
 .width100V {
-    width: 100vw;
+  width: 100vw;
 }
 
 .width80V {
-    width: 80vw;
+  width: 80vw;
 }
 
 .width50P {
-    width: 50% !important;
+  width: 50% !important;
 }
 
 .widthAuto {
-    width: auto !important;
+  width: auto !important;
 }
 
 .width100 {
-    width: 100px;
+  width: 100px;
 }
 
 .width16 {
-    width: 16px;
+  width: 16px;
 }
 
 .width20 {
-    width: 20px;
+  width: 20px;
 }
 
 .width32 {
-    width: 32px !important;
+  width: 32px !important;
 }
 
 .width33 {
-    width: 33px !important;
+  width: 33px !important;
 }
 
 .width40 {
-    width: 40px;
+  width: 40px;
 }
 
 .width50 {
-    width: 50px;
+  width: 50px;
 }
 
 .width80 {
-    width: 80px;
+  width: 80px;
 }
 
 .width150 {
-    width: 150px;
+  width: 150px;
 }
 
 .width220 {
-    width: 220px !important;
+  width: 220px !important;
 }
 
 .width15 {
-    width: 15px;
+  width: 15px;
 }
 
 .width10 {
-    width: 10px;
+  width: 10px;
 }
 
 .width100P-131 {
-    width: calc(100% - 131px) !important;
+  width: calc(100% - 131px) !important;
 }
 
 .max-width100VW {
-    max-width: 100vw;
+  max-width: 100vw;
 }
 
 .max-width700 {
-    max-width: 700px;
+  max-width: 700px;
 }
 
 .max-width500 {
-    max-width: 500px;
+  max-width: 500px;
 }
 
 .height50P {
-    height: 50% !important;
+  height: 50% !important;
 }
 
 .height30P {
-    height: 30% !important;
+  height: 30% !important;
 }
 
 .height70P {
-    height: 70% !important;
+  height: 70% !important;
 }
 
 .height100P {
-    height: 100% !important;
+  height: 100% !important;
 }
 
 .height10 {
-    height: 10px;
+  height: 10px;
 }
 
 .height15 {
-    height: 15px !important;
+  height: 15px !important;
 }
 
 .height20 {
-    height: 20px !important;
+  height: 20px !important;
 }
 
 .height25 {
-    height: 25px !important;
+  height: 25px !important;
 }
 
 .height30 {
-    height: 30px !important;
+  height: 30px !important;
 }
 
 .height40 {
-    height: 40px !important;
+  height: 40px !important;
 }
 
 .height50 {
-    height: 50px;
+  height: 50px;
 }
 
 .height100 {
-    height: 100px !important;
+  height: 100px !important;
 }
 
 .height200 {
-    height: 200px !important;
+  height: 200px !important;
 }
 
 .height500 {
-    height: 500px;
+  height: 500px;
 }
 
 .height135 {
-    height: 135px;
+  height: 135px;
 }
 
 .height30V {
-    height: 30vh;
+  height: 30vh;
 }
 
 .height50V {
-    height: 50vh;
+  height: 50vh;
 }
 
 .height100V {
-    height: 100vh;
+  height: 100vh;
 }
 
 .min-height100 {
-    min-height: 100px;
+  min-height: 100px;
 }
 
 .max-height250 {
-    max-height: 250px !important;
+  max-height: 250px !important;
 }
 
 /* Text */
 
 .centerTxt {
-    text-align: center;
+  text-align: center;
 }
 
 .startTxt {
-    text-align: start;
+  text-align: start;
 }
 
 .endTxt {
-    text-align: end;
+  text-align: end;
 }
 
 .listInside {
-    list-style-position: inside;
+  list-style-position: inside;
 }
 
 .txt3R {
-    font-size: 3rem;
+  font-size: 3rem;
 }
 
 .txt60 {
-    font-size: 60px;
+  font-size: 60px;
 }
 
 .txt55 {
-    font-size: 55px;
+  font-size: 55px;
 }
 
 .txt40 {
-    font-size: 40px;
+  font-size: 40px;
 }
 
 .txt32 {
-    font-size: 32px;
+  font-size: 32px;
 }
 
 .txt20 {
-    font-size: 20px;
+  font-size: 20px;
 }
 
 .txt16 {
-    font-size: 16px;
+  font-size: 16px;
 }
 
 .txt14 {
-    font-size: 14px;
+  font-size: 14px;
 }
 
 .txt12 {
-    font-size: 12px;
+  font-size: 12px;
 }
 
 .txt11 {
-    font-size: 11px;
+  font-size: 11px;
 }
 
 .weight100 {
-    font-weight: 100 !important;
+  font-weight: 100 !important;
 }
 /* Cursor */
 .Pointer {
-    cursor: pointer;
+  cursor: pointer;
 }
 
 .cursorNone {
-    cursor: none;
+  cursor: none;
 }
 
 .notSelectable {
-    user-select: none;
+  user-select: none;
 }
 
 .float-right {
-    float: right;
+  float: right;
 }
 
 .float-left {
-    float: left;
+  float: left;
 }
 
 .float-unset {
-    float: unset !important;
+  float: unset !important;
 }
 
 .empty {
-    height: 70px;
+  height: 70px;
 }
 
 .left9vw {
-    margin-left: 9vw !important;
+  margin-left: 9vw !important;
 }
 
 .right9vw {
-    margin-right: 9vw !important;
+  margin-right: 9vw !important;
 }
 
 .mt--10 {
-    margin-top: -10px;
+  margin-top: -10px;
 }
 
 .mt-0 {
-    margin-top: 0 !important;
+  margin-top: 0 !important;
 }
 
 .mt-3 {
-    margin-top: 3px;
+  margin-top: 3px;
 }
 .mt-5 {
-    margin-top: 5px;
+  margin-top: 5px;
 }
 .mt-10 {
-    margin-top: 10px;
+  margin-top: 10px;
 }
 
 .mt-15 {
-    margin-top: 15px;
+  margin-top: 15px;
 }
 
 .mt-20 {
-    margin-top: 20px !important;
+  margin-top: 20px !important;
 }
 
 .mt-150 {
-    margin-top: 150px;
+  margin-top: 150px;
 }
 
 .mb-10 {
-    margin-bottom: 10px;
+  margin-bottom: 10px;
 }
 
 .mb-20 {
-    margin-bottom: 20px !important;
+  margin-bottom: 20px !important;
 }
 
 .ml-0 {
-    margin-left: 0 !important;
+  margin-left: 0 !important;
 }
 
 .ml-10 {
-    margin-left: 10px !important;
+  margin-left: 10px !important;
 }
 
 .ml-20 {
-    margin-left: 20px !important;
+  margin-left: 20px !important;
 }
 
 .mr-20 {
-    margin-right: 20px !important;
+  margin-right: 20px !important;
 }
 
 .mr-28 {
-    margin-right: 28px !important;
+  margin-right: 28px !important;
 }
 
 .ml-50 {
-    margin-left: 50px;
+  margin-left: 50px;
 }
 
 .ml-100 {
-    margin-left: 100px;
+  margin-left: 100px;
 }
 
 .mr-10 {
-    margin-right: 10px;
+  margin-right: 10px;
 }
 
 .mr-50 {
-    margin-right: 50px !important;
+  margin-right: 50px !important;
 }
 
 .mr-58 {
-    margin-right: 58px !important;
+  margin-right: 58px !important;
 }
 
 .mr-150 {
-    margin-right: 150px !important;
+  margin-right: 150px !important;
 }
 
 .blur-5 {
-    filter: blur(5px);
+  filter: blur(5px);
 }
 
 .inv05b {
-    filter: brightness(0) invert(0.5);
+  filter: brightness(0) invert(0.5);
 }
 
 .invert {
-    filter: invert(100);
+  filter: invert(100);
 }
 
 /* Z-index */
 .z-index1 {
-    z-index: 1;
+  z-index: 1;
 }
 
 .z-index999 {
-    z-index: 999;
+  z-index: 999;
 }
 
 .top-15 {
-    top: -15px;
+  top: -15px;
 }
 
 .top0 {
-    top: 0;
+  top: 0;
 }
 
 .top10 {
-    top: 10px;
+  top: 10px;
 }
 
 .top25 {
-    top: 25px;
+  top: 25px;
 }
 
 .top30 {
-    top: 30px;
+  top: 30px;
 }
 
 .top25P {
-    top: 25%;
+  top: 25%;
 }
 
 .left0 {
-    left: 0;
+  left: 0;
 }
 
 .left25P {
-    left: 25%;
+  left: 25%;
 }
 
 .left50PM35 {
-    left: calc(50% - 35px);
+  left: calc(50% - 35px);
 }
 
 .left50PM74 {
-    left: calc(50% - 74px);
+  left: calc(50% - 74px);
 }
 
 .bottom0 {
-    bottom: 0;
+  bottom: 0;
 }
 
 .bottom15 {
-    bottom: 15px;
+  bottom: 15px;
 }
 
 .wh60 {
-    width: 60px;
-    height: 60px;
+  width: 60px;
+  height: 60px;
 }
 
 .wh50 {
-    width: 50px;
-    height: 50px;
+  width: 50px;
+  height: 50px;
 }
 
 .wh100 {
-    width: 100px;
-    height: 100px;
+  width: 100px;
+  height: 100px;
 }
 
 .darkGreenBtn {
-    background-color: #198754 !important;
+  background-color: #198754 !important;
 }
 
 .greenBtn {
-    background-color: #67c667 !important;
+  background-color: #67c667 !important;
 }
 
 .redBtn {
-    background-color: #ef5a5a !important;
+  background-color: #ef5a5a !important;
 }
 
 .orangeBtn {
-    background-color: #d66f2c !important;
+  background-color: #d66f2c !important;
 }
 
 .orangeRedBtn {
-    background-color: #f78055 !important;
+  background-color: #f78055 !important;
 }
 
 .bgWhite {
-    background-color: white;
+  background-color: white;
 }
 
 .bgGray {
-    background-color: gray;
+  background-color: gray;
 }
 
 .bgBlur {
-    backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
 }
 
 .bgTop {
-    background-color: var(--topColor);
+  background-color: var(--topColor);
 }
 
 .bgShade {
-    background-color: #00000007;
+  background-color: #00000007;
 }
 
 .bgNone {
-    background: none !important;
+  background: none !important;
 }
 
 .colorWhite {
-    color: white;
+  color: white;
 }
 
 .colorGreen {
-    color: green;
+  color: green;
 }
 
 .colorRed {
-    color: red;
+  color: red;
 }
 
 .textPower {
-    position: relative;
-    bottom: 0.4em;
-    right: 0.1em;
+  position: relative;
+  bottom: 0.4em;
+  right: 0.1em;
 }
 
 .height-70 {
-    height: 70px;
+  height: 70px;
 }
 
 /* Border */
 .borderNone {
-    border: none;
+  border: none;
 }
 
 .borderTop {
-    border-top: solid gray 1px;
+  border-top: solid gray 1px;
 }
 
 .borderBottom {
-    border-bottom: solid gray 1px;
+  border-bottom: solid gray 1px;
 }
 
 .borderRadius {
-    border-radius: var(--result-curve);
+  border-radius: var(--result-curve);
 }
 
 .borderRadiusLeft {
-    border-radius: var(--result-curve) 0 0 var(--result-curve);
+  border-radius: var(--result-curve) 0 0 var(--result-curve);
 }
 
 .borderRadiusRight {
-    border-radius: 0 var(--result-curve) var(--result-curve) 0;
+  border-radius: 0 var(--result-curve) var(--result-curve) 0;
 }
 
 .borderRed {
-    border: solid 1px red !important;
+  border: solid 1px red !important;
 }
 
 .width30P {
-    width: 30% !important;
+  width: 30% !important;
 }
 
 .opacity5 {
-    opacity: 0.5;
+  opacity: 0.5;
 }
 
 .opacity7 {
-    opacity: 0.7;
+  opacity: 0.7;
 }
 
 .opacity10 {
-    opacity: 1 !important;
+  opacity: 1 !important;
 }
 
 .padding0 {
-    padding: 0;
+  padding: 0;
 }
 
 .padding4 {
-    padding: 4px;
+  padding: 4px;
 }
 
 .padding10 {
-    padding: 10px;
+  padding: 10px;
 }
 
 .padding20 {
-    padding: 20px;
+  padding: 20px;
 }
 
 .paddingUnset {
-    padding: unset !important;
+  padding: unset !important;
 }
 
 .paddingL10 {
-    padding-left: 10px;
+  padding-left: 10px;
 }
 
 .paddingR10 {
-    padding-right: 10px;
+  padding-right: 10px;
 }
 
 .paddingT20 {
-    padding-top: 20px;
+  padding-top: 20px;
 }
 
 .paddingB20 {
-    padding-bottom: 20px;
+  padding-bottom: 20px;
 }
 
 .paddingL20 {
-    padding-left: 20px;
+  padding-left: 20px;
 }
 
 .paddingR20 {
-    padding-right: 20px;
+  padding-right: 20px;
 }
 
 .paddingL20P {
-    padding-left: 20%;
+  padding-left: 20%;
 }
 
 .paddingR20P {
-    padding-right: 20%;
+  padding-right: 20%;
 }
 
 .paddingL20PBoth {
-    padding-left: 20%;
+  padding-left: 20%;
 }
 
 .paddingR20PBoth {
-    padding-right: 20%;
+  padding-right: 20%;
 }
 
 .padding5505 {
-    padding: 5px 5px 0px 5px !important;
+  padding: 5px 5px 0px 5px !important;
 }
 
 .paddingCircle5 {
-    padding: 5px 10px 5px 10px;
+  padding: 5px 10px 5px 10px;
 }
 
 .paddingCircle1215 {
-    padding: 12px 15px 12px 15px;
+  padding: 12px 15px 12px 15px;
 }
 
 .padding7-14 {
-    padding: 7px 14px !important;
+  padding: 7px 14px !important;
 }
 
 .right0 {
-    right: 0 !important;
+  right: 0 !important;
 }
 
 .right60 {
-    right: 60px;
+  right: 60px;
 }
 
 .rotate180 {
-    rotate: 180deg;
+  rotate: 180deg;
 }
 
 .unset {
-    margin-left: unset !important;
-    clear: unset !important;
-    float: unset !important;
+  margin-left: unset !important;
+  clear: unset !important;
+  float: unset !important;
 }
 
 .hidden {
-    visibility: hidden;
+  visibility: hidden;
 }
 
 .overflowHidden {
-    overflow: hidden;
+  overflow: hidden;
 }
 
 /* Effects */
 .opened {
-    display: none;
+  display: none;
 }
 
 .opener:focus ~ .opened,
 .openerCheck:checked ~ .opened {
-    display: block;
+  display: block;
 }
 
 .opened:hover {
-    display: block;
+  display: block;
 }
 
 .zoom {
-    transition: all 0.3s ease-in-out;
+  transition: all 0.3s ease-in-out;
 }
 
 .zoom:hover {
-    transform: scale(1.1);
+  transform: scale(1.1);
 }
 
 .shadowGradRightDown {
-    box-shadow: 2px 2px 5px gray;
+  box-shadow: 2px 2px 5px gray;
 }

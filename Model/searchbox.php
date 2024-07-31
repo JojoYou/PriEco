@@ -58,7 +58,7 @@ echo '>';
   if($lang == null || $lang == 'en' || $lang == 'all'){echo 'All';}
   else{echo $promoobj['All'][0][$lang];}
   echo '</p></button>
-  </form>  
+  </form>
 
 
   <form method="POST" action="">
@@ -174,7 +174,7 @@ echo '</a>
 <label for="threedotsquick" class="labelforcheckquick feedbackMenuLabel"><img alt="quick settings" src="./View/icon/sliders.svg"></label>
   </div>
   </div>
- 
+
   <label for="notify" class="notify">
   <div class="Pointer filterImage width15 height15 absolute right60 top10">
   <img src="View/icon/bell.svg" class="width100P height100P">';
@@ -499,8 +499,11 @@ echo '
 <div class="quickSettingsSpace"></div>
 
 <input type="checkbox" id="notify" class="notificationCheckbox none" '; if(!isset($_COOKIE['telemetry'])){echo 'checked';}echo '>
-  
-<div class="notifications scrollDown flexDColumn max-height250 fixed right60 top30 whiteAblackBg padding20 curve">
+
+<div class="notifications scrollDown flexDColumn max-height250 fixed right60 whiteAblackBg padding20 curve top30 ';
+if(!isset($_COOKIE['telemetry'])){echo 'mobile_top80P';}
+
+echo '">
 <label for="notify" id="notifyHandle" class="width150 block height30 bgGray absolute curve top-15 left50PM74"></label>';
 
   if($not){
