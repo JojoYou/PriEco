@@ -416,8 +416,8 @@ if (
                     break;
                 case 1:
                     $ch3 = curl_init(
-                        "https://index.jojoyou.org/api.php?p=0&t=0&api=" .
-                            $_ENV["PriEcoGoogle"] .
+                        "https://remote.prieco.net/?s=g&api=" .
+                            $_ENV["Index2"] .
                             "&q=" .
                             $Bpurl
                     );
@@ -451,8 +451,8 @@ if (
                     break;
                 case 3:
                     $ch3 = curl_init(
-                        "https://index.jojoyou.org/bing.php?p=0&t=0&api=" .
-                            $_ENV["PriEcoGoogle"] .
+                        "https://remote.prieco.net/?s=b&api=" .
+                            $_ENV["Index2"] .
                             "&q=" .
                             $Bpurl
                     );
@@ -1473,10 +1473,7 @@ if ($type === "image") {
         include "Controller/functions/engines/img/prieco.php";
     } elseif (isset($_GET["openverse"])) {
         include "Controller/functions/engines/img/openverse.php";
-    } elseif (
-        !file_exists("disBing.txt") ||
-        isset(
-            $_SESSION[
+    } elseif (file_exists("disBing.txt") || !file_exists("disBing2.txt") || isset($_SESSION[
                 $Bpurl .
                     $page .
                     $imgsize .

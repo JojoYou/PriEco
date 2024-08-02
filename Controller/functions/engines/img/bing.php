@@ -29,6 +29,23 @@ if (!$dev) {
                 "&q=" .
                 $Bpurl;
         }
+        if (!file_exists("disBing2.txt")) {
+            $apis[] =
+                "https://remote.prieco.net/?s=b&img=true&api=". $_ENV['Index2'] .'&page='.
+                $page * 82 .
+                "&uiv=1&locale=en_US&imgsize=" .
+                $imgsize .
+                "&imgcolor=" .
+                $imgcolor .
+                "&imgtype=" .
+                $imgtype .
+                "&imgtime=" .
+                $imgtime .
+                "&imgright=" .
+                $imgright .
+                "&q=" .
+                $Bpurl;
+        }
 
         $imgUrl = "";
         if (count($apis) > 1) {
