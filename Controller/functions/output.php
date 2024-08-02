@@ -415,25 +415,17 @@ if (
                     $ch3 = curl_init($Googlefile);
                     break;
                 case 1:
+                $tmp = $lang;
+                if ($lang = "all") {
+                    $tmp = "en";
+                }
                     $ch3 = curl_init(
-                        "https://remote.prieco.net/?s=g&api=" .
+                        "https://remote.prieco.net/?s=g&google_language_results='.$tmp.'&google_language_site='.$tmp.'&api=" .
                             $_ENV["Index2"] .
                             "&q=" .
                             $Bpurl
                     );
-                    $tmp = $lang;
-                    if ($lang = "all") {
-                        $tmp = "en";
-                    }
-                    $cookies =
-                        "google_language_results=" .
-                        $tmp .
-                        ";google_number_of_results=20;google_language_site=" .
-                        $tmp .
-                        ";";
-                    if (!isset($_COOKIE["safe"])) {
-                        $cookies .= "safe_search=on;";
-                    }
+
                     curl_setopt($ch3, CURLOPT_COOKIE, $cookies);
                     break;
                 case 2:
