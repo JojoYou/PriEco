@@ -5,8 +5,8 @@
 $jsVersion = 8;
 if (!isset($_COOKIE['DisWid'])) {
   echo '<script src="View/js/summary.js?v='.$jsVersion.'"></script>
-  <script src="View/js/notify.js?v='.$jsVersion.'"></script>
-  <script src="View/js/apiLoad.js?v='.$jsVersion.'"></script>';
+  <script src="View/js/notify.js?v='.$jsVersion.'"></script>';
+  //<script src="View/js/apiLoad.js?v='.$jsVersion.'"></script>';
 }
 if (!isset($_COOKIE['DisSugges'])) {
   echo '<script src="View/js/suggest.php"></script>';
