@@ -73,7 +73,7 @@ include 'settings.php';
     <div class="shortcuts">
       <?php
       $i = 0;
-      if (($_SERVER['HTTP_HOST'] == 'search.jojoyou.org' || $_SERVER['HTTP_HOST'] == 'prieco.net') && $loc != 'all') {
+      /*if (($_SERVER['HTTP_HOST'] == 'search.jojoyou.org' || $_SERVER['HTTP_HOST'] == 'prieco.net') && $loc != 'all') {
         $curl_handle = curl_init();
         curl_setopt($curl_handle, CURLOPT_URL, 'https://' . $_ENV['VEVE_CUSTOMER_KEY'] . '.veve.com/qlapi?o=' . $_ENV['VEVE_CUSTOMER_KEY'] . '&s=' . $_ENV['VEVE_SITE_ID'] . '&u=search.jojoyou.org&itype=ss&f=json&i=1&is=36x36&ist=3&cc=' . $loc);
         curl_setopt($curl_handle, CURLOPT_CONNECTTIMEOUT, 2);
@@ -109,7 +109,7 @@ include 'settings.php';
             ++$i;
           }
         }
-      }
+      }*/
       $i = 0;
       if (isset($_COOKIE['shortcuts'])) {
         $shortcuts = explode(',', urldecode($_COOKIE['shortcuts']));

@@ -94,7 +94,7 @@ if ($_GET["t"] == "p") {
     unset($response[3]);
     curl_close($ch);
 }
-if (strlen($purl) >= 3 && $_GET["c"] != "all") {
+/*if (strlen($purl) >= 3 && $_GET["c"] != "all") {
     if ($_GET["t"] != "p") {
         $dev = true;
         include "../../database.php";
@@ -128,6 +128,6 @@ if (strlen($purl) >= 3 && $_GET["c"] != "all") {
         $response = array_merge_recursive($sponsored, $response);
     }
     curl_close($ch);
-}
+}*/
 header("Content-Type: application/json");
 echo json_encode($response);
