@@ -823,7 +823,7 @@ if (
     include "addons/related.php";
     include "addons/topImgs.php";
     include "addons/answer.php";
-    include "addons/small/peopleAsk.php";
+    //include "addons/small/peopleAsk.php";
 
     include "addons/news.php";
     include "addons/yt.php";
@@ -1114,11 +1114,9 @@ if (
         }
     }
 
-    $questionAnswer = isset($_COOKIE["DisWid"])
-        ? ""
-        : questionAnswer($purl, $results, $wikiTxt, $wikiobj);
+    //$questionAnswer = isset($_COOKIE["DisWid"]) ? "" : questionAnswer($purl, $results, $wikiTxt, $wikiobj);
 
-    if (isset($_COOKIE["index"])) {
+    /*if (isset($_COOKIE["index"])) {
         $peopleAskUrl = $PriEcoObj;
     } else {
         switch ($searchId) {
@@ -1146,7 +1144,7 @@ if (
                     str_replace("+", "_", ucwords($wikiobj["title"]));
                 break;
         }
-    }
+    }*/
 
     if (gettype($results) == "array") {
         preg_match_all(
@@ -1156,7 +1154,7 @@ if (
         );
 
         // Output the URLs
-        $peopleAskUrl = [];
+        /*$peopleAskUrl = [];
         foreach ($matches[0] as $url) {
             if (strpos($url, "wikipedia.org") !== false) {
                 $peopleAskUrl[] = $url;
@@ -1189,7 +1187,7 @@ if (
                 ".wikipedia.org/wiki/" .
                 str_replace("+", "_", ucwords($wikiobj["title"]));
         }
-        $peopleAsk = isset($_COOKIE["DisWid"]) ? "" : peopleAsk($peopleAskUrl);
+        $peopleAsk = isset($_COOKIE["DisWid"]) ? "" : peopleAsk($peopleAskUrl);*/
     }
     if (!isset($_COOKIE["safe"]) && !isset($_COOKIE["time"])) {
         if (
@@ -1279,7 +1277,7 @@ if (
             $news,
             $priecoResults[2],
             $priecoResults[3],
-            $peopleAsk,
+           // $peopleAsk,
             $priecoResults[4],
             $priecoResults[5],
             $reddit,
@@ -1297,7 +1295,7 @@ if (
     } elseif (isset($results)) {
         echo $topInfo,
             $insAnswer,
-            $questionAnswer["answer"],
+            //$questionAnswer["answer"],
             $results[1],
             $privateAltOut,
             $wiki,
@@ -1307,7 +1305,7 @@ if (
             $results[4],
             $shop,
             $results[5],
-            $peopleAsk,
+         //  $peopleAsk,
             $results[6],
             $reddit,
             $results[7],
@@ -1750,4 +1748,3 @@ if ($type == "news") {
     }
     echo "</div>";
 }
-
