@@ -498,9 +498,9 @@ echo '
 </form>
 <div class="quickSettingsSpace"></div>
 
-<input type="checkbox" id="notify" class="notificationCheckbox none" '; if(!isset($_COOKIE['telemetry'])){echo 'checked';}echo '>
+<input type="checkbox" id="notify" class="notificationCheckbox none" '; if(!isset($_COOKIE['telemetry'])){echo 'checked';}echo '>';
 
-<div class="notifications scrollDown flexDColumn max-height250 fixed right60 whiteAblackBg padding20 curve top30 ';
+echo '<div class="notifications scrollDown flexDColumn max-height250 fixed right60 whiteAblackBg padding20 curve top30 ';
 if(!isset($_COOKIE['telemetry'])){echo 'mobile_top80P';}
 
 echo '">
@@ -537,5 +537,7 @@ echo '">
     ++$i;
   }
 
-echo '</div>
-';
+echo '</div>';
+if(!isset($_COOKIE['telemetry'])){
+echo '<div class="none" data="NoTelemetry"></div>';
+}
