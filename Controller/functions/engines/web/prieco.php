@@ -1,6 +1,7 @@
 <?php
 function prieco($PriEcoObj, $purl, $loc, $lang)
 {
+    $urls = [];
     $sitelimit = false;
     $siteDomain = $purl;
     if (strpos($purl, 'site:') !== false) {
@@ -8,8 +9,8 @@ function prieco($PriEcoObj, $purl, $loc, $lang)
         $siteDomain = str_replace('site:', '', $purl);
     }
     //Get query keywords
-    $purlKeywords = explode(' ', strtolower($siteDomain));    
-   
+    $purlKeywords = explode(' ', strtolower($siteDomain));
+
     $allRes[0] = '';
     $jP = 0;
     $PriEcoData = array();
@@ -18,8 +19,9 @@ function prieco($PriEcoObj, $purl, $loc, $lang)
     $pres = '';
 
     foreach($PriEcoObj as $row){
-    $PriEcoUrl = $row['url'];
+          $PriEcoUrl = $row['url'];
             $row['title'] = utf8_encode($row['title']);
+            $urls[] = $PriEcoUrl . '<-->'.$row['title'];
             $row['description'] = utf8_encode($row['description']);
             $outImg = false;
             if (!in_array($PriEcoUrl, $allRes)) {
@@ -197,7 +199,7 @@ function prieco($PriEcoObj, $purl, $loc, $lang)
             $pres = null;
         }
         array_multisort($likable, SORT_DESC, $PriEcoData);
-    
+
     unset($allRes);
-    return $PriEcoData;
+    return [$PriEcoData, $urls];
 }

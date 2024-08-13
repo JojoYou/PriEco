@@ -157,7 +157,7 @@
     filter: unset;
 }
 
-.settingBtnsActive img {
+.settingBtnsActive img{
     filter: invert(56%) sepia(24%) saturate(1094%) hue-rotate(133deg) brightness(97%) contrast(84%);
 }
 
@@ -1295,7 +1295,7 @@ h4 {
 }
 
 .resTopImgs span,
-.redditCon span {
+.redditCon span, .expandLines {
     flex: 1;
     height: 1px;
     background-color: #ddd;
@@ -1323,13 +1323,99 @@ h4 {
     height: 250px;
 }
 
+#lyrics{
+  max-height: 350px;
+  overflow: hidden;
+  transition: all 1s ease-in-out;
+}
+
+#lyricsBtn:checked~#lyrics{
+  max-height: 20000px;
+}
+
 #topImgConBtn:checked~#topImgConBtnExp,
 #topImgConBtn:not(:checked)~#topImgConBtnMin,
 #redOpener:checked~#redExp,
-#redOpener:not(:checked)~#redMin {
+#redOpener:not(:checked)~#redMin,
+.expandBtn:checked~#expandExpand,
+.expandBtn:not(:checked)~#expandMinimize{
     display: none;
 }
 
+.lyricsMenu{
+  background: #d4d8ea;
+  padding: 10px 20px 10px 20px;
+  border-radius: 50px;
+  margin: 10px 20px 10px 0;
+  font-size: 16px;
+}
+.bigLyrics{
+  background-color: var(--result-bg);
+  position: fixed;
+  top: 150vh;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  transition: all 0.5s ease-in-out;
+}
+.bgBigLyrics{
+  object-fit: cover;
+  filter: blur(50px);
+  opacity: 0.5;
+}
+.bigLyricsTitle{
+  display: flex;
+  position: relative;
+  background-color: #0003;
+  padding: 10px;
+  top: 5px;
+  left: 5px;
+  border-radius: 20px;
+  align-items: center;
+  width: fit-content;
+}
+
+.bigLyricsBtn:checked~.bigLyrics{
+  top: 0;
+}
+
+.albumCover{
+  height: 150px;
+  border: solid 10px #888e;
+  border-radius: 20px 20px 0 0;
+}
+
+.albumTxt{
+  background-color: #888e;
+  position: relative;
+  top: -5px;
+  border-radius: 0 0 20px 20px;
+  padding: 10px;
+}
+
+.lyricsArtist{
+  display: flex;
+  flex-direction: column;
+  max-width: 500px;
+  margin-left: 100px;
+}
+@media (min-width: 1140px) {
+    .lyricsArtist {
+        margin-left: 200px;
+    }
+}
+
+.lyricsBox{
+  display: none;
+}
+.lyricsRadio:checked~.lyricsBox{
+  display: block;
+}
+.lyricsTxt{
+  width: 30%;
+  margin-right: 50px;
+}
 .findelsewhere {
     float: left;
     clear: left;

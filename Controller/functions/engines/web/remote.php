@@ -26,16 +26,19 @@ function remote($obj, $engine)
     }
 
 
-    $remote[] = null;
+    $urls = $remote = [];
+
     if($engine == 'Google'){
         foreach ($obj['items'] as &$item) {
             $remote[] = prepareResult($item, $namespace, $engine);
+            $urls[] = $item[$namespace[1]]. '<--->'. strip_tags($item[$namespace[2]]);
         }
     }
     elseif($engine == 'Google2'){
         foreach ($obj as &$item) {
             if(!isset($item['url'])){continue;}
             $remote[] = prepareResult($item, $namespace, $engine);
+            $urls[] = $item[$namespace[1]]. '<--->'. strip_tags($item[$namespace[2]]);
         }
     }
     elseif ($engine == 'QWant') {
@@ -43,6 +46,7 @@ function remote($obj, $engine)
         if ($item['type'] === 'web') {
             foreach ($item['items'] as &$items) {
                 $remote[] = prepareResult($items, $namespace, $engine);
+                $urls[] = $items[$namespace[1]]. '<--->'. strip_tags($items[$namespace[2]]);
             }
         }
     }
@@ -50,11 +54,15 @@ function remote($obj, $engine)
     else{
         foreach ($obj[$namespace[0]] as &$item) {
             $remote[] = prepareResult($item, $namespace, $engine);
+            $urls[] = $item[$namespace[1]]. '<--->'. strip_tags($item[$namespace[2]]);
         }
     }
 
-   
-    return $remote;
+
+    return [
+      $remote,
+      $urls
+    ];
 }
 
 function prepareResult($item, $namespace, $engine)
@@ -91,6 +99,7 @@ function prepareResult($item, $namespace, $engine)
     if (isset($_COOKIE['new'])) {
         $format .= 'target="_blank"';
     }
+
     $format .= 'href="' . (isset($_GET['tabs']) ? 'Controller/functions/saveTab.php?tab=' . $_GET['tab'] . '&url=' . urlencode($item[$namespace[1]]) : $item[$namespace[1]]) . '" rel="noopener noreferrer" data-sxpr-link>';
     $format .= '<p class="OutTitle">' . strip_tags($item[$namespace[2]]) . '</p></a>
     <p class="resLink">' . strip_tags($gurl) . '</p>

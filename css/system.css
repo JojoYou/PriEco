@@ -1,5 +1,4 @@
 @media (prefers-color-scheme: light) {
-
   html,
   .copyQuery {
     background-color: #f2f4f7;
@@ -19,7 +18,9 @@
   }
 
   .weatherBtnActive {
-    box-shadow: rgb(233, 233, 237) -4px -2px 8px, rgba(149, 162, 211, 0.8) 4px 2px 8px;
+    box-shadow:
+      rgb(233, 233, 237) -4px -2px 8px,
+      rgba(149, 162, 211, 0.8) 4px 2px 8px;
   }
 
   .topbg {
@@ -95,7 +96,9 @@
   }
 
   .setChooseChecked {
-    box-shadow: -4px -2px 8px #e9e9ed, 4px 2px 8px rgba(149, 162, 211, 0.8);
+    box-shadow:
+      -4px -2px 8px #e9e9ed,
+      4px 2px 8px rgba(149, 162, 211, 0.8);
   }
 
   .suggestion:hover {
@@ -153,7 +156,13 @@
   }
 
   .bgStripes {
-    background: repeating-linear-gradient(315deg, #FFFFFF, #ffffff 50px, #edeff7 50px, #edeff7 100px)
+    background: repeating-linear-gradient(
+      315deg,
+      #ffffff,
+      #ffffff 50px,
+      #edeff7 50px,
+      #edeff7 100px
+    );
   }
 
   .box-shadow-main {
@@ -206,6 +215,10 @@
 
   .white {
     color: white;
+  }
+
+  .bgAnswer {
+    background-color: var(--result-bg);
   }
 
   .settingButton,
@@ -261,7 +274,9 @@
   }
 
   .weatherBtnActive {
-    box-shadow: rgb(42, 44, 45) -4px -2px 8px, rgba(0, 0, 0, 0.6) 4px 2px 8px;
+    box-shadow:
+      rgb(42, 44, 45) -4px -2px 8px,
+      rgba(0, 0, 0, 0.6) 4px 2px 8px;
   }
 
   .topbg {
@@ -323,15 +338,12 @@
     background-color: var(--result-bg);
     color: white;
   }
-
   .quickAnswer {
     background-color: var(--result-bg);
   }
-
   .quickAnswer b {
     background-color: #797e93;
   }
-
   .setBut {
     -webkit-filter: brightness(0) invert(1);
     filter: brightness(0) invert(1);
@@ -372,14 +384,18 @@
   .sidebarTitle img {
     filter: brightness(0) invert(1);
   }
-
+  .lyricsMenu {
+    background-color: #595b67;
+  }
   .bigimgout {
     background-color: var(--sidebar-bg-color-dark);
     color: white;
   }
 
   .setChooseChecked {
-    box-shadow: -4px -2px 8px #2a2c2d, 4px 2px 8px rgba(0, 0, 0, 0.6);
+    box-shadow:
+      -4px -2px 8px #2a2c2d,
+      4px 2px 8px rgba(0, 0, 0, 0.6);
   }
 
   .autocom-box {
@@ -390,15 +406,12 @@
   .suggestion:hover {
     background-color: #222;
   }
-
   .peopleAskDiv {
     background-color: var(--result-bg);
   }
-
   .lds-ellipsis div {
     background-color: white;
   }
-
   .active {
     background-color: #222;
   }
@@ -475,15 +488,13 @@
   #map {
     filter: brightness(0.7);
   }
-
   .resOptionsGroup:hover,
-  .resOptions:hover~.resOptionsGroup {
+  .resOptions:hover ~ .resOptionsGroup {
     opacity: 1;
     display: flex;
     background-color: var(--result-bg);
     border-radius: 10px;
   }
-
   .nextPage button {
     background-color: #2a2c2d;
     color: white;
@@ -498,7 +509,13 @@
   }
 
   .bgStripes {
-    background: repeating-linear-gradient(315deg, #000, #000 50px, #181a1b 50px, #181a1b 100px);
+    background: repeating-linear-gradient(
+      315deg,
+      #000,
+      #000 50px,
+      #181a1b 50px,
+      #181a1b 100px
+    );
   }
 
   .box-shadow-main {
@@ -533,11 +550,9 @@
   .comparison-table td:nth-child(2n) {
     background: #373737;
   }
-
   .tosdr td:nth-child(1) {
     background-image: url(../View/img/tosdr_white.svg);
   }
-
   .question {
     background: #373737;
   }

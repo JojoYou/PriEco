@@ -167,6 +167,15 @@ if (isset($_POST['sugPSave'])) {
   $reload = true;
 }
 
+if (isset($_POST['lyrPSave'])) {
+  if ($_POST['lyrPDropdown'] == 'sp') {
+    setcookie('sugProvider', null, -1, '/',null,true,true);
+  } else {
+    setcookie('lyrProvider', $_POST['lyrPDropdown'], time() + 31536000, '/',null,true,true);
+  }
+  $reload = true;
+}
+
 if (isset($_POST['hQuery'])) {
   if ($_POST['hQuery'] == 'hQueryOff') {
     setcookie('hQuery', 'on', time() + 31536000, '/',null,true,true);
@@ -361,6 +370,15 @@ elseif(isset($_POST['tabClose'])){
 if(isset($_POST['markasread'])){
   setcookie('notify', $_POST['markasreadValue'], time() + 31536000, '/',null,true,true);
   $reload = true;
+}
+
+//Album
+if (!isset($_GET['album'])) {
+  if (strpos($purl, "album: ") !== false) {
+      $album_title = substr($purl, strpos($purl, "album: ") + 7);
+      header('Location: '.(isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https://" : "http://") . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'] . '&album=true', true);
+      exit();
+    }
 }
 
 //Reload

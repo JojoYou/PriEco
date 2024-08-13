@@ -232,7 +232,9 @@
     position: static;
     margin-left: 2vw;
   }
-
+  .ml-80D {
+    margin-left: unset !important;
+  }
   .hQuery {
     margin-top: 0px;
   }
@@ -343,8 +345,27 @@
     top: 20%;
   }
 
+  .bigLyricsTitle {
+    width: calc(100% - 12px);
+  }
+  .lyricsArtist {
+    max-width: 95%;
+    margin-left: unset;
+  }
+  .lyricsTxt {
+    width: unset;
+    margin-right: unset;
+    padding-right: 20px;
+  }
+
+  .mflexCR {
+    flex-direction: column-reverse;
+  }
   .mobile_top80P {
     top: 80% !important;
+  }
+  .mobile_width100P {
+    width: 100% !important;
   }
 
   .notifications div {

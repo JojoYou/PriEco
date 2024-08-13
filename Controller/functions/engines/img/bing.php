@@ -31,7 +31,7 @@ if (!$dev) {
         }
         if (!file_exists("disBing2.txt")) {
             $apis[] =
-                "https://remote.prieco.net/?s=b&img=true&api=". $_ENV['Index2'] .'&page='.
+                "https://obunic.net/tests/prieco/?s=b&img=true&api=". $_ENV['Index2'] .'&page='.
                 $page * 82 .
                 "&uiv=1&locale=en_US&imgsize=" .
                 $imgsize .

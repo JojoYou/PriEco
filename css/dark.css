@@ -24,6 +24,10 @@ html,
   color: white;
 }
 
+.bgAnswer {
+  background-color: var(--result-bg);
+}
+
 .settingButton,
 .sx-search-sug-link span,
 .sx-kp-tab-content,
@@ -77,7 +81,9 @@ html,
 }
 
 .weatherBtnActive {
-  box-shadow: rgb(42, 44, 45) -4px -2px 8px, rgba(0, 0, 0, 0.6) 4px 2px 8px;
+  box-shadow:
+    rgb(42, 44, 45) -4px -2px 8px,
+    rgba(0, 0, 0, 0.6) 4px 2px 8px;
 }
 
 .topbg {
@@ -139,10 +145,10 @@ html,
   background-color: var(--result-bg);
   color: white;
 }
-.quickAnswer{
+.quickAnswer {
   background-color: var(--result-bg);
 }
-.quickAnswer b{
+.quickAnswer b {
   background-color: #797e93;
 }
 .setBut {
@@ -185,14 +191,18 @@ html,
 .sidebarTitle img {
   filter: brightness(0) invert(1);
 }
-
+.lyricsMenu {
+  background-color: #595b67;
+}
 .bigimgout {
   background-color: var(--sidebar-bg-color-dark);
   color: white;
 }
 
 .setChooseChecked {
-  box-shadow: -4px -2px 8px #2a2c2d, 4px 2px 8px rgba(0, 0, 0, 0.6);
+  box-shadow:
+    -4px -2px 8px #2a2c2d,
+    4px 2px 8px rgba(0, 0, 0, 0.6);
 }
 
 .autocom-box {
@@ -203,10 +213,10 @@ html,
 .suggestion:hover {
   background-color: #222;
 }
-.peopleAskDiv{
+.peopleAskDiv {
   background-color: var(--result-bg);
 }
-.lds-ellipsis div{
+.lds-ellipsis div {
   background-color: white;
 }
 .active {
@@ -286,7 +296,7 @@ html,
   filter: brightness(0.7);
 }
 .resOptionsGroup:hover,
-.resOptions:hover~.resOptionsGroup {
+.resOptions:hover ~ .resOptionsGroup {
   opacity: 1;
   display: flex;
   background-color: var(--result-bg);
@@ -306,7 +316,13 @@ html,
 }
 
 .bgStripes {
-  background: repeating-linear-gradient(315deg, #000, #000 50px, #181a1b 50px, #181a1b 100px);
+  background: repeating-linear-gradient(
+    315deg,
+    #000,
+    #000 50px,
+    #181a1b 50px,
+    #181a1b 100px
+  );
 }
 
 .box-shadow-main {

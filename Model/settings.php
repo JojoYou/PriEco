@@ -218,8 +218,23 @@ echo '>
     <input type="url" class="langSave" name="redURL" placeholder="https://safereddit.com/"';if(isset($_COOKIE['redURL'])){echo 'value="',$_COOKIE['redURL'],'"';}echo'>
     <input type="submit" value="Save" class="langSave" name="redSave">
     </div>
+
+    <br><br>
+    <p>Lyrics instance:</p>
+    <div>
+    <select name="lyrPDropdown">
+
+    <option value="sp"';if (!isset($_COOKIE['lyrProvider'])){echo 'selected';}echo '>Spotify</option>
+    <option value="y"';if (isset($_COOKIE['lyrProvider']) && $_COOKIE['lyrProvider'] == 'y'){echo 'selected';}echo '>YouTube</option>
+    <option value="ym"';if (isset($_COOKIE['lyrProvider']) && $_COOKIE['lyrProvider'] == 'ym'){echo 'selected';}echo '>YouTube Music</option>
+    <option value="a"';if (isset($_COOKIE['lyrProvider']) && $_COOKIE['lyrProvider'] == 'a'){echo 'selected';}echo '>Apple Music</option>
+    <option value="s"';if (isset($_COOKIE['lyrProvider']) && $_COOKIE['lyrProvider'] == 's'){echo 'selected';}echo '>SoundCloud</option>
+    </select> <input type="submit" value="Save" class="langSave" name="lyrPSave">
+    </div>
 </div>
 </div>
+
+
 <br>
 <div class="setListItem">
 <input type="checkbox" id="jsSet" class="none">

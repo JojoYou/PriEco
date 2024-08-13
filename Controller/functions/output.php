@@ -217,7 +217,9 @@ if (
             $mh = curl_multi_init();
 
             $e = $_ENV["Obunic"];
-            $ch2 = curl_init("http://127.0.0.1:8000/api/wiki?q=$fil_enc_que"); // Wiki
+            $wiki_query = isset($_GET['lyrics_artist']) ? urlencode($_GET['lyrics_artist']) : $fil_enc_que;
+
+            $ch2 = curl_init("http://127.0.0.1:8000/api/wiki?q=$wiki_query"); // Wiki
             $ch3 = curl_init("http://127.0.0.1:8000/api/reddit?q=$fil_enc_que"); // Reddit
             $ch4 = curl_init("http://127.0.0.1:8000/api/news?q=$fil_enc_que"); // News
             $ch5 = curl_init(
@@ -297,7 +299,7 @@ if (
             //Wiki
             $indexW = false;
             foreach ($wikiObj as $item) {
-                if (strtolower($item["title"]) === strtolower($purl)) {
+                if (strtolower($item["title"]) === strtolower($purl) || strtolower($item["title"]) === strtolower($_GET['lyrics_artist'])) {
                     $wikiObj = $item;
                     $indexW = true;
                     break;
@@ -416,13 +418,13 @@ if (
                     break;
                 case 1:
                 $tmp = $lang;
-                if ($lang = "all") {
+                if ($tmp = "all" || empty($tmp) || !isset($tmp)) {
                     $tmp = "en";
                 }
                     $ch3 = curl_init(
-                        "https://remote.prieco.net/?s=g&google_language_results='.$tmp.'&google_language_site='.$tmp.'&api=" .
+                        'https://obunic.net/tests/prieco/?s=g&google_language_results='.$tmp.'&google_language_site='.$tmp.'&api=' .
                             $_ENV["Index2"] .
-                            "&q=" .
+                            '&q=' .
                             $Bpurl
                     );
 
@@ -430,9 +432,9 @@ if (
                     break;
                 case 2:
                     $ch3 = curl_init(
-                        "https://api.qwant.com/v3/search/web/?count=10&offset=" .
+                        'https://api.qwant.com/v3/search/web/?count=10&offset=' .
                             $page .
-                            "0&uiv=1&locale=en_us&q=" .
+                            '0&uiv=1&locale=en_us&q=' .
                             $Bpurl
                     );
                     curl_setopt(
@@ -443,7 +445,7 @@ if (
                     break;
                 case 3:
                     $ch3 = curl_init(
-                        "https://remote.prieco.net/?s=b&api=" .
+                        "https://obunic.net/tests/prieco/?s=b&api=" .
                             $_ENV["Index2"] .
                             "&q=" .
                             $Bpurl
@@ -644,6 +646,62 @@ if (
             }
         }
 
+        preg_match('/song:\s*(.*?)\s*artist:\s*(.*)/', $purl, $matches);
+
+        $artist = $matches[2];
+        $song = $matches[1];
+
+        if(strpos($purl, 'lyric') !== false || (!empty($artist) && !empty($song)) || (isset($_GET['album']) && $_GET['album'] == 'true')){
+        $song_name = trim(preg_replace('/\b(l(yric|yrics))\b/i', '', $purl));
+
+          if(isset($_GET['lyrics_id'])){
+          $lyrCh =curl_init($_ENV['ObunicSongId'].$_GET['lyrics_id']);
+          }
+          elseif(isset($_GET['album']) && !empty($_GET['album'])){
+            if($_GET['album'] != 'true'){
+              $lyrCh =curl_init($_ENV['ObunicAlbumId'].$_GET['album']);
+            }
+            else{
+              $lyrCh =curl_init($_ENV['ObunicAlbumName'].urlencode(str_replace('album: ','',$purl)));
+            }
+          }
+          elseif(!empty($artist) && !empty($song)){
+          $lyrCh =curl_init($_ENV['ObunicSong'].str_replace('+', '%20',urlencode($song)).'&artist='.str_replace('+', '%20',urlencode($artist)));
+          }
+          else{
+          $lyrCh =curl_init($_ENV['ObunicLyrics'].urlencode($song_name));
+          }
+            curl_setopt($lyrCh, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt(
+                $lyrCh,
+                CURLOPT_USERAGENT,
+                "Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13"
+            );
+            curl_setopt($lyrCh, CURLOPT_CONNECTTIMEOUT, 2);
+            curl_setopt($lyrCh, CURLOPT_TIMEOUT, 2.5);
+            $curlHandles[] = $lyrCh;
+            if (count($curlHandles) > $curlCount) {
+                $lyrOn = true;
+                $curlCount = count($curlHandles);
+            }
+
+            if(isset($_GET['lyrics_artist'])){
+            $artCh =curl_init($_ENV['ObunicArtist'].urlencode($_GET['lyrics_artist']));
+            curl_setopt($artCh, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt(
+                $artCh,
+                CURLOPT_USERAGENT,
+                "Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13"
+            );
+            $curlHandles[] = $artCh;
+            if (count($curlHandles) > $curlCount) {
+                $artOn = true;
+                $curlCount = count($curlHandles);
+            }
+
+            }
+        }
+
         // Execute multi-curl requests
         foreach ($curlHandles as $handle) {
             curl_multi_add_handle($multiHandle, $handle);
@@ -754,6 +812,18 @@ if (
                 } elseif (isset($shopOn) && !isset($ShopObj)) {
                     $ShopObj = json_decode($response, true);
                     unset($shopOn);
+                } elseif (isset($lyrOn) && !isset($LyricsObj)){
+                if(isset($_GET['lyrics_id']) || (!empty($artist) && !empty($song))){
+                $LyricsObj = json_decode('['.$response.']', true);
+                }
+                else{
+                $LyricsObj = json_decode($response, true);
+                }
+                unset($lyrOn);
+                }
+                elseif (isset($artOn) && !isset($artistObj)){
+                $artistObj = json_decode($response, true);
+                  unset($artOn);
                 }
             }
             curl_multi_remove_handle($multiHandle, $handle);
@@ -815,6 +885,7 @@ if (
     include "addons/related.php";
     include "addons/topImgs.php";
     include "addons/answer.php";
+    include "addons/lyrics.php";
     //include "addons/small/peopleAsk.php";
 
     include "addons/news.php";
@@ -919,7 +990,7 @@ if (
     #Printing
     ##
     //Addons
-    $questionAnswer = $wiki = $news = $reddit = $youtube = $relatedP = "";
+    $lyrics = $questionAnswer = $wiki = $news = $reddit = $youtube = $relatedP = "";
     if (isset($_COOKIE["hQuery"])) {
         $hideQueryCopy = hideQuery($Bpurl);
     } else {
@@ -955,6 +1026,7 @@ if (
     if (isset($ShopObj)) {
         $shop = shop($ShopObj);
     }
+
 
     $privateAltOut = "";
     $privateAltOut = pHigh($purl);
@@ -1015,10 +1087,7 @@ if (
     while ($apiFailed) {
         $newCall = false;
 
-        if (
-            $searchId == 0 &&
-            strpos(json_encode($obj), $apiErrors[0]) !== false
-        ) {
+        if ($searchId == 0 && strpos(json_encode($obj), $apiErrors[0]) !== false) {
             $newCall = disFile("disGoogle.txt");
             $disabled[0] = 1;
         } elseif (
@@ -1088,23 +1157,35 @@ if (
     }
 
     //Engines
+    $all_urls = [];
     if (!isset($_COOKIE["index"])) {
         if ($searchId == 0) {
             $results = remote($obj, "Google");
+            $all_urls = $results[1];
+            $results = $results[0];
         }
         if (!isset($results[0]) && isset($g2obj)) {
             $results = remote($g2obj, "Google2");
+            $all_urls = $results[1];
+            $results = $results[0];
         }
         if (!isset($results[0]) && isset($QWantObj)) {
             $results = remote($QWantObj, "QWant");
+            $all_urls = $results[1];
+            $results = $results[0];
         }
         if (!isset($results[0]) && isset($BraveObj)) {
             $results = remote($BraveObj, "Brave");
+            $all_urls = $results[1];
+            $results = $results[0];
         }
         if (!isset($results[0]) && isset($MojeekObj)) {
             $results = remote($MojeekObj, "Mojeek");
+            $all_urls = $results[1];
+            $results = $results[0];
         }
     }
+
 
     //$questionAnswer = isset($_COOKIE["DisWid"]) ? "" : questionAnswer($purl, $results, $wikiTxt, $wikiobj);
 
@@ -1261,7 +1342,15 @@ if (
 
     if (isset($_COOKIE["index"])) {
         $priecoResults = prieco($PriEcoObj, $purl, $loc, $lang);
-        echo $insAnswer,
+        $all_urls = $priecoResults[1];
+        $priecoResults = $priecoResults[0];
+        if (isset($LyricsObj) && !isset($LyricsObj[0]['error'])) {
+        $first_genius_url = array_shift(array_values(array_filter($all_urls, function($url) {
+            return strpos($url, 'genius.com') !== false;
+        })));
+            $lyrics = lyrics($LyricsObj, $artistObj, $first_genius_url);
+        }
+        echo $lyrics, $insAnswer,
             $priecoResults[0],
             $privateAltOut,
             $wiki,
@@ -1285,7 +1374,13 @@ if (
         }
         echo $elseWhere;
     } elseif (isset($results)) {
-        echo $topInfo,
+    if (isset($LyricsObj) && !isset($LyricsObj[0]['error'])) {
+    $first_genius_url = array_shift(array_values(array_filter($all_urls, function($url) {
+        return strpos($url, 'genius.com') !== false;
+    })));
+        $lyrics = lyrics($LyricsObj, $artistObj, $first_genius_url);
+   }
+        echo $topInfo, $lyrics,
             $insAnswer,
             //$questionAnswer["answer"],
             $results[1],
@@ -1316,14 +1411,16 @@ if (
                 $priecoResults = explode("-<+>-", $_SESSION[$purl . ":-:pri"]);
             } else {
                 $priecoResults = prieco($PriEcoObj, $purl, $loc, $lang);
+                $all_urls = $priecoResults[1];
+                $priecoResults = $priecoResults[0];
             }
-
             $pRes = "";
             for ($i = 0; $i < 10; $i++) {
                 echo $priecoResults[$i];
                 $pRes .= $priecoResults[$i] . "-<+>-";
             }
             $_SESSION[$purl . ":-:pri"] = $pRes;
+
         }
         //nextPage($purl,$page);
     } else {
@@ -1465,7 +1562,7 @@ if ($type === "image") {
         include "Controller/functions/engines/img/prieco.php";
     } elseif (isset($_GET["openverse"])) {
         include "Controller/functions/engines/img/openverse.php";
-    } elseif (file_exists("disBing.txt") || !file_exists("disBing2.txt") || isset($_SESSION[
+    } elseif (!file_exists("disBing.txt") || !file_exists("disBing2.txt") || isset($_SESSION[
                 $Bpurl .
                     $page .
                     $imgsize .
