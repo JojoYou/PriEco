@@ -65,46 +65,94 @@ function shield($pdo, $purl, $cssver)
     }
 
     #Similar words repeate
-    function calculateSimilarity($string1, $string2) {
-        $words1 = preg_split('/\s+/', trim($string1));
-        $words2 = preg_split('/\s+/', trim($string2));
-        $commonWords = array_intersect($words1, $words2);
-        return count($commonWords);
+    function query_encrypt($data, $key) {
+        $cipher = "aes-256-cbc";
+        $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length($cipher));
+        $encryptedData = openssl_encrypt($data, $cipher, $key, 0, $iv);
+        return base64_encode($iv . $encryptedData);
     }
 
-    /*$filePath = "query.txt";
-    $similarityThreshold = 3;
+    function query_decrypt($data, $key) {
+        $cipher = "aes-256-cbc";
+        $data = base64_decode($data);
+        $ivLength = openssl_cipher_iv_length($cipher);
+        $iv = substr($data, 0, $ivLength);
+        $encryptedData = substr($data, $ivLength);
+        return openssl_decrypt($encryptedData, $cipher, $key, 0, $iv);
+    }
 
-    if (file_exists($filePath)) {
-        $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-
-        $similarStrings = array_filter($lines, function($line) use ($purl, $similarityThreshold) {
-            return levenshtein(trim($line), $purl) <= $similarityThreshold;
-        });
-        $count = count($similarStrings);
-
-        if ($count >= 4) {
-           $pass = false;
+    function countWordOccurrences($filename, $key) {
+        $wordCount = [];
+        if (file_exists($filename)) {
+            $contents = file_get_contents($filename);
+            $lines = explode("\n", trim($contents));
+            foreach ($lines as $line) {
+                $line = query_decrypt($line, $key);
+                $words = preg_split('/\s+/', strtolower(trim($line)));
+                foreach ($words as $word) {
+                    $wordCount[$word] = ($wordCount[$word] ?? 0) + 1;
+                }
+            }
         }
-        else{
-          $similarStrings = array_filter($lines, function($line) use ($purl, $similarityThreshold) {
-               return calculateSimilarity(trim($line), $purl) >= $similarityThreshold;
-          });
-          $count = count($similarStrings);
-          if ($count >= 4) {$pass=false;}
-        }
-        if($pass){
-          $lines[] = $purl;
+        return $wordCount;
+    }
 
-          if (count($lines) > 30) {
-            $lines = array_slice($lines, -30);
-          }
-          file_put_contents($filePath, implode("\n", $lines));
+    function isSimilarQuery($newQuery, $previousQueries, $wordOccurrences, $key) {
+        $newQuery = query_decrypt($newQuery, $key);
+        $newQueryWords = array_map('strtolower', preg_split('/\s+/', trim($newQuery)));
+
+        $similarCount = 0;
+
+        foreach ($previousQueries as $query) {
+            $query = query_decrypt($query, $key);
+            $queryWords = array_map('strtolower', preg_split('/\s+/', trim($query)));
+            $commonWords = array_intersect($newQueryWords, $queryWords);
+            $commonWordCount = 0;
+
+            foreach ($commonWords as $word) {
+                if ($wordOccurrences[$word] ?? 0 > 1) {
+                    $commonWordCount++;
+                }
+            }
+            if ($commonWordCount > 1) {
+                $similarCount++;
+            } else {
+                $levDistance = levenshtein($newQuery, $query);
+                if ($levDistance <= 3) {
+                    $similarCount++;
+                }
+            }
+
+            if ($similarCount >= 4) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    $query_file = "query.txt";
+    $key = $_ENV['Query_Encryption'];
+
+    if (!file_exists($query_file) || filesize($query_file) == 0) {
+        if (!empty($purl)) {
+            $encryptedPurl = query_encrypt($purl, $key);
+            file_put_contents($query_file, $encryptedPurl . "\n");
+        }
+    } elseif (!empty($purl)) {
+        $lines = file($query_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $wordOccurrences = countWordOccurrences($query_file, $key);
+
+        $encryptedPurl = query_encrypt($purl, $key);
+        if (isSimilarQuery($encryptedPurl, $lines, $wordOccurrences, $key)) {
+            $pass = false;
+        } else {
+            if (count($lines) >= 100) {
+                $lines = array_slice($lines, -99);
+            }
+            $lines[] = $encryptedPurl;
+            file_put_contents($query_file, implode("\n", $lines) . "\n");
         }
     }
-    else{
-      file_put_contents($filePath, $purl);
-    }*/
 
 
     #CAPTCHA
