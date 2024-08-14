@@ -11,3 +11,13 @@ allow from all
     </If>
 </IfModule>
 
+# Allow access to /api for all user agents
+RewriteEngine On
+
+RewriteCond %{REQUEST_URI} ^/api [NC]
+RewriteRule ^ - [L]
+
+# Block access for Wget and Curl user agents for all other requests
+RewriteCond %{HTTP_USER_AGENT} ^Wget.* [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} ^curl.* [NC]
+RewriteRule ^ - [F,L]
