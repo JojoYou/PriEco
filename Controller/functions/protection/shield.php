@@ -116,7 +116,10 @@ function shield($pdo, $purl, $cssver)
             }
             if ($commonWordCount > 1) {
                 $similarCount++;
-            } else {
+            }
+           else if($commonWordCount > 0){
+              $similarCount += 0.5;
+           } else {
                 $levDistance = levenshtein($newQuery, $query);
                 if ($levDistance <= 3) {
                     $similarCount++;
