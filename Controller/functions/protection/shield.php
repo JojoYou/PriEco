@@ -37,7 +37,7 @@ function shield($pdo, $purl, $cssver)
     $pass = true;
     #IP
     if (!isset($_SESSION["IPPass"])) {
-        $ip = explode(".", $_SERVER["REMOTE_ADDR"]);
+        $ip = explode(".", (isset($_SERVER['HTTP_CF_CONNECTING_IP']) ? $_SERVER['HTTP_CF_CONNECTING_IP'] : $_SERVER['REMOTE_ADDR']));
         $curl = curl_init("http://127.0.0.1:8000/api/api/ipShield?q=" . $ip[0]);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         $row = json_decode(curl_exec($curl), true);
