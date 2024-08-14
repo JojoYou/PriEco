@@ -159,7 +159,7 @@ if (
             if (preg_match("/\bip\b/i", $purl)) {
                 $ipCh = curl_init(
                     "http://127.0.0.1:8000/api/ip2loc?q=" .
-                        ip2long(getenv("REMOTE_ADDR"))
+                        ip2long((isset($_SERVER['HTTP_CF_CONNECTING_IP']) ? $_SERVER['HTTP_CF_CONNECTING_IP'] : $_SERVER['REMOTE_ADDR']))
                 );
                 curl_setopt($ipCh, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt(

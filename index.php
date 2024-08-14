@@ -129,8 +129,8 @@ if (
 ) {
     if (
         !$dev &&
-        !str_starts_with(getenv("REMOTE_ADDR"), "192.") &&
-        !str_starts_with(getenv("REMOTE_ADDR"), "127.")
+        !str_starts_with((isset($_SERVER['HTTP_CF_CONNECTING_IP']) ? $_SERVER['HTTP_CF_CONNECTING_IP'] : $_SERVER['REMOTE_ADDR']), "192.") &&
+        !str_starts_with((isset($_SERVER['HTTP_CF_CONNECTING_IP']) ? $_SERVER['HTTP_CF_CONNECTING_IP'] : $_SERVER['REMOTE_ADDR']), "127.")
     ) {
         $ch = curl_init();
 
@@ -140,7 +140,7 @@ if (
             $ch,
             CURLOPT_URL,
             "http://127.0.0.1:8000/api/ip2loc?q=" .
-                ip2long(getenv("REMOTE_ADDR"))
+                ip2long((isset($_SERVER['HTTP_CF_CONNECTING_IP']) ? $_SERVER['HTTP_CF_CONNECTING_IP'] : $_SERVER['REMOTE_ADDR']))
         );
         curl_setopt(
             $ch,
