@@ -59,7 +59,7 @@ function shield($pdo, $purl, $cssver)
     }
 
     #Suspicious words
-    $words = ["slot"];
+    $words = ['slot', 'podatelna', 'kosmetik'];
     if (!empty(array_intersect(explode(" ", $purl), $words))) {
         $pass = false;
     }
