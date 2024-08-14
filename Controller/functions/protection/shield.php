@@ -64,6 +64,49 @@ function shield($pdo, $purl, $cssver)
         $pass = false;
     }
 
+    #Similar words repeate
+    function calculateSimilarity($string1, $string2) {
+        $words1 = preg_split('/\s+/', trim($string1));
+        $words2 = preg_split('/\s+/', trim($string2));
+        $commonWords = array_intersect($words1, $words2);
+        return count($commonWords);
+    }
+
+    $filePath = "query.txt";
+    $similarityThreshold = 3;
+
+    if (file_exists($filePath)) {
+        $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+
+        $similarStrings = array_filter($lines, function($line) use ($purl, $similarityThreshold) {
+            return levenshtein(trim($line), $purl) <= $similarityThreshold;
+        });
+        $count = count($similarStrings);
+
+        if ($count >= 4) {
+           $pass = false;
+        }
+        else{
+          $similarStrings = array_filter($lines, function($line) use ($purl, $similarityThreshold) {
+               return calculateSimilarity(trim($line), $purl) >= $similarityThreshold;
+          });
+          $count = count($similarStrings);
+          if ($count >= 4) {$pass=false;}
+        }
+        if($pass){
+          $lines[] = $purl;
+
+          if (count($lines) > 30) {
+            $lines = array_slice($lines, -30);
+          }
+          file_put_contents($filePath, implode("\n", $lines));
+        }
+    }
+    else{
+      file_put_contents($filePath, $purl);
+    }
+
+
     #CAPTCHA
     if (!$pass) {
         header("HTTP/1.0 403 Forbidden");

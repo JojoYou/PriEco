@@ -1425,7 +1425,7 @@ if (
         //nextPage($purl,$page);
     } else {
         echo '<div class="width100V height50V flex alignC wrap justConC inv05b"><h1 class="mr-20">No results found!</h1><img src="/View/icon/no_link.svg"
-    style="width:100px;height:auto;"></div>';
+    class="width100"></div>';
     }
 }
 if ($type === "image") {
