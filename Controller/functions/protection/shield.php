@@ -72,47 +72,39 @@ function shield($pdo, $purl, $cssver)
         return count($commonWords);
     }
 
-    $filePath = "query.txt";
+    /*$filePath = "query.txt";
     $similarityThreshold = 3;
-    $encryptionKey = $_ENV['Query_Encryption'];
 
-    if (file_exists($filePath) && !empty($purl)) {
+    if (file_exists($filePath)) {
         $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 
-        $similarStrings = array_filter($lines, function($line) use ($purl, $similarityThreshold, $encryptionKey) {
-            $decodedLine = openssl_decrypt(base64_decode($line), 'aes-256-cbc', $encryptionKey, 0, '1234567890123456');
-            return levenshtein(trim($decodedLine), $purl) <= $similarityThreshold;
+        $similarStrings = array_filter($lines, function($line) use ($purl, $similarityThreshold) {
+            return levenshtein(trim($line), $purl) <= $similarityThreshold;
         });
         $count = count($similarStrings);
 
         if ($count >= 4) {
-            $pass = false;
-        } else {
-            $similarStrings = array_filter($lines, function($line) use ($purl, $similarityThreshold, $encryptionKey) {
-                $decodedLine = openssl_decrypt(base64_decode($line), 'aes-256-cbc', $encryptionKey, 0, '1234567890123456');
-                return calculateSimilarity(trim($decodedLine), $purl) >= $similarityThreshold;
-            });
-            $count = count($similarStrings);
-            if ($count >= 4) {
-                $pass = false;
-            }
+           $pass = false;
         }
-
-        if ($pass) {
-            $iv = '1234567890123456';
-            $encryptedPurl = base64_encode(openssl_encrypt($purl, 'aes-256-cbc', $encryptionKey, 0, $iv));
-            $lines[] = $encryptedPurl;
-
-            if (count($lines) > 30) {
-                $lines = array_slice($lines, -30);
-            }
-            file_put_contents($filePath, implode("\n", $lines));
+        else{
+          $similarStrings = array_filter($lines, function($line) use ($purl, $similarityThreshold) {
+               return calculateSimilarity(trim($line), $purl) >= $similarityThreshold;
+          });
+          $count = count($similarStrings);
+          if ($count >= 4) {$pass=false;}
         }
-    } elseif(!empty($purl)) {
-        $iv = '1234567890123456';
-        $encryptedPurl = base64_encode(openssl_encrypt($purl, 'aes-256-cbc', $encryptionKey, 0, $iv));
-        file_put_contents($filePath, $encryptedPurl);
+        if($pass){
+          $lines[] = $purl;
+
+          if (count($lines) > 30) {
+            $lines = array_slice($lines, -30);
+          }
+          file_put_contents($filePath, implode("\n", $lines));
+        }
     }
+    else{
+      file_put_contents($filePath, $purl);
+    }*/
 
 
     #CAPTCHA
