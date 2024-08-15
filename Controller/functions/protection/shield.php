@@ -126,7 +126,7 @@ function shield($pdo, $purl, $cssver)
                 }
             }
 
-            if ($similarCount >= 4) {
+            if ($similarCount >= 10) {
                 return true;
             }
         }
