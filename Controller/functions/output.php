@@ -183,7 +183,7 @@ if (
                 $lines = file("cache/" . $hashedQuery . ".txt");
                 if (!empty($lines)) {
                     $date = explode("---", array_shift($lines));
-                    $searchId = $lines[1];
+                    $searchId = $date[1];
                     $date = $date[1];
                     $cache = decrypt(
                         gzuncompress(implode("", $lines)),
