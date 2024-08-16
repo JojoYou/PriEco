@@ -65,7 +65,7 @@ function shield($pdo, $purl, $cssver)
     }
 
     #Similar words repeate
-    function query_encrypt($data, $key) {
+    /*function query_encrypt($data, $key) {
         $cipher = "aes-256-cbc";
         $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length($cipher));
         $encryptedData = openssl_encrypt($data, $cipher, $key, 0, $iv);
@@ -155,7 +155,7 @@ function shield($pdo, $purl, $cssver)
             $lines[] = $encryptedPurl;
             file_put_contents($query_file, implode("\n", $lines) . "\n");
         }
-    }
+    }*/
 
 
     #CAPTCHA
