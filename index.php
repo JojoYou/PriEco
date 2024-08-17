@@ -19,19 +19,24 @@ function removeDisFile($name, $time = 3600)
 {
     if (file_exists($name)) {
         $tmp = file_get_contents($name);
-        if (time() > $tmp + $time) {
+        if($time == 10){
+          if(time() > strtotime('+1 day', strtotime(date('Y-m-d 10:00:00', $saved_time)))){
+            unlink($name);
+          }
+        }
+        elseif (time() > $tmp + $time) {
             unlink($name);
         }
     }
 }
 $sumPath = "";
 
-removeDisFile("disGoogle.txt");
-removeDisFile("disGoogle2.txt");
-removeDisFile("disBing.txt");
-removeDisFile("disBing2.txt");
+removeDisFile("disGoogle.txt", 10);
+removeDisFile("disGoogle2.txt", 1440);
+removeDisFile("disBing.txt", 1440);
+removeDisFile("disBing2.txt", 1440);
 removeDisFile("disBrave.txt");
-removeDisFile("disMojeek.txt");
+removeDisFile("disMojeek.txt", 30);
 
 //Get data from $PromoFile
 $promoobj = json_decode(
