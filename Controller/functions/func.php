@@ -1,12 +1,12 @@
 <?php
 function cutString($inputString, $len) {
     if (strlen($inputString) <= $len) {return $inputString;}
-  
+
     $trimmed = substr($inputString, 0, $len);
     $lastSpacePos = strrpos($trimmed, ' ');
-  
+
     if ($lastSpacePos === false) {return $trimmed.'...';}
-  
+
     return substr($trimmed, 0, $lastSpacePos).'...';
   }
 function openverseToken(){
@@ -160,8 +160,20 @@ function backupCall($searchId, $disabled, &$complex, $Bpurl, $Googlefile, $Brave
             break;
         case 2:
             $ch3 = curl_init('https://api.qwant.com/v3/search/web/?count=10&offset=' . $page . '0&uiv=1&locale=en_us&q=' . $Bpurl);
-            curl_setopt($ch3, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
-            break;
+            curl_setopt($ch3, CURLOPT_HTTPHEADER, [
+                "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/png,image/svg+xml,*/*;q=0.8",
+                "Accept-Language: en-US,en;q=0.5",
+                "Connection: keep-alive",
+                "DNT: 1",
+                "Host: api.qwant.com",
+                "Priority: u=0, i",
+                "Sec-Fetch-Dest: document",
+                "Sec-Fetch-Mode: navigate",
+                "Sec-Fetch-Site: cross-site",
+                "TE: trailers",
+                "Upgrade-Insecure-Requests: 1",
+                "User-Agent: $randomUserAgent"
+            ]);            break;
         case 3:
             $ch3 = curl_init('https://jojoyou.org/librex/bing.php?g2API=' . $_ENV['PriEcoGoogle'] . '&q=' . $Bpurl);
             curl_setopt($ch3, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13');
@@ -173,7 +185,7 @@ function backupCall($searchId, $disabled, &$complex, $Bpurl, $Googlefile, $Brave
                 'Accept: application/json',
                 'Authorization: Bearer my-access-token'
             );
-            
+
             curl_setopt($ch3, CURLOPT_HTTPHEADER, $headers);
             break;
         case 5:

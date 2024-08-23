@@ -411,6 +411,16 @@ if (
                 $disabled[5] = 1;
             }
 
+            $userAgents = [
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.81 Safari/537.36 Edge/16.16299',
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36',
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.198 Safari/537.36',
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Safari/537.36',
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.190 Safari/537.36',
+            ];
+            $randomUserAgent = $userAgents[array_rand($userAgents)];
+
             $searchId = chooseAPI($disabled, $complex);
             switch ($searchId) {
                 case 0:
@@ -437,11 +447,20 @@ if (
                             '0&uiv=1&locale=en_us&q=' .
                             $Bpurl
                     );
-                    curl_setopt(
-                        $ch3,
-                        CURLOPT_USERAGENT,
-                        "Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13"
-                    );
+                    curl_setopt($ch3, CURLOPT_HTTPHEADER, [
+                        "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/png,image/svg+xml,*/*;q=0.8",
+                        "Accept-Language: en-US,en;q=0.5",
+                        "Connection: keep-alive",
+                        "DNT: 1",
+                        "Host: api.qwant.com",
+                        "Priority: u=0, i",
+                        "Sec-Fetch-Dest: document",
+                        "Sec-Fetch-Mode: navigate",
+                        "Sec-Fetch-Site: cross-site",
+                        "TE: trailers",
+                        "Upgrade-Insecure-Requests: 1",
+                        "User-Agent: $randomUserAgent"
+                    ]);
                     break;
                 case 3:
                     $ch3 = curl_init(

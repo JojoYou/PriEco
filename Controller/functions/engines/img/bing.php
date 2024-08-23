@@ -47,26 +47,38 @@ if (!$dev) {
                 $Bpurl;
         }
 
-        $imgUrl = "";
-        if (count($apis) > 1) {
-            $imgUrl = $apis[array_rand($apis)];
-        } else {
-            $imgUrl = $apis[0];
-        }
+        $userAgents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15',
+            'Mozilla/5.0 (Linux; Android 9; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Mobile Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0',
+        ];
+        $randomUserAgent = $userAgents[array_rand($userAgents)];
 
-        $qCh = curl_init();
-        curl_setopt($qCh, CURLOPT_URL, $imgUrl);
-        curl_setopt(
-            $qCh,
-            CURLOPT_USERAGENT,
-            "Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13"
-        );
-        curl_setopt($qCh, CURLOPT_CONNECTTIMEOUT, 2.5);
+        // Initialize cURL session
+        $imgUrl = $apis[array_rand($apis)];
+
+        $qCh = curl_init($imgUrl);
+
         curl_setopt($qCh, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($qCh, CURLOPT_HTTPHEADER, [
+            "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/png,image/svg+xml,*/*;q=0.8",
+            "Accept-Language: en-US,en;q=0.5",
+            "Connection: keep-alive",
+            "DNT: 1",
+            "Host: api.qwant.com",
+            "Priority: u=0, i",
+            "Sec-Fetch-Dest: document",
+            "Sec-Fetch-Mode: navigate",
+            "Sec-Fetch-Site: cross-site",
+            "TE: trailers",
+            "Upgrade-Insecure-Requests: 1",
+            "User-Agent: $randomUserAgent"
+        ]);
+            $qResponse = curl_exec($qCh);
 
-        $qResponse = curl_exec($qCh);
-
-        curl_close($qCh);
+            curl_close($qCh);
 
         $Qimg[0] = $qResponse;
         $Qimg[1] = $imgUrl;
