@@ -47,6 +47,12 @@ function remote($obj, $engine)
             foreach ($item['items'] as &$items) {
                 $remote[] = prepareResult($items, $namespace, $engine);
                 $urls[] = $items[$namespace[1]]. '<--->'. strip_tags($items[$namespace[2]]);
+                if(isset($items['links'])){
+                  foreach ($items['links'] as &$link) {
+                    $remote[] = prepareResult($link, $namespace, $engine);
+                    $urls[] = $link[$namespace[1]]. '<--->'. strip_tags($link[$namespace[2]]);
+                  }
+                }
             }
         }
     }
@@ -57,7 +63,6 @@ function remote($obj, $engine)
             $urls[] = $item[$namespace[1]]. '<--->'. strip_tags($item[$namespace[2]]);
         }
     }
-
 
     return [
       $remote,
@@ -117,5 +122,6 @@ function prepareResult($item, $namespace, $engine)
         $format .= '<p class="resProvider">' . $engine . '</p>';
     }
     $format .= '</div>';
+
     return $format;
 }

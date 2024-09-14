@@ -1402,6 +1402,7 @@ if (
         echo $topInfo, $lyrics,
             $insAnswer,
             //$questionAnswer["answer"],
+            $results[0],
             $results[1],
             $privateAltOut,
             $wiki,
