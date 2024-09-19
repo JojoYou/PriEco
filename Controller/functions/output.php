@@ -1827,12 +1827,14 @@ if ($type == "news") {
             $item["clickUrl"],
             '"';
         if (isset($_COOKIE["new"])) {
-            echo 'target="_blank';
+            echo 'target="_blank"';
         }
         echo '>
+        <div class="flex justConC width100P">
                       <img src="Controller/functions/proxy.php?q=',
             urlencode($item["thumbnail"]["url"]),
             '" class="shopout imgout">
+        </div>
                       <p class="shopTitle">',
             $item["title"],
             '</p>

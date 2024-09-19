@@ -1499,7 +1499,7 @@ h4 {
     display: inline-block;
     flex-grow: 1;
     position: relative;
-    max-width: 20%;
+    max-width: 15%;
 }
 
 .imgoutdiv p {
@@ -1725,6 +1725,7 @@ h4 {
     margin-bottom: 5px;
     white-space: unset !important;
     padding: 10px;
+    height: 50px;
 }
 
 .shopPrice {
@@ -1744,6 +1745,7 @@ h4 {
     width: 70px;
     height: auto;
     margin-right: 10px;
+    border-bottom-left-radius: 20px;
 }
 
 /*Setting Sidebar*/
