@@ -1,4 +1,6 @@
 <?php
+@ob_end_clean();
+
 ini_set("session.cookie_httponly", 1);
 ini_set("session.cookie_domain", ".jojoyou.org");
 session_set_cookie_params(0, "/", "", 1, true);
@@ -339,11 +341,14 @@ if ($purl != null or $purl != "") {
 
     //Create inputbox with settings
     include "Model/searchbox.php";
+    flush();
+
     //Print output
     $priecoTime = -1;
     $resultTime = microtime(true);
     include "Controller/functions/output.php";
     $resultTime = microtime(true) - $resultTime;
+    flush();
 
     //Improve PriEco
     if (
