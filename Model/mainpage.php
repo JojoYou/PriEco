@@ -11,47 +11,6 @@ foreach ($promoobj['lang'][0] as $name => $value) {
   array_push($langName, $name);
 }
 
-if (isset($_COOKIE['auth']) && !$dev) {
-
-  $auth = '▛' . $auth;
-
-  $possibleUsr = strstr($auth, '▛');
-  $possibleUsr = strstr($auth, ' ', true);
-  $possibleUsr = substr($possibleUsr, 3);
-
-  $authName = str_replace('▛' . $possibleUsr . ' ', '', $auth);
-  $sql = "SELECT * FROM JYS WHERE Username='$possibleUsr'";
-  $result = $conn->query($sql);
-  if ($result->num_rows > 0) {
-    $row = $result->fetch_assoc();
-    $authDB = explode(',', $row['Auth']);
-    foreach ($authDB as $a) {
-      if ($a == $authName) {
-        $usr = $row['Username'];
-        $usrSearches = $row['Searches'];
-        $_SESSION['usr'] = $usr;
-        continue;
-      }
-    }
-  }
-  $usr = $row['Username'];
-  $select_user = "SELECT * FROM JYS WHERE Username='$usr'";
-  $run_qry = mysqli_query($conn, $select_user);
-  if (mysqli_num_rows($run_qry) > 0) {
-    if ($row = mysqli_fetch_assoc($run_qry)) {
-      $usrSearches = $row['Searches'];
-      $usrSearches++;
-      $update_user = "UPDATE JYS SET Searches='$usrSearches' WHERE Username='$_SESSION[usr]'";
-      $run_qry = mysqli_query($conn, $update_user);
-    }
-  }
-}
-if (!isset($usr)) {
-  $usr = 'Guest';
-}
-
-
-include './Controller/functions/indexLogic.php';
 include 'settings.php';
 ?>
 
