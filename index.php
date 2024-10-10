@@ -106,8 +106,6 @@ if (isset($_POST["q"]) && $_POST["q"] != $purl && !isset($_COOKIE["hQuery"])) {
 #IndexLogic
 include "Controller/functions/indexLogic.php";
 
-include "Model/header.php";
-
 ##
 #Protection
 ##
@@ -118,6 +116,9 @@ if (!$dev) {
 
 //Bangs
 include "Controller/functions/addons/bangs.php";
+
+//Header
+include "Model/header.php";
 
 //Tabs
 if (isset($_GET["tabs"])) {
