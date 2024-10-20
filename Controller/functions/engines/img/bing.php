@@ -46,15 +46,25 @@ if (!$dev) {
                 "&q=" .
                 $Bpurl;
         }
+        if(!file_exists('disBing3.txt')){
+          $apis[] =
+              "http://77.237.247.206:8010/?s=b&img=true&api=". $_ENV['Index2'] .'&page='.
+              $page * 82 .
+              "&uiv=1&locale=en_US&imgsize=" .
+              $imgsize .
+              "&imgcolor=" .
+              $imgcolor .
+              "&imgtype=" .
+              $imgtype .
+              "&imgtime=" .
+              $imgtime .
+              "&imgright=" .
+              $imgright .
+              "&q=" .
+              $Bpurl;
+        }
 
-        $userAgents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15',
-            'Mozilla/5.0 (Linux; Android 9; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Mobile Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0',
-        ];
-        $randomUserAgent = $userAgents[array_rand($userAgents)];
+        $randomUserAgent = generateRandomUserAgent();
 
         // Initialize cURL session
         $imgUrl = $apis[array_rand($apis)];
@@ -255,3 +265,13 @@ if (!isset($_COOKIE["DisHImg"])) {
     echo '<script src="View/js/highImg.js"></script>';
 }
 //echo nextPage($purl, $page, $imgsize, $imgcolor,$imgtype, $imgtime, $imgright);
+function generateRandomUserAgent() {
+    $browsers = ['Chrome', 'Firefox', 'Safari', 'Edge', 'Opera'];
+    $os = ['Windows NT 10.0', 'Macintosh; Intel Mac OS X 10_15_7', 'Linux; Android 10', 'iPhone; CPU iPhone OS 14_0 like Mac OS X'];
+    $browser = $browsers[array_rand($browsers)];
+    $operatingSystem = $os[array_rand($os)];
+
+    $version = rand(70, 100) . '.' . rand(0, 100) . '.' . rand(0, 5000);
+
+    return "Mozilla/5.0 ($operatingSystem) AppleWebKit/537.36 (KHTML, like Gecko) $browser/$version Safari/537.36";
+}

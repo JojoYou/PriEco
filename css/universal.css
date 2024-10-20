@@ -8,11 +8,6 @@
   --linkColor: #1a0dab;
   --topColor: #34a8ac;
 }
-@font-face {
-  font-family: "San Francisco";
-  font-weight: 400;
-  src: url("https://applesocial.s3.amazonaws.com/assets/styles/fonts/sanfrancisco/sanfranciscodisplay-regular-webfont.woff");
-}
 
 * {
   margin: 0;

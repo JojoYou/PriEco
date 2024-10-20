@@ -64,6 +64,46 @@ function shield($pdo, $purl, $cssver)
         $pass = false;
     }
 
+    #HTTP version
+    $httpVersion = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : '';
+    // Define the versions you want to exclude
+    $excludedVersions = ["HTTP/3", "SPDY/3.1", "HTTP/2"];
+
+    // Check if the HTTP version is not in the excluded versions
+    if (in_array($httpVersion, $excludedVersions)) {
+        // Your logic here for requests that do not match the excluded versions
+       //echo "Request is allowed.";
+    } else {
+        // Logic for excluded versions
+        //echo "Request is not allowed.";
+    }
+
+    #Browser version
+    $userAgent = $_SERVER['HTTP_USER_AGENT'];
+    $browser = '';
+    $version = 0;
+    if (preg_match('/Firefox/i', $userAgent)) {
+        $browser = 'Firefox';
+        preg_match('/Firefox\/([0-9\.]+)/', $userAgent, $versionMatch);
+        $version = isset($versionMatch[1]) ? $versionMatch[1] : '';
+    } elseif (preg_match('/Chrome/i', $userAgent)) {
+        $browser = 'Chrome';
+        preg_match('/Chrome\/([0-9\.]+)/', $userAgent, $versionMatch);
+        $version = isset($versionMatch[1]) ? $versionMatch[1] : '';
+    } elseif (preg_match('/Safari/i', $userAgent)) {
+        $browser = 'Safari';
+        preg_match('/Version\/([0-9\.]+)/', $userAgent, $versionMatch);
+        $version = isset($versionMatch[1]) ? $versionMatch[1] : '';
+    }
+    if(($browser == 'Safari' && $version < 16) || ($browser != '' && $version < 125)){
+      $pass = false;
+    }
+
+    #No encoding
+    if (!isset($_SERVER['HTTP_ACCEPT_ENCODING']) || empty($_SERVER['HTTP_ACCEPT_ENCODING'])) {
+      $pass = false;
+    }
+
     #Similar words repeate
     /*function query_encrypt($data, $key) {
         $cipher = "aes-256-cbc";
