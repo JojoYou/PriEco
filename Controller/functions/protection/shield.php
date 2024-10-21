@@ -66,16 +66,10 @@ function shield($pdo, $purl, $cssver)
 
     #HTTP version
     $httpVersion = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : '';
-    // Define the versions you want to exclude
-    $excludedVersions = ["HTTP/3", "SPDY/3.1", "HTTP/2"];
+    $supportedHttpVersions = ['HTTP/2.0'];
 
-    // Check if the HTTP version is not in the excluded versions
-    if (in_array($httpVersion, $excludedVersions)) {
-        // Your logic here for requests that do not match the excluded versions
-       //echo "Request is allowed.";
-    } else {
-        // Logic for excluded versions
-        //echo "Request is not allowed.";
+    if (!in_array($httpVersion, $supportedHttpVersions)) {
+      $pass = false;
     }
 
     #Browser version
@@ -212,7 +206,6 @@ function shield($pdo, $purl, $cssver)
         echo '<input type="submit" name="submit" value="🔓 Unlock" class="whiteAblackBg borderNone borderRadius Pointer padding10"></form></div><script src="https://hcaptcha.com/1/api.js" async defer></script>';
         $beforePathStyle = "/";
         include "Model/style.php";
-        include "Model/footer.php";
         echo "</body></html>";
 
         exit();
