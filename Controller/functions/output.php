@@ -1582,19 +1582,7 @@ if ($type === "image") {
         include "Controller/functions/engines/img/prieco.php";
     } elseif (isset($_GET["openverse"])) {
         include "Controller/functions/engines/img/openverse.php";
-    } elseif (!file_exists("disBing.txt") || !file_exists("disBing2.txt") || isset($_SESSION[
-                $Bpurl .
-                    $page .
-                    $imgsize .
-                    $imgcolor .
-                    $imgtype .
-                    $imgtime .
-                    $imgright .
-                    ":-:imgBing"
-            ]
-        )
-    ) {
-        include "Model/imgset.php";
+    } elseif (!file_exists("disBing.txt") || !file_exists("disBing2.txt") || !file_exists('disBing3.txt') || !file_exists('disKarma.txt') || isset($_SESSION[$Bpurl .$page .$imgsize .$imgcolor .$imgtype .$imgtime .$imgright .":-:imgBing"]) || isset($_SESSION[$Bpurl .$page .$imgsize .$imgcolor .$imgtype .$imgtime .$imgright .":-:imgKarma"])) {
         include "Controller/functions/engines/img/bing.php";
     } else {
         include "Controller/functions/engines/img/openverse.php";
