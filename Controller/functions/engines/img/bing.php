@@ -147,13 +147,13 @@ function print_karma($Qimg){
               </div>
 
             <div class="bigimgout">
-              <img src ="Controller/functions/proxy.php?q=',urldecode($item['thumbnail']['src']),'">
+              <img src ="Controller/functions/proxy.php?q=',urldecode($item['thumbnail']['src']),'" data-src="/Controller/functions/proxy.php?q=',urldecode($item['properties']['url']),'"';if (!isset($_COOKIE["DisHImg"])) {echo 'class="blur-5"';}echo '>
               <br>
               <h3>',$item["title"],'</h3><br>
               <p>From website: ',$item["url"],'</p><br>
               <div class="bigimgbtn"><a href="',$item["url"],'">
                 <button class="imgtoolsOption">Go to website</button></a><br>
-                <a href="',$item['thumbnail']['src'],'"> <button class="imgtoolsOption">Go to image</button></a>
+                <a href="',$item['properties']['url'],'"> <button class="imgtoolsOption">Go to image</button></a>
               </div>
               <button class="mobile-visible mt-20 imgtoolsOption">Close</button>
               </div>
