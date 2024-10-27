@@ -65,12 +65,12 @@ function shield($pdo, $purl, $cssver)
     }
 
     #HTTP version
-    $httpVersion = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : '';
+    /*$httpVersion = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : '';
     $supportedHttpVersions = ['HTTP/2.0'];
 
     if (!in_array($httpVersion, $supportedHttpVersions)) {
       $pass = false;
-    }
+    }*/
 
     #Browser version
     $userAgent = $_SERVER['HTTP_USER_AGENT'];
@@ -210,6 +210,5 @@ function shield($pdo, $purl, $cssver)
 
         exit();
     }
-    return;
 }
 shield($pdo, $purl, $cssver);
