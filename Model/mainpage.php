@@ -133,9 +133,8 @@ include 'settings.php';
       for ($j = 0; $j < ($i - 2) / 4; $j++) {
         echo '<div class="mainSpace"></div>';
       }
-      ?>
-
-      <a href="#scroll">
+if(!isset($_COOKIE['hideDesc'])){
+      echo '<a href="#scroll">
         <div class="flex flexDColumn alignC">
           <img class="filterImage width40 floatAnim absolute bottom15" src="View/icon/arrow-down.png" alt="Arrow down">
         </div>
@@ -264,3 +263,15 @@ include 'settings.php';
           </div>
         </div>
       </div>
+
+      <form method="post" class="float-right paddingR10">
+        <label for="hideDesc" class="Pointer">... would you like to remove description?</label>
+        <input type="submit" name="hideDesc" id="hideDesc" class="hidden">
+      </form>';
+}
+else{
+  echo '<form method="post" class="float-right paddingR10 paddingT5V">
+    <label for="hideDesc" class="Pointer">... would you like to add description?</label>
+    <input type="submit" name="hideDesc" id="hideDesc" class="hidden">
+  </form>';
+}

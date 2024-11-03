@@ -880,6 +880,10 @@ img {
   padding: 7px 14px !important;
 }
 
+.paddingT5V {
+  padding-top: 5vh;
+}
+
 .right0 {
   right: 0 !important;
 }

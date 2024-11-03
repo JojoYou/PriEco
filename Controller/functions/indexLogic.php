@@ -381,6 +381,16 @@ if (!isset($_GET['album'])) {
     }
 }
 
+//Landing page
+if(isset($_POST['hideDesc'])){
+  if(isset($_COOKIE['hideDesc'])){
+    setcookie('hideDesc', null, -1, '/',null,true,true);
+  }
+  else{
+    setcookie('hideDesc', 'true', time() + 31536000, '/',null,true,true);
+  }
+  $reload = true;
+}
 //Reload
 if ($reload) {
   $reload = false;
