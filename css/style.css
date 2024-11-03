@@ -1290,9 +1290,7 @@ h4 {
     margin-bottom: 20px;
 }
 
-.resTopImgs p,
-#redExp,
-#redMin {
+.resTopImgs p{
     color: #5b5b5b;
 }
 

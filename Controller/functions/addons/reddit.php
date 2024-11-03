@@ -39,7 +39,7 @@ function search_reddit($results)
         }
         $conversations .= '>
         <p class="OutTitle">' . $res['title'] . '</p></a>
-            <section>r/' . $res['sub'] . ' ⋮ ' . $res['nCom'] . ' 💬 ⋮ ' . $res['ups'] . ' 🔼 ⋮ ' . $res['upR'] * 100 . '% 👍 ⋮ Author: <p class="inline"><b>' . $res['author'] . '</b></p></section>                
+            <section>r/' . $res['sub'] . ' ⋮ ' . $res['nCom'] . ' 💬 ⋮ ' . $res['ups'] . ' 🔼 ⋮ ' . $res['upR'] * 100 . '% 👍 ⋮ Author: <p class="inline"><b>' . $res['author'] . '</b></p></section>
             </div>';
         ++$i;
     }
@@ -48,12 +48,12 @@ function search_reddit($results)
         $conversations .= '
         <label id="redExp" for="redOpener" class="flex Pointer width100P">
         <span></span>
-        <p class="block width50P centerTxt">Expand Images<img class="filterImage width16 ml-10 height15 opacity5" src="View/icon/dropdown.svg"></p>
+        <p class="block centerTxt">Expand Reddit<img class="filterImage width16 ml-10 height15 opacity5" src="View/icon/dropdown.svg"></p>
         <span></span></label>
 
         <label id="redMin" for="redOpener" class="flex Pointer width100P">
         <span></span>
-        <p class="block width50P centerTxt">Minimize Images<img class="filterImage width16 ml-10 height15 opacity5 rotate180" src="View/icon/dropdown.svg"></p>
+        <p class="block centerTxt">Minimize Reddit<img class="filterImage width16 ml-10 height15 opacity5 rotate180" src="View/icon/dropdown.svg"></p>
         <span></span></label>
         ';
     }

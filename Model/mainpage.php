@@ -264,14 +264,22 @@ if(!isset($_COOKIE['hideDesc'])){
         </div>
       </div>
 
-      <form method="post">
-        <label for="hideDesc" class="Pointer float-right paddingR20">... would you like to remove description?</label>
+
+      <form method="post" class="redditCon">
+        <label id="redExp" for="hideDesc" class="flex Pointer width100P">
+        <span></span>
+        <p class="block centerTxt">Hide Information<img class="filterImage width16 ml-10 height15 opacity5 rotate180" src="View/icon/dropdown.svg"></p>
+        <span></span></label>
+
         <input type="submit" name="hideDesc" id="hideDesc" class="hidden">
       </form>';
 }
 else{
-  echo '<form method="post">
-    <label for="hideDesc" class="Pointer float-right paddingR20 paddingT5V">... would you like to add description?</label>
+  echo '<form method="post" class="redditCon paddingT5V">
+    <label id="redMin" for="hideDesc" class="flex Pointer width100P">
+    <span></span>
+    <p class="block centerTxt">Show Information<img class="filterImage width16 ml-10 height15 opacity5" src="View/icon/dropdown.svg"></p>
+    <span></span></label>
     <input type="submit" name="hideDesc" id="hideDesc" class="hidden">
   </form>';
 }
