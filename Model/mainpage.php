@@ -264,14 +264,14 @@ if(!isset($_COOKIE['hideDesc'])){
         </div>
       </div>
 
-      <form method="post" class="float-right paddingR10">
-        <label for="hideDesc" class="Pointer">... would you like to remove description?</label>
+      <form method="post">
+        <label for="hideDesc" class="Pointer float-right paddingR20">... would you like to remove description?</label>
         <input type="submit" name="hideDesc" id="hideDesc" class="hidden">
       </form>';
 }
 else{
-  echo '<form method="post" class="float-right paddingR10 paddingT5V">
-    <label for="hideDesc" class="Pointer">... would you like to add description?</label>
+  echo '<form method="post">
+    <label for="hideDesc" class="Pointer float-right paddingR20 paddingT5V">... would you like to add description?</label>
     <input type="submit" name="hideDesc" id="hideDesc" class="hidden">
   </form>';
 }
