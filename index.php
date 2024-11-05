@@ -1,10 +1,18 @@
 <?php
 @ob_end_clean();
 
-ini_set("session.cookie_httponly", 1);
-ini_set("session.cookie_domain", ".jojoyou.org");
-session_set_cookie_params(0, "/", "", 1, true);
+ini_set('session.cookie_httponly', 1);
+ini_set('session.cookie_domain', '.prieco.net');
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path' => '/',
+    'domain' => '.prieco.net',
+    'secure' => true,
+    'httponly' => true,
+    'samesite' => 'Strict'
+]);
 session_start();
+
 include "Controller/simple_html_dom.php";
 
 $gTime = microtime(true);
@@ -159,55 +167,23 @@ if (
         $geo = json_decode(curl_exec($ch), true);
         if (!isset($_COOKIE["Location"])) {
             if ($geo[0]["code"] != "") {
-                setcookie(
-                    "Location",
-                    $geo[0]["code"] . "_3",
-                    time() + 604800,
-                    "/",
-                    null,
-                    true,
-                    true
-                );
+                setcookie("Location",$geo[0]["code"] . "_3", ['expires' => time() + 604800,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
             } else {
-                setcookie(
-                    "Location",
-                    "all",
-                    time() + 604800,
-                    "/",
-                    null,
-                    true,
-                    true
-                );
+                setcookie("Location","all", ['expires' => time() + 604800,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
             }
         }
         if (!isset($_COOKIE["Language"])) {
             if ($geo[0]["lang"] != "") {
-                setcookie(
-                    "Language",
-                    $geo[0]["lang"] . "_3",
-                    time() + 604800,
-                    "/",
-                    null,
-                    true,
-                    true
-                );
+                setcookie("Language",$geo[0]["lang"] . "_3",['expires' => time() + 604800,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
             } else {
-                setcookie(
-                    "Language",
-                    "all",
-                    time() + 604800,
-                    "/",
-                    null,
-                    true,
-                    true
-                );
+                setcookie("Language","all",['expires' => time() + 604800,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
             }
         }
 
         $reload = true;
     } else {
-        setcookie("Language", "all", time() + 604800, "/", null, true, true);
-        setcookie("Location", "all", time() + 604800, "/", null, true, true);
+        setcookie("Language", "all", ['expires' => time() + 604800,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
+        setcookie("Location", "all", ['expires' => time() + 604800,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
         $reload = true;
     }
 }
@@ -217,17 +193,9 @@ if (strpos($lang, "_") !== false) {
     $langNum = $lang[1] - 1;
     $lang = $lang[0];
     if ($langNum == 0) {
-        setcookie("Language", $lang, time() + 604800, "/", null, true, true);
+        setcookie("Language", $lang, ['expires' => time() + 604800,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
     } else {
-        setcookie(
-            "Language",
-            $lang . "_" . $langNum,
-            time() + 604800,
-            "/",
-            null,
-            true,
-            true
-        );
+        setcookie("Language",$lang . "_" . $langNum, ['expires' => time() + 604800,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
     }
     $msgLang = true;
 }
@@ -236,17 +204,9 @@ if (strpos($loc, "_") !== false) {
     $locNum = $loc[1] - 1;
     $loc = $loc[0];
     if ($locNum == 0) {
-        setcookie("Location", $loc, time() + 604800, "/", null, true, true);
+        setcookie("Location", $loc, ['expires' => time() + 604800,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
     } else {
-        setcookie(
-            "Location",
-            $loc . "_" . $locNum,
-            time() + 604800,
-            "/",
-            null,
-            true,
-            true
-        );
+        setcookie("Location",$loc . "_" . $locNum, ['expires' => time() + 604800,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
     }
 
     $msgLoc = true;
@@ -280,7 +240,7 @@ if (
     !isset($_COOKIE["temp"]) &&
     in_array($_COOKIE["Location"], $fahrenheitCountries)
 ) {
-    setcookie("temp", "f", time() + 604800, "/", null, true, true);
+    setcookie("temp", "f", ['expires' => time() + 604800,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
 }
 
 if (isset($_COOKIE["safe"])) {

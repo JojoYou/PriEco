@@ -4,14 +4,14 @@ if(isset($_COOKIE['searchNum'])){
     $num = $_COOKIE['searchNum']+1;
 }
 
-setcookie('searchNum', $num, time() + 4, '/',null,true,true);
+setcookie('searchNum', $num, ['expires' => time() + 4,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
 
 if($num >= 50){
 
-    setcookie('searchNum', $num, time() + 21600, '/',null,true,true);
+    setcookie('searchNum', $num, ['expires' => time() + 21600,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
 
-    if(isset($_POST['stop'])){ 
-        setcookie('searchNum', 47, time() + 3600, '/',null,true,true);
+    if(isset($_POST['stop'])){
+        setcookie('searchNum', 47, ['expires' => time() + 3600,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
         header("Refresh:0");
         exit();
     }
@@ -27,30 +27,30 @@ if($num >= 50){
     }
 }
 elseif($num >= 25){
-    setcookie('searchNum', $num, time() + 3600, '/',null,true,true);
+    setcookie('searchNum', $num, ['expires' => time() + 3600,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
 
-if(isset($_POST['submit'])){ 
-        if(!empty($_POST['h-captcha-response'])){ 
-            $verifyURL = 'https://hcaptcha.com/siteverify'; 
-            $token = $_POST['h-captcha-response']; 
-            $data = array( 
-                'secret' => $_ENV['hCaptcha_Secret'], 
-                'response' => $token, 
-                'remoteip' => $_SERVER['REMOTE_ADDR'] 
-            ); 
-            $curlConfig = array( 
-                CURLOPT_URL => $verifyURL, 
-                CURLOPT_POST => true, 
-                CURLOPT_RETURNTRANSFER => true, 
-                CURLOPT_POSTFIELDS => $data 
-            ); 
-            $ch = curl_init(); 
-            curl_setopt_array($ch, $curlConfig); 
-            $response = curl_exec($ch); 
-            curl_close($ch); 
-            $responseData = json_decode($response); 
-            if($responseData->success){ 
-                setcookie('searchNum', $num, time() - 1, '/',null,true,true);
+if(isset($_POST['submit'])){
+        if(!empty($_POST['h-captcha-response'])){
+            $verifyURL = 'https://hcaptcha.com/siteverify';
+            $token = $_POST['h-captcha-response'];
+            $data = array(
+                'secret' => $_ENV['hCaptcha_Secret'],
+                'response' => $token,
+                'remoteip' => $_SERVER['REMOTE_ADDR']
+            );
+            $curlConfig = array(
+                CURLOPT_URL => $verifyURL,
+                CURLOPT_POST => true,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POSTFIELDS => $data
+            );
+            $ch = curl_init();
+            curl_setopt_array($ch, $curlConfig);
+            $response = curl_exec($ch);
+            curl_close($ch);
+            $responseData = json_decode($response);
+            if($responseData->success){
+                setcookie('searchNum', $num, ['expires' => time() - 3600,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
                 header('refresh:0');
             }
 } }
@@ -59,15 +59,15 @@ if(isset($_POST['submit'])){
     text-align: center;
     padding-top: 20vh;">
         <h1 style="filter: drop-shadow(0 0 10px red);">Shield 🛡️</h1>
-        <p><b><h3 style="display:inline;">You have been blocked! </h3></b>We are sorry but we had to block you from searching. 
+        <p><b><h3 style="display:inline;">You have been blocked! </h3></b>We are sorry but we had to block you from searching.
         You have been searching really fast and we had to block you to protect PriEco.
         <br><b>If you aren`t bot or attacker please fill this CAPTCHA.</b></p>
 
         <form action="" method="post">
             <div class="h-captcha" data-sitekey="',$_ENV['hCaptcha_Site'],'"></div>
             ';
-        if(isset($_POST['submit'])){ 
-            if(empty($_POST['h-captcha-response'])){ 
+        if(isset($_POST['submit'])){
+            if(empty($_POST['h-captcha-response'])){
                 echo '<p style="color:red;margin:0;">Fill up hCaptcha!</p>';
             }
         }
@@ -79,9 +79,9 @@ if(isset($_POST['submit'])){
             cursor: pointer;
             padding: 5px;">
         </form>
-        
+
     </div>
-    
+
     <script src="https://hcaptcha.com/1/api.js" async defer></script>
     ';
     die();
