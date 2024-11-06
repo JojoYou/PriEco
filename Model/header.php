@@ -18,9 +18,15 @@
   <meta name="msvalidate.01" content="F8A35372CFCA71418F60B9D549FFD676" />
 
   <link rel="icon" href="./favicon.ico?1">
-  <link rel="search" type="application/opensearchdescription+xml" title="PriEco" href="osd.xml">
-  <link rel="search" type="application/opensearchdescription+xml" title="PriEco (.onion)" href="http://priecovk7jsuh3tvkh62c6j4oep3l5bldigpzmay26rdpqz357t5dmad.onion/onion-osd.xml">
-
+  <?php
+    $currentDomain = $_SERVER['HTTP_HOST'];
+      if ($currentDomain === 'prieco.net') {
+        echo '<link rel="search" type="application/opensearchdescription+xml" title="PriEco" href="osd.xml">';
+      }
+      else{
+        echo '<link rel="search" type="application/opensearchdescription+xml" title="PriEco (.onion)" href= "http://priecovk7jsuh3tvkh62c6j4oep3l5bldigpzmay26rdpqz357t5dmad.onion/onion-osd.xml">';
+      }
+    ?>
   <link rel="manifest" crossorigin="anonymous" href="manifest.json">
 </head>
 
