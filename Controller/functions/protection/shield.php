@@ -89,9 +89,10 @@ function shield($pdo, $purl, $cssver)
         preg_match('/Version\/([0-9\.]+)/', $userAgent, $versionMatch);
         $version = isset($versionMatch[1]) ? $versionMatch[1] : '';
     }
-    if(($browser == 'Safari' && $version < 16) || ($browser != '' && $version < 125)){
-      $pass = false;
+    if (($browser == 'Safari' && $version < 16) || ($browser != '' && $version < 125 && !($browser == 'Firefox' && $version == 115))) {
+        $pass = false;
     }
+
 
     #No encoding
     if (!isset($_SERVER['HTTP_ACCEPT_ENCODING']) || empty($_SERVER['HTTP_ACCEPT_ENCODING'])) {
