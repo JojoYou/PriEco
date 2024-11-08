@@ -2,7 +2,7 @@
 <!-- -->
 <!--  SPDX-License-Identifier: AGPL-3.0-or-later -->
 <?php
-$jsVersion = 13;
+$jsVersion = 14;
 if (!isset($_COOKIE['DisWid'])) {
   echo '<script src="View/js/summary.js?v='.$jsVersion.'"></script>
   <script src="View/js/notify.js?v='.$jsVersion.'"></script>';

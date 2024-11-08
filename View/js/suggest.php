@@ -1,4 +1,12 @@
-    function debounce(func, wait) {
+console.log("██████  ██████  ██ ███████  ██████  ██████");
+console.log("██   ██ ██   ██ ██ ██      ██      ██    ██");
+console.log("██████  ██████  ██ █████   ██      ██    ██");
+console.log("██      ██   ██ ██ ██      ██      ██    ██");
+console.log("██      ██   ██ ██ ███████  ██████  ██████");
+console.log("Nice to see you here! 👋");
+console.log("What are we working on?");
+
+function debounce(func, wait) {
   let timeout;
   return function() {
     const context = this;
@@ -10,7 +18,7 @@
   };
 }
 
-    <?php 
+    <?php
     header('Content-Type: application/javascript');
     $loc = 'all';
     if(isset($_COOKIE['Location']) && $_COOKIE['Location'] != 'all'){
@@ -22,7 +30,7 @@
     else{
       echo 'const sugUrl ="Controller/functions/addons/sug.php/?t=p&c='.$loc.'&q=";';
     }
-    ?> 
+    ?>
   // Getting all required elements
 const searchWrapper = document.querySelector(".searchForm");
 const inputBox = searchWrapper.querySelector(".searchBox");
@@ -52,18 +60,18 @@ async function fetchSuggestions(userData) {
       data.forEach((item) => {
         if (item.ad) {
           if(typeof item.ad === "object"){
-          Object.values(item.ad).forEach((ad) => {  
+          Object.values(item.ad).forEach((ad) => {
             if(typeof ad === "object"){
             if(z == 1){
               adDown = `<a href="${ad.rurl}" class="clearLink"><li class="suggestion"><img loading="lazy" class="nofilterImage sugImg" src="/Controller/functions/proxy.php?q=${ad.iurl}"><img class="none" loading="lazy" src="/Controller/functions/proxy.php?q=${ad.impurl}">${ad.brand}<img loading="lazy" class="ml-20" src="/View/icon/arrow-trend-up.svg"><img loading="lazy" class="ml-10" src="/View/icon/ad1.svg"></li></a>`;
             }
             else if(z == 0){
             emptyArray.push(
-              `<a href="${ad.rurl}" class="clearLink"><li class="suggestion"><img loading="lazy" class="nofilterImage sugImg" src="/Controller/functions/proxy.php?q=${ad.iurl}"><img class="none" loading="lazy" src="/Controller/functions/proxy.php?q=${ad.impurl}">${ad.brand}<img loading="lazy" class="ml-20" src="/View/icon/arrow-trend-up.svg"><img loading="lazy" class="ml-10" src="/View/icon/ad1.svg"></li></a>`   
+              `<a href="${ad.rurl}" class="clearLink"><li class="suggestion"><img loading="lazy" class="nofilterImage sugImg" src="/Controller/functions/proxy.php?q=${ad.iurl}"><img class="none" loading="lazy" src="/Controller/functions/proxy.php?q=${ad.impurl}">${ad.brand}<img loading="lazy" class="ml-20" src="/View/icon/arrow-trend-up.svg"><img loading="lazy" class="ml-10" src="/View/icon/ad1.svg"></li></a>`
             );
           }
-          z++; 
-        }          
+          z++;
+        }
         else{
           if(w==4){
             if(z == 1){
@@ -71,16 +79,16 @@ async function fetchSuggestions(userData) {
             }
             else if(z == 0){
             emptyArray.push(
-              `<a href="${ar[2]}" class="clearLink"><li class="suggestion"><img loading="lazy" class="nofilterImage sugImg" src="/Controller/functions/proxy.php?q=${ar[3]}"><img class="none" loading="lazy" src="/Controller/functions/proxy.php?q=${ar[4]}">${ar[0]}<img loading="lazy" class="ml-20" src="/View/icon/arrow-trend-up.svg"><img loading="lazy" class="ml-10" src="/View/icon/ad1.svg"></li></a>`   
+              `<a href="${ar[2]}" class="clearLink"><li class="suggestion"><img loading="lazy" class="nofilterImage sugImg" src="/Controller/functions/proxy.php?q=${ar[3]}"><img class="none" loading="lazy" src="/Controller/functions/proxy.php?q=${ar[4]}">${ar[0]}<img loading="lazy" class="ml-20" src="/View/icon/arrow-trend-up.svg"><img loading="lazy" class="ml-10" src="/View/icon/ad1.svg"></li></a>`
             );
           }
-          z++; 
+          z++;
             w=0;
             ar.length = 0;
           }
          ar.push(ad);
          w++;
-        } 
+        }
           });
         }
       }
@@ -96,7 +104,7 @@ async function fetchSuggestions(userData) {
                 sug = sug + `<img loading="lazy" src="/View/icon/search.webp">`;
               }
               sug = sug + `<p>${element.name}</p></li>`;
-      
+
               emptyArray.push(sug);
             });';
           }
@@ -113,7 +121,7 @@ async function fetchSuggestions(userData) {
         adDown
       );
     }';
-  
+
 ?>
   // Show the suggestions
   showSuggestions(emptyArray);
@@ -127,7 +135,7 @@ function showSuggestions(list) {
     listData = `<li class="suggestion"><img loading="lazy" src="/View/icon/search.webp">${userValue}</li>`;
   } else {
     listData = list.join("");
-    
+
   }
   suggBox.innerHTML = listData;
 
@@ -138,7 +146,7 @@ function showSuggestions(list) {
         const form = document.getElementById("searchForm");
         form.submit();
     });
-  }); 
+  });
   inputBox.classList.add("hasSuggestions");
   inputBtn.classList.add("hasSuggestions");
 }
