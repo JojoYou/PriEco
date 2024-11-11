@@ -5,7 +5,7 @@ if (isset($_POST['shortcutSubmit'])) {
   if (strpos($shURL, "http://") !== 0 && strpos($shURL, "https://") !== 0 && strpos($shURL, "file://") !== 0) {
     $shURL = 'https://' . $shURL;
   }
-  setcookie('shortcuts', $_COOKIE['shortcuts'] . ',' . $_POST['shortcutName'] . '=' . $shURL, ['expires' => time() + 31536000,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
+  setcookie('shortcuts', $_COOKIE['shortcuts'] . ',' . $_POST['shortcutName'] . '=' . $shURL, ['expires' => time() + 31536000,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Lax']);
   $reload = true;
 }
 if (isset($_POST['shortcutDelete'])) {
@@ -19,7 +19,7 @@ if (isset($_POST['shortcutDelete'])) {
     ++$i;
   }
   $pasteCookie = substr($pasteCookie, 0, -1);
-  setcookie('shortcuts', $pasteCookie, ['expires' => time() + 31536000,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
+  setcookie('shortcuts', $pasteCookie, ['expires' => time() + 31536000,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Lax']);
   $reload = true;
 }
 if (isset($_POST['shortcutEdit'])) {
@@ -42,7 +42,7 @@ if (isset($_POST['shortcutEdit'])) {
   }
   $pasteCookie = substr($pasteCookie, 0, -1);
 
-  setcookie('shortcuts', $pasteCookie, ['expires' => time() + 31536000,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
+  setcookie('shortcuts', $pasteCookie, ['expires' => time() + 31536000,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Lax']);
   $reload = true;
 }
 //Quick Settings Buttons
@@ -79,15 +79,15 @@ if (isset($_POST['mapBut'])) {
 //Save Settings
 
 if (isset($_POST['systemTheme'])) {
-  setcookie('mode', '', ['expires' => time() - 3600,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
+  setcookie('mode', '', ['expires' => time() - 3600,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Lax']);
   $reload = true;
 }
 if (isset($_POST['light'])) {
-  setcookie('mode', '1', ['expires' => time() + 31536000,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
+  setcookie('mode', '1', ['expires' => time() + 31536000,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Lax']);
   $reload = true;
 }
 if (isset($_POST['dark'])) {
-  setcookie('mode', '2', ['expires' => time() + 31536000,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
+  setcookie('mode', '2', ['expires' => time() + 31536000,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Lax']);
   $reload = true;
 }
 
@@ -160,16 +160,16 @@ if (isset($_POST['datasave'])) {
 }
 if (isset($_POST['sugPSave'])) {
   if ($_POST['sugPDropdown'] == 'd') {
-    setcookie('sugProvider', '', ['expires' => time() - 3600,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
+    setcookie('sugProvider', '', ['expires' => time() - 3600,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Lax']);
   } else {
-    setcookie('sugProvider', $_POST['sugPDropdown'], ['expires' => time() + 31536000,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
+    setcookie('sugProvider', $_POST['sugPDropdown'], ['expires' => time() + 31536000,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Lax']);
   }
   $reload = true;
 }
 
 if (isset($_POST['lyrPSave'])) {
   if ($_POST['lyrPDropdown'] == 'sp') {
-    setcookie('sugProvider', '', ['expires' => time() - 3600,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
+    setcookie('lyrProvider', '', ['expires' => time() - 3600,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
   } else {
     setcookie('lyrProvider', $_POST['lyrPDropdown'], ['expires' => time() + 31536000,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
   }
@@ -372,10 +372,10 @@ if (!isset($_GET['album'])) {
 //Landing page
 if(isset($_POST['hideDesc'])){
   if(isset($_COOKIE['hideDesc'])){
-    setcookie('hideDesc', '', ['expires' => time() - 3600,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
+    setcookie('hideDesc', '', ['expires' => time() - 3600,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Lax']);
   }
   else{
-    setcookie('hideDesc', 'true', ['expires' => time() + 31536000,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Strict']);
+    setcookie('hideDesc', 'true', ['expires' => time() + 31536000,'path' => '/','domain' => null,'secure' => true,'httponly' => true,'samesite' => 'Lax']);
   }
   $reload = true;
 }
