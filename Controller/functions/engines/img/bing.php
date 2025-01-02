@@ -1,7 +1,7 @@
 <?php
 if (!$dev) {
     function imgCall($Bpurl,$page,$imgsize,$imgcolor,$imgtype,$imgtime,$imgright) {
-      $united_url_part= $page * 82 ."&uiv=1&locale=en_US&size=" .$imgsize . "&color=" .   $imgcolor . "&imagetype=" . $imgtype . "&freshness=" . $imgtime . "&license=" . $imgright . "&q=";
+      $united_url_part= '&'.$page * 82 ."&uiv=1&locale=en_US&size=" .$imgsize . "&color=" .   $imgcolor . "&imagetype=" . $imgtype . "&freshness=" . $imgtime . "&license=" . $imgright . "&q=";
         $Qimg[0] = '{"status":"error","data":{"error_code":24}}';
 
         $apis = [];
@@ -12,9 +12,9 @@ if (!$dev) {
             $apis[] = 'https://obunic.net/tests/prieco/?s=b&img=true&api='. $_ENV['Index2'] .'&page='. $united_url_part . $Bpurl;
         }
         if(!file_exists('disBing3.txt')){
-          $apis[] = 'https://prieco.jojoyou.org/?s=b&img=true&api=' . $_ENV['Index2'] . '&q=' . $Bpurl;
+          $apis[] = 'https://prieco.jojoyou.org/?s=b&img=true&api=' . $_ENV['Index2'] . $united_url_part . $Bpurl;
         }
-        if(!file_exists('disKarma.txt')){
+        if(!file_exists('disKarma.txt') && !isset($_GET['imgsize'])){
           $apis[] = 'https://api.karmasearch.org/search/images?adultFilter=moderate&market=en-US&userLanguage=en&country=US&pageNumber=1&searchTerm=' . $Bpurl;
         }
 
