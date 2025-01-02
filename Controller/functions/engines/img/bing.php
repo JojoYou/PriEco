@@ -53,7 +53,7 @@ if (!$dev) {
         return $Qimg;
     }
 
-   /* if(isset($_SESSION[$Bpurl.$page.$imgsize.$imgcolor.$imgtype.$imgtime.$imgright.":-:imgBing"])){
+    if(isset($_SESSION[$Bpurl.$page.$imgsize.$imgcolor.$imgtype.$imgtime.$imgright.":-:imgBing"])){
       include "Model/imgset.php";
       $Qimg=$_SESSION[$Bpurl.$page.$imgsize.$imgcolor.$imgtype.$imgtime.$imgright.":-:imgBing"];
       $Qimg = json_decode($Qimg, true);
@@ -64,7 +64,7 @@ if (!$dev) {
       $Qimg = json_decode($Qimg, true);
       print_karma($Qimg);
     }
-    else {*/
+    else {
       $Qimg=imgCall($Bpurl,$page,$imgsize,$imgcolor,$imgtype,$imgtime,$imgright);
       if(strpos(($Qimg[1]), "karmasearch.org") !== false){
         $_SESSION[ $Bpurl . $page . $imgsize . $imgcolor . $imgtype . $imgtime . $imgright . ":-:imgKarma" ] = $Qimg[0];
@@ -76,7 +76,7 @@ if (!$dev) {
         $_SESSION[ $Bpurl . $page . $imgsize . $imgcolor . $imgtype . $imgtime . $imgright . ":-:imgBing" ] = $Qimg[0];
         $Qimg = json_decode($Qimg[0], true);
         print_bing($Qimg);
-        // }
+	}
     }
   }
   else {
