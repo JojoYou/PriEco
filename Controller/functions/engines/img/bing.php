@@ -12,7 +12,7 @@ if (!$dev) {
             $apis[] = 'https://obunic.net/tests/prieco/?s=b&img=true&api='. $_ENV['Index2'] .'&page='. $united_url_part . $Bpurl;
         }
         if(!file_exists('disBing3.txt')){
-          $apis[] = 'http://77.237.247.206:8010/?s=b&img=true&api=' . $_ENV['Index2'] .'&page='. $united_url_part . $Bpurl;
+          $apis[] = 'https://prieco.jojoyou.org/?s=b&img=true&api=' . $_ENV['Index2'] . '&q=' . $Bpurl;
         }
         if(!file_exists('disKarma.txt')){
           $apis[] = 'https://api.karmasearch.org/search/images?adultFilter=moderate&market=en-US&userLanguage=en&country=US&pageNumber=1&searchTerm=' . $Bpurl;
@@ -26,7 +26,7 @@ if (!$dev) {
         $qCh = curl_init($imgUrl);
 
         curl_setopt($qCh, CURLOPT_RETURNTRANSFER, true);
-        if(strpos($imgUrl,'karmasearch.org') === false){
+        if(strpos($imgUrl,'karmasearch.org') === false && strpos($imgUrl,'prieco.jojoyou.org') === false){
           curl_setopt($qCh, CURLOPT_HTTPHEADER, [
                       "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/png,image/svg+xml,*/*;q=0.8",
                       "Accept-Language: en-US,en;q=0.5",
@@ -53,7 +53,7 @@ if (!$dev) {
         return $Qimg;
     }
 
-    if(isset($_SESSION[$Bpurl.$page.$imgsize.$imgcolor.$imgtype.$imgtime.$imgright.":-:imgBing"])){
+   /* if(isset($_SESSION[$Bpurl.$page.$imgsize.$imgcolor.$imgtype.$imgtime.$imgright.":-:imgBing"])){
       include "Model/imgset.php";
       $Qimg=$_SESSION[$Bpurl.$page.$imgsize.$imgcolor.$imgtype.$imgtime.$imgright.":-:imgBing"];
       $Qimg = json_decode($Qimg, true);
@@ -64,7 +64,7 @@ if (!$dev) {
       $Qimg = json_decode($Qimg, true);
       print_karma($Qimg);
     }
-    else {
+    else {*/
       $Qimg=imgCall($Bpurl,$page,$imgsize,$imgcolor,$imgtype,$imgtime,$imgright);
       if(strpos(($Qimg[1]), "karmasearch.org") !== false){
         $_SESSION[ $Bpurl . $page . $imgsize . $imgcolor . $imgtype . $imgtime . $imgright . ":-:imgKarma" ] = $Qimg[0];
@@ -76,7 +76,7 @@ if (!$dev) {
         $_SESSION[ $Bpurl . $page . $imgsize . $imgcolor . $imgtype . $imgtime . $imgright . ":-:imgBing" ] = $Qimg[0];
         $Qimg = json_decode($Qimg[0], true);
         print_bing($Qimg);
-      }
+        // }
     }
   }
   else {
