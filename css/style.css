@@ -1487,6 +1487,7 @@ h4 {
     flex-wrap: wrap;
     gap: 20px;
     padding: 40px;
+    padding-top: 10px;
 }
 
 .imgoutdiv {
