@@ -38,12 +38,8 @@ if (
         $ImpProfiles = false;
         $ImpGoogle = true;
         $name = strtolower($purl);
-        if (
-            isset(
-                $_SESSION[$purl . $lang . $loc . $safeS . $_COOKIE["time"]]
-            ) &&
-            !isset($_COOKIE["index"])
-        ) {
+        if ((isset($_SESSION[$purl . $lang . $loc . $safeS . $_COOKIE["time"]]) &&
+        !isset($_COOKIE["index"]))) {
             if (
                 strpos(
                     $_SESSION[$purl . $lang . $loc . $safeS . $_COOKIE["time"]],
@@ -104,11 +100,11 @@ if (
                     "brave +=+ "
                 ) !== false
             ) {
-                $BraveObj = str_replace(
+                $BraveObj = json_decode( str_replace(
                     "brave +=+ ",
                     "",
                     $_SESSION[$purl . $lang . $loc . $safeS . $_COOKIE["time"]]
-                );
+                ));
                 $searchId = 4;
             }
             if (
@@ -251,7 +247,7 @@ if (
                 $words = explode(" ", $purl);
                 foreach ($words as $word) {
                     $ch = curl_init(
-                        "http://127.0.0.1:8000/api/indexing/?q=" .
+                        "http://0.0.0.0:8010/api/web/?q=" .
                             urlencode($word)
                     );
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -259,12 +255,12 @@ if (
                     $indexing_handles[] = $ch;
                 }
             } else {
-                $ch7 = curl_init(
-                    "http://127.0.0.1:8000/api/indexing/?q=" . urlencode($purl)
+                $ch = curl_init(
+                    "http://0.0.0.0:8010/api/web/?q=" . urlencode($purl)
                 );
-                curl_setopt($ch7, CURLOPT_RETURNTRANSFER, true);
-                curl_multi_add_handle($mh, $ch7);
-                $indexing_handles[] = $ch7;
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_multi_add_handle($mh, $ch);
+                $indexing_handles[] = $ch;
             }
             $running = null;
             do {

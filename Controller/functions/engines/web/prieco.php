@@ -19,10 +19,10 @@ function prieco($PriEcoObj, $purl, $loc, $lang)
     $pres = '';
 
     foreach($PriEcoObj as $row){
-          $PriEcoUrl = $row['url'];
-            $row['title'] = utf8_encode($row['title']);
+          $PriEcoUrl = urldecode($row['url']);
+            $row['title'] = urldecode($row['title']);
             $urls[] = $PriEcoUrl . '<-->'.$row['title'];
-            $row['description'] = utf8_encode($row['description']);
+            $row['description'] = urldecode($row['description']);
             $outImg = false;
             if (!in_array($PriEcoUrl, $allRes)) {
                 $allRes[$jP] = $PriEcoUrl;
