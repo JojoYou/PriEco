@@ -104,7 +104,7 @@ if (
                     "brave +=+ ",
                     "",
                     $_SESSION[$purl . $lang . $loc . $safeS . $_COOKIE["time"]]
-                ));
+                ), true);
                 $searchId = 4;
             }
             if (
