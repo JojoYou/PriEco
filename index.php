@@ -119,7 +119,7 @@ include "Controller/functions/indexLogic.php";
 ##
 if (!$dev) {
     include "Controller/functions/protection/cookie.php";
-    include "Controller/functions/protection/shield.php";
+    //include "Controller/functions/protection/shield.php";
 }
 
 //Bangs
