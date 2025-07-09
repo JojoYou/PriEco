@@ -37,7 +37,7 @@ $beforePathFooter = isset($beforePathFooter) ? $beforePathFooter : '';
                 <a class="clearLink" href="http://priecovk7jsuh3tvkh62c6j4oep3l5bldigpzmay26rdpqz357t5dmad.onion/">Tor onion domain</a><br>
             </div>
             <div class="join">
-                <a class="clearLink" href="https://signal.group/#CjQKIF8X7zfpbghe6yFKUXKZppu_wkjELEXEmRtAdUJ2kqLNEhAWBjviRL1Dbw_BFvGSpJnI">Signal Group</a><br>
+                <a class="clearLink" href="https://jojoyou.org/signal">Signal Group</a><br>
                 <a class="clearLink" href="https://discord.gg/gmUgAVkTKx">Discord Server</a><br>
                 <a class="clearLink" href="https://t.me/priecosearch">Join Telegram</a><br>
             </div>
