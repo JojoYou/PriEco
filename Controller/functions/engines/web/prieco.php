@@ -14,7 +14,6 @@ function prieco($PriEcoObj, $purl, $loc, $lang)
     $allRes[0] = '';
     $jP = 0;
     $PriEcoData = array();
-    $likable = array();
     $i = 0;
     $pres = '';
 
@@ -98,107 +97,12 @@ function prieco($PriEcoObj, $purl, $loc, $lang)
                 $pres .= '<p class="resProvider">PriEco</p>';
             }
             ##END Make PriEcoObjs##
-            ##Sort by likeable##
 
-            //Get quality points
-            $likable[$i] = $row['likeable'];
-            ##
-            #Keywords
-            ##
-
-            #Keywords in title
-            $titleKeywords = explode(' ', strtolower($row['title']));
-            $j = 0;
-            foreach ($titleKeywords as &$tit) {
-                if (in_array($tit, $purlKeywords)) {
-                    $likable[$i] += (isset($_COOKIE['rankTitle']) ? $_COOKIE['rankTitle'] : 200);
-                    if ($j == 0) {
-                        $likable[$i] += (isset($_COOKIE['rankTitle']) ? $_COOKIE['rankTitle'] : 200);
-                    }
-                }
-                if ($tit != null) {
-                    ++$j;
-                }
-            }
-            unset($titleKeywords);
-
-            #Keywords in H1
-            $h1Keywords = explode(' ', strtolower($row['H1']));
-            foreach ($h1Keywords as &$tit) {
-                if (in_array($tit, $purlKeywords)) {
-                    $likable[$i] += (isset($_COOKIE['rankSecTitle']) ? $_COOKIE['rankSecTitle'] : 200);
-                }
-            }
-            unset($h1Keywords);
-            #Keywords in description
-            $desKeywords = explode(' ', strtolower($row['description']));
-            foreach ($desKeywords as &$tit) {
-                if (in_array($tit, $purlKeywords)) {
-                    $likable[$i] += (isset($_COOKIE['rankDesc']) ? $_COOKIE['rankDesc'] : 50);
-                }
-            }
-            unset($desKeywords);
-            #Keywords in url
-            foreach ($purlKeywords as &$tit) {
-                if (strpos($row['url'], $tit) !== false) {
-                    $likable[$i] += (isset($_COOKIE['rankURL']) ? $_COOKIE['rankURL'] : 100);
-                }
-            }
-            //url == query
-            $domain = parse_url($PriEcoUrl, PHP_URL_HOST);
-            if (substr_count($domain, '.') > 1) {
-                $tmp = explode('.', $domain);
-                $tmpNum = count($tmp);
-                $domain = $tmp[$tmpNum - 2] . '.' . $tmp[--$tmpNum];
-            }
-            $domainName = explode('.', $domain)[0];
-
-            if (strpos($PriEcoUrl, 'www.') !== false) {
-                $domain = 'www.' . $domain;
-            }
-            $schemeUrl = parse_url($PriEcoUrl)['scheme'];
-            $domain = $schemeUrl . '://' . $domain;
-            if ($PriEcoUrl[strlen($PriEcoUrl) - 1] == '/') {
-                $domain .= '/';
-            }
-            if ($domain == $PriEcoUrl && in_array($domainName, $purlKeywords)) {
-                $likable[$i] += (isset($_COOKIE['rankURL']) ? ($_COOKIE['rankURL'] * 10) : 1000);
-            }
-
-            //home page
-            if (in_array($domainName, $purlKeywords)) {
-            }
-            //Same url country/language
-            if (strpos($PriEcoUrl, '.' . $loc) !== false && $loc != null) {
-                $likable[$i] += (isset($_COOKIE['rankDomain']) ? $_COOKIE['rankDomain'] : 50);
-            }
-            if (strpos($PriEcoUrl, '.' . $lang) !== false && $lang != null) {
-                $likable[$i] += (isset($_COOKIE['rankDomain']) ? $_COOKIE['rankDomain'] : 50);
-            }
-
-            //Same website language
-            if ($lang == $row['lang']) {
-                $likable[$i] += (isset($_COOKIE['rankLang']) ? $_COOKIE['rankLang'] : 100);
-            }
-            //Same website location
-            if ($loc == $row['server']) {
-                $likable[$i] += (isset($_COOKIE['rankLoc']) ? $_COOKIE['rankLoc'] : 100);
-            }
-            #Keywords in masKey
-            foreach ($purlKeywords as &$tit) {
-                if ($tit == $row['masKey']) {
-                    $likable[$i] += (isset($_COOKIE['rankMas']) ? $_COOKIE['rankMas'] : 250);
-                    break;
-                }
-            }
-            $likable[$i] = $likable[$i] + $row['pagerank'] * 1000000;
-            ##END Sort by likeable##
             $pres .= '</div>';
             $PriEcoData[$i] = $pres;
             ++$i;
             $pres = null;
         }
-        array_multisort($likable, SORT_DESC, $PriEcoData);
 
     unset($allRes);
     return [$PriEcoData, $urls];
