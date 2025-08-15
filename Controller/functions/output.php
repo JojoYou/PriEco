@@ -243,25 +243,13 @@ if (
             curl_multi_add_handle($mh, $ch8);
 
             // PriEco Results
-            if (strpos($purl, " ") !== false) {
-                $words = explode(" ", $purl);
-                foreach ($words as $word) {
-                    $ch = curl_init(
-                        "https://jojoyou.org/api/web/?q=" .
-                            urlencode($word)
-                    );
-                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_multi_add_handle($mh, $ch);
-                    $indexing_handles[] = $ch;
-                }
-            } else {
                 $ch = curl_init(
                     "https://jojoyou.org/api/web/?q=" . urlencode($purl)
                 );
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                 curl_multi_add_handle($mh, $ch);
                 $indexing_handles[] = $ch;
-            }
+
             $running = null;
             do {
                 curl_multi_exec($mh, $running);
@@ -285,7 +273,7 @@ if (
             foreach ($indexing_handles as $ch) {
                 $response = json_decode(curl_multi_getcontent($ch), true);
                 if (is_array($response)) {
-                    $PriEcoObj = array_merge($PriEcoObj, $response);
+                    $PriEcoObj = $response;
                 }
                 curl_multi_remove_handle($mh, $ch);
                 curl_close($ch);

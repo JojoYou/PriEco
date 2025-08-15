@@ -39,16 +39,13 @@ function prieco($PriEcoObj, $purl, $loc, $lang)
                 $PriEcoUrl = substr_replace($PriEcoUrl, '', -1);
             }
             ##Make PriEcoObjs##
-            if (strpos($PriEcoUrl, 'https://') !== false) {
-                $doma = get_string_betweens($PriEcoUrl, 'https://', '/');
-            }
             $pres = '<div class="output" id="output">';
-            if ($row['img'] != '' && !isset($_COOKIE['datasave'])) {
+            if ($row['image'] != '' && !isset($_COOKIE['datasave'])) {
                 $outImg = true;
-                $pres .= '<img loading="lazy" alt="‎" src="/Controller/functions/proxy.php?q=' . $row['img'] . '" class="OutSideImg">';
+                $pres .= '<img loading="lazy" alt="‎" src="/Controller/functions/proxy.php?q=' . $row['image'] . '" class="OutSideImg">';
             }
             if (strpos($PriEcoUrl, 'https://') !== false && !isset($_COOKIE['datasave'])) {
-                $pres .= '<img loading="lazy" alt="‎" class="Outfavicon" src="/Controller/functions/proxy.php?q=https://judicial-peach-octopus.b-cdn.net/' . $doma . '">';
+                $pres .= '<img loading="lazy" alt="‎" class="Outfavicon" src="https://jojoyou.org/static/prieco_favicons/' . $row['favicon'] . '">';
             }
             if (!isset($_COOKIE['DisWid'])) {
                 $pres .= '<div class="resOptionsGroup">
