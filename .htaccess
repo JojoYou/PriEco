@@ -9,7 +9,7 @@ allow from all
 </Files>
 
 <IfModule mod_headers.c>
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://unpkg.com https://hcaptcha.com; style-src 'self' https://unpkg.com; img-src 'self' data: https://unpkg.com https://tile.openstreetmap.org; connect-src 'self' https://nominatim.openstreetmap.org; frame-src 'self' https://newassets.hcaptcha.com https://tile.openstreetmap.org; frame-ancestors 'self'; form-action 'self'; object-src 'none'; base-uri 'self'"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://unpkg.com https://hcaptcha.com; style-src 'self' https://unpkg.com; img-src 'self' data: https://jojoyou.org https://unpkg.com https://tile.openstreetmap.org; connect-src 'self' https://nominatim.openstreetmap.org; frame-src 'self' https://newassets.hcaptcha.com https://tile.openstreetmap.org; frame-ancestors 'self'; form-action 'self'; object-src 'none'; base-uri 'self'"
 
   <If "%{REQUEST_URI} =~ m#/proxy/#">
         Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://unpkg.com https://hcaptcha.com 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://nominatim.openstreetmap.org; frame-src 'self' https://newassets.hcaptcha.com https://tile.openstreetmap.org; frame-ancestors 'self'; form-action 'self'; object-src 'none'; base-uri 'self'"
