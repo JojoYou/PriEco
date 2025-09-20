@@ -1,7 +1,13 @@
 [package]
 name = "prieco_rs"
-version = "0.1.0"
+version = "1.0.0"
+authors = ["Roman Láncoš <support@jojoyou.org>"]
 edition = "2024"
+
+license-file = "LICENSE"
+
+repository = "https://codeberg.org/JojoYou/PriEco"
+homepage = "https://prieco.net"
 
 [profile.release]
 #debug = true # Profiling
