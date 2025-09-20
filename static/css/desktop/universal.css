@@ -1,0 +1,77 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: arial, sans-serif;
+}
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+  transition: none;
+  scroll-behavior: smooth;
+}
+img {
+  object-fit: contain;
+}
+a {
+  color: unset;
+  text-decoration: unset;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track-piece {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #7c7c7e;
+  border-radius: 20px;
+}
+.footer {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 50px;
+}
+.footer-content-left a,
+.footer-content-left img {
+  width: 60px;
+  border-radius: 15px;
+}
+.footer-content-left a {
+  display: block;
+  height: 60px;
+}
+.footer-content-left img {
+  padding: 20px;
+  overflow: hidden;
+}
+.footer-content-right {
+  display: flex;
+  margin-right: 50px;
+}
+.footer-content-right div {
+  max-width: 600px;
+  min-width: 400px;
+  height: 250px;
+  padding: 20px;
+  margin: 20px;
+  border-radius: 20px;
+}
+.footer-content-right a {
+  font-size: 18px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+}
+.footer-social {
+  display: flex;
+  margin: 20px 0;
+}
+.footer-social a:first-child {
+  margin-right: 20px;
+}

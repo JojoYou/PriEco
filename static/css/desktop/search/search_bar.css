@@ -1,0 +1,123 @@
+.div_search_bar {
+  width: 100%;
+  height: 99px;
+
+  position: fixed;
+  display: flex;
+  align-items: center;
+
+  padding: 20px 30px 10px 50px;
+
+  backdrop-filter: blur(20px);
+  border-radius: 0 0 20px 20px;
+  box-shadow: 0 1px 3px rgba(23, 23, 23, 0.1);
+
+  z-index: 81;
+}
+
+.logo {
+  height: 65px;
+  margin-left: 20px;
+}
+.div_search_type {
+  margin-left: 45px;
+}
+.search_bar {
+  display: flex;
+}
+
+.search_button {
+  width: 50px;
+  height: 40px;
+
+  position: relative;
+  left: 10px;
+
+  border: none;
+  border-radius: 30px 0 0 30px;
+
+  cursor: pointer;
+}
+
+.search_button::before {
+  width: 100%;
+  height: 100%;
+
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+
+  border-radius: 30px 0 0 30px;
+
+  -webkit-clip-path: inset(-5px 10px -5px -5px);
+  clip-path: inset(-5px 10px -5px -5px);
+}
+
+.search_button::after {
+  height: 50%;
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 25%;
+  border-right: 1.2px solid #25dab9;
+}
+.search_box {
+  height: 40px;
+  width: 552px;
+  max-width: clamp(1px, 675px, 90vw);
+  border-width: 0px;
+  border-style: solid;
+  border-radius: 0 30px 30px 0;
+  font-size: 16px;
+  padding-left: 30px;
+  padding-right: 53px;
+  outline: none;
+}
+.btn_del_query {
+  width: 20px;
+  margin-left: -33px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  margin-right: 15px;
+}
+.btn_del_query img {
+  width: 100%;
+  height: 100%;
+  filter: opacity(0.7);
+}
+
+.type_btns {
+  display: flex;
+  overflow: auto hidden;
+  margin-bottom: 5px;
+  align-items: flex-end;
+}
+.type_btns button {
+  font-weight: normal;
+  background: none;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  margin-left: 15px;
+  display: flex;
+  font-size: 16px;
+  padding-right: 1.5px;
+  padding-left: 1.5px;
+  white-space: nowrap;
+  margin-top: 10px;
+}
+.type_btns img {
+  width: 22px;
+  background: -webkit-linear-gradient(green, #00f);
+  background: -moz-linear-gradient(green, #00f);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  padding-right: 5px;
+}
+.type_active img {
+  filter: invert(56%) sepia(24%) saturate(1094%) hue-rotate(133deg)
+    brightness(97%) contrast(84%) !important;
+}

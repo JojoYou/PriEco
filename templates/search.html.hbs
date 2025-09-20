@@ -1,0 +1,40 @@
+{{> header }}
+
+<link rel="stylesheet" href="{{ css_path }}settings.css?v={{ css_version }}">
+<link rel="stylesheet" href="{{ css_theme }}settings.css?v={{ css_version }}">
+<div id="js_load_settings"></div>
+
+
+{{> search/search_bar }}
+
+<link rel="stylesheet" href="{{ css_path }}search/results.css?v={{ css_version }}">
+<link rel="stylesheet" href="{{ css_theme }}search/results.css?v={{ css_version }}">
+<link rel="stylesheet" href="{{ css_path }}search/images.css?v={{ css_version }}">
+<link rel="stylesheet" href="{{ css_theme }}search/images.css?v={{ css_version }}">
+{{#if all_active}}
+  <div id="js_load_results" class="div_output">
+    {{#each placeholder_number}}
+      <div class="placeholder output">
+        <div></div>
+        <br>
+        <div></div>
+      </div>
+    {{/each}}
+  </div>
+{{/if}}
+
+{{#if img_active}}
+  <div id="js_load_results" class="div_images">
+      {{#each placeholder_number}}
+      <div class="placeholder_img output">
+        <div></div>
+        <br>
+        <div></div>
+      </div>
+    {{/each}}
+  </div>
+{{/if}}
+
+<script src="static/js/del_query.js?v={{ js_version }}"></script>
+
+{{> footer }}

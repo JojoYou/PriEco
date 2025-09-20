@@ -1,0 +1,98 @@
+{{#if all_results}}
+  <div class="div_output">
+    <div class="results">
+      {{#each results}}
+        <div class='output'>
+            <div class="output_text">
+              <div class="output_url">
+                <img loading='lazy' alt="‎" src='{{ favicon }}'>
+                <a href='{{ url }}' rel='noopener noreferrer' {{{ newtab }}} class="link">
+                <b>{{ domain }}</b>
+                <p>{{ display_url }}</p>
+                </a>
+              </div>
+              <a href='{{ url }}' rel='noopener noreferrer' {{{ newtab }}} class="link" data-sxpr-link>
+                <h3>{{ title }}</h3>
+              </a>
+              <p>{{{ description }}}</p>
+            </div>
+
+            {{#if (eq ../css_path "static/css/desktop/")}}
+              {{{ image }}}
+            {{/if}}
+        </div>
+
+        {{!-- Insert the knowledge panel after the first result --}}
+        {{#if @first}}
+          <div class="knowledge_panel" data-sxpr-knowledge-panel>
+            <!-- Knowledge panel will render here -->
+          </div>
+        {{/if}}
+
+        {{!-- Insert Yadore products --}}
+        {{#if (and (eq @index 2) ../yadore)}}
+          <div class="products">
+            <p>👕 Products</p>
+            <img src="static/img/icon/ad.svg">
+          </div>
+          <div class="yadore">
+            {{#each ../yadore}}
+              <div class="yadore_item">
+                <a href="{{ url }}">
+                  <button>
+                    {{{ image }}}
+                  </button>
+                  <div class="yadore_text">
+                    <p class="yadore_title">{{ title }}</p>
+                    <p class="yadore_price">{{ price }}</p>
+                    <div class="yadore_domain">
+                      <img src="proxy?u={{ favicon }}" alt="‎" loading="lazy">
+                      <p>{{ domain }}</p>
+                    </div>
+                  </div>
+                </a>
+              </div>
+            {{/each}}
+          </div>
+        {{/if}}
+      {{/each}}
+    </div>
+  </div>
+
+<script src="/proxy?u=https%3A%2F%2Fcdn.searchexpander.com%2Fjs%2Fsxpr.js"></script>
+<script src="static/js/hbs/searchexpander.js.hbs?q={{ query }}"></script>
+{{/if}}
+
+{{#if img_results}}
+  <div class="div_images">
+    {{#each images}}
+      <div class="div_single_img">
+        <div tabindex="0" class="div_img_thumb">
+          <img src="{{ thumbnail }}" alt="‎" class="thumb" loading="lazy">
+          <a href="{{ site_url }}" rel='noopener noreferrer' {{{ newtab }}} class="img_link">
+            <img src="/proxy?u={{ favicon }}" alt="‎" loading="lazy">
+            <p>{{ site_domain }}</p>
+          </a>
+        </div>
+
+        <div class="div_full_img">
+          <img src="{{ thumbnail }}" data-src="{{ image }}" alt="‎" loading="lazy">
+          <br>
+          <h3>{{ title }}</h3><br>
+          <p>From website: {{ site_domain }}</p>
+          <br>
+          <div class="div_full_img_btn">
+            <a href="{{ site_url }}" rel='noopener noreferrer' {{{ newtab }}}>
+              <button>Go to website</button>
+            </a>
+            <br>
+            <a href="{{ image }}" rel='noopener noreferrer' {{{ newtab }}}>
+              <button>Go to image</button>
+            </a>
+          </div>
+          <button>Close</button>
+          </div>
+      </div>
+    {{/each}}
+  </div>
+{{/if}}

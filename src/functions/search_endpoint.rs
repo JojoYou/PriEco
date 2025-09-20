@@ -1,0 +1,140 @@
+use ahash::AHashSet;
+use rocket::{State, http::CookieJar};
+use serde_json::{Value, json};
+use std::collections::HashMap;
+
+use crate::{
+    functions::{
+        search_api::{all, img, yadore},
+        search_db,
+    },
+    globals::{EmbeddingService, SearchResult},
+    set_cookie,
+};
+
+pub async fn run(
+    t: &str,
+    q: &str,
+    lang: &str,
+    loc: &str,
+    embedding_service: &State<EmbeddingService>,
+    cookie_jar: &CookieJar<'_>,
+) -> HashMap<String, Value> {
+    if q.contains("!") {
+        return HashMap::new();
+    }
+
+    let mut context: HashMap<String, Value> = HashMap::with_capacity(100);
+
+    match t {
+        "img" => {
+            context.insert(String::from("img_results"), json!(true));
+            context.insert(
+                String::from("images"),
+                json!(&img::run(&q.to_lowercase().replace(" ", "+")).await),
+            );
+        }
+        _ => {
+            all_search(&mut context, q, lang, loc, embedding_service, cookie_jar).await;
+        }
+    }
+
+    context
+}
+
+async fn all_search(
+    context: &mut HashMap<String, Value>,
+    q: &str,
+    lang: &str,
+    loc: &str,
+    embedding_service: &State<EmbeddingService>,
+    cookie_jar: &CookieJar<'_>,
+) {
+    context.insert(String::from("all_results"), json!(true)); // Set btn search type
+
+    let mut results_vec: Vec<SearchResult> = Vec::with_capacity(100);
+
+    let index_confidence = search_db::run(&mut results_vec, q, lang, loc, &embedding_service).await; // Search database: Modify results + return confidence score
+
+    // Use other indexes too + PriEco confidence is too low
+    if !cookie_jar.get("index").is_some() && index_confidence < 0.95 {
+        let mut mixed_results = Vec::with_capacity(100);
+        let mut seen_urls: AHashSet<String> = AHashSet::with_capacity(100);
+
+        let prieco_urls: AHashSet<String> = results_vec
+            .iter()
+            .map(|result| result.url.clone())
+            .collect(); // Extract urls from PriEco index to show them when PriEco + Remote is a duplicated result
+
+        let remote_results: Vec<SearchResult> = loop {
+            if let Some(res) = all::run(&q.to_lowercase().replace(" ", "+"), &lang, "us").await {
+                break res;
+            }
+        };
+
+        let mut db_iter = results_vec.into_iter();
+        let mut remote_iter = remote_results.into_iter();
+
+        // Interleave results: 2 Remote, 1 PriEco, repeat
+        loop {
+            let mut added_any = false;
+            for _ in 0..2 {
+                if let Some(google_result) = remote_iter.next() {
+                    if !prieco_urls.contains(&google_result.url)
+                        && seen_urls.insert(google_result.url.clone())
+                    {
+                        mixed_results.push(google_result);
+                        added_any = true;
+                    }
+                }
+            }
+            if let Some(db_result) = db_iter.next() {
+                if seen_urls.insert(db_result.url.clone()) {
+                    mixed_results.push(db_result);
+                    added_any = true;
+                }
+            }
+            if !added_any {
+                break;
+            }
+        }
+
+        results_vec = mixed_results; // Rewrite results
+    }
+    // Confidence is enought + pure PriEco isn't selected
+    else if !cookie_jar.get("index").is_some() {
+        set_cookie(
+            cookie_jar,
+            String::from("prieco_searches"),
+            (cookie_jar
+                .get("prieco_searches")
+                .and_then(|c| c.value().parse::<u64>().ok())
+                .unwrap_or(0)
+                + 1)
+            .to_string(),
+            true,
+            false,
+        );
+    }
+
+    // Web search was made
+    if !cookie_jar.get("index").is_some() {
+        set_cookie(
+            cookie_jar,
+            String::from("all_searches"),
+            (cookie_jar
+                .get("all_searches")
+                .and_then(|c| c.value().parse::<u64>().ok())
+                .unwrap_or(0)
+                + 1)
+            .to_string(),
+            true,
+            false,
+        );
+    }
+
+    context.insert(String::from("results"), json!(&results_vec));
+
+    // Yadore Ads
+    context.insert(String::from("yadore"), json!(&yadore::run(q, loc).await));
+}

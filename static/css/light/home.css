@@ -1,0 +1,8 @@
+.bg_search_bar {
+  background: radial-gradient(circle, #d5f2ee 0%, transparent 70%);
+}
+.search_button,
+.search_box {
+  background: #fff;
+  color: #000;
+}

@@ -1,0 +1,2 @@
+@import url("../../light/search/results.css") (prefers-color-scheme: light);
+@import url("../../dark/search/results.css") (prefers-color-scheme: dark);

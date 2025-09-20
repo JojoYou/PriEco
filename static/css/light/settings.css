@@ -1,0 +1,16 @@
+.settings {
+  background-color: #fafbff;
+  color: black;
+}
+.settings-header {
+  background-color: white;
+  color: black;
+  box-shadow: 0 5px 5px #ece9e9;
+}
+.settings-group {
+  background: white;
+}
+.div_theme_radio {
+  background: #f2f4f7;
+  box-shadow: #eaeaf2 0 0 5px 5px inset;
+}

@@ -1,0 +1,130 @@
+.div_images {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 10px;
+  margin-top: 130px;
+}
+.div_single_img {
+  width: 46%;
+  position: relative;
+  flex-grow: 1;
+  border-radius: 5px;
+  text-align: center;
+  transition: all 0s ease-in-out;
+  cursor: pointer;
+}
+.div_single_img p {
+  font-size: 12px;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: 5px;
+}
+.div_img_thumb {
+  cursor: pointer;
+  border: none;
+  background: none;
+  min-width: 100px;
+  height: calc(90% - 45px);
+}
+.div_img_thumb:focus ~ .div_full_img {
+  right: 0;
+}
+.thumb {
+  height: 200px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease-in-out;
+  border-radius: 10px;
+  display: block;
+  width: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+.thumb:hover {
+  box-shadow: 0 0 5px 5px #7773;
+  transform: scale(1.1);
+  z-index: 1;
+}
+.img_link {
+  position: absolute;
+  bottom: 5px;
+  background-color: #00000077;
+  border-radius: 25px;
+  display: flex;
+  padding: 5px;
+  left: 5px;
+  padding-right: 7px;
+  z-index: 2;
+  max-width: 80%;
+  align-items: center;
+}
+.img_link img {
+  width: 20px;
+  height: 20px;
+  margin-right: 9px;
+  float: left;
+  border-radius: 5px;
+}
+.img_link p {
+  color: #fff;
+}
+.div_full_img {
+  transition: all 0.45s ease-in-out;
+  width: 100%;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  z-index: 84;
+  right: -110vw;
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  box-shadow: 0 0 10px 10px #0002;
+}
+
+.div_full_img img {
+  width: 100%;
+  height: auto;
+  max-height: 50vh;
+  border-radius: 20px 20px 0 0;
+}
+
+.div_full_img h3 {
+  padding-right: 5%;
+  display: flex;
+  justify-content: center;
+  font-weight: bold;
+  padding-left: 5%;
+  padding-top: 5%;
+}
+
+.div_full_img p {
+  padding-right: 5%;
+  padding-left: 5%;
+}
+
+.div_full_img_btn {
+  display: flex;
+  justify-content: center;
+}
+.div_full_img_btn a {
+  padding: 10px 0;
+}
+.div_full_img button {
+  padding: 5px;
+  border-radius: 10px;
+  cursor: pointer;
+  height: auto;
+  width: auto;
+  margin: 3px 5px;
+}
+
+.bigimgclose {
+  margin-top: 25px;
+  padding: 10px !important;
+  display: none;
+}

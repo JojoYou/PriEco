@@ -1,0 +1,13 @@
+body {
+  background: #181a1b;
+}
+.footer {
+  color: #fff;
+}
+.footer-content-right div,
+.footer-content-left a {
+  background: #202124;
+}
+.footer-social img {
+  filter: brightness(0) invert(1);
+}

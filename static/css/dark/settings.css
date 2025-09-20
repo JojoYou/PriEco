@@ -1,0 +1,24 @@
+.settings {
+  background-color: #181a1b;
+  color: white;
+}
+.settings-header {
+  background-color: #202124;
+  color: white;
+  box-shadow: 0 0 20px 5px #181a1b;
+}
+.settings-header img {
+  filter: brightness(0) invert(1);
+}
+.settings-group {
+  background: #202124;
+}
+.settings select {
+  color: #fff;
+  background: #202124;
+  border: solid 1px #181a1b;
+}
+.div_theme_radio {
+  background: #181a1b;
+  box-shadow: #202124 0 0 5px 5px inset;
+}

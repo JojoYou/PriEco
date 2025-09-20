@@ -1,0 +1,112 @@
+// Own index
+const checkbox_index = document.getElementById("check_index");
+checkbox_index.checked = document.cookie
+  .split("; ")
+  .some((s) => s === "index=1");
+checkbox_index.addEventListener("change", () => {
+  document.cookie =
+    "index=" +
+    (checkbox_index.checked ? "1; max-age=31536000" : "; max-age=0") +
+    "; path=/; SameSite=Strict; Secure";
+  location.reload();
+});
+
+// Language selection
+document.getElementById("lang_select").addEventListener("change", function () {
+  document.cookie =
+    "lang=" +
+    this.value +
+    "; path=/; SameSite=Strict; Secure; max-age=31536000";
+  location.reload();
+});
+// Location selection
+document.getElementById("loc_select").addEventListener("change", function () {
+  document.cookie =
+    "loc=" + this.value + "; path=/; SameSite=Strict; Secure; max-age=31536000";
+  location.reload();
+});
+
+// Open links in a new tab
+const checkbox_newtab = document.getElementById("check_newtab");
+checkbox_newtab.checked = document.cookie
+  .split("; ")
+  .some((s) => s === "newtab=1");
+const updateLinks = () => {
+  document.querySelectorAll("a.link").forEach((a) => {
+    if (checkbox_newtab.checked) a.setAttribute("target", "_blank");
+    else a.removeAttribute("target");
+  });
+};
+updateLinks();
+checkbox_newtab.addEventListener("change", () => {
+  document.cookie =
+    "newtab=" +
+    (checkbox_newtab.checked ? "1; max-age=31536000" : "; max-age=0") +
+    "; path=/; SameSite=Strict; Secure;";
+  updateLinks();
+});
+
+// Theme
+function setScreenWidthCookie() {
+  const currentWidth = window.innerWidth;
+  const cookieMatch = document.cookie.match(/screen_width=(\d+)/);
+  const storedWidth = cookieMatch ? parseInt(cookieMatch[1], 10) : null;
+
+  // Determine if breakpoint has changed
+  const crossedThreshold =
+    storedWidth === null || // first load
+    (storedWidth < 890 && currentWidth >= 890) ||
+    (storedWidth >= 890 && currentWidth < 890);
+
+  // Only reload if breakpoint changed and not first load
+  if (crossedThreshold || storedWidth == null) {
+    document.cookie =
+      "screen_width=" +
+      currentWidth +
+      "; path=/; SameSite=Strict; Secure; max-age=31536000";
+    location.reload();
+  }
+}
+
+// Initialize
+setScreenWidthCookie();
+
+// Add resize listener with debounce
+window.addEventListener("resize", () => {
+  clearTimeout(window._resizeTimeout);
+  window._resizeTimeout = setTimeout(setScreenWidthCookie, 200);
+});
+
+// Theme
+const r = document.querySelectorAll('input[name="theme"]'),
+  cookie = (n, v) =>
+    v !== undefined
+      ? (document.cookie = `${n}=${v};path=/;SameSite=Strict;Secure;max-age=${30 * 24 * 60 * 60}`)
+      : document.cookie
+          .split("; ")
+          .find((c) => c.startsWith(n + "="))
+          ?.split("=")[1],
+  del = (n) => (document.cookie = `${n}=;path=/;max-age=0`),
+  swapCSS = (t) =>
+    document
+      .querySelectorAll('link[rel="stylesheet"]')
+      .forEach(
+        (l) =>
+          (l.href = l.href.replace(
+            /static\/css\/(light|dark|system)\//,
+            `static/css/${t}/`,
+          )),
+      );
+
+let t = cookie("theme") || "system";
+r.forEach((x) => (x.checked = x.value === t));
+swapCSS(t);
+
+r.forEach((x) =>
+  x.addEventListener("change", (e) => {
+    e.target.value === "system"
+      ? del("theme")
+      : cookie("theme", e.target.value);
+    swapCSS(e.target.value);
+  }),
+);

@@ -1,0 +1,342 @@
+<!-- Settings open btn -->
+<input type="checkbox" id="open-settings" hidden>
+
+<!-- Settings -->
+<section class="settings">
+  <div class="settings-header">
+    <img src="static/img/icon/gear.svg" alt="Settings icon" width="17px">
+    <p>Settings</p>
+      <label for="open-settings">
+        <img src="static/img/icon/cross.svg" alt="close settings" class="btn-close-settings">
+      </label>
+  </div>
+
+  <div class="settings-content">
+    <div class="settings-group">
+      <h3>📊 Stats</h3>
+      <div class="settings-item">
+        <label for="check_index" title="Use pure PriEco index, no external results">🌲 PriEco:</label>
+        <div class="checkbox_cute">
+          <div class="check">
+           <input id="check_index" type="checkbox">
+            <label for="check_index"></label>
+          </div>
+        </div>
+      </div>
+      <br>
+      <div class="settings-item">
+        <input type="range" value="{{ prieco_user_stats }}" min="0" max="100" step="1" style="--fill-percent: {{ prieco_user_stats }}%;" class="user_index_stats" disabled>
+        <div class="user_index_stats_label">{{ prieco_user_stats }} %</div>
+      </div>
+    </div>
+
+
+    <div class="settings-group">
+      <h3>General</h3>
+      <br>
+      <div class="settings-item">
+        <label title="Select your location">🌍 Location:</label>
+        <select class="setSelect" id="loc_select">
+            <option value="af" {{#if (eq selected_loc "all")}}selected{{/if}}>افغانستان 🇦🇫</option>
+            <option value="all" {{#if (eq selected_loc "all")}}selected{{/if}}>All 🌍</option>
+            <option value="za" {{#if (eq selected_loc "za")}}selected{{/if}}>Afrika-Borwa 🇿🇦</option>
+            <option value="al" {{#if (eq selected_loc "al")}}selected{{/if}}>Shqipëria 🇦🇱</option>
+            <option value="dz" {{#if (eq selected_loc "dz")}}selected{{/if}}>الجزائر 🇩🇿</option>
+            <option value="ad" {{#if (eq selected_loc "ad")}}selected{{/if}}>Andorra 🇦🇩</option>
+            <option value="ao" {{#if (eq selected_loc "ao")}}selected{{/if}}>Angola 🇦🇴</option>
+            <option value="ai" {{#if (eq selected_loc "ai")}}selected{{/if}}>Anguilla 🇦🇮</option>
+            <option value="aq" {{#if (eq selected_loc "aq")}}selected{{/if}}>Antarctica 🇦🇶</option>
+            <option value="ag" {{#if (eq selected_loc "ag")}}selected{{/if}}>Antigua Barbuda 🇦🇬</option>
+            <option value="ar" {{#if (eq selected_loc "ar")}}selected{{/if}}>Argentina 🇦🇷</option>
+            <option value="am" {{#if (eq selected_loc "am")}}selected{{/if}}>Հայաստան 🇦🇲</option>
+            <option value="aw" {{#if (eq selected_loc "aw")}}selected{{/if}}>Aruba 🇦🇼</option>
+            <option value="au" {{#if (eq selected_loc "au")}}selected{{/if}}>Australia 🇦🇺</option>
+            <option value="az" {{#if (eq selected_loc "az")}}selected{{/if}}>Azərbaycan 🇦🇿</option>
+            <option value="bs" {{#if (eq selected_loc "bs")}}selected{{/if}}>Bahamas 🇧🇸</option>
+            <option value="bh" {{#if (eq selected_loc "bh")}}selected{{/if}}>البحرين 🇧🇭</option>
+            <option value="bd" {{#if (eq selected_loc "bd")}}selected{{/if}}>বাংলাদেশ 🇧🇩</option>
+            <option value="bb" {{#if (eq selected_loc "bb")}}selected{{/if}}>Barbados 🇧🇧</option>
+            <option value="by" {{#if (eq selected_loc "by")}}selected{{/if}}>Беларусь 🇧🇾</option>
+            <option value="be" {{#if (eq selected_loc "be")}}selected{{/if}}>België 🇧🇪</option>
+            <option value="bz" {{#if (eq selected_loc "bz")}}selected{{/if}}>Belize 🇧🇿</option>
+            <option value="bj" {{#if (eq selected_loc "bj")}}selected{{/if}}>Bénin 🇧🇯</option>
+            <option value="bm" {{#if (eq selected_loc "bm")}}selected{{/if}}>Bermuda 🇧🇲</option>
+            <option value="bt" {{#if (eq selected_loc "bt")}}selected{{/if}}>འབྲུག་ཡུལ 🇧🇹</option>
+            <option value="bo" {{#if (eq selected_loc "bo")}}selected{{/if}}>Bolivia 🇧🇴</option>
+            <option value="ba" {{#if (eq selected_loc "ba")}}selected{{/if}}>Bosna i Hercegovina 🇧🇦</option>
+            <option value="bw" {{#if (eq selected_loc "bw")}}selected{{/if}}>Botswana 🇧🇼</option>
+            <option value="bv" {{#if (eq selected_loc "bv")}}selected{{/if}}>Bouvet Island 🇧🇻</option>
+            <option value="br" {{#if (eq selected_loc "br")}}selected{{/if}}>Brasil 🇧🇷</option>
+            <option value="io" {{#if (eq selected_loc "io")}}selected{{/if}}>British Indian Ocean Territory 🇮🇴</option>
+            <option value="bn" {{#if (eq selected_loc "bn")}}selected{{/if}}>Brunei Darussalam 🇧🇳</option>
+            <option value="bg" {{#if (eq selected_loc "bg")}}selected{{/if}}>България 🇧🇬</option>
+            <option value="bf" {{#if (eq selected_loc "bf")}}selected{{/if}}>Burkina Faso 🇧🇫</option>
+            <option value="bi" {{#if (eq selected_loc "bi")}}selected{{/if}}>Burundi 🇧🇮</option>
+            <option value="kh" {{#if (eq selected_loc "kh")}}selected{{/if}}>កម្ពុជា 🇰🇭</option>
+            <option value="cm" {{#if (eq selected_loc "cm")}}selected{{/if}}>Cameroun 🇨🇲</option>
+            <option value="ca" {{#if (eq selected_loc "ca")}}selected{{/if}}>Canada 🇨🇦</option>
+            <option value="cv" {{#if (eq selected_loc "cv")}}selected{{/if}}>Cabo Verde 🇨🇻</option>
+            <option value="ky" {{#if (eq selected_loc "ky")}}selected{{/if}}>Cayman Islands 🇰🇾</option>
+            <option value="cf" {{#if (eq selected_loc "cf")}}selected{{/if}}>République Centrafricaine 🇨🇫</option>
+            <option value="td" {{#if (eq selected_loc "td")}}selected{{/if}}>تشاد 🇹🇩</option>
+            <option value="cl" {{#if (eq selected_loc "cl")}}selected{{/if}}>Chile 🇨🇱</option>
+            <option value="cn" {{#if (eq selected_loc "cn")}}selected{{/if}}>中国 🇨🇳</option>
+            <option value="cx" {{#if (eq selected_loc "cx")}}selected{{/if}}>Christmas Island 🇨🇽</option>
+            <option value="cc" {{#if (eq selected_loc "cc")}}selected{{/if}}>Cocos Islands 🇨🇨</option>
+            <option value="co" {{#if (eq selected_loc "co")}}selected{{/if}}>Colombia 🇨🇴</option>
+            <option value="km" {{#if (eq selected_loc "km")}}selected{{/if}}>جزر القمر 🇰🇲</option>
+            <option value="cg" {{#if (eq selected_loc "cg")}}selected{{/if}}>Congo 🇨🇬</option>
+            <option value="cd" {{#if (eq selected_loc "cd")}}selected{{/if}}>R.D Congo 🇨🇩</option>
+            <option value="ck" {{#if (eq selected_loc "ck")}}selected{{/if}}>Cook Islands 🇨🇰</option>
+            <option value="cr" {{#if (eq selected_loc "cr")}}selected{{/if}}>Costa Rica 🇨🇷</option>
+            <option value="ci" {{#if (eq selected_loc "ci")}}selected{{/if}}>Côte d'Ivoire 🇨🇮</option>
+            <option value="hr" {{#if (eq selected_loc "hr")}}selected{{/if}}>Hrvatska 🇭🇷</option>
+            <option value="cu" {{#if (eq selected_loc "cu")}}selected{{/if}}>Cuba 🇨🇺</option>
+            <option value="cy" {{#if (eq selected_loc "cy")}}selected{{/if}}>Κύπρος 🇨🇾</option>
+            <option value="cz" {{#if (eq selected_loc "cz")}}selected{{/if}}>Česká republika 🇨🇿</option>
+            <option value="dk" {{#if (eq selected_loc "dk")}}selected{{/if}}>Danmark 🇩🇰</option>
+            <option value="at" {{#if (eq selected_loc "at")}}selected{{/if}}>Österreich 🇦🇹</option>
+            <option value="de" {{#if (eq selected_loc "de")}}selected{{/if}}>Deutschland 🇩🇪</option>
+            <option value="dj" {{#if (eq selected_loc "dj")}}selected{{/if}}>جيبوتي 🇩🇯</option>
+            <option value="dm" {{#if (eq selected_loc "dm")}}selected{{/if}}>Dominica 🇩🇲</option>
+            <option value="do" {{#if (eq selected_loc "do")}}selected{{/if}}>República Dominicana 🇩🇴</option>
+            <option value="ec" {{#if (eq selected_loc "ec")}}selected{{/if}}>Ecuador 🇪🇨</option>
+            <option value="eg" {{#if (eq selected_loc "eg")}}selected{{/if}}>مصر 🇪🇬</option>
+            <option value="sv" {{#if (eq selected_loc "sv")}}selected{{/if}}>El Salvador 🇸🇻</option>
+            <option value="gq" {{#if (eq selected_loc "gq")}}selected{{/if}}>Guinea Ecuatorial 🇬🇶</option>
+            <option value="er" {{#if (eq selected_loc "er")}}selected{{/if}}>ኤርትራ 🇪🇷</option>
+            <option value="ee" {{#if (eq selected_loc "ee")}}selected{{/if}}>Eesti 🇪🇪</option>
+            <option value="et" {{#if (eq selected_loc "et")}}selected{{/if}}>ኢትዮጵያ 🇪🇹</option>
+            <option value="fk" {{#if (eq selected_loc "fk")}}selected{{/if}}>Falkland Islands 🇫🇰</option>
+            <option value="fo" {{#if (eq selected_loc "fo")}}selected{{/if}}>Føroyar 🇫🇴</option>
+            <option value="fj" {{#if (eq selected_loc "fj")}}selected{{/if}}>Fiji 🇫🇯</option>
+            <option value="fi" {{#if (eq selected_loc "fi")}}selected{{/if}}>Suomi 🇫🇮</option>
+            <option value="fr" {{#if (eq selected_loc "fr")}}selected{{/if}}>France 🇫🇷</option>
+            <option value="gf" {{#if (eq selected_loc "gf")}}selected{{/if}}>Guyane française 🇬🇫</option>
+            <option value="pf" {{#if (eq selected_loc "pf")}}selected{{/if}}>Polynésie française 🇵🇫</option>
+            <option value="tf" {{#if (eq selected_loc "tf")}}selected{{/if}}>Terres australes françaises 🇹🇫</option>
+            <option value="ga" {{#if (eq selected_loc "ga")}}selected{{/if}}>Gabon 🇬🇦</option>
+            <option value="gm" {{#if (eq selected_loc "gm")}}selected{{/if}}>Gambia 🇬🇲</option>
+            <option value="ge" {{#if (eq selected_loc "ge")}}selected{{/if}}>საქართველო 🇬🇪</option>
+            <option value="gh" {{#if (eq selected_loc "gh")}}selected{{/if}}>Ghana 🇬🇭</option>
+            <option value="gi" {{#if (eq selected_loc "gi")}}selected{{/if}}>Gibraltar 🇬🇮</option>
+            <option value="gr" {{#if (eq selected_loc "gr")}}selected{{/if}}>Ελλάδα 🇬🇷</option>
+            <option value="gl" {{#if (eq selected_loc "gl")}}selected{{/if}}>Kalaallit Nunaat 🇬🇱</option>
+            <option value="gd" {{#if (eq selected_loc "gd")}}selected{{/if}}>Grenada 🇬🇩</option>
+            <option value="gp" {{#if (eq selected_loc "gp")}}selected{{/if}}>Guadeloupe 🇬🇵</option>
+            <option value="gu" {{#if (eq selected_loc "gu")}}selected{{/if}}>Guam 🇬🇺</option>
+            <option value="gt" {{#if (eq selected_loc "gt")}}selected{{/if}}>Guatemala 🇬🇹</option>
+            <option value="gn" {{#if (eq selected_loc "gn")}}selected{{/if}}>Guinée 🇬🇳</option>
+            <option value="gw" {{#if (eq selected_loc "gw")}}selected{{/if}}>Guiné-Bissau 🇬🇼</option>
+            <option value="gy" {{#if (eq selected_loc "gy")}}selected{{/if}}>Guyana 🇬🇾</option>
+            <option value="ht" {{#if (eq selected_loc "ht")}}selected{{/if}}>Haïti 🇭🇹</option>
+            <option value="hm" {{#if (eq selected_loc "hm")}}selected{{/if}}>Heard Island 🇭🇲</option>
+            <option value="hn" {{#if (eq selected_loc "hn")}}selected{{/if}}>Honduras 🇭🇳</option>
+            <option value="hk" {{#if (eq selected_loc "hk")}}selected{{/if}}>香港 🇭🇰</option>
+            <option value="hu" {{#if (eq selected_loc "hu")}}selected{{/if}}>Magyarország 🇭🇺</option>
+            <option value="is" {{#if (eq selected_loc "is")}}selected{{/if}}>Ísland 🇮🇸</option>
+            <option value="in" {{#if (eq selected_loc "in")}}selected{{/if}}>भारत 🇮🇳</option>
+            <option value="id" {{#if (eq selected_loc "id")}}selected{{/if}}>Indonesia 🇮🇩</option>
+            <option value="ir" {{#if (eq selected_loc "ir")}}selected{{/if}}>ایران 🇮🇷</option>
+            <option value="iq" {{#if (eq selected_loc "iq")}}selected{{/if}}>العراق 🇮🇶</option>
+            <option value="ie" {{#if (eq selected_loc "ie")}}selected{{/if}}>Éire 🇮🇪</option>
+            <option value="il" {{#if (eq selected_loc "il")}}selected{{/if}}>ישראל 🇮🇱</option>
+            <option value="it" {{#if (eq selected_loc "it")}}selected{{/if}}>Italia 🇮🇹</option>
+            <option value="jm" {{#if (eq selected_loc "jm")}}selected{{/if}}>Jamaica 🇯🇲</option>
+            <option value="jp" {{#if (eq selected_loc "jp")}}selected{{/if}}>日本 🇯🇵</option>
+            <option value="jo" {{#if (eq selected_loc "jo")}}selected{{/if}}>الأردن 🇯🇴</option>
+            <option value="kz" {{#if (eq selected_loc "kz")}}selected{{/if}}>Қазақстан 🇰🇿</option>
+            <option value="ke" {{#if (eq selected_loc "ke")}}selected{{/if}}>Kenya 🇰🇪</option>
+            <option value="ki" {{#if (eq selected_loc "ki")}}selected{{/if}}>Kiribati 🇰🇮</option>
+            <option value="kp" {{#if (eq selected_loc "kp")}}selected{{/if}}>조선민주주의인민공화국 🇰🇵</option>
+            <option value="kr" {{#if (eq selected_loc "kr")}}selected{{/if}}>한국 🇰🇷</option>
+            <option value="kw" {{#if (eq selected_loc "kw")}}selected{{/if}}>الكويت 🇰🇼</option>
+            <option value="kg" {{#if (eq selected_loc "kg")}}selected{{/if}}>Кыргызстан 🇰🇬</option>
+            <option value="la" {{#if (eq selected_loc "la")}}selected{{/if}}>ລາວ 🇱🇦</option>
+            <option value="lv" {{#if (eq selected_loc "lv")}}selected{{/if}}>Latvija 🇱🇻</option>
+            <option value="lb" {{#if (eq selected_loc "lb")}}selected{{/if}}>لبنان 🇱🇧</option>
+            <option value="ls" {{#if (eq selected_loc "ls")}}selected{{/if}}>Lesotho 🇱🇸</option>
+            <option value="lr" {{#if (eq selected_loc "lr")}}selected{{/if}}>Liberia 🇱🇷</option>
+            <option value="ly" {{#if (eq selected_loc "ly")}}selected{{/if}}>ليبيا 🇱🇾</option>
+            <option value="li" {{#if (eq selected_loc "li")}}selected{{/if}}>Liechtenstein 🇱🇮</option>
+            <option value="lt" {{#if (eq selected_loc "lt")}}selected{{/if}}>Lietuva 🇱🇹</option>
+            <option value="lu" {{#if (eq selected_loc "lu")}}selected{{/if}}>Luxembourg 🇱🇺</option>
+            <option value="mo" {{#if (eq selected_loc "mo")}}selected{{/if}}>澳門 🇲🇴</option>
+            <option value="mk" {{#if (eq selected_loc "mk")}}selected{{/if}}>Македонија 🇲🇰</option>
+            <option value="mg" {{#if (eq selected_loc "mg")}}selected{{/if}}>Madagasikara 🇲🇬</option>
+            <option value="mw" {{#if (eq selected_loc "mw")}}selected{{/if}}>Malawi 🇲🇼</option>
+            <option value="my" {{#if (eq selected_loc "my")}}selected{{/if}}>Malaysia 🇲🇾</option>
+            <option value="mv" {{#if (eq selected_loc "mv")}}selected{{/if}}>Maldives 🇲🇻</option>
+            <option value="ml" {{#if (eq selected_loc "ml")}}selected{{/if}}>Mali 🇲🇱</option>
+            <option value="mt" {{#if (eq selected_loc "mt")}}selected{{/if}}>Malta 🇲🇹</option>
+            <option value="mh" {{#if (eq selected_loc "mh")}}selected{{/if}}>Marshall Islands 🇲🇭</option>
+            <option value="mq" {{#if (eq selected_loc "mq")}}selected{{/if}}>Martinique 🇲🇶</option>
+            <option value="mr" {{#if (eq selected_loc "mr")}}selected{{/if}}>موريتانيا 🇲🇷</option>
+            <option value="mu" {{#if (eq selected_loc "mu")}}selected{{/if}}>Maurice 🇲🇺</option>
+            <option value="yt" {{#if (eq selected_loc "yt")}}selected{{/if}}>Mayotte 🇾🇹</option>
+            <option value="mx" {{#if (eq selected_loc "mx")}}selected{{/if}}>México 🇲🇽</option>
+            <option value="fm" {{#if (eq selected_loc "fm")}}selected{{/if}}>Micronesia 🇫🇲</option>
+            <option value="md" {{#if (eq selected_loc "md")}}selected{{/if}}>Moldova 🇲🇩</option>
+            <option value="mc" {{#if (eq selected_loc "mc")}}selected{{/if}}>Monaco 🇲🇨</option>
+            <option value="mn" {{#if (eq selected_loc "mn")}}selected{{/if}}>Монгол 🇲🇳</option>
+            <option value="ms" {{#if (eq selected_loc "ms")}}selected{{/if}}>Montserrat 🇲🇸</option>
+            <option value="ma" {{#if (eq selected_loc "ma")}}selected{{/if}}>المغرب 🇲🇦</option>
+            <option value="mz" {{#if (eq selected_loc "mz")}}selected{{/if}}>Moçambique 🇲🇿</option>
+            <option value="mm" {{#if (eq selected_loc "mm")}}selected{{/if}}>မြန်မာ 🇲🇲</option>
+            <option value="na" {{#if (eq selected_loc "na")}}selected{{/if}}>Namibia 🇳🇦</option>
+            <option value="nr" {{#if (eq selected_loc "nr")}}selected{{/if}}>Nauru 🇳🇷</option>
+            <option value="np" {{#if (eq selected_loc "np")}}selected{{/if}}>नेपाल 🇳🇵</option>
+            <option value="nl" {{#if (eq selected_loc "nl")}}selected{{/if}}>Nederland 🇳🇱</option>
+            <option value="an" {{#if (eq selected_loc "an")}}selected{{/if}}>Nederlandse Antillen 🇧🇶</option>
+            <option value="nc" {{#if (eq selected_loc "nc")}}selected{{/if}}>Nouvelle-Calédonie 🇳🇨</option>
+            <option value="nz" {{#if (eq selected_loc "nz")}}selected{{/if}}>New Zealand 🇳🇿</option>
+            <option value="ni" {{#if (eq selected_loc "ni")}}selected{{/if}}>Nicaragua 🇳🇮</option>
+            <option value="ne" {{#if (eq selected_loc "ne")}}selected{{/if}}>Niger 🇳🇪</option>
+            <option value="ng" {{#if (eq selected_loc "ng")}}selected{{/if}}>Nigeria 🇳🇬</option>
+            <option value="nu" {{#if (eq selected_loc "nu")}}selected{{/if}}>Niue 🇳🇺</option>
+            <option value="nf" {{#if (eq selected_loc "nf")}}selected{{/if}}>Norfolk Island 🇳🇫</option>
+            <option value="mp" {{#if (eq selected_loc "mp")}}selected{{/if}}>Northern Mariana Islands 🇲🇵</option>
+            <option value="no" {{#if (eq selected_loc "no")}}selected{{/if}}>Norge 🇳🇴</option>
+            <option value="om" {{#if (eq selected_loc "om")}}selected{{/if}}>عُمان 🇴🇲</option>
+            <option value="pk" {{#if (eq selected_loc "pk")}}selected{{/if}}>پاکستان 🇵🇰</option>
+            <option value="pw" {{#if (eq selected_loc "pw")}}selected{{/if}}>Palau 🇵🇼</option>
+            <option value="ps" {{#if (eq selected_loc "ps")}}selected{{/if}}>فلسطين 🇵🇸</option>
+            <option value="pa" {{#if (eq selected_loc "pa")}}selected{{/if}}>Panamá 🇵🇦</option>
+            <option value="pg" {{#if (eq selected_loc "pg")}}selected{{/if}}>Papua New Guinea 🇵🇬</option>
+            <option value="py" {{#if (eq selected_loc "py")}}selected{{/if}}>Paraguay 🇵🇾</option>
+            <option value="pe" {{#if (eq selected_loc "pe")}}selected{{/if}}>Perú 🇵🇪</option>
+            <option value="ph" {{#if (eq selected_loc "ph")}}selected{{/if}}>Pilipinas 🇵🇭</option>
+            <option value="pn" {{#if (eq selected_loc "pn")}}selected{{/if}}>Pitcairn 🇵🇳</option>
+            <option value="pl" {{#if (eq selected_loc "pl")}}selected{{/if}}>Polska 🇵🇱</option>
+            <option value="pt" {{#if (eq selected_loc "pt")}}selected{{/if}}>Portugal 🇵🇹</option>
+            <option value="pr" {{#if (eq selected_loc "pr")}}selected{{/if}}>Puerto Rico 🇵🇷</option>
+            <option value="qa" {{#if (eq selected_loc "qa")}}selected{{/if}}>قطر 🇶🇦</option>
+            <option value="re" {{#if (eq selected_loc "re")}}selected{{/if}}>Réunion 🇷🇪</option>
+            <option value="ro" {{#if (eq selected_loc "ro")}}selected{{/if}}>România 🇷🇴</option>
+            <option value="ru" {{#if (eq selected_loc "ru")}}selected{{/if}}>Россия 🇷🇺</option>
+            <option value="rw" {{#if (eq selected_loc "rw")}}selected{{/if}}>Rwanda 🇷🇼</option>
+            <option value="sh" {{#if (eq selected_loc "sh")}}selected{{/if}}>Saint Helena 🇸🇭</option>
+            <option value="kn" {{#if (eq selected_loc "kn")}}selected{{/if}}>Saint Kitts 🇰🇳</option>
+            <option value="lc" {{#if (eq selected_loc "lc")}}selected{{/if}}>Saint Lucia 🇱🇨</option>
+            <option value="pm" {{#if (eq selected_loc "pm")}}selected{{/if}}>Saint Pierre 🇵🇲</option>
+            <option value="vc" {{#if (eq selected_loc "vc")}}selected{{/if}}>Saint Vincent 🇻🇨</option>
+            <option value="ws" {{#if (eq selected_loc "ws")}}selected{{/if}}>Samoa 🇼🇸</option>
+            <option value="sm" {{#if (eq selected_loc "sm")}}selected{{/if}}>San Marino 🇸🇲</option>
+            <option value="st" {{#if (eq selected_loc "st")}}selected{{/if}}>São Tomé e Príncipe 🇸🇹</option>
+            <option value="sa" {{#if (eq selected_loc "sa")}}selected{{/if}}>السعودية 🇸🇦</option>
+            <option value="sn" {{#if (eq selected_loc "sn")}}selected{{/if}}>Sénégal 🇸🇳</option>
+            <option value="cs" {{#if (eq selected_loc "cs")}}selected{{/if}}>Србија и Црна Гора 🇷🇸</option>
+            <option value="sc" {{#if (eq selected_loc "sc")}}selected{{/if}}>Seychelles 🇸🇨</option>
+            <option value="sl" {{#if (eq selected_loc "sl")}}selected{{/if}}>Sierra Leone 🇸🇱</option>
+            <option value="sg" {{#if (eq selected_loc "sg")}}selected{{/if}}>Singapore 🇸🇬</option>
+            <option value="sk" {{#if (eq selected_loc "sk")}}selected{{/if}}>Slovensko 🇸🇰</option>
+            <option value="si" {{#if (eq selected_loc "si")}}selected{{/if}}>Slovenija 🇸🇮</option>
+            <option value="sb" {{#if (eq selected_loc "sb")}}selected{{/if}}>Solomon Islands 🇸🇧</option>
+            <option value="so" {{#if (eq selected_loc "so")}}selected{{/if}}>Soomaaliya 🇸🇴</option>
+            <option value="gs" {{#if (eq selected_loc "gs")}}selected{{/if}}>South Georgia 🇬🇸</option>
+            <option value="es" {{#if (eq selected_loc "es")}}selected{{/if}}>España 🇪🇸</option>
+            <option value="lk" {{#if (eq selected_loc "lk")}}selected{{/if}}>ශ්‍රී ලංකාව 🇱🇰</option>
+            <option value="sd" {{#if (eq selected_loc "sd")}}selected{{/if}}>السودان 🇸🇩</option>
+            <option value="sr" {{#if (eq selected_loc "sr")}}selected{{/if}}>Suriname 🇸🇷</option>
+            <option value="sj" {{#if (eq selected_loc "sj")}}selected{{/if}}>Svalbard 🇸🇯</option>
+            <option value="sz" {{#if (eq selected_loc "sz")}}selected{{/if}}>eSwatini 🇸🇿</option>
+            <option value="se" {{#if (eq selected_loc "se")}}selected{{/if}}>Sverige 🇸🇪</option>
+            <option value="ch" {{#if (eq selected_loc "ch")}}selected{{/if}}>Schweiz 🇨🇭</option>
+            <option value="sy" {{#if (eq selected_loc "sy")}}selected{{/if}}>سوريا 🇸🇾</option>
+            <option value="tw" {{#if (eq selected_loc "tw")}}selected{{/if}}>台灣 🇹🇼</option>
+            <option value="tj" {{#if (eq selected_loc "tj")}}selected{{/if}}>Тоҷикистон 🇹🇯</option>
+            <option value="tz" {{#if (eq selected_loc "tz")}}selected{{/if}}>Tanzania 🇹🇿</option>
+            <option value="th" {{#if (eq selected_loc "th")}}selected{{/if}}>ประเทศไทย 🇹🇭</option>
+            <option value="tl" {{#if (eq selected_loc "tl")}}selected{{/if}}>Timor-Leste 🇹🇱</option>
+            <option value="tg" {{#if (eq selected_loc "tg")}}selected{{/if}}>Togo 🇹🇬</option>
+            <option value="tk" {{#if (eq selected_loc "tk")}}selected{{/if}}>Tokelau 🇹🇰</option>
+            <option value="to" {{#if (eq selected_loc "to")}}selected{{/if}}>Tonga 🇹🇴</option>
+            <option value="tt" {{#if (eq selected_loc "tt")}}selected{{/if}}>Trinidad 🇹🇹</option>
+            <option value="tn" {{#if (eq selected_loc "tn")}}selected{{/if}}>تونس 🇹🇳</option>
+            <option value="tr" {{#if (eq selected_loc "tr")}}selected{{/if}}>Türkiye 🇹🇷</option>
+            <option value="tm" {{#if (eq selected_loc "tm")}}selected{{/if}}>Türkmenistan 🇹🇲</option>
+            <option value="tc" {{#if (eq selected_loc "tc")}}selected{{/if}}>Turks 🇹🇨</option>
+            <option value="tv" {{#if (eq selected_loc "tv")}}selected{{/if}}>Tuvalu 🇹🇻</option>
+            <option value="ug" {{#if (eq selected_loc "ug")}}selected{{/if}}>Uganda 🇺🇬</option>
+            <option value="ua" {{#if (eq selected_loc "ua")}}selected{{/if}}>Україна 🇺🇦</option>
+            <option value="ae" {{#if (eq selected_loc "ae")}}selected{{/if}}>الإمارات العربية المتحدة 🇦🇪</option>
+            <option value="uk" {{#if (eq selected_loc "uk")}}selected{{/if}}>United Kingdom 🇬🇧</option>
+            <option value="us" {{#if (eq selected_loc "us")}}selected{{/if}}>United States 🇺🇸</option>
+            <option value="um" {{#if (eq selected_loc "um")}}selected{{/if}}>US Outlying Islands 🇺🇲</option>
+            <option value="uy" {{#if (eq selected_loc "uy")}}selected{{/if}}>Uruguay 🇺🇾</option>
+            <option value="uz" {{#if (eq selected_loc "uz")}}selected{{/if}}>Oʻzbekiston 🇺🇿</option>
+            <option value="vu" {{#if (eq selected_loc "vu")}}selected{{/if}}>Vanuatu 🇻🇺</option>
+            <option value="va" {{#if (eq selected_loc "va")}}selected{{/if}}>Stato della Città del Vaticano 🇻🇦</option>
+            <option value="ve" {{#if (eq selected_loc "ve")}}selected{{/if}}>Venezuela 🇻🇪</option>
+            <option value="vn" {{#if (eq selected_loc "vn")}}selected{{/if}}>Việt Nam 🇻🇳</option>
+            <option value="vg" {{#if (eq selected_loc "vg")}}selected{{/if}}>British Virgin Islands 🇻🇬</option>
+            <option value="vi" {{#if (eq selected_loc "vi")}}selected{{/if}}>U.S. Virgin Islands 🇻🇮</option>
+            <option value="wf" {{#if (eq selected_loc "wf")}}selected{{/if}}>Wallis 🇼🇫</option>
+            <option value="eh" {{#if (eq selected_loc "eh")}}selected{{/if}}>الصحراء الغربية 🇪🇭</option>
+            <option value="ye" {{#if (eq selected_loc "ye")}}selected{{/if}}>اليمن 🇾🇪</option>
+            <option value="zm" {{#if (eq selected_loc "zm")}}selected{{/if}}>Zambia 🇿🇲</option>
+            <option value="zw" {{#if (eq selected_loc "zw")}}selected{{/if}}>Zimbabwe 🇿🇼</option>
+        </select>
+      </div>
+      <div class="settings-item">
+        <label title="Select language in which results and UI will be displayed">💬 Language:</label>
+        <select class="setSelect" id="lang_select">
+          <option value="all" {{#if (eq selected_lang "all")}}selected{{/if}}>All 🌍</option>
+          <option value="bg" {{#if (eq selected_lang "bg")}}selected{{/if}}>Български 🇧🇬</option>
+          <option value="ca" {{#if (eq selected_lang "ca")}}selected{{/if}}>Català 🇦🇩</option>
+          <option value="cs" {{#if (eq selected_lang "cs")}}selected{{/if}}>Čeština 🇨🇿</option>
+          <option value="da" {{#if (eq selected_lang "da")}}selected{{/if}}>Dansk 🇩🇰</option>
+          <option value="de" {{#if (eq selected_lang "de")}}selected{{/if}}>Deutsch 🇩🇪</option>
+          <option value="et" {{#if (eq selected_lang "et")}}selected{{/if}}>Eesti 🇪🇪</option>
+          <option value="en" {{#if (eq selected_lang "en")}}selected{{/if}}>English 🇬🇧</option>
+          <option value="es" {{#if (eq selected_lang "es")}}selected{{/if}}>Español 🇪🇸</option>
+          <option value="fr" {{#if (eq selected_lang "fr")}}selected{{/if}}>Français 🇫🇷</option>
+          <option value="el" {{#if (eq selected_lang "el")}}selected{{/if}}>Ελληνικά 🇬🇷</option>
+          <option value="he" {{#if (eq selected_lang "he")}}selected{{/if}}>עברית 🇮🇱</option>
+          <option value="hr" {{#if (eq selected_lang "hr")}}selected{{/if}}>Hrvatski 🇭🇷</option>
+          <option value="is" {{#if (eq selected_lang "is")}}selected{{/if}}>Íslenska 🇮🇸</option>
+          <option value="id" {{#if (eq selected_lang "id")}}selected{{/if}}>Indonesia 🇮🇩</option>
+          <option value="it" {{#if (eq selected_lang "it")}}selected{{/if}}>Italiano 🇮🇹</option>
+          <option value="lv" {{#if (eq selected_lang "lv")}}selected{{/if}}>Latviešu 🇱🇻</option>
+          <option value="lt" {{#if (eq selected_lang "lt")}}selected{{/if}}>Lietuvių 🇱🇹</option>
+          <option value="hu" {{#if (eq selected_lang "hu")}}selected{{/if}}>Magyar 🇭🇺</option>
+          <option value="nl" {{#if (eq selected_lang "nl")}}selected{{/if}}>Nederlands 🇳🇱</option>
+          <option value="no" {{#if (eq selected_lang "no")}}selected{{/if}}>Norsk 🇳🇴</option>
+          <option value="pl" {{#if (eq selected_lang "pl")}}selected{{/if}}>Polski 🇵🇱</option>
+          <option value="pt" {{#if (eq selected_lang "pt")}}selected{{/if}}>Português 🇵🇹</option>
+          <option value="ro" {{#if (eq selected_lang "ro")}}selected{{/if}}>Română 🇷🇴</option>
+          <option value="sr" {{#if (eq selected_lang "sr")}}selected{{/if}}>Српски 🇷🇸</option>
+          <option value="sk" {{#if (eq selected_lang "sk")}}selected{{/if}}>Slovenčina 🇸🇰</option>
+          <option value="sl" {{#if (eq selected_lang "sl")}}selected{{/if}}>Slovenščina 🇸🇮</option>
+          <option value="fi" {{#if (eq selected_lang "fi")}}selected{{/if}}>Suomi 🇫🇮</option>
+          <option value="sv" {{#if (eq selected_lang "sv")}}selected{{/if}}>Svenska 🇸🇪</option>
+          <option value="tr" {{#if (eq selected_lang "tr")}}selected{{/if}}>Türkçe 🇹🇷</option>
+          <option value="ar" {{#if (eq selected_lang "ar")}}selected{{/if}}>العربية 🇸🇦</option>
+          <option value="ja" {{#if (eq selected_lang "ja")}}selected{{/if}}>日本語 🇯🇵</option>
+          <option value="ko" {{#if (eq selected_lang "ko")}}selected{{/if}}>한국어 🇰🇷</option>
+          <option value="ru" {{#if (eq selected_lang "ru")}}selected{{/if}}>Русский 🇷🇺</option>
+        </select>
+      </div>
+      <br>
+      <div class="settings-item">
+        <label for="check_newtab" title="Open all links in a new tab?">New tab:</label>
+        <div class="checkbox_cute">
+          <div class="check">
+           <input id="check_newtab" type="checkbox">
+            <label for="check_newtab"></label>
+          </div>
+        </div>
+      </div>
+      <br>
+      <div class="settings-item">
+        <label title="System, light or dark mode?">Theme:</label>
+        <div class="div_theme_radio">
+          <input type="radio" id="theme_system" name="theme" value="system" {{#if (eq selected_theme "system")}}selected{{/if}}>
+          <input type="radio" id="theme_light" name="theme" value="light" {{#if (eq selected_theme "light")}}selected{{/if}}>
+          <input type="radio" id="theme_dark" name="theme" value="dark" {{#if (eq selected_theme "dark")}}selected{{/if}}>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>

@@ -1,0 +1,2 @@
+@import url("../light/universal.css") (prefers-color-scheme: light);
+@import url("../dark/universal.css") (prefers-color-scheme: dark);

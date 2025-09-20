@@ -1,0 +1,53 @@
+<link rel="stylesheet" href="{{ css_path }}search/search_bar.css?v={{ css_version }}">
+<link rel="stylesheet" href="{{ css_theme }}search/search_bar.css?v={{ css_version }}">
+
+<div class="div_search_bar">
+  <a href="/"
+    ><img src="static/img/prieco.webp" alt="PriEco logo" class="logo"
+  /></a>
+
+  <div class="div_search_type">
+    <!-- Search bar -->
+    <form action="search" class="search_bar">
+      <button class="search_button">
+        <img
+          src="static/img/icon/search.webp"
+          alt="Search button icon"
+          width="13px"
+        />
+      </button>
+      <input type="hidden" name="t" value="{{ type }}">
+      <input name="q" placeholder="PriEco" value="{{ query }}" class="search_box" data-sxpr-input>
+      <button type="button" aria-label="Clear query button" class="btn_del_query">
+          <img src="static/img/icon/cross.svg" alt="Delete query button">
+        </button>
+    </form>
+
+    <!-- Type bar -->
+    <div class="type_btns">
+      <form action="search">
+        <input type="hidden" name="t" value="all">
+        <input type="hidden" name="q" value="{{query}}">
+        <button class="{{all_active}}">
+          <img src="static/img/icon/earth.svg">
+          <p>All</p>
+        </button>
+      </form>
+
+      <form action="search">
+        <input type="hidden" name="t" value="img">
+        <input type="hidden" name="q" value="{{query}}">
+        <button class="{{img_active}}">
+          <img src="static/img/icon/image.svg">
+          <p>Images</p>
+        </button>
+      </form>
+
+      <button class="btn_settings">
+        <label for="open-settings" class="open-settings-btn">
+          <img src="static/img/icon/gear.svg" alt="open settings" width="13px">
+        </label>
+      </button>
+    </div>
+  </div>
+</div>

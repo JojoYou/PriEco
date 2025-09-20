@@ -1,0 +1,42 @@
+function loadSection(containerId, url, scriptPath) {
+  const container = document.getElementById(containerId);
+  if (!container) return Promise.resolve(); // keep Promise.all happy
+
+  return fetch(url) // <-- return so Promise.all can track it
+    .then(response => response.text())
+    .then(html => {
+      const tempDiv = document.createElement("div");
+      tempDiv.innerHTML = html;
+
+      // Replace the old element
+      container.replaceWith(...tempDiv.childNodes);
+
+      // Dynamically load the script if provided
+      if (scriptPath) {
+        const script = document.createElement("script");
+        script.src = scriptPath;
+        script.defer = true;
+        document.body.appendChild(script);
+      }
+    })
+    .catch(error => {
+      console.error(`Error loading ${url}:`, error);
+    });
+}
+
+Promise.all([
+  loadSection("js_load_results", "/results_html?t={{t}}&lang={{lang}}&loc={{loc}}&q={{q}}", ""),
+  loadSection("js_load_settings", "/settings_html", "static/js/settings.js"),
+]).then(() => {
+  // High Res Images script
+  const highResScript = document.createElement("script");
+  highResScript.src = "static/js/high_res_img.js?v={{ js_version }}";
+  highResScript.defer = true;
+  document.body.appendChild(highResScript);
+
+  // Search Expander script
+  const searchExpanderInit = document.createElement("script");
+  searchExpanderInit.src = "static/js/hbs/searchexpander.js.hbs?q={{ q }}";
+  searchExpanderInit.defer = true;
+  document.body.appendChild(searchExpanderInit);
+});
