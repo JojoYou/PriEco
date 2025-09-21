@@ -446,6 +446,12 @@ async fn search(
         context.insert(String::from(key), json!("type_active"));
     }
 
+    if q.contains("!") {
+        context.insert(String::from("bang"), json!(true));
+    } else {
+        context.insert(String::from("bang"), json!(false));
+    }
+
     settings::run(&mut context, &Some(client_ip.0), cookie_jar); // Aplly cookies' settings to context
 
     Template::render("search", &context)

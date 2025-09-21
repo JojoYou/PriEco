@@ -25,7 +25,7 @@
       </div>
       <br>
       <div class="settings-item">
-        <input type="range" value="{{ prieco_user_stats }}" min="0" max="100" step="1" style="--fill-percent: {{ prieco_user_stats }}%;" class="user_index_stats" disabled>
+        <input type="range" aria-label="PriEco user search statics" value="{{ prieco_user_stats }}" min="0" max="100" step="1" style="--fill-percent: {{ prieco_user_stats }}%;" class="user_index_stats" disabled>
         <div class="user_index_stats_label">{{ prieco_user_stats }} %</div>
       </div>
     </div>
@@ -36,7 +36,7 @@
       <br>
       <div class="settings-item">
         <label title="Select your location">🌍 Location:</label>
-        <select class="setSelect" id="loc_select">
+        <select aria-label="location selection" class="setSelect" id="loc_select">
             <option value="all" {{#if (eq selected_loc "all")}}selected{{/if}}>All 🌍</option>
             <option value="af" {{#if (eq selected_loc "all")}}selected{{/if}}>افغانستان 🇦🇫</option>
             <option value="za" {{#if (eq selected_loc "za")}}selected{{/if}}>Afrika-Borwa 🇿🇦</option>
@@ -280,7 +280,7 @@
       </div>
       <div class="settings-item">
         <label title="Select language in which results and UI will be displayed">💬 Language:</label>
-        <select class="setSelect" id="lang_select">
+        <select aria-label="language selection" class="setSelect" id="lang_select">
           <option value="all" {{#if (eq selected_lang "all")}}selected{{/if}}>All 🌍</option>
           <option value="bg" {{#if (eq selected_lang "bg")}}selected{{/if}}>Български 🇧🇬</option>
           <option value="ca" {{#if (eq selected_lang "ca")}}selected{{/if}}>Català 🇦🇩</option>
@@ -331,9 +331,9 @@
       <div class="settings-item">
         <label title="System, light or dark mode?">Theme:</label>
         <div class="div_theme_radio">
-          <input type="radio" id="theme_system" name="theme" value="system" {{#if (eq selected_theme "system")}}selected{{/if}}>
-          <input type="radio" id="theme_light" name="theme" value="light" {{#if (eq selected_theme "light")}}selected{{/if}}>
-          <input type="radio" id="theme_dark" name="theme" value="dark" {{#if (eq selected_theme "dark")}}selected{{/if}}>
+          <input type="radio" id="theme_system" name="theme" aria-label="theme system" value="system" {{#if (eq selected_theme "system")}}selected{{/if}}>
+          <input type="radio" id="theme_light" name="theme" aria-label="theme light" value="light" {{#if (eq selected_theme "light")}}selected{{/if}}>
+          <input type="radio" id="theme_dark" name="theme" aria-label="theme dark" value="dark" {{#if (eq selected_theme "dark")}}selected{{/if}}>
         </div>
       </div>
 

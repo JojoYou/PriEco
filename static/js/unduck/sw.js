@@ -111,22 +111,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Network-first for .hbs files
-  if (url.pathname.endsWith(".hbs")) {
-    event.respondWith(
-      fetch(event.request)
-        .then(async (res) => {
-          if (res.ok && event.request.method === "GET") {
-            await addToCache(event.request, res);
-          }
-          return res;
-        })
-        .catch(() => caches.match(event.request)),
-    );
-    return;
-  }
-
-  // Cache-first for everything else
   event.respondWith(
     caches.match(event.request).then(async (cached) => {
       if (cached) return cached;
