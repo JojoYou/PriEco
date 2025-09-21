@@ -17,7 +17,10 @@ use rocket::{
     http::{ContentType, CookieJar, Header, Status},
     launch, post,
     request::{FromRequest, Outcome},
-    response::{self, Responder, content::RawJavaScript},
+    response::{
+        self, Responder,
+        content::{RawJavaScript, RawText},
+    },
     routes,
     serde::json::{Json, Value as RocketValue},
 };
@@ -253,6 +256,7 @@ fn rocket() -> _ {
                 sw_js, // Service worker (Browser cache + unduck)
                 unduck_js,
                 security_txt, // Security.txt
+                robots_txt,   // Robots.txt
                 script,
                 favicon,
                 // Landing page
@@ -289,10 +293,14 @@ async fn unduck_js() -> Option<NamedFile> {
         .ok()
 }
 #[get("/.well-known/security.txt")]
-async fn security_txt() -> &'static str {
-    "Contact: mailto:support@jojoyou.org\n\
-Expires: 2026-04-16T12:00:00.000Z\n\
-Preferred-Languages: en,sk,cs\n"
+async fn security_txt() -> RawText<&'static str> {
+    RawText(
+        "Contact: mailto:support@jojoyou.org\nExpires: 2026-04-16T12:00:00.000Z\nPreferred-Languages: en,sk,cs",
+    )
+}
+#[get("/robots.txt")]
+async fn robots_txt() -> RawText<&'static str> {
+    RawText("User-agent: *\nDisallow: /search")
 }
 
 // JavaScript templates
