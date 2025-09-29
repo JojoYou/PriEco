@@ -259,6 +259,7 @@ fn rocket() -> _ {
                 robots_txt,   // Robots.txt
                 script,
                 favicon,
+                privacy, // Privacy Policy
                 // Landing page
                 index,
                 index_head,
@@ -375,10 +376,27 @@ async fn favicon(filename: String) -> Result<DecompressedImage, Status> {
 }
 
 ////
+// Terms
+////
+// JavaScript templates
+#[get("/privacy")]
+fn privacy(cookie_jar: &CookieJar<'_>) -> Template {
+    let mut context: HashMap<String, RocketValue> = HashMap::from([
+        (String::from("css_version"), json!(CSS_VERSION)),
+        (String::from("js_version"), json!(JS_VERSION)),
+        (String::from("title_query"), json!("Privacy Policy | ")),
+    ]);
+
+    settings::run(&mut context, &None, cookie_jar);
+
+    Template::render("legal/privacy", context)
+}
+
+////
 // Landing page
 ////
 #[get("/")]
-fn index(client_ip: ClientIp, cookies: &CookieJar<'_>) -> Template {
+fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>) -> Template {
     let ip_addr = client_ip.0; // Extract IP address
 
     let mut context: HashMap<String, RocketValue> = HashMap::new();
@@ -386,7 +404,7 @@ fn index(client_ip: ClientIp, cookies: &CookieJar<'_>) -> Template {
     context.insert(String::from("css_version"), json!(CSS_VERSION));
     context.insert(String::from("js_version"), json!(JS_VERSION));
 
-    settings::run(&mut context, &Some(ip_addr), cookies);
+    settings::run(&mut context, &Some(ip_addr), cookie_jar);
 
     Template::render("home", &context)
 }

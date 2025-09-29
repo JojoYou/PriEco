@@ -1,0 +1,2 @@
+@import url("../../light/legal/privacy.css") (prefers-color-scheme: light);
+@import url("../../dark/legal/privacy.css") (prefers-color-scheme: dark);
