@@ -29,10 +29,34 @@ pub async fn run(query: &str) -> Vec<ImgResult> {
     {
         println!("Cache!");
 
+        let bing_json: Value = match serde_json::from_str(&read_file(&bing_file)) {
+            Ok(json) => json,
+            Err(e) => {
+                println!("Failed to parse Bing cache {}: {}", bing_file, e);
+                Value::Null
+            }
+        };
+
+        let unsplash_json = match serde_json::from_str(&read_file(&unsplash_file)) {
+            Ok(json) => json,
+            Err(e) => {
+                println!("Failed to parse Unsplash cache {}: {}", unsplash_file, e);
+                Value::Null
+            }
+        };
+
+        let fanart_json = match serde_json::from_str(&read_file(&fanart_file)) {
+            Ok(json) => json,
+            Err(e) => {
+                println!("Failed to parse Fanart cache {}: {}", fanart_file, e);
+                Value::Null
+            }
+        };
+
         return merge_images(
-            format_bing(serde_json::from_str(&read_file(&bing_file)).unwrap()),
-            format_unsplash(serde_json::from_str(&read_file(&unsplash_file)).unwrap()),
-            format_fanart(serde_json::from_str(&read_file(&fanart_file)).unwrap()),
+            format_bing(bing_json),
+            format_unsplash(unsplash_json),
+            format_fanart(fanart_json),
         );
     }
 
@@ -62,14 +86,20 @@ pub async fn run(query: &str) -> Vec<ImgResult> {
         String::new()
     };
 
-    let client = Client::builder()
+    let client = match Client::builder()
         .user_agent("PriEco/1.0.0 ( support@jojoyou.org )")
         .timeout(Duration::from_secs(2))
         .gzip(true)
         .brotli(true)
         .deflate(true)
         .build()
-        .unwrap();
+    {
+        Ok(c) => c,
+        Err(e) => {
+            println!("Img: Failed to build HTTP client: {}", e);
+            return Vec::new();
+        }
+    };
 
     // Await the results of both requests
     let (bing_result, unsplash_result, fanart_result) = tokio::join!(
@@ -128,23 +158,43 @@ pub async fn run(query: &str) -> Vec<ImgResult> {
     // Cache results
     ////
     // Bing
-    write(
-        &format!("cache/img/bing/{}.json", query.replace("/", "_"),),
-        serde_json::to_string_pretty(&bing_json).unwrap(),
-    )
-    .unwrap();
+    let path = format!("cache/img/bing/{}.json", query.replace("/", "_"));
+    match serde_json::to_string_pretty(&bing_json) {
+        Ok(json_str) => {
+            if let Err(e) = write(&path, json_str) {
+                println!("Failed to write Bing cache {}: {}", path, e);
+            }
+        }
+        Err(e) => {
+            println!("Failed to serialize Bing JSON for caching: {}", e);
+        }
+    }
+
     // Unsplash
-    write(
-        &format!("cache/img/unsplash/{}.json", query.replace("/", "_"),),
-        serde_json::to_string_pretty(&unsplash_json).unwrap(),
-    )
-    .unwrap();
+    let path = format!("cache/img/unsplash/{}.json", query.replace("/", "_"));
+    match serde_json::to_string_pretty(&unsplash_json) {
+        Ok(json_str) => {
+            if let Err(e) = write(&path, json_str) {
+                println!("Failed to write Unsplash cache {}: {}", path, e);
+            }
+        }
+        Err(e) => {
+            println!("Failed to serialize Bing JSON for caching: {}", e);
+        }
+    }
+
     // FanART
-    write(
-        &format!("cache/img/fanart/{}.json", query.replace("/", "_"),),
-        serde_json::to_string_pretty(&fanart_json).unwrap(),
-    )
-    .unwrap();
+    let path = format!("cache/img/fanart/{}.json", query.replace("/", "_"));
+    match serde_json::to_string_pretty(&fanart_json) {
+        Ok(json_str) => {
+            if let Err(e) = write(&path, json_str) {
+                println!("Failed to write Unsplash cache {}: {}", path, e);
+            }
+        }
+        Err(e) => {
+            println!("Failed to serialize FanArt JSON for caching: {}", e);
+        }
+    }
 
     merge_images(
         format_bing(bing_json),

@@ -106,8 +106,12 @@ fn process(
     // Extract the specified fields from source
     for field in fields_to_show {
         if let Some(value) = source.get(field) {
-            let processed_value = if field == &"image" && value.is_string() {
-                json!(value.as_str().unwrap().trim_end_matches('/'))
+            let processed_value = if *field == "image" {
+                if let Some(s) = value.as_str() {
+                    json!(s.trim_end_matches('/'))
+                } else {
+                    value.clone() // fallback if not a string
+                }
             } else {
                 value.clone()
             };
@@ -439,14 +443,10 @@ pub async fn run_json(
                 if let Some(current_score) =
                     local_results[index].get("_score").and_then(|v| v.as_i64())
                 {
-                    local_results[index]
-                        .as_object_mut()
-                        .unwrap()
-                        .insert("_score".to_string(), json!(current_score + 1000));
-                    local_results[index]
-                        .as_object_mut()
-                        .unwrap()
-                        .insert("_dual_search_boost".to_string(), json!(1000));
+                    if let Some(obj) = local_results[index].as_object_mut() {
+                        obj.insert("_score".to_string(), json!(current_score + 1000));
+                        obj.insert("_dual_search_boost".to_string(), json!(1000));
+                    }
                 }
             }
         }
@@ -538,7 +538,7 @@ pub async fn run_json(
     // ---------- Score Drop Ratio ----------
     let scores: Vec<f64> = local_results
         .iter()
-        .map(|r| r.get("_score").unwrap().as_f64().unwrap())
+        .filter_map(|r| r.get("_score").and_then(|v| v.as_f64()))
         .collect();
 
     let mut drop_score = 0.0;

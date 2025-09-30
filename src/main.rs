@@ -321,8 +321,13 @@ fn script(
     let template_content = std::fs::read_to_string(&template_path)
         .unwrap_or_else(|_| format!("console.error('Template {} not found');", template_path));
 
-    hbs.register_template_string("js_template", &template_content)
-        .unwrap(); // Register the template
+    // Register the template
+    if let Err(e) = hbs.register_template_string("js_template", &template_content) {
+        return RawJavaScript(format!(
+            "console.error('Failed to register template: {}');",
+            e
+        ));
+    }
 
     RawJavaScript(
         hbs.render(
@@ -642,12 +647,12 @@ async fn proxy_request(
     }
 
     let client = Client::builder()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36")
-        .gzip(true)
-        .brotli(true)
-        .deflate(true)
-        .build()
-        .unwrap();
+            .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36")
+            .gzip(true)
+            .brotli(true)
+            .deflate(true)
+            .build()
+            .map_err(|_| Status::InternalServerError)?;
 
     let request_builder = match method {
         "GET" => client

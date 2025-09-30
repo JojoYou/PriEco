@@ -1,4 +1,4 @@
-use chrono::{Datelike, Duration as chDuration, Local, TimeZone};
+use chrono::{Datelike, Duration as chDuration, Local, TimeZone, offset::LocalResult};
 use dotenv_codegen::dotenv;
 use rand::Rng;
 use reqwest::Client;
@@ -31,29 +31,44 @@ pub async fn run(query: &str, lang: &str, loc: &str) -> Option<Vec<SearchResult>
             println!("Cache!");
             match *dir {
                 "google" => {
-                    return Some(format_google(
-                        serde_json::from_str(&read_file(&cache_file)).unwrap(),
-                    ));
+                    if let Ok(json) = serde_json::from_str(&read_file(&cache_file)) {
+                        return Some(format_google(json));
+                    } else {
+                        println!("All: Failed to parse JSON from cache: {}", cache_file);
+                        return Some(Vec::new());
+                    }
                 }
                 "bing" => {
-                    return Some(format_bing(
-                        serde_json::from_str(&read_file(&cache_file)).unwrap(),
-                    ));
+                    if let Ok(json) = serde_json::from_str(&read_file(&cache_file)) {
+                        return Some(format_bing(json));
+                    } else {
+                        println!("All: Failed to parse JSON from cache: {}", cache_file);
+                        return Some(Vec::new());
+                    }
                 }
                 "bing2" => {
-                    return Some(format_bing(
-                        serde_json::from_str(&read_file(&cache_file)).unwrap(),
-                    ));
+                    if let Ok(json) = serde_json::from_str(&read_file(&cache_file)) {
+                        return Some(format_bing(json));
+                    } else {
+                        println!("All: Failed to parse JSON from cache: {}", cache_file);
+                        return Some(Vec::new());
+                    }
                 }
                 "brave" => {
-                    return Some(format_brave(
-                        serde_json::from_str(&read_file(&cache_file)).unwrap(),
-                    ));
+                    if let Ok(json) = serde_json::from_str(&read_file(&cache_file)) {
+                        return Some(format_brave(json));
+                    } else {
+                        println!("All: Failed to parse JSON from cache: {}", cache_file);
+                        return Some(Vec::new());
+                    }
                 }
                 "brave2" => {
-                    return Some(format_brave2(
-                        serde_json::from_str(&read_file(&cache_file)).unwrap(),
-                    ));
+                    if let Ok(json) = serde_json::from_str(&read_file(&cache_file)) {
+                        return Some(format_brave2(json));
+                    } else {
+                        println!("All: Failed to parse JSON from cache: {}", cache_file);
+                        return Some(Vec::new());
+                    }
                 }
                 _ => continue,
             }
@@ -176,38 +191,50 @@ pub async fn run(query: &str, lang: &str, loc: &str) -> Option<Vec<SearchResult>
 
             // Check for errors
             if brave_json.get("error").is_some() {
-                dis_remote("Brave", {
-                    let now = Local::now();
-                    Local
-                        .with_ymd_and_hms(
-                            now.year() + if now.month() == 12 { 1 } else { 0 },
-                            if now.month() == 12 {
-                                1
-                            } else {
-                                now.month() + 1
-                            },
-                            1,
-                            0,
-                            0,
-                            0,
-                        )
-                        .unwrap()
-                        .timestamp() as u64
-                }); // Disable until 1st of next month
+                // Disable until 1st of next month
+                let now = Local::now();
+                let next_month = if now.month() == 12 {
+                    1
+                } else {
+                    now.month() + 1
+                };
+                let year = now.year() + if now.month() == 12 { 1 } else { 0 };
+
+                match Local.with_ymd_and_hms(year, next_month, 1, 0, 0, 0) {
+                    LocalResult::Single(disable_dt) => {
+                        dis_remote("Brave", disable_dt.timestamp() as u64);
+                    }
+                    LocalResult::Ambiguous(dt1, _dt2) => {
+                        // pick the first in case of ambiguity
+                        dis_remote("Brave", dt1.timestamp() as u64);
+                    }
+                    LocalResult::None => {
+                        println!(
+                            "All: Failed to compute first day of next month for Brave disable"
+                        );
+                    }
+                }
 
                 return None; // Send signal to retry search
             }
 
-            write(
-                &format!(
-                    "cache/all/brave/{}_{}_{}.json",
-                    query.replace(" ", "_").replace("/", "_"),
-                    loc,
-                    lang
-                ),
-                serde_json::to_string_pretty(&brave_json).unwrap(),
-            )
-            .unwrap();
+            let path = format!(
+                "cache/all/brave/{}_{}_{}.json",
+                query.replace(" ", "_").replace("/", "_"),
+                loc,
+                lang
+            );
+            match serde_json::to_string_pretty(&brave_json) {
+                Ok(json_str) => {
+                    if let Err(e) = write(&path, json_str) {
+                        println!("All: Failed to write cache file {}: {}", path, e);
+                    }
+                }
+                Err(e) => {
+                    println!("All: Failed to serialize brave_json for caching: {}", e);
+                }
+            }
+
             return Some(format_brave(brave_json));
         }
         "brave2" => {
@@ -230,16 +257,23 @@ pub async fn run(query: &str, lang: &str, loc: &str) -> Option<Vec<SearchResult>
                 }
             };
 
-            write(
-                &format!(
-                    "cache/all/brave2/{}_{}_{}.json",
-                    query.replace(" ", "_").replace("/", "_"),
-                    loc,
-                    lang
-                ),
-                serde_json::to_string_pretty(&brave2_json).unwrap(),
-            )
-            .unwrap();
+            let path = format!(
+                "cache/all/brave2/{}_{}_{}.json",
+                query.replace(" ", "_").replace("/", "_"),
+                loc,
+                lang
+            );
+            match serde_json::to_string_pretty(&brave2_json) {
+                Ok(json_str) => {
+                    if let Err(e) = write(&path, json_str) {
+                        println!("All: Failed to write cache file {}: {}", path, e);
+                    }
+                }
+                Err(e) => {
+                    println!("All: Failed to serialize brave2_json for caching: {}", e);
+                }
+            }
+
             return Some(format_brave2(brave2_json));
         }
         "bing" => {
@@ -261,16 +295,23 @@ pub async fn run(query: &str, lang: &str, loc: &str) -> Option<Vec<SearchResult>
                 }
             };
 
-            write(
-                &format!(
-                    "cache/all/bing/{}_{}_{}.json",
-                    query.replace(" ", "_").replace("/", "_"),
-                    loc,
-                    lang
-                ),
-                serde_json::to_string_pretty(&bing_json).unwrap(),
-            )
-            .unwrap();
+            let path = format!(
+                "cache/all/bing/{}_{}_{}.json",
+                query.replace(" ", "_").replace("/", "_"),
+                loc,
+                lang
+            );
+            match serde_json::to_string_pretty(&bing_json) {
+                Ok(json_str) => {
+                    if let Err(e) = write(&path, json_str) {
+                        println!("All: Failed to write cache file {}: {}", path, e);
+                    }
+                }
+                Err(e) => {
+                    println!("All: Failed to serialize bing_json for caching: {}", e);
+                }
+            }
+
             return Some(format_bing(bing_json));
         }
         "bing2" => {
@@ -293,16 +334,23 @@ pub async fn run(query: &str, lang: &str, loc: &str) -> Option<Vec<SearchResult>
                 }
             };
 
-            write(
-                &format!(
-                    "cache/all/bing2/{}_{}_{}.json",
-                    query.replace(" ", "_").replace("/", "_"),
-                    loc,
-                    lang
-                ),
-                serde_json::to_string_pretty(&bing2_json).unwrap(),
-            )
-            .unwrap();
+            let path = format!(
+                "cache/all/bing2/{}_{}_{}.json",
+                query.replace(" ", "_").replace("/", "_"),
+                loc,
+                lang
+            );
+            match serde_json::to_string_pretty(&bing2_json) {
+                Ok(json_str) => {
+                    if let Err(e) = write(&path, json_str) {
+                        println!("All: Failed to write cache file {}: {}", path, e);
+                    }
+                }
+                Err(e) => {
+                    println!("All: Failed to serialize bing2_json for caching: {}", e);
+                }
+            }
+
             return Some(format_bing(bing2_json));
         }
         _ => {
@@ -328,32 +376,52 @@ pub async fn run(query: &str, lang: &str, loc: &str) -> Option<Vec<SearchResult>
 
             // Check for errors
             if google_json.get("error").is_some() {
-                dis_remote("Google", {
-                    let now = Local::now();
-                    let today_8am = Local
-                        .with_ymd_and_hms(now.year(), now.month(), now.day(), 8, 0, 0)
-                        .unwrap();
-                    (if now >= today_8am {
-                        today_8am + chDuration::days(1)
-                    } else {
-                        today_8am
-                    })
-                    .timestamp() as u64
-                }); // Disable until 8am (today/tomorrow)
+                // Disable until 8am (today/tomorrow)
+                let now = Local::now();
+
+                match Local.with_ymd_and_hms(now.year(), now.month(), now.day(), 8, 0, 0) {
+                    LocalResult::Single(today_8am) => {
+                        let disable_until = if now >= today_8am {
+                            today_8am + chDuration::days(1)
+                        } else {
+                            today_8am
+                        };
+                        dis_remote("Google", disable_until.timestamp() as u64);
+                    }
+                    LocalResult::Ambiguous(dt1, _dt2) => {
+                        // pick the first option if ambiguous
+                        let disable_until = if now >= dt1 {
+                            dt1 + chDuration::days(1)
+                        } else {
+                            dt1
+                        };
+                        dis_remote("Google", disable_until.timestamp() as u64);
+                    }
+                    LocalResult::None => {
+                        println!("Failed to compute 8 AM for Google disable");
+                    }
+                }
 
                 return None; // Send signal to retry search
             }
 
-            write(
-                &format!(
-                    "cache/all/google/{}_{}_{}.json",
-                    query.replace(" ", "_").replace("/", "_"),
-                    loc,
-                    lang
-                ),
-                serde_json::to_string_pretty(&google_json).unwrap(),
-            )
-            .unwrap();
+            let path = format!(
+                "cache/all/google/{}_{}_{}.json",
+                query.replace(" ", "_").replace("/", "_"),
+                loc,
+                lang
+            );
+            match serde_json::to_string_pretty(&google_json) {
+                Ok(json_str) => {
+                    if let Err(e) = write(&path, json_str) {
+                        println!("All: Failed to write cache file {}: {}", path, e);
+                    }
+                }
+                Err(e) => {
+                    println!("All: Failed to serialize google_json for caching: {}", e);
+                }
+            }
+
             return Some(format_google(google_json));
         }
     }
