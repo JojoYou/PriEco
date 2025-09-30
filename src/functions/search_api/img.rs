@@ -72,7 +72,7 @@ pub async fn run(query: &str) -> Vec<ImgResult> {
         .unwrap();
 
     // Await the results of both requests
-    let (bing_results, unsplash_results, fanart_results) = tokio::try_join!(
+    let (bing_result, unsplash_result, fanart_result) = tokio::join!(
         // Bing
         client
             .get(&format!(
@@ -97,14 +97,29 @@ pub async fn run(query: &str) -> Vec<ImgResult> {
                 dotenv!("FANART_API_KEY")
             ))
             .send(),
-    )
-    .unwrap();
+    );
 
-    // Parse the responses as JSON
-    let bing_json: Value = bing_results.json().await.unwrap();
-    let unsplash_json: Value = unsplash_results.json().await.unwrap();
+    // Convert Results into Options
+    let bing_resp = bing_result.ok();
+    let unsplash_resp = unsplash_result.ok();
+    let fanart_resp = fanart_result.ok();
+
+    // Parse JSON, falling back to Value::Null if missing or parsing fails
+    let bing_json: Value = match bing_resp {
+        Some(resp) => resp.json().await.unwrap_or(Value::Null),
+        None => Value::Null,
+    };
+
+    let unsplash_json: Value = match unsplash_resp {
+        Some(resp) => resp.json().await.unwrap_or(Value::Null),
+        None => Value::Null,
+    };
+
     let fanart_json: Value = if !mbid.is_empty() {
-        fanart_results.json().await.unwrap()
+        match fanart_resp {
+            Some(resp) => resp.json().await.unwrap_or(Value::Null),
+            None => Value::Null,
+        }
     } else {
         Value::Null
     };
