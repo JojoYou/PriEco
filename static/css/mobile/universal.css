@@ -72,9 +72,18 @@ a {
   align-items: center;
 }
 .footer-social {
-  display: flex;
   margin: 20px 0;
 }
-.footer-social a:first-child {
-  margin-right: 20px;
+.footer-social-group {
+  display: flex;
+  overflow: auto hidden;
+}
+.footer-social-group a {
+  margin: 0px 5px;
+}
+.footer-social-group svg,
+.footer-social-group img {
+  width: 60px;
+  height: 60px;
+  padding: 17px;
 }

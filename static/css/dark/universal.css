@@ -8,6 +8,6 @@ body {
 .footer-content-left a {
   background: #202124;
 }
-.footer-social img {
+.filter-img {
   filter: brightness(0) invert(1);
 }
