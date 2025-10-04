@@ -290,16 +290,26 @@ pub async fn run_json(
     // Exact root domain
     let exact_future = async {
         let mut exact_results = Vec::new();
-        let mut urls = Vec::new();
 
+        // Sanitize the query
+        let sanitized_q = q
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '-')
+            .collect::<String>();
+
+        if sanitized_q.is_empty() {
+            return exact_results;
+        }
+
+        let mut urls = Vec::new();
         for tld in vec![
             "com", "org", "net", "co.uk", "de", "fr", "ca", "au", "in", "br", "mx", "es", "it",
             "ru", "jp", "cn",
         ] {
-            urls.push(format!("'https://{}.{}/'", &q, tld));
-            urls.push(format!("'http://{}.{}/'", &q, tld));
-            urls.push(format!("'https://www.{}.{}/'", &q, tld));
-            urls.push(format!("'http://www.{}.{}/'", &q, tld));
+            urls.push(format!("'https://{}.{}/'", &sanitized_q, tld));
+            urls.push(format!("'http://{}.{}/'", &sanitized_q, tld));
+            urls.push(format!("'https://www.{}.{}/'", &sanitized_q, tld));
+            urls.push(format!("'http://www.{}.{}/'", &sanitized_q, tld));
         }
 
         if let Ok(response) = UtilsApiClient::new(Arc::new(Configuration::new()))
