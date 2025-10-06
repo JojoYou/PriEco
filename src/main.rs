@@ -14,12 +14,12 @@ use rocket::{
     fairing::{Fairing, Info, Kind},
     fs::{FileServer, NamedFile},
     get, head,
-    http::{ContentType, CookieJar, Header, Status},
+    http::{ContentType, CookieJar, Header, Status, uri::Host},
     launch, post,
     request::{FromRequest, Outcome},
     response::{
         self, Responder,
-        content::{RawJavaScript, RawText},
+        content::{RawJavaScript, RawText, RawXml},
     },
     routes,
     serde::json::{Json, Value as RocketValue},
@@ -255,8 +255,9 @@ fn rocket() -> _ {
                 // Assets
                 sw_js, // Service worker (Browser cache + unduck)
                 unduck_js,
-                security_txt, // Security.txt
-                robots_txt,   // Robots.txt
+                security, // Security.txt
+                robots,   // Robots.txt
+                osd,
                 script,
                 favicon,
                 privacy, // Privacy Policy
@@ -294,14 +295,46 @@ async fn unduck_js() -> Option<NamedFile> {
         .ok()
 }
 #[get("/.well-known/security.txt")]
-async fn security_txt() -> RawText<&'static str> {
+async fn security() -> RawText<&'static str> {
     RawText(
         "Contact: mailto:support@jojoyou.org\nExpires: 2026-04-16T12:00:00.000Z\nPreferred-Languages: en,sk,cs",
     )
 }
 #[get("/robots.txt")]
-async fn robots_txt() -> RawText<&'static str> {
+async fn robots() -> RawText<&'static str> {
     RawText("User-agent: *\nDisallow: /search")
+}
+#[get("/osd.xml")]
+fn osd(host: &Host) -> RawXml<String> {
+    let (short_name, base_url, search_url) = if host.domain().as_str().ends_with(".onion") {
+        (
+            "PriEco (Onion)",
+            "http://priecovk7jsuh3tvkh62c6j4oep3l5bldigpzmay26rdpqz357t5dmad.onion/",
+            "http://priecovk7jsuh3tvkh62c6j4oep3l5bldigpzmay26rdpqz357t5dmad.onion/search?t=all&amp;q={searchTerms}",
+        )
+    } else {
+        (
+            "PriEco",
+            "https://prieco.net/",
+            "https://prieco.net/search?t=all&amp;q={searchTerms}",
+        )
+    };
+
+    let xml = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+  <ShortName>{short}</ShortName>
+  <Description>Search Privately, Securely and EcoFriendly</Description>
+  <InputEncoding>UTF-8</InputEncoding>
+  <Url type="text/html" template="{search}"/>
+  <SearchForm>{base}</SearchForm>
+</OpenSearchDescription>"#,
+        short = short_name,
+        search = search_url,
+        base = base_url
+    );
+
+    RawXml(xml)
 }
 
 // JavaScript templates
@@ -385,14 +418,14 @@ async fn favicon(filename: String) -> Result<DecompressedImage, Status> {
 ////
 // JavaScript templates
 #[get("/privacy")]
-fn privacy(cookie_jar: &CookieJar<'_>) -> Template {
+fn privacy(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     let mut context: HashMap<String, RocketValue> = HashMap::from([
         (String::from("css_version"), json!(CSS_VERSION)),
         (String::from("js_version"), json!(JS_VERSION)),
         (String::from("title_query"), json!("Privacy Policy | ")),
     ]);
 
-    settings::run(&mut context, &None, cookie_jar);
+    settings::run(&mut context, &None, cookie_jar, host);
 
     Template::render("legal/privacy", context)
 }
@@ -401,7 +434,7 @@ fn privacy(cookie_jar: &CookieJar<'_>) -> Template {
 // Landing page
 ////
 #[get("/")]
-fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>) -> Template {
+fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     let ip_addr = client_ip.0; // Extract IP address
 
     let mut context: HashMap<String, RocketValue> = HashMap::new();
@@ -409,7 +442,7 @@ fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>) -> Template {
     context.insert(String::from("css_version"), json!(CSS_VERSION));
     context.insert(String::from("js_version"), json!(JS_VERSION));
 
-    settings::run(&mut context, &Some(ip_addr), cookie_jar);
+    settings::run(&mut context, &Some(ip_addr), cookie_jar, host);
 
     Template::render("home", &context)
 }
@@ -430,6 +463,7 @@ async fn search(
     #[allow(unused_variables)] sxprsearchsugg: Option<&str>, // Search Expander data
     client_ip: ClientIp,
     cookie_jar: &CookieJar<'_>,
+    host: &Host<'_>,
 ) -> Template {
     ////
     // Create context
@@ -483,7 +517,7 @@ async fn search(
         context.insert(String::from("bang"), json!(false));
     }
 
-    settings::run(&mut context, &Some(client_ip.0), cookie_jar); // Aplly cookies' settings to context
+    settings::run(&mut context, &Some(client_ip.0), cookie_jar, host); // Aplly cookies' settings to context
 
     Template::render("search", &context)
 }
@@ -523,7 +557,7 @@ async fn api(
 // Settings
 ////
 #[get("/settings_html")]
-fn settings_htmls(cookie_jar: &CookieJar<'_>) -> Template {
+fn settings_htmls(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     let mut context: HashMap<String, RocketValue> = HashMap::new();
 
     context.insert(String::from("css_version"), json!(CSS_VERSION));
@@ -551,7 +585,7 @@ fn settings_htmls(cookie_jar: &CookieJar<'_>) -> Template {
         context.insert(String::from("prieco_user_stats"), json!(100.0));
     }
 
-    settings::run(&mut context, &None, cookie_jar);
+    settings::run(&mut context, &None, cookie_jar, host);
 
     Template::render("settings", &context)
 }

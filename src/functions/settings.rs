@@ -1,4 +1,4 @@
-use rocket::http::CookieJar;
+use rocket::http::{CookieJar, uri::Host};
 use serde_json::json;
 use std::{
     collections::HashMap,
@@ -14,7 +14,16 @@ pub fn run(
     context: &mut HashMap<String, serde_json::Value>,
     maybe_ip: &Option<IpAddr>,
     cookie_jar: &CookieJar<'_>,
+    host: &Host,
 ) {
+    ////
+    // OSD
+    ////
+    if host.domain().as_str().ends_with(".onion") {
+        println!("ONion!");
+        context.insert(String::from("osd_title"), json!(" (Onion)"));
+    }
+
     ////
     // Language & Location
     ////
