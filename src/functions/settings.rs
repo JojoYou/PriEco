@@ -20,7 +20,6 @@ pub fn run(
     // OSD
     ////
     if host.domain().as_str().ends_with(".onion") {
-        println!("ONion!");
         context.insert(String::from("osd_title"), json!(" (Onion)"));
     }
 
