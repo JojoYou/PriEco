@@ -75,8 +75,10 @@ a {
   margin: 20px 0;
 }
 .footer-social-group {
+  max-width: 100vw;
   display: flex;
   overflow: auto hidden;
+  margin: 10px 0;
 }
 .footer-social-group a {
   margin: 0px 5px;
