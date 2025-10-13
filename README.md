@@ -72,6 +72,12 @@ bc1q9zs9n28jk4jx2w2659mhzd84skg0mlgkq7g3rr
 DJS1CEu1atr46Tkyg5Vq2fZKqW11gj27TmfQ9VF2fZ6h
 ```
 
+**Monero**
+
+```
+459wNiZ9LkCEAMmiW4f1cfZxuj4mxS7ihaxvrxVZ7j2uJao31FbxhnADS3Y4wHZ4aqAAkNrC4rJezUt8ePsiCrdr8mpWP3A
+```
+
 ## Authors
 
 - [@Roman Láncoš](https://codeberg.org/JojoYou)
