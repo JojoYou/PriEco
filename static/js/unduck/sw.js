@@ -1,4 +1,4 @@
-const CACHE_NAME = "prieco-browser-cache";
+const CACHE_NAME = "prieco-browser-cache?v=0.1.2";
 const EXCLUDED_FILES = ["/settings_html", "/api"];
 const MAX_CACHE_ITEMS = 2000;
 

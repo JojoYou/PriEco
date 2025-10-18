@@ -13,8 +13,8 @@ use std::{
 use tokenizers::Tokenizer;
 use tokio::task;
 
-pub const CSS_VERSION: &str = "0.1.1";
-pub const JS_VERSION: &str = "0.1.1";
+pub const CSS_VERSION: &str = "0.1.2";
+pub const JS_VERSION: &str = "0.1.2";
 
 // Constants for all possible terminal colors
 pub mod colors {
