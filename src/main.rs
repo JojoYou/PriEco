@@ -81,10 +81,10 @@ impl Fairing for GlobalHeaders {
         res.set_header(Header::new(
             "Content-Security-Policy",
             "default-src 'self'; \
-             script-src 'self' https://umami.prieco.net; \
+             script-src 'self' https://liwan.prieco.net; \
              style-src 'self'; \
              img-src 'self' data: https://proxy.prieco.net; \
-             connect-src 'self' https://proxy.prieco.net https://umami.prieco.net; \
+             connect-src 'self' https://proxy.prieco.net https://liwan.prieco.net; \
              frame-src 'self'; \
              frame-ancestors 'self'; \
              form-action 'self'; \
