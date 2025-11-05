@@ -16,11 +16,10 @@
   text-align: center;
 }
 .logo {
-  height: 48px;
-  width: 25.65px;
+  height: 70px;
 }
 .title {
-  font-size: 44px;
+  font-size: 70px;
   font-weight: bold;
   width: 40%;
   background: -webkit-linear-gradient(#03d781, #3edce2);
@@ -34,7 +33,7 @@
 }
 .search_button {
   width: 8%;
-  height: 45px;
+  height: 52px;
   right: -10px;
   left: unset;
   border: none;
@@ -64,7 +63,7 @@
   border-right: 1.2px solid #25dab9;
 }
 .search_box {
-  height: 45px;
+  height: 52px;
   width: calc(92% - 30px);
   min-width: 200px;
   max-width: clamp(1px, 675px, 90vw);
