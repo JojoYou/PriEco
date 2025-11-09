@@ -2,7 +2,11 @@ function loadSection(containerId, url, scriptPath) {
   const container = document.getElementById(containerId);
   if (!container) return Promise.resolve(); // keep Promise.all happy
 
-  return fetch(url) // <-- return so Promise.all can track it
+  return fetch(url, {
+    headers: {
+      "requested-with": "js"
+    }
+  })
     .then(response => response.text())
     .then(html => {
       const tempDiv = document.createElement("div");
