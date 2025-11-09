@@ -101,50 +101,62 @@ pub async fn run(query: &str, lang: &str, loc: &str) -> Option<Vec<SearchResult>
     }
 
     let selected_api = if is_likely_english {
-        if is_hard_query || random_boost {
+            if is_hard_query || random_boost {
+                // Prefer powerful APIs for hard queries
+                if !google_blocked {
+                    Some("google")
+                } else if !bing_blocked {
+                    Some("bing")
+                } else if !bing2_blocked {
+                    Some("bing2")
+                } else if !brave2_blocked {
+                    Some("brave2")
+                } else if !brave_blocked {
+                    Some("brave")
+                } else {
+                    None
+                }
+            } else {
+                // Prefer cheaper APIs for easy queries
+                if !brave2_blocked {
+                    Some("brave2")
+                } else if !brave_blocked {
+                    Some("brave")
+                } else if !bing_blocked {
+                    Some("bing")
+                } else if !bing2_blocked {
+                    Some("bing2")
+                } else if !google_blocked {
+                    Some("google")
+                } else {
+                    None
+                }
+            }
+        } else {
+            // Non-English: prefer Google
             if !google_blocked {
-                "google"
+                Some("google")
             } else if !bing_blocked {
-                "bing"
-            } else if !bing_blocked {
-                "bing2"
+                Some("bing")
+            } else if !bing2_blocked {
+                Some("bing2")
             } else if !brave2_blocked {
-                "brave2"
+                Some("brave2")
             } else if !brave_blocked {
-                "brave"
+                Some("brave")
             } else {
-                "google"
-            } // fallback even if blocked
-        } else {
-            if !brave2_blocked {
-                "brave2"
-            } else if !brave_blocked {
-                "brave"
-            } else if !bing_blocked {
-                "bing"
-            } else if !bing_blocked {
-                "bing2"
-            } else if !google_blocked {
-                "google"
-            } else {
-                "bing"
-            } // fallback even if blocked
-        }
-    } else {
-        if !google_blocked {
-            "google"
-        } else if !bing_blocked {
-            "bing"
-        } else if !bing_blocked {
-            "bing2"
-        } else if !brave2_blocked {
-            "brave2"
-        } else if !brave_blocked {
-            "brave"
-        } else {
-            "google"
-        } // fallback even if blocked
-    };
+                None
+            }
+        };
+
+        let selected_api = match selected_api {
+            Some(api) => api,
+            None => {
+                println!("No available APIs (all blocked)");
+                return Some(Vec::new());
+            }
+        };
+
 
     println!("Using API: {}", selected_api);
 
@@ -652,36 +664,45 @@ fn format_brave2(json: Value) -> Vec<SearchResult> {
 // Helper functions
 ////
 fn dis_remote(remote_name: &str, time: u64) {
-    let mut file = match File::create(format!("dis{}.txt", remote_name)) {
-        Ok(file) => file,
+    let filename = format!("dis{}.txt", remote_name);
+    println!("Creating dis file: {} with timestamp: {}", filename, time);
+
+    match File::create(&filename) {
+        Ok(mut file) => {
+            if let Err(e) = write!(file, "{}", time) {
+                println!(
+                    "{}Failed to write to {}:{} {}",
+                    colors::RED,
+                    filename,
+                    colors::RESET,
+                    e
+                );
+            } else if let Err(e) = file.sync_all() {
+                println!(
+                    "{}Failed to sync {}:{} {}",
+                    colors::RED,
+                    filename,
+                    colors::RESET,
+                    e
+                );
+            } else {
+                println!("Successfully created {} - {} blocked until timestamp {}",
+                         filename, remote_name, time);
+            }
+        }
         Err(e) => {
             println!(
-                "{}1. Failed to create dis{}.txt:{} {}",
+                "{}Failed to create {}:{} {}",
                 colors::RED,
-                remote_name,
+                filename,
                 colors::RESET,
                 e
             );
-            return;
         }
-    };
-    match file.write_all(format!("{}", time).as_bytes()) {
-        Ok(_) => {}
-        Err(e) => {
-            println!(
-                "{}2. Failed to write to dis{}.txt:{} {}",
-                colors::RED,
-                remote_name,
-                colors::RESET,
-                e
-            );
-            return;
-        }
-    };
+    }
 }
 
-fn check_dis_remote(remote_name: &str) -> bool {
-    let filename = format!("dis{}.txt", remote_name);
+fn check_dis_remote(filename: &str) -> bool {
 
     // Check if the file exists
     if metadata(&filename).is_err() {
