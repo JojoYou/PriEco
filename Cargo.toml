@@ -1,6 +1,6 @@
 [package]
 name = "prieco_rs"
-version = "1.0.0"
+version = "2.0.0"
 authors = ["Roman Láncoš <support@jojoyou.org>"]
 edition = "2024"
 
@@ -33,11 +33,13 @@ tikv-jemallocator = "0.6.0" # Memory allocator
 dotenv_codegen = "0.15.0" # .env file
 num_cpus = "1.17.0" # Number of CPU cores
 once_cell = "1.20.3" # Global variables
+parking_lot = "0.12.5" # Global variables mutexes
 reqwest = { version = "0.12.23", features = ["json", "gzip", "brotli", "deflate"] } # Out HTTP reqvest client
-rand = { version = "0.9.2", features = [
+rand = { version = "0.9.0", features = [
   "std",
   "std_rng",
 ] } # Random number generator
+dashmap = "6.1.0"# Multi threaded hashmap
 
 # Web server
 rocket = { version = "0.5.1", features = ["json"] } # Web server
@@ -47,23 +49,34 @@ tokio = { version = "1.37.0", features = ["full"] }
 serde = "1.0.219"
 serde_json = "1.0.142"
 
+# Blob storage
+flate2 = "1.1.9" # Streamed file compression and decompression (RAM)
+tar = "0.4.44" # Tar archive
+
 # Database
-manticoresearch = "1.1.0"
-http-body-util = "0.1.3"
+rocksdb = "0.24.0" # Results' data
+tantivy = "0.25.0" # Full-text index
+
 redb = "3.0.1"            # Key-Value
 
 # Vector embedding
-ort = "1.16.3"
-tokenizers = "0.21.1"
+ort = { path = "vendor/ort-1.16.3"  , features = ["cuda", "load-dynamic"] } # Query to vector
+tokenizers = "0.21.1" # Ort model tokenizer
+cudarc = { version = "0.19.2", optional = true, features = ["cublas", "nvrtc", "cuda-version-from-build-system"] } # Nvidia GPU, used for comparing cosine distance between vectors
 ndarray = "0.15.1"
 
-
 # Tools
-ahash = "0.8.12"      # Ultra fast single threaded hashmap
-twox-hash = "2.1.2" # Predictable hash
+ahash = "0.8.12"      # Faster single threaded hashmap
+twox-hash = "2.1.0" # Predictable hash
 url = "2.5.2"         # URL manager
-urlencoding = "2.1.3"
-brotli = "8.0.2"
+urlencoding = "2.1.3" # URL encoder/decoder
+brotli = "8.0.2" # Google compression for html, css, js
+zstd = "0.13.3" # Zstandard compression
 mime_guess = "2.0.5"
-chrono = "0.4.41" # Datetime
+chrono = "0.4.43" # Datetime
 image = "0.25.8" # Image manipulation
+
+# I want to be able to develop on any device while PriEco in production requires Nvidia GPU
+[features]
+default = []
+cuda = ["dep:cudarc"] # Compile:  RUSTFLAGS='-C target-cpu=native' cargo build --release --features cuda

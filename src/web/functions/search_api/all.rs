@@ -10,9 +10,9 @@ use std::{
 };
 
 use crate::{
-    call_api_future_json, get_domain,
     globals::{SearchResult, colors},
     read_file,
+    web::functions::general::{call_api_future_json, get_domain},
 };
 
 pub async fn run(query: &str, lang: &str, loc: &str) -> Option<Vec<SearchResult>> {
@@ -101,39 +101,8 @@ pub async fn run(query: &str, lang: &str, loc: &str) -> Option<Vec<SearchResult>
     }
 
     let selected_api = if is_likely_english {
-            if is_hard_query || random_boost {
-                // Prefer powerful APIs for hard queries
-                if !google_blocked {
-                    Some("google")
-                } else if !bing_blocked {
-                    Some("bing")
-                } else if !bing2_blocked {
-                    Some("bing2")
-                } else if !brave2_blocked {
-                    Some("brave2")
-                } else if !brave_blocked {
-                    Some("brave")
-                } else {
-                    None
-                }
-            } else {
-                // Prefer cheaper APIs for easy queries
-                if !brave2_blocked {
-                    Some("brave2")
-                } else if !brave_blocked {
-                    Some("brave")
-                } else if !bing_blocked {
-                    Some("bing")
-                } else if !bing2_blocked {
-                    Some("bing2")
-                } else if !google_blocked {
-                    Some("google")
-                } else {
-                    None
-                }
-            }
-        } else {
-            // Non-English: prefer Google
+        if is_hard_query || random_boost {
+            // Prefer powerful APIs for hard queries
             if !google_blocked {
                 Some("google")
             } else if !bing_blocked {
@@ -147,16 +116,46 @@ pub async fn run(query: &str, lang: &str, loc: &str) -> Option<Vec<SearchResult>
             } else {
                 None
             }
-        };
-
-        let selected_api = match selected_api {
-            Some(api) => api,
-            None => {
-                println!("No available APIs (all blocked)");
-                return Some(Vec::new());
+        } else {
+            // Prefer cheaper APIs for easy queries
+            if !brave2_blocked {
+                Some("brave2")
+            } else if !brave_blocked {
+                Some("brave")
+            } else if !bing_blocked {
+                Some("bing")
+            } else if !bing2_blocked {
+                Some("bing2")
+            } else if !google_blocked {
+                Some("google")
+            } else {
+                None
             }
-        };
+        }
+    } else {
+        // Non-English: prefer Google
+        if !google_blocked {
+            Some("google")
+        } else if !bing_blocked {
+            Some("bing")
+        } else if !bing2_blocked {
+            Some("bing2")
+        } else if !brave2_blocked {
+            Some("brave2")
+        } else if !brave_blocked {
+            Some("brave")
+        } else {
+            None
+        }
+    };
 
+    let selected_api = match selected_api {
+        Some(api) => api,
+        None => {
+            println!("No available APIs (all blocked)");
+            return Some(Vec::new());
+        }
+    };
 
     println!("Using API: {}", selected_api);
 
@@ -686,8 +685,10 @@ fn dis_remote(remote_name: &str, time: u64) {
                     e
                 );
             } else {
-                println!("Successfully created {} - {} blocked until timestamp {}",
-                         filename, remote_name, time);
+                println!(
+                    "Successfully created {} - {} blocked until timestamp {}",
+                    filename, remote_name, time
+                );
             }
         }
         Err(e) => {
@@ -703,7 +704,6 @@ fn dis_remote(remote_name: &str, time: u64) {
 }
 
 fn check_dis_remote(filename: &str) -> bool {
-
     // Check if the file exists
     if metadata(&filename).is_err() {
         return false;

@@ -1,0 +1,95 @@
+[package]
+name = "ort"
+description = "A Rust wrapper for ONNX Runtime 1.16 - Optimize and Accelerate Machine Learning Inferencing"
+version = "1.16.3"
+edition = "2021"
+rust-version = "1.70"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/pykeio/ort"
+readme = "README.md"
+keywords = [ "machine-learning", "ai", "ml" ]
+categories = [ "algorithms", "mathematics", "science" ]
+authors = [
+	"pyke.io <contact@pyke.io>",
+	"Nicolas Bigaouette <nbigaouette@gmail.com>"
+]
+include = [ "src/", "examples/", "tests/", "toolchains/", "build.rs", "LICENSE", "README.md" ]
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+codegen-units = 1
+
+[package.metadata.docs.rs]
+features = [ "half", "fetch-models", "copy-dylibs" ]
+
+[features]
+default = [ "half", "download-binaries", "copy-dylibs" ]
+
+profiling = [ "widestring" ]
+
+fetch-models = [ "ureq" ]
+download-binaries = [ "ureq", "zip" ]
+load-dynamic = [ "libloading" ]
+copy-dylibs = []
+
+minimal-build = []
+experimental = []
+mimalloc = []
+compile-static = []
+
+cuda = []
+tensorrt = []
+openvino = []
+onednn = []
+directml = []
+nnapi = []
+coreml = []
+xnnpack = []
+rocm = []
+acl = []
+armnn = []
+tvm = []
+migraphx = []
+rknpu = []
+vitis = []
+cann = []
+qnn = []
+
+[dependencies]
+ndarray = "0.15"
+thiserror = "1.0"
+libloading = { version = "0.7", optional = true }
+
+ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }
+lazy_static = "1.4"
+tracing = "0.1"
+half = { version = "2.1", optional = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = [ "std", "libloaderapi" ] }
+widestring = { version = "1.0", optional = true }
+
+[dev-dependencies]
+anyhow = "1.0"
+ureq = "2.1"
+image = "0.24"
+test-log = { version = "0.2", default-features = false, features = [ "trace" ] }
+tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
+tokenizers = { version = ">=0.13.4", default-features = false, features = [ "onig" ] }
+rand = "0.8"
+
+[build-dependencies]
+ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }
+zip = { version = "0.6", optional = true, default-features = false, features = [ "deflate" ] }
+
+[target.'cfg(not(target_os = "windows"))'.build-dependencies]
+flate2 = "1.0"
+tar = "0.4"
+
+[target.'cfg(target_os = "windows")'.build-dependencies]
+vswhom = "0.1"

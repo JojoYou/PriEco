@@ -1,37 +1,63 @@
-use rocket::http::{CookieJar, uri::Host};
-use serde_json::json;
+/*
+  File: web/modules/settings.rs
+  Description: PriEco settings module
+
+  Author: Roman Lancos <support@jojoyou.org>
+  License: AGPL v3.0
+
+  Date Created: 2025-09-20
+  Last Modified: 2026-02-06
+
+  Usage: Run run() on any page to integrate settings to the page
+  TODO:
+*/
+
+/*
+  Import system libraries
+*/
 use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr},
 };
 
+/*
+  Import external libraries
+*/
+use rocket::http::{CookieJar, uri::Host};
+use serde_json::json;
+
+/*
+  Import own libraries
+*/
 use crate::{
     globals::{COUNTRY_TO_LANG, IP_TO_LOC},
-    set_cookie,
+    web::functions::general::set_cookie,
 };
 
+/*
+  Description: Integrates settings to the page
+
+  Input: Shared context beteween functions, Optional IP address, CookieJar, Host (PriEco URL)
+  Output: None
+*/
 pub fn run(
     context: &mut HashMap<String, serde_json::Value>,
     maybe_ip: &Option<IpAddr>,
     cookie_jar: &CookieJar<'_>,
-    host: &Host,
+    prieco_url: &Host,
 ) {
-    ////
     // OSD
-    ////
-    if host.domain().as_str().ends_with(".onion") {
+    if prieco_url.domain().as_str().ends_with(".onion") {
         context.insert(String::from("osd_title"), json!(" (Onion)"));
     }
 
-    ////
     // Language & Location
-    ////
     let ip_addr = maybe_ip.unwrap_or_else(|| IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)));
 
     if (cookie_jar.get("lang").is_none() || cookie_jar.get("loc").is_none())
         && ip_addr != IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0))
     {
-        let loc: String = if !host.domain().as_str().ends_with(".onion") {
+        let loc: String = if !prieco_url.domain().as_str().ends_with(".onion") {
             match IP_TO_LOC.lookup_country(&ip_addr.to_string()) {
                 Ok(Some(country)) => country,
                 Ok(None) => {
@@ -50,7 +76,7 @@ pub fn run(
         if !loc.is_empty() {
             set_cookie(cookie_jar, String::from("loc"), loc.clone(), false, true);
 
-            if !host.domain().as_str().ends_with(".onion") {
+            if !prieco_url.domain().as_str().ends_with(".onion") {
                 if let Some(lang) = COUNTRY_TO_LANG.get(loc.as_str()) {
                     set_cookie(
                         cookie_jar,
@@ -77,6 +103,14 @@ pub fn run(
                     true,
                 );
             }
+        } else {
+            set_cookie(
+                cookie_jar,
+                String::from("loc"),
+                String::from("all"),
+                false,
+                true,
+            );
         }
     }
     context.insert(

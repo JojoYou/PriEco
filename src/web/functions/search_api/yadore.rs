@@ -4,8 +4,8 @@ use serde_json::Value;
 use std::time::Duration;
 
 use crate::{
-    call_api_future_json,
     globals::{WebScrollResult, colors},
+    web::functions::general::call_api_future_json,
 };
 
 pub async fn run(query: &str, loc: &str) -> Vec<WebScrollResult> {

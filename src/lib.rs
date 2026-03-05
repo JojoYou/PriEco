@@ -1,57 +1,109 @@
-use rocket::{
-    http::{Cookie, CookieJar, SameSite},
-    time::{Duration, OffsetDateTime},
-};
-use serde_json::Value;
-use std::{fs::read_to_string, hash::Hasher};
-use twox_hash::XxHash64;
-use url::Url;
-
-// Import local libraries
-pub mod globals;
-
-pub mod functions {
-    pub mod search_db;
-    pub mod search_endpoint;
-    pub mod settings;
-
-    pub mod search_api {
-        pub mod all;
-        pub mod img;
-        pub mod yadore;
-    }
-}
-
 /*
-  Description: Gets domain from URL
+  File: lib.rs
+  Description: Joins whole project & Holds universal functions
 
-  Input: URL, if remove_www
-  Output: domain
+  Author: Roman Lancos <support@jojoyou.org>
+  License: AGPL v3.0
+
+  Date Created: 2025-09-20
+  Last Modified: 2026-02-06
+
+  Usage: Call these functions to develop faster
+  TODO:
 */
-pub fn get_domain(url: &str, remove_www: bool) -> String {
-    if url.is_empty() {
-        return String::new();
+
+/*
+  Import system libraries
+*/
+use std::{
+    fs::{File, OpenOptions, create_dir_all, metadata, read_to_string, remove_file},
+    hash::Hasher,
+    io::{self, BufWriter, Read, Seek, SeekFrom, Write},
+    path::Path,
+};
+
+use twox_hash::XxHash3_64;
+
+use crate::{
+    globals::{FILE_LOCKS, colors},
+    pagerank::compute::{SCORES_A, SCORES_B, zstd_reader},
+};
+
+/*
+  Connect all files in the project
+*/
+pub mod globals; // Global variables
+pub mod set_up; // Set up code
+
+// PriEco Website
+pub mod web {
+    // Pages
+    pub mod routes {
+        pub mod apis;
+        pub mod assets;
+        pub mod pages;
     }
-    let parsed_url = Url::parse(url);
-    match parsed_url {
-        Ok(parsed) => {
-            if let Some(domain) = parsed.domain() {
-                if remove_www && domain.starts_with("www.") {
-                    return domain[4..].to_string();
-                }
-                return domain.to_string();
-            }
-            println!("URL has no domain part: {}", url);
+
+    // Universal modules
+    pub mod modules {
+        pub mod settings;
+    }
+
+    // Back-end functionality
+    pub mod functions {
+        pub mod general;
+
+        pub mod search_endpoint;
+
+        pub mod ranking {
+            pub mod hand;
+            pub mod rrf;
         }
-        Err(err) => {
-            println!("Failed to parse URL {}: {}", url, err);
+        pub mod search_db;
+        pub mod search_api {
+            pub mod all;
+            pub mod img;
+            pub mod yadore;
         }
     }
-    String::new()
+}
+
+// Blob storage
+pub mod blob;
+
+// Database inserter
+pub mod insert {
+    pub mod db_insert;
+}
+
+// Pagerank calculation
+pub mod pagerank {
+    pub mod compute;
+    pub mod import {
+        pub mod hashing;
+        pub mod merge;
+        pub mod translate;
+    }
+    pub mod nodes {
+        pub mod csr;
+    }
+    pub mod iter {
+        pub mod iterate;
+    }
 }
 
 /*
-  Description: Reads file
+  Description: I find it more intuitive than Path exists
+
+  Input: file path
+  Output: true if file exists, false otherwise
+*/
+pub fn file_exists(file_path: &str) -> bool {
+    Path::new(file_path).exists()
+}
+
+/*
+  Description: Simpler function with error handling, if failed to load file I expect empty string
 
   Input: file path
   Output: file contents as a string
@@ -62,65 +114,77 @@ pub fn read_file(file_path: &str) -> String {
         Err(_) => String::new(),
     }
 }
+
 /*
-  Description: Checks if URL is valid
+  Description: Safe, thread resistent write to a file
 
-  Input: URL
-  Output: true if valid, false otherwise
+  Input: file path, content, should append the file (if false it removes all already written content)
+  Output: None
 */
-pub fn is_valid_url(input: &str) -> bool {
-    match Url::parse(input) {
-        Ok(url) => match url.scheme() {
-            "http" | "https" => true,
-            _ => false,
-        },
-        Err(_) => false,
-    }
-}
+pub fn write_file(file_path: &str, content: &str, append: bool) {
+    acquire_file_lock(file_path);
 
-pub fn set_cookie(
-    cookie_jar: &CookieJar<'_>,
-    cookie_name: String,
-    cookie_value: String,
-    cookie_long_life: bool,
-    js: bool,
-) {
-    let mut cookie = Cookie::new(cookie_name, cookie_value);
-    cookie.set_same_site(SameSite::Strict);
-    cookie.set_secure(true);
-
-    if cookie_long_life {
-        cookie.set_max_age(Duration::days(365));
-        cookie.set_expires(OffsetDateTime::now_utc() + Duration::days(365));
-    } else {
-        cookie.set_max_age(Duration::days(7));
-        cookie.set_expires(OffsetDateTime::now_utc() + Duration::days(7));
+    // Create parent directories if needed
+    let path = Path::new(file_path);
+    if let Err(e) = create_dir_all(
+        path.parent()
+            .map(|p| p.to_str().unwrap_or(""))
+            .unwrap_or(""),
+    ) {
+        println!("{}{}{}", colors::RED, e, colors::RESET);
     }
 
-    if !js {
-        cookie.set_http_only(true);
-    }
-
-    cookie_jar.add(cookie);
-}
-pub fn hash_node(node: &str) -> u64 {
-    let mut hasher = XxHash64::default();
-    hasher.write(node.as_bytes());
-    hasher.finish()
-}
-
-pub async fn call_api_future_json(req: reqwest::RequestBuilder) -> Option<Value> {
-    match req.send().await {
-        Ok(resp) => match resp.text().await {
-            Ok(text) => serde_json::from_str::<Value>(&text).ok(),
-            Err(err) => {
-                eprintln!("Failed to read response text: {}", err);
-                None
-            }
-        },
-        Err(err) => {
-            eprintln!("Request failed: {}", err);
-            None
+    /*
+      Create, open, write and flush the data
+    */
+    // Open file with buffered writer
+    let mut file = match OpenOptions::new()
+        .write(true)
+        .create(true)
+        .append(append)
+        .truncate(!append)
+        .open(file_path)
+        .map(BufWriter::new)
+    {
+        Ok(f) => f,
+        Err(e) => {
+            println!(
+                "{}Bulk write function{}: Failed to open file {} Because of: {}",
+                colors::RED,
+                colors::RESET,
+                file_path,
+                e
+            );
+            return;
         }
+    };
+
+    // Write and flush
+    let _ = file
+        .write_all(content.as_bytes())
+        .and_then(|_| file.flush());
+
+    release_file_lock(file_path);
+}
+
+pub fn acquire_file_lock(path: &str) {
+    let mut set = FILE_LOCKS.set.lock();
+
+    while set.contains(path) {
+        FILE_LOCKS.condvar.wait(&mut set);
     }
+
+    set.insert(path.to_string());
+}
+
+pub fn release_file_lock(path: &str) {
+    let set = FILE_LOCKS.set.lock();
+    set.remove(path);
+    FILE_LOCKS.condvar.notify_one();
+}
+
+pub fn url_to_id(url: &str) -> u64 {
+    let mut h = XxHash3_64::with_seed(0);
+    h.write(url.as_bytes());
+    h.finish()
 }

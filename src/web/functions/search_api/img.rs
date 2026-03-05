@@ -8,12 +8,12 @@ use std::{
 };
 
 use crate::{
-    get_domain,
     globals::{
         ARTISTS_DB, ARTISTS_TABLE, ImgResult,
         colors::{self},
     },
     read_file,
+    web::functions::general::get_domain,
 };
 
 pub async fn run(query: &str) -> Vec<ImgResult> {

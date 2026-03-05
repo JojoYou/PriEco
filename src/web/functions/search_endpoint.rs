@@ -1,17 +1,41 @@
-use ahash::AHashSet;
-use rocket::{State, http::CookieJar};
-use serde_json::{Value, json};
+/*
+  File: web/modules/search_endpoint.rs
+  Description: Decided what to do with the search query
+
+  Author: Roman Lancos <support@jojoyou.org>
+  License: AGPL v3.0
+
+  Date Created: 2025-09-20
+  Last Modified: 2026-02-06
+
+  Usage Call this to get results in Rocket template format (context that gets inserted to the template)
+  TODO:
+*/
+
+/*
+  Import system libraries
+*/
 use std::collections::HashMap;
 
+/*
+  Import external libraries
+*/
+use rocket::{State, http::CookieJar};
+use serde_json::{Value, json};
+
+/*
+  Import own libraries
+*/
 use crate::{
-    functions::{
-        search_api::{all, img, yadore},
-        search_db,
-    },
     globals::{EmbeddingService, SearchResult},
-    set_cookie,
+    web::functions::{search_api::img, search_db},
 };
 
+/*
+  Description: Decides what kind of search to perform
+  Input: Search type, Search query, Language, Location, Embedding service, Cookie jar
+  Output: Search results in Rocket template format
+*/
 pub async fn run(
     t: &str,
     q: &str,
@@ -20,6 +44,7 @@ pub async fn run(
     embedding_service: &State<EmbeddingService>,
     cookie_jar: &CookieJar<'_>,
 ) -> HashMap<String, Value> {
+    // Don't perform a search on bang
     if q.contains("!") {
         return HashMap::new();
     }
@@ -56,9 +81,9 @@ async fn all_search(
 
     let index_confidence = search_db::run(&mut results_vec, q, lang, loc, &embedding_service).await; // Search database: Modify results + return confidence score
 
-    // Use other indexes too + PriEco confidence is too low
-    if !cookie_jar.get("index").is_some() && index_confidence < 0.95 {
-        let mut mixed_results = Vec::with_capacity(100);
+    // If PriEco confidence is too low, use other indexes too
+    /*if !cookie_jar.get("index").is_some() && index_confidence < 0.95 {
+        let mut mixed_results = Vec::with_capacity(200);
         let mut seen_urls: AHashSet<String> = AHashSet::with_capacity(100);
 
         let prieco_urls: AHashSet<String> = results_vec
@@ -66,6 +91,7 @@ async fn all_search(
             .map(|result| result.url.clone())
             .collect(); // Extract urls from PriEco index to show them when PriEco + Remote is a duplicated result
 
+        // Call external result provider
         let remote_results: Vec<SearchResult> = loop {
             if let Some(res) = all::run(&q.to_lowercase().replace(" ", "+"), &lang, "us").await {
                 break res;
@@ -117,7 +143,7 @@ async fn all_search(
         );
     }
 
-    // Web search was made
+    // Web search was made, increment cookie counter
     if !cookie_jar.get("index").is_some() {
         set_cookie(
             cookie_jar,
@@ -131,10 +157,10 @@ async fn all_search(
             true,
             false,
         );
-    }
+    }*/
 
     context.insert(String::from("results"), json!(&results_vec));
 
     // Yadore Ads
-    context.insert(String::from("yadore"), json!(&yadore::run(q, loc).await));
+    //context.insert(String::from("yadore"), json!(&yadore::run(q, loc).await));
 }
