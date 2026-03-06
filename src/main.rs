@@ -102,7 +102,7 @@ impl Fairing for GlobalHeaders {
             "default-src 'self'; \
              script-src 'self' https://liwan.prieco.net; \
              style-src 'self'; \
-             img-src 'self'; \
+             img-src 'self' data:; \
              connect-src 'self' https://liwan.prieco.net; \
              frame-src 'self'; \
              frame-ancestors 'self'; \

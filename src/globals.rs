@@ -874,11 +874,13 @@ pub struct CentroidIndex;
 #[cfg(not(feature = "cuda"))]
 impl CentroidIndex {
     pub fn new(_: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
-        Err("CUDA feature not enabled".into())
+        println!("CUDA feature not enabled");
+        Ok(Self)
     }
 
     pub fn assign_batch(&self, _: &[Vec<f32>]) -> Result<Vec<usize>, Box<dyn std::error::Error>> {
-        Err("CUDA feature not enabled".into())
+        println!("CUDA feature not enabled");
+        Ok(Vec::new())
     }
 
     pub fn search(

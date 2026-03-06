@@ -210,7 +210,7 @@ pub fn index_size() -> String {
 */
 #[get("/cache-ver")]
 pub fn cache_ver() -> String {
-    String::from("0.1.3")
+    String::from("0.1.4")
 }
 
 /*
