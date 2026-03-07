@@ -79,7 +79,7 @@ async fn all_search(
 
     let mut results_vec: Vec<SearchResult> = Vec::with_capacity(100);
 
-    let index_confidence = search_db::run(&mut results_vec, q, lang, loc, &embedding_service).await; // Search database: Modify results + return confidence score
+    let _ = search_db::run(&mut results_vec, q, lang, loc, &embedding_service).await; // Search database: Modify results + return confidence score
 
     // If PriEco confidence is too low, use other indexes too
     /*if !cookie_jar.get("index").is_some() && index_confidence < 0.95 {

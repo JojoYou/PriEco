@@ -17,6 +17,7 @@
 */
 use std::{collections::HashMap, net::IpAddr};
 
+use chrono::Utc;
 /*
   Import external libraries
 */
@@ -34,7 +35,7 @@ use urlencoding::encode;
   Import own libraries
 */
 use crate::{
-    globals::{CSS_VERSION, EmbeddingService, JS_VERSION, ROCKSDB_INDEX},
+    globals::{ANALYTICS, CSS_VERSION, EmbeddingService, JS_VERSION, ROCKSDB_INDEX, UserAgent},
     web::{functions::search_endpoint, modules::settings},
 };
 
@@ -115,6 +116,7 @@ pub async fn search(
     #[allow(unused_variables)] sxprmedia: Option<&str>, // Search Expander data, route needs to accept it
     #[allow(unused_variables)] sxprsearchsugg: Option<&str>, // Search Expander data, route needs to accept it
     client_ip: ClientIp,
+    user_agent: UserAgent<'_>,
     cookie_jar: &CookieJar<'_>,
     host: &Host<'_>,
 ) -> Template {
@@ -163,6 +165,14 @@ pub async fn search(
     // Aplly cookies' settings to context
     settings::run(&mut context, &Some(client_ip.0), cookie_jar, host);
 
+    // Analytics
+    ANALYTICS.record_visitor(
+        &client_ip.0.to_string(),
+        user_agent.0,
+        &host.to_string(),
+        cookie_jar.get("loc").map(|c| c.value()),
+    );
+
     Template::render("search", &context)
 }
 
@@ -181,6 +191,8 @@ pub async fn results_htmls(
     embedding_service: &State<EmbeddingService>,
     cookie_jar: &CookieJar<'_>,
 ) -> Template {
+    ANALYTICS.record_query();
+
     Template::render(
         "search/results",
         search_endpoint::run(t, q, lang, loc, embedding_service, cookie_jar).await,
@@ -193,24 +205,111 @@ pub async fn results_htmls(
   Input:
   Output: Index size
 */
-#[get("/size")]
-pub fn index_size() -> String {
-    match ROCKSDB_INDEX.property_int_value("rocksdb.estimate-num-keys") {
-        Ok(Some(value)) => value.to_string(),
-        Ok(None) => "0".to_string(),
-        Err(_) => "0".to_string(),
-    }
-}
+#[get("/stats")]
+pub async fn stats(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host<'_>) -> Template {
+    // Index
+    let index_size_raw: u64 = match ROCKSDB_INDEX.property_int_value("rocksdb.estimate-num-keys") {
+        Ok(Some(v)) => v,
+        _ => 0,
+    };
+    let index_display = if index_size_raw >= 1_000_000_000 {
+        (
+            format!("{:.2}", index_size_raw as f64 / 1_000_000_000.0),
+            "B results",
+        )
+    } else if index_size_raw >= 1_000_000 {
+        (
+            format!("{:.2}", index_size_raw as f64 / 1_000_000.0),
+            "M results",
+        )
+    } else if index_size_raw >= 1_000 {
+        (
+            format!("{:.1}", index_size_raw as f64 / 1_000.0),
+            "K results",
+        )
+    } else {
+        (index_size_raw.to_string(), "results")
+    };
 
-/*
-  Description: PriEco SW Cache version
+    // Search volume chart
+    let raw_days = ANALYTICS.daily_queries(30);
+    let max_count = raw_days.iter().map(|(_, c)| *c).max().unwrap_or(1);
+    let search_days: Vec<Value> = raw_days
+        .iter()
+        .map(|(date, count)| {
+            let height_pct = (*count as f64 / max_count as f64 * 100.0) as u64;
+            json!({ "date": date, "count": count.to_string(), "height_pct": height_pct.max(2) })
+        })
+        .collect();
+    let search_today = raw_days.last().map(|(_, c)| *c).unwrap_or(0);
+    let len = raw_days.len();
+    let search_x_labels: Vec<String> = raw_days
+        .iter()
+        .enumerate()
+        .filter_map(|(i, (date, _))| {
+            let step = (len / 5).max(1);
+            if i % step == 0 || i == len - 1 {
+                Some(date[5..].to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
 
-  Input:
-  Output: PriEco SW cache version
-*/
-#[get("/cache-ver")]
-pub fn cache_ver() -> String {
-    String::from("0.1.4")
+    // Visitors + pageviews
+    let (visitors_today, visitors_yesterday, pageviews_today, _) = ANALYTICS.visitor_stats();
+    let visitors_delta = if visitors_yesterday == 0 {
+        0.0
+    } else {
+        (visitors_today as f64 - visitors_yesterday as f64) / visitors_yesterday as f64 * 100.0
+    };
+
+    // Countries
+    let countries: Vec<Value> = ANALYTICS
+        .top_countries(5)
+        .into_iter()
+        .map(|(cc, count)| {
+            let (name, flag) = country_info(&cc);
+            let pct = if visitors_today == 0 {
+                0.0
+            } else {
+                count as f64 / visitors_today as f64 * 100.0
+            };
+            json!({ "flag": flag, "name": name, "pct": format!("{:.1}", pct) })
+        })
+        .collect();
+
+    let mut context: HashMap<String, Value> = HashMap::from([
+        (
+            String::from("generated_at"),
+            json!(Utc::now().format("updated %H:%M UTC").to_string()),
+        ),
+        (String::from("index_size_display"), json!(index_display.0)),
+        (String::from("index_size_unit"), json!(index_display.1)),
+        (String::from("search_days"), json!(search_days)),
+        (
+            String::from("search_today"),
+            json!(search_today.to_string()),
+        ),
+        (String::from("search_x_labels"), json!(search_x_labels)),
+        (
+            String::from("visitors_24h"),
+            json!(visitors_today.to_string()),
+        ),
+        (
+            String::from("visitors_delta"),
+            json!(format!("{:.1}", visitors_delta.abs())),
+        ),
+        (String::from("visitors_up"), json!(visitors_delta >= 0.0)),
+        (
+            String::from("pageviews_24h"),
+            json!(pageviews_today.to_string()),
+        ),
+        (String::from("countries"), json!(countries)),
+    ]);
+
+    settings::run(&mut context, &Some(client_ip.0), cookie_jar, host);
+    Template::render("analytics", context)
 }
 
 /*
@@ -289,4 +388,249 @@ pub fn ext_privacy(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     settings::run(&mut context, &None, cookie_jar, host);
 
     Template::render("ext/privacy", context)
+}
+
+/* Helper functions */
+pub fn country_info(code: &str) -> (&'static str, &'static str) {
+    match code.to_lowercase().as_str() {
+        "af" => ("Afghanistan", "🇦🇫"),
+        "za" => ("South Africa", "🇿🇦"),
+        "al" => ("Albania", "🇦🇱"),
+        "dz" => ("Algeria", "🇩🇿"),
+        "ad" => ("Andorra", "🇦🇩"),
+        "ao" => ("Angola", "🇦🇴"),
+        "ai" => ("Anguilla", "🇦🇮"),
+        "aq" => ("Antarctica", "🇦🇶"),
+        "ag" => ("Antigua and Barbuda", "🇦🇬"),
+        "ar" => ("Argentina", "🇦🇷"),
+        "am" => ("Armenia", "🇦🇲"),
+        "aw" => ("Aruba", "🇦🇼"),
+        "au" => ("Australia", "🇦🇺"),
+        "az" => ("Azerbaijan", "🇦🇿"),
+        "bs" => ("Bahamas", "🇧🇸"),
+        "bh" => ("Bahrain", "🇧🇭"),
+        "bd" => ("Bangladesh", "🇧🇩"),
+        "bb" => ("Barbados", "🇧🇧"),
+        "by" => ("Belarus", "🇧🇾"),
+        "be" => ("Belgium", "🇧🇪"),
+        "bz" => ("Belize", "🇧🇿"),
+        "bj" => ("Benin", "🇧🇯"),
+        "bm" => ("Bermuda", "🇧🇲"),
+        "bt" => ("Bhutan", "🇧🇹"),
+        "bo" => ("Bolivia", "🇧🇴"),
+        "ba" => ("Bosnia and Herzegovina", "🇧🇦"),
+        "bw" => ("Botswana", "🇧🇼"),
+        "bv" => ("Bouvet Island", "🇧🇻"),
+        "br" => ("Brazil", "🇧🇷"),
+        "io" => ("British Indian Ocean Territory", "🇮🇴"),
+        "bn" => ("Brunei", "🇧🇳"),
+        "bg" => ("Bulgaria", "🇧🇬"),
+        "bf" => ("Burkina Faso", "🇧🇫"),
+        "bi" => ("Burundi", "🇧🇮"),
+        "kh" => ("Cambodia", "🇰🇭"),
+        "cm" => ("Cameroon", "🇨🇲"),
+        "ca" => ("Canada", "🇨🇦"),
+        "cv" => ("Cape Verde", "🇨🇻"),
+        "ky" => ("Cayman Islands", "🇰🇾"),
+        "cf" => ("Central African Republic", "🇨🇫"),
+        "td" => ("Chad", "🇹🇩"),
+        "cl" => ("Chile", "🇨🇱"),
+        "cn" => ("China", "🇨🇳"),
+        "cx" => ("Christmas Island", "🇨🇽"),
+        "cc" => ("Cocos (Keeling) Islands", "🇨🇨"),
+        "co" => ("Colombia", "🇨🇴"),
+        "km" => ("Comoros", "🇰🇲"),
+        "cg" => ("Republic of the Congo", "🇨🇬"),
+        "cd" => ("Democratic Republic of the Congo", "🇨🇩"),
+        "ck" => ("Cook Islands", "🇨🇰"),
+        "cr" => ("Costa Rica", "🇨🇷"),
+        "ci" => ("Ivory Coast", "🇨🇮"),
+        "hr" => ("Croatia", "🇭🇷"),
+        "cu" => ("Cuba", "🇨🇺"),
+        "cy" => ("Cyprus", "🇨🇾"),
+        "cz" => ("Czech Republic", "🇨🇿"),
+        "dk" => ("Denmark", "🇩🇰"),
+        "at" => ("Austria", "🇦🇹"),
+        "de" => ("Germany", "🇩🇪"),
+        "dj" => ("Djibouti", "🇩🇯"),
+        "dm" => ("Dominica", "🇩🇲"),
+        "do" => ("Dominican Republic", "🇩🇴"),
+        "ec" => ("Ecuador", "🇪🇨"),
+        "eg" => ("Egypt", "🇪🇬"),
+        "sv" => ("El Salvador", "🇸🇻"),
+        "gq" => ("Equatorial Guinea", "🇬🇶"),
+        "er" => ("Eritrea", "🇪🇷"),
+        "ee" => ("Estonia", "🇪🇪"),
+        "et" => ("Ethiopia", "🇪🇹"),
+        "fk" => ("Falkland Islands", "🇫🇰"),
+        "fo" => ("Faroe Islands", "🇫🇴"),
+        "fj" => ("Fiji", "🇫🇯"),
+        "fi" => ("Finland", "🇫🇮"),
+        "fr" => ("France", "🇫🇷"),
+        "gf" => ("French Guiana", "🇬🇫"),
+        "pf" => ("French Polynesia", "🇵🇫"),
+        "tf" => ("French Southern Territories", "🇹🇫"),
+        "ga" => ("Gabon", "🇬🇦"),
+        "gm" => ("Gambia", "🇬🇲"),
+        "ge" => ("Georgia", "🇬🇪"),
+        "gh" => ("Ghana", "🇬🇭"),
+        "gi" => ("Gibraltar", "🇬🇮"),
+        "gr" => ("Greece", "🇬🇷"),
+        "gl" => ("Greenland", "🇬🇱"),
+        "gd" => ("Grenada", "🇬🇩"),
+        "gp" => ("Guadeloupe", "🇬🇵"),
+        "gu" => ("Guam", "🇬🇺"),
+        "gt" => ("Guatemala", "🇬🇹"),
+        "gn" => ("Guinea", "🇬🇳"),
+        "gw" => ("Guinea-Bissau", "🇬🇼"),
+        "gy" => ("Guyana", "🇬🇾"),
+        "ht" => ("Haiti", "🇭🇹"),
+        "hm" => ("Heard Island and McDonald Islands", "🇭🇲"),
+        "hn" => ("Honduras", "🇭🇳"),
+        "hk" => ("Hong Kong", "🇭🇰"),
+        "hu" => ("Hungary", "🇭🇺"),
+        "is" => ("Iceland", "🇮🇸"),
+        "in" => ("India", "🇮🇳"),
+        "id" => ("Indonesia", "🇮🇩"),
+        "ir" => ("Iran", "🇮🇷"),
+        "iq" => ("Iraq", "🇮🇶"),
+        "ie" => ("Ireland", "🇮🇪"),
+        "il" => ("Israel", "🇮🇱"),
+        "it" => ("Italy", "🇮🇹"),
+        "jm" => ("Jamaica", "🇯🇲"),
+        "jp" => ("Japan", "🇯🇵"),
+        "jo" => ("Jordan", "🇯🇴"),
+        "kz" => ("Kazakhstan", "🇰🇿"),
+        "ke" => ("Kenya", "🇰🇪"),
+        "ki" => ("Kiribati", "🇰🇮"),
+        "kp" => ("North Korea", "🇰🇵"),
+        "kr" => ("South Korea", "🇰🇷"),
+        "kw" => ("Kuwait", "🇰🇼"),
+        "kg" => ("Kyrgyzstan", "🇰🇬"),
+        "la" => ("Laos", "🇱🇦"),
+        "lv" => ("Latvia", "🇱🇻"),
+        "lb" => ("Lebanon", "🇱🇧"),
+        "ls" => ("Lesotho", "🇱🇸"),
+        "lr" => ("Liberia", "🇱🇷"),
+        "ly" => ("Libya", "🇱🇾"),
+        "li" => ("Liechtenstein", "🇱🇮"),
+        "lt" => ("Lithuania", "🇱🇹"),
+        "lu" => ("Luxembourg", "🇱🇺"),
+        "mo" => ("Macau", "🇲🇴"),
+        "mk" => ("North Macedonia", "🇲🇰"),
+        "mg" => ("Madagascar", "🇲🇬"),
+        "mw" => ("Malawi", "🇲🇼"),
+        "my" => ("Malaysia", "🇲🇾"),
+        "mv" => ("Maldives", "🇲🇻"),
+        "ml" => ("Mali", "🇲🇱"),
+        "mt" => ("Malta", "🇲🇹"),
+        "mh" => ("Marshall Islands", "🇲🇭"),
+        "mq" => ("Martinique", "🇲🇶"),
+        "mr" => ("Mauritania", "🇲🇷"),
+        "mu" => ("Mauritius", "🇲🇺"),
+        "yt" => ("Mayotte", "🇾🇹"),
+        "mx" => ("Mexico", "🇲🇽"),
+        "fm" => ("Micronesia", "🇫🇲"),
+        "md" => ("Moldova", "🇲🇩"),
+        "mc" => ("Monaco", "🇲🇨"),
+        "mn" => ("Mongolia", "🇲🇳"),
+        "ms" => ("Montserrat", "🇲🇸"),
+        "ma" => ("Morocco", "🇲🇦"),
+        "mz" => ("Mozambique", "🇲🇿"),
+        "mm" => ("Myanmar", "🇲🇲"),
+        "na" => ("Namibia", "🇳🇦"),
+        "nr" => ("Nauru", "🇳🇷"),
+        "np" => ("Nepal", "🇳🇵"),
+        "nl" => ("Netherlands", "🇳🇱"),
+        "an" => ("Netherlands Antilles", "🇧🇶"),
+        "nc" => ("New Caledonia", "🇳🇨"),
+        "nz" => ("New Zealand", "🇳🇿"),
+        "ni" => ("Nicaragua", "🇳🇮"),
+        "ne" => ("Niger", "🇳🇪"),
+        "ng" => ("Nigeria", "🇳🇬"),
+        "nu" => ("Niue", "🇳🇺"),
+        "nf" => ("Norfolk Island", "🇳🇫"),
+        "mp" => ("Northern Mariana Islands", "🇲🇵"),
+        "no" => ("Norway", "🇳🇴"),
+        "om" => ("Oman", "🇴🇲"),
+        "pk" => ("Pakistan", "🇵🇰"),
+        "pw" => ("Palau", "🇵🇼"),
+        "ps" => ("Palestine", "🇵🇸"),
+        "pa" => ("Panama", "🇵🇦"),
+        "pg" => ("Papua New Guinea", "🇵🇬"),
+        "py" => ("Paraguay", "🇵🇾"),
+        "pe" => ("Peru", "🇵🇪"),
+        "ph" => ("Philippines", "🇵🇭"),
+        "pn" => ("Pitcairn Islands", "🇵🇳"),
+        "pl" => ("Poland", "🇵🇱"),
+        "pt" => ("Portugal", "🇵🇹"),
+        "pr" => ("Puerto Rico", "🇵🇷"),
+        "qa" => ("Qatar", "🇶🇦"),
+        "re" => ("Reunion", "🇷🇪"),
+        "ro" => ("Romania", "🇷🇴"),
+        "ru" => ("Russia", "🇷🇺"),
+        "rw" => ("Rwanda", "🇷🇼"),
+        "sh" => ("Saint Helena", "🇸🇭"),
+        "kn" => ("Saint Kitts and Nevis", "🇰🇳"),
+        "lc" => ("Saint Lucia", "🇱🇨"),
+        "pm" => ("Saint Pierre and Miquelon", "🇵🇲"),
+        "vc" => ("Saint Vincent and the Grenadines", "🇻🇨"),
+        "ws" => ("Samoa", "🇼🇸"),
+        "sm" => ("San Marino", "🇸🇲"),
+        "st" => ("Sao Tome and Principe", "🇸🇹"),
+        "sa" => ("Saudi Arabia", "🇸🇦"),
+        "sn" => ("Senegal", "🇸🇳"),
+        "cs" => ("Serbia and Montenegro", "🇷🇸"),
+        "sc" => ("Seychelles", "🇸🇨"),
+        "sl" => ("Sierra Leone", "🇸🇱"),
+        "sg" => ("Singapore", "🇸🇬"),
+        "sk" => ("Slovakia", "🇸🇰"),
+        "si" => ("Slovenia", "🇸🇮"),
+        "sb" => ("Solomon Islands", "🇸🇧"),
+        "so" => ("Somalia", "🇸🇴"),
+        "gs" => ("South Georgia and the South Sandwich Islands", "🇬🇸"),
+        "es" => ("Spain", "🇪🇸"),
+        "lk" => ("Sri Lanka", "🇱🇰"),
+        "sd" => ("Sudan", "🇸🇩"),
+        "sr" => ("Suriname", "🇸🇷"),
+        "sj" => ("Svalbard and Jan Mayen", "🇸🇯"),
+        "sz" => ("Eswatini", "🇸🇿"),
+        "se" => ("Sweden", "🇸🇪"),
+        "ch" => ("Switzerland", "🇨🇭"),
+        "sy" => ("Syria", "🇸🇾"),
+        "tw" => ("Taiwan", "🇹🇼"),
+        "tj" => ("Tajikistan", "🇹🇯"),
+        "tz" => ("Tanzania", "🇹🇿"),
+        "th" => ("Thailand", "🇹🇭"),
+        "tl" => ("Timor-Leste", "🇹🇱"),
+        "tg" => ("Togo", "🇹🇬"),
+        "tk" => ("Tokelau", "🇹🇰"),
+        "to" => ("Tonga", "🇹🇴"),
+        "tt" => ("Trinidad and Tobago", "🇹🇹"),
+        "tn" => ("Tunisia", "🇹🇳"),
+        "tr" => ("Turkey", "🇹🇷"),
+        "tm" => ("Turkmenistan", "🇹🇲"),
+        "tc" => ("Turks and Caicos Islands", "🇹🇨"),
+        "tv" => ("Tuvalu", "🇹🇻"),
+        "ug" => ("Uganda", "🇺🇬"),
+        "ua" => ("Ukraine", "🇺🇦"),
+        "ae" => ("United Arab Emirates", "🇦🇪"),
+        "uk" => ("United Kingdom", "🇬🇧"),
+        "us" => ("United States", "🇺🇸"),
+        "um" => ("U.S. Minor Outlying Islands", "🇺🇲"),
+        "uy" => ("Uruguay", "🇺🇾"),
+        "uz" => ("Uzbekistan", "🇺🇿"),
+        "vu" => ("Vanuatu", "🇻🇺"),
+        "va" => ("Vatican City", "🇻🇦"),
+        "ve" => ("Venezuela", "🇻🇪"),
+        "vn" => ("Vietnam", "🇻🇳"),
+        "vg" => ("British Virgin Islands", "🇻🇬"),
+        "vi" => ("U.S. Virgin Islands", "🇻🇮"),
+        "wf" => ("Wallis and Futuna", "🇼🇫"),
+        "eh" => ("Western Sahara", "🇪🇭"),
+        "ye" => ("Yemen", "🇾🇪"),
+        "zm" => ("Zambia", "🇿🇲"),
+        "zw" => ("Zimbabwe", "🇿🇼"),
+        _ => ("Unknown", "🏳"),
+    }
 }

@@ -1,0 +1,255 @@
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+:root {
+    --border: #1e2025;
+    --border-hi: #2a2d35;
+    --accent: #03d781;
+    --accent2: #47c8ff;
+    --text-hi: #f0f2f5;
+    --mono: "IBM Plex Mono", monospace;
+    --sans: "IBM Plex Sans", sans-serif;
+}
+html,
+body {
+    background: white;
+    font-family: var(--mono);
+    min-height: 100vh;
+    padding: 32px 28px 60px;
+}
+header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 32px;
+}
+header h1 {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 400;
+}
+.dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+    flex-shrink: 0;
+}
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.3;
+    }
+}
+header .ts {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--dim);
+    font-weight: 300;
+}
+.grid {
+    display: grid;
+    gap: 2px;
+}
+.row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+}
+.cell {
+    background: #eaeaf2;
+    padding: 24px 28px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 20px;
+    margin: 10px;
+    overflow: auto;
+}
+
+.cell-label {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--dim);
+    font-weight: 500;
+    margin-bottom: 6px;
+}
+.cell-title {
+    font-size: 13px;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-weight: 300;
+    margin-bottom: 20px;
+    line-height: 1.4;
+}
+.cell-value {
+    font-size: 42px;
+    font-weight: 600;
+    color: #3edce2;
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+.cell-value .unit {
+    font-size: 16px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-left: 6px;
+    letter-spacing: 0;
+}
+.cell-sub {
+    font-size: 11px;
+    color: var(--dim);
+    margin-top: 8px;
+    font-weight: 300;
+}
+/* Chart */
+.cell-chart {
+    padding-bottom: 28px;
+}
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+}
+.chart-header .right {
+    text-align: right;
+}
+.bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 140px;
+    padding: 0 1px;
+}
+.bar-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    height: 100%;
+    position: relative;
+}
+.bar {
+    background: var(--accent2);
+    opacity: 0.55;
+    border-radius: 1px 1px 0 0;
+    min-height: 2px;
+}
+.bar-wrap:last-child .bar {
+    background: var(--accent);
+    opacity: 1;
+}
+.bar-wrap:hover .bar {
+    opacity: 1;
+}
+.bar-wrap:hover .bar-tooltip {
+    display: block;
+}
+.bar-tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    font-size: 9px;
+    color: var(--text);
+    white-space: nowrap;
+    z-index: 10;
+    pointer-events: none;
+}
+.chart-x-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 9px;
+    color: var(--dim);
+    letter-spacing: 0.06em;
+}
+/* Countries */
+.country-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.country-flag {
+    font-size: 16px;
+    line-height: 1;
+}
+.country-name {
+    font-size: 11px;
+    color: var(--muted);
+    width: 130px;
+    flex-shrink: 0;
+}
+.country-bar-wrap {
+    flex: 1;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.country-bar-fill {
+    height: 100%;
+    background: var(--accent2);
+    border-radius: 2px;
+}
+.country-pct {
+    font-size: 10px;
+    color: var(--dim);
+    width: 36px;
+    text-align: right;
+    flex-shrink: 0;
+}
+/* Separator */
+.separator {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 28px 0;
+}
+.separator-line {
+    flex: 1;
+    height: 1px;
+    background: #888;
+}
+.separator-label {
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--dim);
+    white-space: nowrap;
+}
+/* Index */
+.index-value {
+    font-size: 64px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: -0.03em;
+    line-height: 1;
+    text-shadow: 0 0 40px rgba(232, 255, 71, 0.15);
+}
+.index-value .unit {
+    font-size: 20px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-left: 8px;
+}
+.delta-up {
+    color: var(--accent);
+}
+.delta-down {
+    color: #ff6b47;
+}

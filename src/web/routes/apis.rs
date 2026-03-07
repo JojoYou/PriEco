@@ -24,7 +24,7 @@ use image::GenericImageView;
 use reqwest::Client;
 use rocket::{
     State, get,
-    http::{ContentType, Status},
+    http::{ContentType, CookieJar, Status, uri::Host},
     post,
     serde::json::{Json, Value as RocketValue},
 };
@@ -33,7 +33,11 @@ use rocket::{
   Import own libraries
 */
 use crate::{
-    globals::EmbeddingService, web::functions::general::is_valid_url, web::functions::search_db,
+    globals::{ANALYTICS, EmbeddingService, UserAgent},
+    web::{
+        functions::{general::is_valid_url, search_db},
+        routes::pages::ClientIp,
+    },
 };
 
 /*
@@ -276,4 +280,37 @@ fn resize_image(
     }
 
     Ok(out.into_inner())
+}
+
+/*
+  Description: PriEco SW Cache version
+
+  Input:
+  Output: PriEco SW cache version
+*/
+#[get("/cache-ver")]
+pub fn cache_ver() -> String {
+    String::from("0.1.5")
+}
+
+/*
+  Description: Increment pageview
+
+  Input:
+  Output: ok
+*/
+#[get("/pv")]
+pub fn pageview(
+    client_ip: ClientIp,
+    user_agent: UserAgent<'_>,
+    cookie_jar: &CookieJar<'_>,
+    host: &Host<'_>,
+) -> &'static str {
+    ANALYTICS.record_visitor(
+        &client_ip.0.to_string(),
+        user_agent.0,
+        &host.to_string(),
+        cookie_jar.get("loc").map(|c| c.value()),
+    );
+    "ok"
 }

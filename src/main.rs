@@ -58,7 +58,7 @@ use tokio::sync::Mutex;
 use prieco_rs::{
     blob,
     globals::{
-        BLOB_STORAGE, EmbeddingService, PRIECO_CONFIG, TANTIVY_READER, TANTIVY_WRITER,
+        ANALYTICS, BLOB_STORAGE, EmbeddingService, PRIECO_CONFIG, TANTIVY_READER, TANTIVY_WRITER,
         VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_MODEL, VECTOR_EMBEDDING_TOKENIZER, colors, icons,
         pagerank_warmup_lookup_cache,
     },
@@ -124,7 +124,7 @@ impl Fairing for GlobalHeaders {
   Output: None
 */
 #[launch]
-fn rocket() -> _ {
+async fn rocket() -> _ {
     // Print banner
     println!(
         "{}{}{}",
@@ -160,6 +160,9 @@ fn rocket() -> _ {
         thread_manager();
     });
 
+    // Analytics
+    tokio::spawn(async { ANALYTICS.background_purge_task().await });
+
     // Launch Rocket web server
     rocket::build()
         .configure(
@@ -183,7 +186,6 @@ fn rocket() -> _ {
                 script,
                 favicon,
                 privacy, // Privacy Policy
-                cache_ver,
                 // Landing page
                 index,
                 index_head,
@@ -191,7 +193,9 @@ fn rocket() -> _ {
                 search,
                 results_htmls,
                 api,
-                index_size,
+                stats,
+                cache_ver,
+                pageview,
                 // Settings
                 settings_htmls,
                 // Proxy

@@ -16,18 +16,15 @@
   Import system libraries
 */
 use std::{
-    fs::{File, OpenOptions, create_dir_all, metadata, read_to_string, remove_file},
+    fs::{OpenOptions, create_dir_all, read_to_string},
     hash::Hasher,
-    io::{self, BufWriter, Read, Seek, SeekFrom, Write},
+    io::{BufWriter, Write},
     path::Path,
 };
 
 use twox_hash::XxHash3_64;
 
-use crate::{
-    globals::{FILE_LOCKS, colors},
-    pagerank::compute::{SCORES_A, SCORES_B, zstd_reader},
-};
+use crate::globals::{FILE_LOCKS, colors};
 
 /*
   Connect all files in the project

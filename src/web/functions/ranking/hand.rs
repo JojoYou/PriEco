@@ -1,10 +1,4 @@
-
-
-use crate::{
-    globals::WebDocument,
-    pagerank::compute::{FINAL_SCORES, ID_MAP_FILE, zstd_reader},
-    url_to_id,
-};
+use crate::globals::WebDocument;
 
 pub fn run(results: &mut Vec<WebDocument>, query: &str, lang: &str, loc: &str) {
     // Calculate custom ranking boost

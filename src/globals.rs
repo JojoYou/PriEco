@@ -19,6 +19,7 @@
 use std::{fs::read, io::Cursor};
 use std::{
     fs::{File, metadata},
+    hash::{Hash, Hasher},
     io::{BufWriter, Read, Seek, SeekFrom, Write},
     net::{Ipv4Addr, Ipv6Addr},
     path::Path,
@@ -30,6 +31,7 @@ use std::{
   Import external libraries
 */
 use ahash::{AHashMap, AHashSet};
+use chrono::{Duration, NaiveDate, Utc};
 #[cfg(feature = "cuda")]
 use cudarc::{
     cublas::{CudaBlas, Gemm, GemmConfig, StridedBatchedConfig, sys::cublasOperation_t},
@@ -49,7 +51,11 @@ use parking_lot::{Condvar, Mutex};
 #[cfg(feature = "cuda")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use redb::{Database, ReadableDatabase, TableDefinition};
-use rocksdb::{DB, DBCompressionType, Options};
+use rocket::{
+    Request,
+    request::{FromRequest, Outcome},
+};
+use rocksdb::{DB, DBCompressionType, Options, WriteBatch};
 use serde::{Deserialize, Serialize};
 use tantivy::{
     Index, IndexReader, IndexWriter, ReloadPolicy,
@@ -58,6 +64,7 @@ use tantivy::{
 };
 use tokenizers::Tokenizer;
 use tokio::task;
+use twox_hash::XxHash3_64;
 
 /*
   Import own libraries
@@ -164,6 +171,17 @@ pub static FILE_LOCKS: Lazy<Arc<FileLocks>> = Lazy::new(|| {
         condvar: Condvar::new(),
     })
 });
+
+pub struct UserAgent<'r>(pub &'r str);
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for UserAgent<'r> {
+    type Error = ();
+    async fn from_request(req: &'r Request<'_>) -> Outcome<Self, ()> {
+        Outcome::Success(UserAgent(
+            req.headers().get_one("User-Agent").unwrap_or("unknown"),
+        ))
+    }
+}
 
 /*
 PriEco config
@@ -1097,3 +1115,181 @@ pub const ARTISTS_TABLE: TableDefinition<&str, &str> = TableDefinition::new("art
 
 pub static TOP_DOMAINS: Lazy<AHashSet<&'static str>> =
     Lazy::new(|| include_str!("../data/domains.txt").lines().collect());
+
+/*
+  Analytics
+*/
+pub static ANALYTICS: Lazy<AnalyticsDb> = Lazy::new(|| AnalyticsDb::open("kv/analytics"));
+
+pub struct AnalyticsDb {
+    db: Arc<DB>,
+}
+
+impl AnalyticsDb {
+    fn open(path: &str) -> Self {
+        let mut opts = Options::default();
+        opts.create_if_missing(true);
+        let db = DB::open(&opts, path).expect("Failed to open analytics RocksDB");
+        Self { db: Arc::new(db) }
+    }
+
+    // Read
+    pub fn daily_queries(&self, days: u32) -> Vec<(String, u64)> {
+        let today = self.today();
+        (0..days)
+            .rev()
+            .map(|i| {
+                let date = today - Duration::days(i as i64);
+                (date.to_string(), self.get_u64(&format!("queries:{}", date)))
+            })
+            .collect()
+    }
+
+    // (today_visitors, yesterday_visitors, today_pageviews, yesterday_pageviews)
+    pub fn visitor_stats(&self) -> (u64, u64, u64, u64) {
+        let today = self.today();
+        let yesterday = today - Duration::days(1);
+        (
+            self.get_u64(&format!("visitors:{}", today)),
+            self.get_u64(&format!("visitors:{}", yesterday)),
+            self.get_u64(&format!("pageviews:{}", today)),
+            self.get_u64(&format!("pageviews:{}", yesterday)),
+        )
+    }
+
+    pub fn top_countries(&self, limit: usize) -> Vec<(String, u64)> {
+        let prefix = format!("country:{}:", self.today());
+        let mut results: Vec<(String, u64)> = self
+            .db
+            .prefix_iterator(prefix.as_bytes())
+            .filter_map(|item| {
+                let (k, v) = item.ok()?;
+                let key_str = std::str::from_utf8(&k).ok()?;
+                if !key_str.starts_with(&prefix) {
+                    return None;
+                }
+                let cc = key_str.rsplit(':').next()?.to_string();
+                let count = u64::from_le_bytes((&v[..]).try_into().unwrap_or([0; 8]));
+                Some((cc, count))
+            })
+            .collect();
+        results.sort_by(|a, b| b.1.cmp(&a.1));
+        results.truncate(limit);
+        results
+    }
+
+    // Purge
+    pub fn purge_expired(&self) {
+        let cutoff = self.today() - Duration::days(30);
+        let mut batch = WriteBatch::default();
+        for prefix in ["queries:", "visitors:", "pageviews:", "country:", "seen:"] {
+            for item in self.db.prefix_iterator(prefix.as_bytes()) {
+                let Ok((k, _)) = item else { continue };
+                let Ok(key_str) = std::str::from_utf8(&k) else {
+                    continue;
+                };
+                if !key_str.starts_with(prefix) {
+                    break;
+                }
+                let date_part = key_str[prefix.len()..].splitn(2, ':').next().unwrap_or("");
+                if let Ok(date) = NaiveDate::parse_from_str(date_part, "%Y-%m-%d") {
+                    if date < cutoff {
+                        batch.delete(&k);
+                    }
+                }
+            }
+        }
+        self.db.write(batch).expect("Analytics purge failed");
+    }
+
+    pub async fn background_purge_task(&self) {
+        self.purge_expired();
+        loop {
+            let now = Utc::now();
+            let secs_until_midnight = {
+                let tomorrow = (now + Duration::days(1))
+                    .date_naive()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap();
+                (tomorrow.and_utc() - now).num_seconds().max(0) as u64
+            };
+            tokio::time::sleep(tokio::time::Duration::from_secs(secs_until_midnight)).await;
+            self.purge_expired();
+        }
+    }
+
+    // Helpers
+    fn today(&self) -> NaiveDate {
+        Utc::now().date_naive()
+    }
+
+    fn get_u64(&self, key: &str) -> u64 {
+        self.db
+            .get(key.as_bytes())
+            .ok()
+            .flatten()
+            .map(|v| u64::from_le_bytes((&v[..]).try_into().unwrap_or([0; 8])))
+            .unwrap_or(0)
+    }
+
+    fn inc(&self, key: &str, delta: u64) {
+        let current = self.get_u64(key);
+        self.db
+            .put(key.as_bytes(), (current + delta).to_le_bytes())
+            .expect("Analytics write failed");
+    }
+
+    fn fingerprint(&self, ip: &str, user_agent: &str, entity_id: &str, date: NaiveDate) -> String {
+        let mut hasher = XxHash3_64::default();
+        ip.hash(&mut hasher);
+        user_agent.hash(&mut hasher);
+        date.to_string().hash(&mut hasher);
+        entity_id.hash(&mut hasher);
+        format!("{:016x}", hasher.finish())
+    }
+
+    // Write
+    pub fn record_query(&self) {
+        self.inc(&format!("queries:{}", self.today()), 1);
+    }
+
+    pub fn record_visitor(
+        &self,
+        ip: &str,
+        user_agent: &str,
+        entity_id: &str,
+        country_code: Option<&str>,
+    ) {
+        let date = self.today();
+
+        // Always count the raw pageview
+        let pvk = format!("pageviews:{}", date);
+        let mut batch = WriteBatch::default();
+        batch.put(pvk.as_bytes(), (self.get_u64(&pvk) + 1).to_le_bytes());
+
+        // Unique visitor dedup
+        let seen_key = format!(
+            "seen:{}:{}",
+            date,
+            self.fingerprint(ip, user_agent, entity_id, date)
+        );
+        if self.db.get(seen_key.as_bytes()).ok().flatten().is_none() {
+            batch.put(seen_key.as_bytes(), &[1u8]);
+
+            let vk = format!("visitors:{}", date);
+            batch.put(vk.as_bytes(), (self.get_u64(&vk) + 1).to_le_bytes());
+
+            if let Some(cc) = country_code {
+                // Skip "all" — that's the default no-selection value
+                if cc != "all" {
+                    let ck = format!("country:{}:{}", date, cc.to_lowercase());
+                    batch.put(ck.as_bytes(), (self.get_u64(&ck) + 1).to_le_bytes());
+                }
+            }
+        }
+
+        self.db
+            .write(batch)
+            .expect("Analytics visitor write failed");
+    }
+}

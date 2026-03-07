@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Search Analytics</title>
+<link rel="stylesheet" href="{{css_path}}analytics.css">
+</head>
+<body>
+<header>
+  <div class="dot"></div>
+  <h1>Search Analytics</h1>
+  <span class="ts">{{generated_at}}</span>
+</header>
+<div class="grid">
+  <div class="cell cell-chart">
+    <div class="chart-header">
+      <div>
+        <div class="cell-label">Queries</div>
+        <div class="cell-title">Daily search queries over the last 30 days</div>
+      </div>
+      <div class="right">
+        <div class="cell-value">{{search_today}}<span class="unit">queries</span></div>
+        <div class="cell-sub">today</div>
+      </div>
+    </div>
+    <div class="bars">
+      {{#each search_days}}
+      <div class="bar-wrap">
+        <div class="bar-tooltip">{{this.date}} · {{this.count}}</div>
+        <div class="bar" style="height:{{this.height_pct}}%"></div>
+      </div>
+      {{/each}}
+    </div>
+    <div class="chart-x-labels">
+      {{#each search_x_labels}}<span>{{this}}</span>{{/each}}
+    </div>
+  </div>
+  <div class="row-2">
+    <div class="cell">
+      <div class="cell-label">Web Traffic</div>
+      <div class="cell-title">Unique visitors in the last 24 hours</div>
+      <div class="cell-value">{{visitors_24h}}<span class="unit">visitors</span></div>
+      <div class="cell-sub">
+        {{#if visitors_up}}<span class="delta-up">↑ {{visitors_delta}}%</span>{{else}}<span class="delta-down">↓ {{visitors_delta}}%</span>{{/if}}
+        vs yesterday &nbsp;·&nbsp; {{pageviews_24h}} pageviews
+      </div>
+    </div>
+    <div class="cell">
+      <div class="cell-label">Geographic Reach</div>
+      {{#each countries}}
+      <div class="country-row">
+        <span class="country-flag">{{this.flag}}</span>
+        <span class="country-name">{{this.name}}</span>
+        <div class="country-bar-wrap"><div class="country-bar-fill" style="width:{{this.pct}}%"></div></div>
+        <span class="country-pct">{{this.pct}}%</span>
+      </div>
+      {{/each}}
+    </div>
+  </div>
+</div>
+<div class="separator">
+  <div class="separator-line"></div>
+  <div class="separator-label">index storage</div>
+  <div class="separator-line"></div>
+</div>
+<div class="cell">
+  <div class="cell-label">Index Size</div>
+  <div class="index-value">{{index_size_display}}<span class="unit">{{index_size_unit}}</span></div>
+</div>
+</body>
+</html>

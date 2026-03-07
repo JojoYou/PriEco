@@ -167,7 +167,9 @@ self.addEventListener("fetch", (event) => {
     if (
         url.pathname === "/sw.js" ||
         url.pathname === CACHE_VER_URL ||
-        url.pathname == "/settings_html"
+        url.pathname == "/settings_html" ||
+        url.pathname == "/stats" ||
+        url.pathname == "/pv"
     )
         return;
     if (event.request.method !== "GET" || url.origin !== self.location.origin)
