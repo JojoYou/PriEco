@@ -361,9 +361,9 @@ checksum = "46c5e41b57b8bba42a04676d81cb89e9ee8e859a1a66f80a5a72e1cb76b34d43"
 
 [[package]]
 name = "bytemuck"
-version = "1.23.2"
+version = "1.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3995eaeebcdf32f91f980d360f78732ddc061097ab4e39991ae7a6ace9194677"
+checksum = "c8efb64bd706a16a1bdde310ae86b351e4d21550d98d056f22f8a7f7a2183fec"
 
 [[package]]
 name = "byteorder"
@@ -2057,9 +2057,9 @@ checksum = "32a282da65faaf38286cf3be983213fcf1d2e2a58700e808f83f4ea9a4804bc0"
 
 [[package]]
 name = "memmap2"
-version = "0.9.9"
+version = "0.9.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "744133e4a0e0a658e1374cf3bf8e415c4052a15a111acd372764c55b4177d490"
+checksum = "714098028fe011992e1c3962653c96b2d578c4b4bce9036e15ff220319b1e0e3"
 dependencies = [
  "libc",
 ]
@@ -2632,12 +2632,14 @@ version = "2.0.0"
 dependencies = [
  "ahash",
  "brotli 8.0.2",
+ "bytemuck",
  "chrono",
  "cudarc",
  "dashmap",
  "dotenv_codegen",
  "flate2",
  "image",
+ "memmap2",
  "mime_guess",
  "ndarray",
  "num_cpus",
@@ -2645,6 +2647,7 @@ dependencies = [
  "ort",
  "parking_lot",
  "rand 0.9.2",
+ "rayon",
  "redb",
  "reqwest",
  "rocket",

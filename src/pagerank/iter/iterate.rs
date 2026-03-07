@@ -4,6 +4,7 @@
 use std::{
     fs::File,
     io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write},
+    mem::swap,
     time::Instant,
 };
 
@@ -21,7 +22,7 @@ use crate::{
 const DAMPING: f32 = 0.85;
 const EPSILON: f32 = 1e-6;
 const MAX_ITER: usize = 100;
-const AVAILABLE_RAM: usize = 6 * 1024 * 1024 * 1024;
+const AVAILABLE_RAM: usize = 4 * 1024 * 1024 * 1024;
 
 pub fn run(total_nodes_usize: usize) -> Result<String, Box<dyn std::error::Error>> {
     run_with(
@@ -193,7 +194,7 @@ pub fn run_with(
             s.elapsed().as_secs_f64()
         );
 
-        std::mem::swap(&mut read_file, &mut write_file);
+        swap(&mut read_file, &mut write_file);
         if max_delta < EPSILON {
             break;
         }

@@ -37,6 +37,8 @@ use cudarc::{
     nvrtc::compile_ptx,
 };
 use dashmap::DashSet;
+#[cfg(feature = "cuda")]
+use memmap2::Mmap;
 use ndarray::{Array, Array2, CowArray, IxDyn};
 use once_cell::sync::Lazy;
 use ort::{
@@ -44,6 +46,8 @@ use ort::{
     tensor::OrtOwnedTensor,
 };
 use parking_lot::{Condvar, Mutex};
+#[cfg(feature = "cuda")]
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use redb::{Database, ReadableDatabase, TableDefinition};
 use rocksdb::{DB, DBCompressionType, Options};
 use serde::{Deserialize, Serialize};
@@ -819,44 +823,63 @@ extern "C" __global__ void topk_argmax(
         let query_norm: Vec<f32> = query.iter().map(|x| x / norm).collect();
 
         // ── 5. Scan buckets, compute cosine sim, collect candidates ─────────────
-        let mut seen = std::collections::HashSet::<u64>::new();
-        let mut candidates: Vec<(u64, f32)> = Vec::new();
+        let mut candidates: Vec<(u64, f32)> = {
+            let all: Vec<Vec<(u64, f32)>> = centroid_ids
+                .par_iter()
+                .filter_map(|&cid| {
+                    let bucket_dir = format!("{}/bucket_{:06}", &PRIECO_CONFIG.vector_path, cid);
+                    let ids_path = format!("{}/ids.bin", bucket_dir);
+                    let vecs_path = format!("{}/vectors.bin", bucket_dir);
 
-        for cid in centroid_ids {
-            let bucket_dir = format!("{}/bucket_{:06}", &PRIECO_CONFIG.vector_path, cid);
-            let ids_path = format!("{}/ids.bin", bucket_dir);
-            let vecs_path = format!("{}/vectors.bin", bucket_dir);
+                    if !Path::new(&ids_path).exists() || cid == 080159 {
+                        return None;
+                    }
 
-            if !Path::new(&ids_path).exists() || cid == 080159 {
-                continue;
-            }
+                    let ids_file = File::open(&ids_path).ok()?;
+                    let vecs_file = File::open(&vecs_path).ok()?;
+                    let ids_mmap = unsafe { Mmap::map(&ids_file).ok()? };
+                    let vecs_mmap = unsafe { Mmap::map(&vecs_file).ok()? };
 
-            let ids_bytes = read(&ids_path)?;
-            let count = ids_bytes.len() / 8;
+                    let ids: &[u64] = bytemuck::cast_slice(&ids_mmap);
+                    let vecs: &[f32] = bytemuck::cast_slice(&vecs_mmap);
 
-            let mut vecs_file = File::open(&vecs_path)?;
-            let mut vec_buf = vec![0u8; count * dims * 4];
-            vecs_file.read_exact(&mut vec_buf)?;
+                    let count = ids.len();
+                    let mut bucket_results = Vec::with_capacity(count);
 
-            for i in 0..count {
-                let id = u64::from_le_bytes(ids_bytes[i * 8..(i + 1) * 8].try_into().unwrap());
-                if !seen.insert(id) {
-                    continue;
-                } // dedup across probed buckets
+                    for i in 0..count {
+                        let id = ids[i];
+                        let slice = &vecs[i * dims..(i + 1) * dims];
 
-                let base = i * dims * 4;
-                let mut dot = 0f32;
-                let mut vnorm = 0f32;
-                for j in 0..dims {
-                    let off = base + j * 4;
-                    let v = f32::from_le_bytes(vec_buf[off..off + 4].try_into().unwrap());
-                    dot += v * query_norm[j];
-                    vnorm += v * v;
+                        let dot: f32 = slice
+                            .iter()
+                            .zip(query_norm.iter())
+                            .map(|(v, q)| v * q)
+                            .sum();
+                        let vnorm: f32 = slice.iter().map(|v| v * v).sum();
+                        let sim = dot / vnorm.sqrt().max(1e-10);
+
+                        bucket_results.push((id, sim));
+                    }
+
+                    Some(bucket_results)
+                })
+                .collect();
+
+            // Flatten and dedup — keep highest sim per id across probed buckets
+            let mut flat: Vec<(u64, f32)> = all.into_iter().flatten().collect();
+            flat.sort_unstable_by_key(|(id, _)| *id);
+            flat.dedup_by(|a, b| {
+                if a.0 == b.0 {
+                    if a.1 > b.1 {
+                        b.1 = a.1;
+                    }
+                    true
+                } else {
+                    false
                 }
-                let sim = dot / vnorm.sqrt().max(1e-10);
-                candidates.push((id, sim));
-            }
-        }
+            });
+            flat
+        };
 
         // ── 6. Sort, truncate ────────────────────────────────────────────────────
         candidates.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
