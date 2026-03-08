@@ -200,10 +200,10 @@ pub async fn results_htmls(
 }
 
 /*
-  Description: PriEco Index size
+  Description: PriEco Analytics
 
   Input:
-  Output: Index size
+  Output: Analytics page html
 */
 #[get("/stats")]
 pub async fn stats(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host<'_>) -> Template {
@@ -266,7 +266,7 @@ pub async fn stats(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host<
 
     // Countries
     let countries: Vec<Value> = ANALYTICS
-        .top_countries(5)
+        .top_countries()
         .into_iter()
         .map(|(cc, count)| {
             let (name, flag) = country_info(&cc);
@@ -278,6 +278,14 @@ pub async fn stats(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host<
             json!({ "flag": flag, "name": name, "pct": format!("{:.1}", pct) })
         })
         .collect();
+
+    // API
+    let (api_today, api_yesterday) = ANALYTICS.api_stats_today_yesterday();
+    let api_delta = if api_yesterday == 0 {
+        0.0
+    } else {
+        (api_today as f64 - api_yesterday as f64) / api_yesterday as f64 * 100.0
+    };
 
     let mut context: HashMap<String, Value> = HashMap::from([
         (
@@ -306,6 +314,12 @@ pub async fn stats(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host<
             json!(pageviews_today.to_string()),
         ),
         (String::from("countries"), json!(countries)),
+        (String::from("api_today"), json!(api_today.to_string())),
+        (
+            String::from("api_delta"),
+            json!(format!("{:.1}", api_delta.abs())),
+        ),
+        (String::from("api_up"), json!(api_delta >= 0.0)),
     ]);
 
     settings::run(&mut context, &Some(client_ip.0), cookie_jar, host);

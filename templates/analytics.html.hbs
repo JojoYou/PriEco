@@ -48,6 +48,7 @@
     </div>
     <div class="cell">
       <div class="cell-label">Geographic Reach</div>
+      <div class="cell-title">Based on location cookie</div>
       {{#each countries}}
       <div class="country-row">
         <span class="country-flag">{{this.flag}}</span>
@@ -64,9 +65,19 @@
   <div class="separator-label">index storage</div>
   <div class="separator-line"></div>
 </div>
-<div class="cell">
-  <div class="cell-label">Index Size</div>
-  <div class="index-value">{{index_size_display}}<span class="unit">{{index_size_unit}}</span></div>
+<div class="row-2">
+    <div class="cell">
+    <div class="cell-label">Index Size</div>
+    <div class="index-value">{{index_size_display}}<span class="unit">{{index_size_unit}}</span></div>
+    </div>
+    <div class="cell">
+    <div class="cell-label">API Requests</div>
+    <div class="index-value">{{api_today}}<span class="unit">requests</span></div>
+    <div class="cell-sub">
+        {{#if api_up}}<span class="delta-up">↑ {{api_delta}}%</span>{{else}}<span class="delta-down">↓ {{api_delta}}%</span>{{/if}}
+        vs yesterday
+    </div>
+</div>
 </div>
 </body>
 </html>

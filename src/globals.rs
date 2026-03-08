@@ -1133,6 +1133,64 @@ impl AnalyticsDb {
         Self { db: Arc::new(db) }
     }
 
+    // Write
+    pub fn record_query(&self) {
+        self.inc(&format!("queries:{}", self.today()), 1);
+    }
+
+    pub fn record_visitor(
+        &self,
+        ip: &str,
+        user_agent: &str,
+        entity_id: &str,
+        country_code: Option<&str>,
+    ) {
+        let date = self.today();
+
+        // Always count the raw pageview
+        let pvk = format!("pageviews:{}", date);
+        let mut batch = WriteBatch::default();
+        batch.put(pvk.as_bytes(), (self.get_u64(&pvk) + 1).to_le_bytes());
+
+        // Unique visitor dedup
+        let seen_key = format!(
+            "seen:{}:{}",
+            date,
+            self.fingerprint(ip, user_agent, entity_id, date)
+        );
+        if self.db.get(seen_key.as_bytes()).ok().flatten().is_none() {
+            batch.put(seen_key.as_bytes(), &[1u8]);
+
+            let vk = format!("visitors:{}", date);
+            batch.put(vk.as_bytes(), (self.get_u64(&vk) + 1).to_le_bytes());
+
+            if let Some(cc) = country_code {
+                // Skip "all" — that's the default no-selection value
+                if cc != "all" {
+                    let ck = format!("country:{}:{}", date, cc.to_lowercase());
+                    batch.put(ck.as_bytes(), (self.get_u64(&ck) + 1).to_le_bytes());
+                }
+            }
+        }
+
+        self.db
+            .write(batch)
+            .expect("Analytics visitor write failed");
+    }
+
+    pub fn record_api_request(&self) {
+        let date = self.today();
+        let mut batch = WriteBatch::default();
+        let total_key = format!("api:total:{}", date);
+        batch.put(
+            total_key.as_bytes(),
+            (self.get_u64(&total_key) + 1).to_le_bytes(),
+        );
+        self.db
+            .write(batch)
+            .expect("API request tracking write failed");
+    }
+
     // Read
     pub fn daily_queries(&self, days: u32) -> Vec<(String, u64)> {
         let today = self.today();
@@ -1157,7 +1215,7 @@ impl AnalyticsDb {
         )
     }
 
-    pub fn top_countries(&self, limit: usize) -> Vec<(String, u64)> {
+    pub fn top_countries(&self) -> Vec<(String, u64)> {
         let prefix = format!("country:{}:", self.today());
         let mut results: Vec<(String, u64)> = self
             .db
@@ -1174,15 +1232,44 @@ impl AnalyticsDb {
             })
             .collect();
         results.sort_by(|a, b| b.1.cmp(&a.1));
-        results.truncate(limit);
         results
+    }
+
+    pub fn daily_api_requests(&self, days: u32) -> Vec<(String, u64)> {
+        let today = self.today();
+        (0..days)
+            .rev()
+            .map(|i| {
+                let date = today - Duration::days(i as i64);
+                (
+                    date.to_string(),
+                    self.get_u64(&format!("api:{}:{}", "total", date)),
+                )
+            })
+            .collect()
+    }
+
+    pub fn api_stats_today_yesterday(&self) -> (u64, u64) {
+        let today = self.today();
+        let yesterday = today - Duration::days(1);
+        (
+            self.get_u64(&format!("api:total:{}", today)),
+            self.get_u64(&format!("api:total:{}", yesterday)),
+        )
     }
 
     // Purge
     pub fn purge_expired(&self) {
         let cutoff = self.today() - Duration::days(30);
         let mut batch = WriteBatch::default();
-        for prefix in ["queries:", "visitors:", "pageviews:", "country:", "seen:"] {
+        for prefix in [
+            "queries:",
+            "visitors:",
+            "pageviews:",
+            "country:",
+            "seen:",
+            "api:",
+        ] {
             for item in self.db.prefix_iterator(prefix.as_bytes()) {
                 let Ok((k, _)) = item else { continue };
                 let Ok(key_str) = std::str::from_utf8(&k) else {
@@ -1246,50 +1333,5 @@ impl AnalyticsDb {
         date.to_string().hash(&mut hasher);
         entity_id.hash(&mut hasher);
         format!("{:016x}", hasher.finish())
-    }
-
-    // Write
-    pub fn record_query(&self) {
-        self.inc(&format!("queries:{}", self.today()), 1);
-    }
-
-    pub fn record_visitor(
-        &self,
-        ip: &str,
-        user_agent: &str,
-        entity_id: &str,
-        country_code: Option<&str>,
-    ) {
-        let date = self.today();
-
-        // Always count the raw pageview
-        let pvk = format!("pageviews:{}", date);
-        let mut batch = WriteBatch::default();
-        batch.put(pvk.as_bytes(), (self.get_u64(&pvk) + 1).to_le_bytes());
-
-        // Unique visitor dedup
-        let seen_key = format!(
-            "seen:{}:{}",
-            date,
-            self.fingerprint(ip, user_agent, entity_id, date)
-        );
-        if self.db.get(seen_key.as_bytes()).ok().flatten().is_none() {
-            batch.put(seen_key.as_bytes(), &[1u8]);
-
-            let vk = format!("visitors:{}", date);
-            batch.put(vk.as_bytes(), (self.get_u64(&vk) + 1).to_le_bytes());
-
-            if let Some(cc) = country_code {
-                // Skip "all" — that's the default no-selection value
-                if cc != "all" {
-                    let ck = format!("country:{}:{}", date, cc.to_lowercase());
-                    batch.put(ck.as_bytes(), (self.get_u64(&ck) + 1).to_le_bytes());
-                }
-            }
-        }
-
-        self.db
-            .write(batch)
-            .expect("Analytics visitor write failed");
     }
 }

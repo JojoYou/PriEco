@@ -58,6 +58,8 @@ pub async fn api(
         return Json(vec![]);
     }
 
+    ANALYTICS.record_api_request();
+
     let (_, results) = search_db::run_json(q, lang, loc, embedding_service).await;
     Json(results)
 }
