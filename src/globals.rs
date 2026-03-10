@@ -15,9 +15,8 @@
 /*
   Import system libraries
 */
-#[cfg(feature = "cuda")]
-use std::{fs::read, io::Cursor};
 use std::{
+    error::Error,
     fs::{File, metadata},
     hash::{Hash, Hasher},
     io::{BufWriter, Read, Seek, SeekFrom, Write},
@@ -26,6 +25,8 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
+#[cfg(feature = "cuda")]
+use std::{fs::read, io::Cursor};
 
 /*
   Import external libraries
@@ -353,7 +354,7 @@ impl IpGeoDatabase {
 pub static COUNTRY_TO_LANG: Lazy<Arc<AHashMap<&'static str, &'static str>>> = Lazy::new(|| {
     let mut map = AHashMap::with_capacity(200);
 
-    // === Direct mappings ===
+    // Direct mappings
     map.insert("de", "de");
     map.insert("at", "de");
     map.insert("ch", "de");
@@ -662,26 +663,18 @@ extern "C" __global__ void topk_argmax(
     pub fn assign_batch(
         &self,
         vectors: &[Vec<f32>],
-    ) -> Result<Vec<usize>, Box<dyn std::error::Error>> {
-        use std::time::Instant;
-
-        let total_start = Instant::now();
+    ) -> Result<Vec<usize>, Box<dyn Error + Send + Sync>> {
         let batch_size = vectors.len();
         let dims = self.dims;
 
-        // ---------------- FLATTEN (CPU) ----------------
-        let t = Instant::now();
+        // FLATTEN (CPU)
         let flat: Vec<f32> = vectors.iter().flatten().copied().collect();
-        println!("flatten: {:?}", t.elapsed());
 
-        // ---------------- COPY H→D ----------------
-        let t = Instant::now();
+        // COPY H→D
         let mut queries_gpu = unsafe { self.stream.alloc::<f32>(flat.len())? };
         self.stream.memcpy_htod(&flat, &mut queries_gpu)?;
-        println!("copy h2d: {:?}", t.elapsed());
 
-        // ---------------- NORMALIZE ON GPU ----------------
-        let t = Instant::now();
+        // NORMALIZE ON GPU
         let threads = 256u32;
         let blocks = ((batch_size as u32) + threads - 1) / threads;
         let cfg = LaunchConfig {
@@ -699,15 +692,13 @@ extern "C" __global__ void topk_argmax(
             builder.launch(cfg)?;
         }
         self.stream.synchronize()?;
-        println!("normalize gpu: {:?}", t.elapsed());
 
-        // ---------------- ALLOC SIM BUFFER ----------------
+        // ALLOC SIM BUFFER
         let mut sims_gpu = self
             .stream
             .alloc_zeros::<f32>(batch_size * self.num_centroids)?;
 
-        // ---------------- GEMM ----------------
-        let t = Instant::now();
+        // GEMM
         unsafe {
             self.blas.gemm(
                 GemmConfig {
@@ -728,10 +719,8 @@ extern "C" __global__ void topk_argmax(
             )?;
         }
         self.stream.synchronize()?;
-        println!("gemm: {:?}", t.elapsed());
 
-        // ---------------- ARGMAX ON GPU ----------------
-        let t = Instant::now();
+        // ARGMAX ON GPU
         let mut argmax_gpu = self.stream.alloc_zeros::<i32>(batch_size)?;
         let num_centroids_i32 = self.num_centroids as i32;
         let batch_size_i32 = batch_size as i32;
@@ -744,18 +733,12 @@ extern "C" __global__ void topk_argmax(
             builder.launch(cfg)?;
         }
         self.stream.synchronize()?;
-        println!("gpu argmax kernel: {:?}", t.elapsed());
 
-        // ---------------- COPY ARGMAX D→H ----------------
-        let t = Instant::now();
+        // COPY ARGMAX D→H
         let mut argmax_cpu = vec![0i32; batch_size];
         self.stream.memcpy_dtoh(&argmax_gpu, &mut argmax_cpu)?;
-        println!("copy argmax d2h: {:?}", t.elapsed());
 
         let result: Vec<usize> = argmax_cpu.into_iter().map(|x| x as usize).collect();
-
-        println!("TOTAL assign_batch: {:?}", total_start.elapsed());
-        println!("--------------------------------");
 
         Ok(result)
     }
@@ -919,7 +902,7 @@ impl CentroidIndex {
         Ok(Self)
     }
 
-    pub fn assign_batch(&self, _: &[Vec<f32>]) -> Result<Vec<usize>, Box<dyn std::error::Error>> {
+    pub fn assign_batch(&self, _: &[Vec<f32>]) -> Result<Vec<usize>, Box<dyn Error + Send + Sync>> {
         println!("CUDA feature not enabled");
         Ok(Vec::new())
     }

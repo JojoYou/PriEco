@@ -3,11 +3,14 @@
 */
 use std::{
     collections::HashMap,
+    error::Error,
     fs::{File, create_dir_all, read_dir, remove_file},
-    io::{BufRead, BufReader, Read, Seek, SeekFrom, Write},
-    path::Path,
+    io::{BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write},
+    path::{Path, PathBuf},
+    sync::atomic::AtomicUsize,
 };
 
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 /*
   Import external libraries
 */
@@ -28,9 +31,43 @@ use crate::{
   Constants
 */
 const MAX_VECTORS_IN_VRAM: usize = 1_500_000;
-const BATCH_SIZE_FOR_GPU: usize = 4_000;
+const BATCH_SIZE_FOR_GPU: usize = 1_500;
 
-pub fn run() -> Result<(), Box<dyn std::error::Error>> {
+/*
+  Structs
+*/
+struct AtomicFile {
+    tmp_path: PathBuf,
+    final_path: PathBuf,
+    writer: BufWriter<File>,
+}
+impl AtomicFile {
+    fn new(final_path: impl AsRef<Path>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let final_path = final_path.as_ref().to_path_buf();
+        let tmp_path = final_path.with_extension("tmp");
+        let writer = BufWriter::with_capacity(1 << 20, File::create(&tmp_path)?);
+        Ok(Self {
+            tmp_path,
+            final_path,
+            writer,
+        })
+    }
+    fn commit(mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.writer.flush()?;
+        std::fs::rename(&self.tmp_path, &self.final_path)?;
+        Ok(())
+    }
+}
+impl Write for AtomicFile {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.writer.write(buf)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.writer.flush()
+    }
+}
+
+pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     create_dir_all(INSERTER_IMPORT_DIR)?;
 
     // Get *results.txt
@@ -51,10 +88,9 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let mut vector_idx_buffer: HashMap<u64, Vec<f32>> = HashMap::with_capacity(1_000_000);
-
     // Process files
-    for file_name in files {
+    let mut vector_idx_buffer: HashMap<u64, Vec<f32>> = HashMap::with_capacity(1_000_000);
+    for file_name in &files {
         let file = File::open(&file_name)?;
         let reader = BufReader::new(file);
         let mut inserted = 0;
@@ -152,8 +188,9 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                     icons::DB_INSERT,
                     vector_idx_buffer.len()
                 );
-                vector_commit(&mut vector_idx_buffer)?;
-                println!("{}: Vector idx commited", icons::DB_INSERT,);
+
+                vector_process(&mut vector_idx_buffer)?;
+                println!("{}: Vector idx commited", icons::DB_INSERT);
             }
         }
 
@@ -163,129 +200,205 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             icons::DB_INSERT,
             vector_idx_buffer.len()
         );
+
         TANTIVY_WRITER.lock().commit()?;
         println!(
             "{}: Tantivy commited {} vectors",
             icons::DB_INSERT,
             vector_idx_buffer.len()
         );
-        vector_commit(&mut vector_idx_buffer)?;
-        println!("{}: Vector idx commited", icons::DB_INSERT,);
 
-        let _ = remove_file(&file_name);
+        vector_process(&mut vector_idx_buffer)?;
+        println!("{}: Vector idx commited", icons::DB_INSERT);
+    }
+
+    println!(
+        "{}: Merging staging files into buckets...",
+        icons::DB_INSERT
+    );
+    let bucket_dirs: Vec<_> = read_dir(&PRIECO_CONFIG.vector_path)?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().join("staging.bin").exists())
+        .collect();
+    let total_buckets = bucket_dirs.len();
+
+    let mut merged_count = 0;
+    for entry in &bucket_dirs {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+        if let Some(id_str) = name_str.strip_prefix("bucket_") {
+            if let Ok(bucket_id) = id_str.parse::<usize>() {
+                merge_bucket(bucket_id)?;
+                merged_count += 1;
+                if merged_count % 100 == 0 || merged_count == total_buckets {
+                    println!(
+                        "{}: Merge progress: {}/{} ({:.1}%)",
+                        icons::DB_INSERT,
+                        merged_count,
+                        total_buckets,
+                        merged_count as f64 / total_buckets as f64 * 100.0
+                    );
+                }
+            }
+        }
+    }
+    println!("{}: Merge complete", icons::DB_INSERT);
+
+    for file_name in &files {
+        let _ = remove_file(file_name);
     }
 
     Ok(())
 }
 
-fn vector_commit(
-    vector_idx_buffer: &mut HashMap<u64, Vec<f32>>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let ids: Vec<u64> = vector_idx_buffer.keys().copied().collect();
+fn vector_process(
+    chunk_buffer: &mut HashMap<u64, Vec<f32>>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let ids: Vec<u64> = chunk_buffer.keys().copied().collect();
     let mut bucket_data: HashMap<usize, Vec<(u64, Vec<f32>)>> =
-        HashMap::with_capacity(vector_idx_buffer.len());
+        HashMap::with_capacity(chunk_buffer.len() + 1_000);
 
-    println!("{}: Assigning vectors!", icons::DB_INSERT,);
+    println!("{}: GPU assigning!", icons::DB_INSERT);
+    let mut inserted_counter = 0;
     for chunk in ids.chunks(BATCH_SIZE_FOR_GPU) {
         let vectors: Vec<Vec<f32>> = chunk
             .iter()
-            .map(|id| vector_idx_buffer.get(id).unwrap().clone())
+            .map(|id| chunk_buffer.get(id).unwrap().clone())
             .collect();
 
         let bucket_ids = VECTOR_CENTROPOIDS.assign_batch(&vectors)?;
 
         for (i, &id) in chunk.iter().enumerate() {
             let bucket_id = bucket_ids[i];
-            let vector = vector_idx_buffer.get(&id).unwrap().clone();
+            let vector = chunk_buffer.get(&id).unwrap().clone();
             bucket_data
                 .entry(bucket_id)
                 .or_insert_with(Vec::new)
                 .push((id, vector));
         }
+
+        inserted_counter += 1;
+        if inserted_counter % 200_000 == 0 {
+            println!(
+                "{}: Assigned: {}/{}",
+                icons::DB_INSERT,
+                inserted_counter,
+                bucket_data.len()
+            );
+        }
     }
 
-    println!("{}: Writing chunks to disk!", icons::DB_INSERT,);
-    for (bucket_id, items) in bucket_data.iter() {
-        update_bucket(*bucket_id, items)?;
+    println!(
+        "{}: Writing chunks to disk! {}",
+        icons::DB_INSERT,
+        bucket_data.len()
+    );
+    bucket_data
+        .par_iter()
+        .try_for_each(|(bucket_id, items)| append_to_bucket(*bucket_id, items))?;
+
+    chunk_buffer.clear();
+    Ok(())
+}
+
+fn append_to_bucket(
+    bucket_id: usize,
+    items: &[(u64, Vec<f32>)],
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let bucket_dir = format!("{}/bucket_{:06}", &PRIECO_CONFIG.vector_path, bucket_id);
+    create_dir_all(&bucket_dir)?;
+
+    let staging_path = format!("{}/staging.bin", bucket_dir);
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&staging_path)?;
+
+    let mut writer = BufWriter::with_capacity(1 << 16, file);
+    for (id, vector) in items {
+        writer.write_all(&id.to_le_bytes())?;
+        let bytes: &[u8] = bytemuck::cast_slice(vector.as_slice());
+        writer.write_all(bytes)?;
+    }
+    writer.flush()?;
+    Ok(())
+}
+
+fn merge_bucket(bucket_id: usize) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let bucket_dir = format!("{}/bucket_{:06}", &PRIECO_CONFIG.vector_path, bucket_id);
+    let staging_path = format!("{}/staging.bin", bucket_dir);
+    if !Path::new(&staging_path).exists() {
+        return Ok(());
     }
 
-    vector_idx_buffer.clear();
+    let ids_path = format!("{}/ids.bin", bucket_dir);
+    let vecs_path = format!("{}/vectors.bin", bucket_dir);
 
+    // First pass: collect all IDs that exist in staging (these will overwrite existing)
+    let mut staging_ids: HashMap<u64, ()> = HashMap::new();
+    {
+        let mut staging_file = BufReader::with_capacity(1 << 20, File::open(&staging_path)?);
+        let mut id_buf = [0u8; 8];
+        while staging_file.read_exact(&mut id_buf).is_ok() {
+            staging_ids.insert(u64::from_le_bytes(id_buf), ());
+            // Skip the vector bytes
+            let mut skip = vec![0u8; 384 * 4];
+            staging_file.read_exact(&mut skip)?;
+        }
+    }
+
+    let mut out_ids = AtomicFile::new(format!("{}/ids.bin", bucket_dir))?;
+    let mut out_vecs = AtomicFile::new(format!("{}/vectors.bin", bucket_dir))?;
+
+    // Stream existing canonical files, skipping any IDs that staging will overwrite
+    if Path::new(&ids_path).exists() && Path::new(&vecs_path).exists() {
+        let ids_len = std::fs::metadata(&ids_path)?.len() as usize;
+        let vecs_len = std::fs::metadata(&vecs_path)?.len() as usize;
+        let count = ids_len / 8;
+        if vecs_len == count * 384 * 4 {
+            let mut ids_file = BufReader::with_capacity(1 << 20, File::open(&ids_path)?);
+            let mut vecs_file = BufReader::with_capacity(1 << 20, File::open(&vecs_path)?);
+            let mut id_buf = [0u8; 8];
+            let mut vec_buf = vec![0u8; 384 * 4];
+            for _ in 0..count {
+                ids_file.read_exact(&mut id_buf)?;
+                vecs_file.read_exact(&mut vec_buf)?;
+                let id = u64::from_le_bytes(id_buf);
+                // Only write if staging doesn't have a newer version
+                if !staging_ids.contains_key(&id) {
+                    out_ids.write_all(&id_buf)?;
+                    out_vecs.write_all(&vec_buf)?;
+                }
+            }
+        } else {
+            println!(
+                "{}: Warning: bucket {} corrupted, discarding",
+                icons::DB_INSERT,
+                bucket_id
+            );
+        }
+    }
+
+    // Stream staging into output
+    {
+        let mut staging_file = BufReader::with_capacity(1 << 20, File::open(&staging_path)?);
+        let mut id_buf = [0u8; 8];
+        let mut vec_buf = vec![0u8; 384 * 4];
+        while staging_file.read_exact(&mut id_buf).is_ok() {
+            staging_file.read_exact(&mut vec_buf)?;
+            out_ids.write_all(&id_buf)?;
+            out_vecs.write_all(&vec_buf)?;
+        }
+    }
+
+    out_ids.commit()?;
+    out_vecs.commit()?;
+
+    std::fs::remove_file(&staging_path)?;
     Ok(())
 }
 
 /* Helper functions */
 fn sanitize_string(s: &str) -> String {
     s.replace('"', "").replace('\'', "")
-}
-
-fn update_bucket(
-    bucket_id: usize,
-    new_items: &[(u64, Vec<f32>)],
-) -> Result<(), Box<dyn std::error::Error>> {
-    let bucket_dir = format!("{}/bucket_{:06}", &PRIECO_CONFIG.vector_path, bucket_id);
-    create_dir_all(&bucket_dir)?;
-
-    let existing_ids_with_positions = load_existing_bucket_ids(bucket_id)?;
-
-    let ids_path = format!("{}/ids.bin", bucket_dir);
-    let vecs_path = format!("{}/vectors.bin", bucket_dir);
-
-    let mut merged: HashMap<u64, Vec<f32>> =
-        HashMap::with_capacity(existing_ids_with_positions.len() + new_items.len());
-
-    if Path::new(&vecs_path).exists() {
-        let mut vecs_file = File::open(&vecs_path)?;
-        for (&id, &pos) in existing_ids_with_positions.iter() {
-            let mut vector = vec![0f32; 384];
-            vecs_file.seek(SeekFrom::Start((pos * 384 * 4) as u64))?;
-            for i in 0..384 {
-                let mut buf = [0u8; 4];
-                vecs_file.read_exact(&mut buf)?;
-                vector[i] = f32::from_le_bytes(buf);
-            }
-            merged.insert(id, vector);
-        }
-    }
-
-    // In case of same id, wins the new vector
-    for (id, vector) in new_items {
-        merged.insert(*id, vector.clone());
-    }
-
-    // Write the files to disk
-    let mut ids_file = File::create(ids_path)?;
-    let mut vecs_file = File::create(vecs_path)?;
-    for (id, vector) in merged.iter() {
-        ids_file.write_all(&id.to_le_bytes())?;
-        for &val in vector {
-            vecs_file.write_all(&val.to_le_bytes())?;
-        }
-    }
-
-    Ok(())
-}
-
-fn load_existing_bucket_ids(
-    bucket_id: usize,
-) -> Result<HashMap<u64, usize>, Box<dyn std::error::Error>> {
-    let ids_path = format!(
-        "{}/bucket_{:06}/ids.bin",
-        &PRIECO_CONFIG.vector_path, bucket_id
-    );
-    let mut id_positions: HashMap<u64, usize> = HashMap::with_capacity(15_000);
-
-    if Path::new(&ids_path).exists() {
-        let mut file = File::open(&ids_path)?;
-        let mut buffer = [0u8; 8];
-        let mut position = 0;
-
-        while file.read_exact(&mut buffer).is_ok() {
-            let id = u64::from_le_bytes(buffer);
-            id_positions.insert(id, position);
-            position += 1;
-        }
-    }
-
-    Ok(id_positions)
 }
