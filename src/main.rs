@@ -220,7 +220,7 @@ fn thread_manager() {
     let _ = TANTIVY_READER;
     let _ = TANTIVY_WRITER;
     println!("Starting PageRank!");
-    // let _ = PAGERANK.read().get_score("https://www.google.com/");
+    let _ = PAGERANK.read().get_score("https://www.google.com/");
     println!("Starting GPU!");
     let _ = VECTOR_CENTROPOIDS.search(&vec![0.0; 384], 1, 1);
 

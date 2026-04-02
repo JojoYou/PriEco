@@ -864,7 +864,7 @@ extern "C" __global__ void topk_argmax(
                 })
                 .collect();
 
-            // Flatten and dedup — keep highest sim per id across probed buckets
+            // Flatten and dedup
             let mut flat: Vec<(u64, f32)> = all.into_iter().flatten().collect();
             flat.sort_unstable_by_key(|(id, _)| *id);
             flat.dedup_by(|a, b| {
@@ -934,12 +934,16 @@ unsafe impl Sync for PageRank {}
 impl PageRank {
     pub fn open(id_map_path: &str, scores_path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let id_file = File::open(id_map_path)?;
-        let id_mmap = unsafe { MmapOptions::new().populate().map(&id_file)? };
+        let id_mmap = unsafe { MmapOptions::new().map(&id_file)? };
+        id_mmap.advise(memmap2::Advice::Random)?;
+
         let len = id_mmap.len() / 16;
         let ptr = id_mmap.as_ptr() as *const (u64, u64);
 
         let scores_file = File::open(scores_path)?;
-        let scores_mmap = unsafe { MmapOptions::new().populate().map(&scores_file)? };
+        let scores_mmap = unsafe { MmapOptions::new().map(&scores_file)? };
+        scores_mmap.advise(memmap2::Advice::Random)?;
+
         let scores_ptr = scores_mmap.as_ptr() as *const f32;
 
         Ok(Self {
@@ -965,12 +969,11 @@ impl PageRank {
 
     pub fn get_score(&self, url: &str) -> f32 {
         let hash = url_to_id(&normalize_url(url.trim()));
-        println!("HASH: {}", hash);
         let node_id = match self.lookup(hash) {
             Some(id) => id,
             None => return 0.0,
         };
-        println!("ID: {}", node_id);
+
         unsafe { *self.scores_ptr.add(node_id as usize) }
     }
 }

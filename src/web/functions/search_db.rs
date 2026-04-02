@@ -299,24 +299,31 @@ pub async fn run_json(
     ranking::hand::run(&mut results, query, lang, loc);
 
     // Stage: 3
-    // Reranker
-    let s = Instant::now();
+    // Reranker + PageRank
+    let mut pagerank_time_total: f32 = 0.0;
+    let mut rerank_time_total: f32 = 0.0;
     let candidates = results.len().min(RERANK_CUTOFF);
     for doc in &mut results[..candidates] {
         // Pagerank
-        /*let s = Instant::now();
+        let pagerank_time = Instant::now();
         let page_rank_score: f32 = PAGERANK.read().get_score(&doc.url);
         let page_rank_boost = 1.0 + page_rank_score;
         doc.search_score *= page_rank_boost;
-        println!("PageRank search: {}s", s.elapsed().as_secs_f32());*/
+        pagerank_time_total += pagerank_time.elapsed().as_secs_f32();
 
+        // Rerank
+        let reranking_time = Instant::now();
         let passage = format!("{} {}", doc.title, doc.description);
         let raw = RERANKER.score(query, &passage);
         let reranker_prob = 1.0 / (1.0 + (-raw).exp());
         doc.search_score = doc.search_score * (0.7 + reranker_prob * 0.6);
+        rerank_time_total += reranking_time.elapsed().as_secs_f32();
     }
     results[..candidates].sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
-    println!("Reranking took: {}s", s.elapsed().as_secs_f32());
+    println!(
+        "PageRank: {}s\nRerank: {}s",
+        pagerank_time_total, rerank_time_total
+    );
 
     // Stage: 4
     // Cap result count from a single domain
