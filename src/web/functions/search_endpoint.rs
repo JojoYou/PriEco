@@ -20,7 +20,7 @@ use std::collections::HashMap;
 /*
   Import external libraries
 */
-use rocket::{State, http::CookieJar};
+use rocket::State;
 use serde_json::{Value, json};
 
 /*
@@ -42,7 +42,6 @@ pub async fn run(
     lang: &str,
     loc: &str,
     embedding_service: &State<EmbeddingService>,
-    cookie_jar: &CookieJar<'_>,
 ) -> HashMap<String, Value> {
     // Don't perform a search on bang
     if q.contains("!") {
@@ -60,7 +59,7 @@ pub async fn run(
             );
         }
         _ => {
-            all_search(&mut context, q, lang, loc, embedding_service, cookie_jar).await;
+            all_search(&mut context, q, lang, loc, embedding_service).await;
         }
     }
 
@@ -73,7 +72,6 @@ async fn all_search(
     lang: &str,
     loc: &str,
     embedding_service: &State<EmbeddingService>,
-    cookie_jar: &CookieJar<'_>,
 ) {
     context.insert(String::from("all_results"), json!(true)); // Set btn search type
 

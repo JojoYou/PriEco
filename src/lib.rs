@@ -23,6 +23,7 @@ use std::{
 };
 
 use twox_hash::XxHash3_64;
+use url::Url;
 
 use crate::globals::{FILE_LOCKS, colors};
 
@@ -184,4 +185,24 @@ pub fn url_to_id(url: &str) -> u64 {
     let mut h = XxHash3_64::with_seed(0);
     h.write(url.as_bytes());
     h.finish()
+}
+
+pub fn normalize_url(raw: &str) -> String {
+    let url_str = if !raw.starts_with("http") {
+        format!("http://{}", raw)
+    } else {
+        raw.to_owned()
+    };
+    Url::parse(&url_str)
+        .ok()
+        .map(|mut url| {
+            url.set_query(None);
+            url.set_fragment(None);
+            let mut normalized = url.to_string();
+            if normalized.ends_with('/') {
+                normalized.pop();
+            }
+            normalized
+        })
+        .unwrap_or_else(|| raw.to_string())
 }

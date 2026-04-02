@@ -6,7 +6,7 @@
   License: AGPL v3.0
 
   Date Created:: 2026-02-26
-  Last Modified: 2026-02-26
+  Last Modified: 2026-03-31
 
   Usage: Call to process connections in
   TODO:
@@ -16,23 +16,26 @@
   Import system libraries
 */
 use std::{
-    fs::{File, create_dir_all, read_dir, remove_file},
-    io::{BufReader, BufWriter, ErrorKind, Read, Write},
+    error::Error,
+    fs::{File, create_dir_all, read_dir, remove_file, rename},
+    io::{BufReader, BufWriter, ErrorKind, Read, Write, copy},
     path::Path,
+    sync::Arc,
 };
 
 /*
   Import external libraries
 */
+use memmap2::{Mmap, MmapOptions};
 use zstd::{Decoder, Encoder};
 
 /*
   Import own libraries
 */
 use crate::{
-    globals::{colors, icons},
+    globals::{PAGERANK, PageRank, colors, icons},
     pagerank::{import, iter, nodes},
-    write_file,
+    read_file, write_file,
 };
 
 /*
@@ -42,22 +45,21 @@ pub const PAGERANK_DIR: &str = "pagerank";
 pub const IMPORT_ONLY_FILE: &str = "pagerank/skip.txt";
 
 pub const CONNECTIONS_DIR: &str = "pagerank/connections";
-pub const BUFFER_SIZE: usize = 8_000_000;
+pub const BUFFER_SIZE: usize = 31_250_000;
 
 pub const EDGES_DIR: &str = "pagerank/edges";
 pub const NODES_DIR: &str = "pagerank/nodes";
 pub const MERGED_DIR: &str = "pagerank/merged";
 
-pub const EDGES_SORTED: &str = "pagerank/edges_sorted.bin.zst"; // Sorted deduplicated (u64 src_id, u64 dst_id) edge list.
-pub const CSR_EDGES: &str = "pagerank/csr_edges.bin";
-pub const CSR_OFFSETS: &str = "pagerank/csr_offsets.bin.zst"; // u64 per node: byte offset into csr_edges where in-neighbors start.
-pub const ID_MAP_FILE: &str = "pagerank/id_map.bin.zst"; // Sorted (u64 hash, u64 id) pairs — binary-searchable URL→ID lookup.
+pub const EDGES_SORTED: &str = "pagerank/edges_sorted.bin.zst";
+pub const CSR_EDGES: &str = "pagerank/csr_edges.bin.zst";
+pub const CSR_OFFSETS: &str = "pagerank/csr_offsets.bin";
+pub const ID_MAP_FILE: &str = "pagerank/id_map.bin";
 pub const SCORES_A: &str = "pagerank/scores_a.bin";
 pub const SCORES_B: &str = "pagerank/scores_b.bin";
-const TOTAL_NODES: &str = "pagerank/total_nodes.txt";
+pub const TOTAL_NODES: &str = "pagerank/total_nodes.txt";
 pub const OUT_DEGREE: &str = "pagerank/out_degree.bin.zst";
-pub const FINAL_SCORES: &str = "pagerank/pageranks.bin.zst";
-pub const TMP_SCORES: &str = "pagerank/pageranks.bin.tmp_lookup";
+pub const FINAL_SCORES: &str = "pagerank/pageranks.bin";
 
 pub const DIRS: [&str; 5] = [
     PAGERANK_DIR,
@@ -66,6 +68,37 @@ pub const DIRS: [&str; 5] = [
     NODES_DIR,
     MERGED_DIR,
 ];
+
+pub struct IdMap {
+    _mmap: Mmap,
+    ptr: *const (u64, u64),
+    len: usize,
+}
+
+impl IdMap {
+    pub fn open(path: &str) -> Result<Self, Box<dyn Error>> {
+        let file = File::open(path)?;
+        let mmap = unsafe { MmapOptions::new().map(&file)? };
+        let len = mmap.len() / 16;
+        let ptr = mmap.as_ptr() as *const (u64, u64);
+        Ok(Self {
+            _mmap: mmap,
+            ptr,
+            len,
+        })
+    }
+
+    pub fn pairs(&self) -> &[(u64, u64)] {
+        unsafe { std::slice::from_raw_parts(self.ptr, self.len) }
+    }
+
+    pub fn lookup(&self, hash: u64) -> Option<u64> {
+        self.pairs()
+            .binary_search_by_key(&hash, |&(h, _)| h)
+            .ok()
+            .map(|i| self.pairs()[i].1)
+    }
+}
 
 /*
   Description: Decide how to proceed and call responsible functions to import connections to the graph and compute pagerank
@@ -77,7 +110,13 @@ pub fn run() {
     // Create required directories
     for dir in DIRS {
         if let Err(e) = create_dir_all(dir) {
-            println!("{}{}{}", colors::RED, e, colors::RESET);
+            println!(
+                "{}: {}{}{}",
+                icons::PAGERANK_ICON,
+                colors::RED,
+                e,
+                colors::RESET
+            );
             return;
         }
     }
@@ -96,7 +135,7 @@ pub fn run() {
 
     println!(
         "{}: Starting\nImport-only mode: {}",
-        icons::PAGERANK,
+        icons::PAGERANK_ICON,
         import_only
     );
 
@@ -109,7 +148,7 @@ pub fn run() {
         total_nodes = match import() {
             Ok(c) => c,
             Err(e) => {
-                println!("{}: {}", icons::PAGERANK, e);
+                println!("{}: {}", icons::PAGERANK_ICON, e);
                 return;
             }
         };
@@ -124,23 +163,31 @@ pub fn run() {
         total_nodes = match import() {
             Ok(c) => c,
             Err(e) => {
-                println!("{}: {}", icons::PAGERANK, e);
+                println!("{}: {}", icons::PAGERANK_ICON, e);
                 return;
             }
         };
         write_file(TOTAL_NODES, &total_nodes.to_string(), false);
+    } else if std::env::var("REBUILD_CSR").is_ok() {
+        total_nodes = match read_file(TOTAL_NODES).trim().parse() {
+            Ok(t) => t,
+            Err(e) => {
+                println!(
+                    "{}Failed to read total nodes:{} {}",
+                    colors::RED,
+                    colors::RESET,
+                    e
+                );
+                return;
+            }
+        };
     } else {
-        println!(
-            "{}: {}No new work!{}",
-            icons::PAGERANK,
-            colors::YELLOW,
-            colors::RESET
-        );
+        println!("No new work!");
         return;
     }
     println!(
         "{}: {}Import done!{}",
-        icons::PAGERANK,
+        icons::PAGERANK_ICON,
         colors::GREEN,
         colors::RESET
     );
@@ -149,7 +196,7 @@ pub fn run() {
     if import_only {
         println!(
             "{}: Pagerank ran in import-only mode. Delete {} to compute PageRank.",
-            icons::PAGERANK,
+            icons::PAGERANK_ICON,
             IMPORT_ONLY_FILE
         );
         return;
@@ -160,7 +207,7 @@ pub fn run() {
     */
     println!(
         "{}: Phase 2: building CSR ({} nodes)…",
-        icons::PAGERANK,
+        icons::PAGERANK_ICON,
         total_nodes
     );
     let total_nodes_usize = total_nodes as usize;
@@ -168,12 +215,12 @@ pub fn run() {
         match nodes::csr::run(total_nodes_usize) {
             Ok(_) => (),
             Err(e) => {
-                println!("{}: {}", icons::PAGERANK, e);
+                println!("{}: {}", icons::PAGERANK_ICON, e);
                 return;
             }
         };
     } else {
-        println!("{}: Skipping Phase 2", icons::PAGERANK);
+        println!("{}: Skipping Phase 2", icons::PAGERANK_ICON);
     }
 
     // Initial scores
@@ -188,39 +235,39 @@ pub fn run() {
     /*
       3: Iterate
     */
-    println!("{}: Phase 3: streaming power iteration…", icons::PAGERANK);
+    println!(
+        "{}: Phase 3: streaming power iteration…",
+        icons::PAGERANK_ICON
+    );
     let final_file: String = match iter::iterate::run(total_nodes_usize) {
         Ok(file) => file,
         Err(e) => {
-            println!("{}: {}", icons::PAGERANK, e);
+            println!("{}: {}", icons::PAGERANK_ICON, e);
             return;
         }
     };
 
     // Save
-    println!("{}: Compressing {} scores…", icons::PAGERANK, total_nodes);
+    println!("{}: Saving {} scores…", icons::PAGERANK_ICON, total_nodes);
+    let tmp = "pagerank/pageranks.bin.tmp";
     let mut rdr = BufReader::with_capacity(1_048_576, File::open(final_file).unwrap());
-    let mut enc = match zstd_writer(FINAL_SCORES) {
-        Ok(e) => e,
-        Err(e) => {
-            println!("{}: {}", icons::PAGERANK, e);
-            return;
-        }
-    };
-    let mut buf = [0u8; 4];
-    for _ in 0..total_nodes {
-        rdr.read_exact(&mut buf).unwrap();
-        enc.write_all(&buf).unwrap();
-    }
-    if let Err(e) = enc.finish() {
-        println!("{}: {}", icons::PAGERANK, e);
-        return;
-    };
+    let mut out = BufWriter::with_capacity(1_048_576, File::create(tmp).unwrap());
+    copy(&mut rdr, &mut out).unwrap();
+    drop(out);
+    rename(tmp, FINAL_SCORES).unwrap();
     println!(
         "{}: {}Saved!{}",
-        icons::PAGERANK,
+        icons::PAGERANK_ICON,
         colors::GREEN,
         colors::RESET
+    );
+
+    *PAGERANK.write() = Arc::new(PageRank::open(ID_MAP_FILE, FINAL_SCORES).unwrap());
+
+    println!(
+        "{}: Google: {}",
+        icons::PAGERANK_ICON,
+        PAGERANK.read().get_score("https://www.google.com/")
     );
 }
 
@@ -232,13 +279,16 @@ pub fn run() {
   Output: Result total_nodes
 */
 fn import() -> Result<u64, Box<dyn std::error::Error>> {
-    println!("{}: Phase 1: Pass A: Hashing!", icons::PAGERANK);
+    println!("{}: Phase 1: Pass A: Hashing!", icons::PAGERANK_ICON);
     let hash_shards = import::hashing::run()?;
 
-    println!("{}: Phase 1: Pass B: Merging!", icons::PAGERANK);
+    println!("{}: Phase 1: Pass B: Merging!", icons::PAGERANK_ICON);
     let total_nodes = import::merge::run(&hash_shards)?;
 
-    println!("{}: Phase 1: Pass C: Translating edges!", icons::PAGERANK);
+    println!(
+        "{}: Phase 1: Pass C: Translating edges!",
+        icons::PAGERANK_ICON
+    );
     import::translate::run(hash_shards)?;
 
     Ok(total_nodes)
@@ -256,7 +306,7 @@ pub fn zstd_writer(
 ) -> Result<Encoder<'static, BufWriter<File>>, Box<dyn std::error::Error>> {
     let f = File::create(path)?;
     let writer = BufWriter::with_capacity(1 << 20, f);
-    let encoder = Encoder::new(writer, 19)?;
+    let encoder = Encoder::new(writer, 19)?; // Lvl 19 compression
 
     Ok(encoder)
 }
@@ -300,5 +350,19 @@ pub fn read_u64_pair_zstd(
                 Err(Box::new(e))
             }
         }
+    }
+}
+
+pub fn read_u64_pair(
+    r: &mut BufReader<File>,
+) -> Result<Option<(u64, u64)>, Box<dyn std::error::Error>> {
+    let mut buf = [0u8; 16];
+    match r.read_exact(&mut buf) {
+        Ok(_) => Ok(Some((
+            u64::from_le_bytes(buf[0..8].try_into()?),
+            u64::from_le_bytes(buf[8..16].try_into()?),
+        ))),
+        Err(e) if e.kind() == ErrorKind::UnexpectedEof => Ok(None),
+        Err(e) => Err(Box::new(e)),
     }
 }

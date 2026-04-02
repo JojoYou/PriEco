@@ -189,13 +189,12 @@ pub async fn results_htmls(
     lang: &str,
     loc: &str,
     embedding_service: &State<EmbeddingService>,
-    cookie_jar: &CookieJar<'_>,
 ) -> Template {
     ANALYTICS.record_query();
 
     Template::render(
         "search/results",
-        search_endpoint::run(t, q, lang, loc, embedding_service, cookie_jar).await,
+        search_endpoint::run(t, q, lang, loc, embedding_service).await,
     )
 }
 

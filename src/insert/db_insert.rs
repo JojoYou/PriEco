@@ -5,9 +5,8 @@ use std::{
     collections::HashMap,
     error::Error,
     fs::{File, create_dir_all, read_dir, remove_file},
-    io::{BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write},
+    io::{BufRead, BufReader, BufWriter, Read, Write},
     path::{Path, PathBuf},
-    sync::atomic::AtomicUsize,
 };
 
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -293,9 +292,10 @@ fn vector_process(
         icons::DB_INSERT,
         bucket_data.len()
     );
-    bucket_data
-        .par_iter()
-        .try_for_each(|(bucket_id, items)| append_to_bucket(*bucket_id, items))?;
+    bucket_data.par_iter().try_for_each(|(bucket_id, items)| {
+        append_to_bucket(*bucket_id, items)
+            .map_err(|e| format!("Failed on bucket {}: {}", bucket_id, e))
+    })?;
 
     chunk_buffer.clear();
     Ok(())
@@ -394,7 +394,7 @@ fn merge_bucket(bucket_id: usize) -> Result<(), Box<dyn Error + Send + Sync>> {
     out_ids.commit()?;
     out_vecs.commit()?;
 
-    std::fs::remove_file(&staging_path)?;
+    remove_file(&staging_path)?;
     Ok(())
 }
 

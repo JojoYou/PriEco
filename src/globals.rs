@@ -17,16 +17,18 @@
 */
 use std::{
     error::Error,
-    fs::{File, metadata},
+    fs::File,
     hash::{Hash, Hasher},
-    io::{BufWriter, Read, Seek, SeekFrom, Write},
     net::{Ipv4Addr, Ipv6Addr},
     path::Path,
     str::FromStr,
     sync::Arc,
 };
 #[cfg(feature = "cuda")]
-use std::{fs::read, io::Cursor};
+use std::{
+    fs::read,
+    io::{Cursor, Read},
+};
 
 /*
   Import external libraries
@@ -40,15 +42,14 @@ use cudarc::{
     nvrtc::compile_ptx,
 };
 use dashmap::DashSet;
-#[cfg(feature = "cuda")]
-use memmap2::Mmap;
+use memmap2::{Mmap, MmapOptions};
 use ndarray::{Array, Array2, CowArray, IxDyn};
 use once_cell::sync::Lazy;
 use ort::{
     Environment, ExecutionProvider, GraphOptimizationLevel, InMemorySession, SessionBuilder, Value,
     tensor::OrtOwnedTensor,
 };
-use parking_lot::{Condvar, Mutex};
+use parking_lot::{Condvar, Mutex, RwLock};
 #[cfg(feature = "cuda")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use redb::{Database, ReadableDatabase, TableDefinition};
@@ -71,7 +72,8 @@ use twox_hash::XxHash3_64;
   Import own libraries
 */
 use crate::{
-    pagerank::compute::{FINAL_SCORES, ID_MAP_FILE, TMP_SCORES, zstd_reader},
+    normalize_url,
+    pagerank::compute::{FINAL_SCORES, ID_MAP_FILE},
     set_up, url_to_id,
 };
 
@@ -97,7 +99,7 @@ pub mod colors {
 pub mod icons {
     pub const BLOB: &str = "🪼";
     pub const DB_INSERT: &str = "💾";
-    pub const PAGERANK: &str = "📋";
+    pub const PAGERANK_ICON: &str = "📋";
 }
 
 /*
@@ -471,10 +473,6 @@ pub static BLOB_STORAGE: Lazy<Arc<DB>> = Lazy::new(|| {
 });
 
 /*
-  Pagerank
-*/
-
-/*
   Index
 */
 pub static ROCKSDB_INDEX: Lazy<Arc<DB>> = Lazy::new(|| {
@@ -745,14 +743,14 @@ extern "C" __global__ void topk_argmax(
 
     pub fn search(
         &self,
-        query: &[f32], // 384D, need not be normalized
-        n: usize,      // how many results to return (0 = all from probs: t)
-        t: usize,      // how many centroid buckets to probe
+        query: &[f32],
+        n: usize, // how many results to return
+        t: usize, // how many centroid buckets to probe
     ) -> Result<Vec<(u64, f32)>, Box<dyn std::error::Error>> {
         assert!(t <= 32, "t must be <=32");
         let dims = self.dims;
 
-        // ── 1. Upload + normalize query on GPU ──────────────────────────────────
+        // Upload + normalize query on GPU
         let mut q_gpu = unsafe { self.stream.alloc::<f32>(dims)? };
         self.stream.memcpy_htod(query, &mut q_gpu)?;
 
@@ -772,7 +770,7 @@ extern "C" __global__ void topk_argmax(
         }
         self.stream.synchronize()?;
 
-        // ── 2. GEMM: sims = centroids^T · query  →  (num_centroids × 1) ────────
+        //  GEMM: sims = centroids^T · query  →  (num_centroids × 1)
         let mut sims_gpu = self.stream.alloc_zeros::<f32>(self.num_centroids)?;
         unsafe {
             self.blas.gemm(
@@ -795,7 +793,7 @@ extern "C" __global__ void topk_argmax(
         }
         self.stream.synchronize()?;
 
-        // ── 3. Top-T argmax on GPU ───────────────────────────────────────────────
+        // Top-T argmax on GPU
         let mut topk_gpu = self.stream.alloc_zeros::<i32>(t)?;
         let nc_i32 = self.num_centroids as i32;
         let one_i32 = 1i32;
@@ -819,11 +817,11 @@ extern "C" __global__ void topk_argmax(
         self.stream.memcpy_dtoh(&topk_gpu, &mut topk_cpu)?;
         let centroid_ids: Vec<usize> = topk_cpu.into_iter().map(|x| x as usize).collect();
 
-        // ── 4. Normalize query on CPU for the brute-force cosine scan ───────────
+        // Normalize query on CPU for the brute-force cosine scan
         let norm = query.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-10);
         let query_norm: Vec<f32> = query.iter().map(|x| x / norm).collect();
 
-        // ── 5. Scan buckets, compute cosine sim, collect candidates ─────────────
+        // Scan buckets, compute cosine sim, collect candidates
         let mut candidates: Vec<(u64, f32)> = {
             let all: Vec<Vec<(u64, f32)>> = centroid_ids
                 .par_iter()
@@ -882,13 +880,12 @@ extern "C" __global__ void topk_argmax(
             flat
         };
 
-        // ── 6. Sort, truncate ────────────────────────────────────────────────────
         candidates.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         if n > 0 {
             candidates.truncate(n);
         }
 
-        Ok(candidates) // (id, cosine_similarity) sorted best → worst
+        Ok(candidates) // (id, cosine_similarity)
     }
 }
 
@@ -920,114 +917,62 @@ impl CentroidIndex {
 /*
   PageRank
 */
-pub static PAGERANK: Lazy<Arc<Database>> =
-    Lazy::new(|| Arc::new(Database::create(Path::new("kv/pageranks.redb")).unwrap()));
-pub const PAGERANKS_TABLE: TableDefinition<&str, f64> = TableDefinition::new("pageranks");
+pub static PAGERANK: Lazy<RwLock<Arc<PageRank>>> =
+    Lazy::new(|| RwLock::new(Arc::new(PageRank::open(ID_MAP_FILE, FINAL_SCORES).unwrap())));
 
-pub fn pagerank_warmup_lookup_cache() {
-    let tmp_map = format!("{}.tmp_lookup", ID_MAP_FILE);
-    let tmp_scores = TMP_SCORES;
-
-    if Path::new(&tmp_map).exists() && Path::new(tmp_scores).exists() {
-        return;
-    }
-
-    println!("Building lookup cache...");
-
-    if !Path::new(&tmp_map).exists() {
-        let mut dec = match zstd_reader(ID_MAP_FILE) {
-            Ok(d) => d,
-            Err(e) => {
-                eprintln!("Failed to open id_map for warmup: {e}");
-                return;
-            }
-        };
-        let mut out = BufWriter::new(match File::create(&tmp_map) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Failed to create tmp lookup file: {e}");
-                return;
-            }
-        });
-        let mut buf = [0u8; 16];
-        while dec.read_exact(&mut buf).is_ok() {
-            out.write_all(&buf).unwrap();
-        }
-    }
-
-    if !Path::new(tmp_scores).exists() {
-        let mut dec = match zstd_reader(FINAL_SCORES) {
-            Ok(d) => d,
-            Err(e) => {
-                println!("Failed to open scores for warmup: {e}");
-                return;
-            }
-        };
-        let mut out = BufWriter::with_capacity(
-            1 << 20,
-            match File::create(tmp_scores) {
-                Ok(f) => f,
-                Err(e) => {
-                    println!("Failed to create tmp scores file: {e}");
-                    return;
-                }
-            },
-        );
-        let mut buf = [0u8; 4];
-        while dec.read_exact(&mut buf).is_ok() {
-            out.write_all(&buf).unwrap();
-        }
-    }
-
-    println!("Lookup cache ready.");
+pub struct PageRank {
+    _id_mmap: Mmap,
+    ptr: *const (u64, u64),
+    len: usize,
+    _scores_mmap: Mmap,
+    scores_ptr: *const f32,
 }
-pub fn lookup_in(url: &str) -> f32 {
-    let target = url_to_id(url);
-    let tmp_map = format!("{}.tmp_lookup", ID_MAP_FILE);
 
-    let num_entries = match metadata(&tmp_map).ok() {
-        Some(m) => m.len() / 16,
-        None => return 0.0,
-    };
-    let mut f = match File::open(&tmp_map) {
-        Ok(f) => f,
-        Err(_) => return 0.0,
-    };
-    let mut buf = [0u8; 16];
-    let mut lo = 0u64;
-    let mut hi = num_entries;
-    let id = loop {
-        if lo >= hi {
-            return 0.0;
-        }
-        let mid = (lo + hi) / 2;
-        if f.seek(SeekFrom::Start(mid * 16)).is_err() {
-            return 0.0;
-        }
-        if f.read_exact(&mut buf).is_err() {
-            return 0.0;
-        }
-        let hash = u64::from_le_bytes(buf[0..8].try_into().unwrap());
-        let id = u64::from_le_bytes(buf[8..16].try_into().unwrap());
-        match hash.cmp(&target) {
-            std::cmp::Ordering::Equal => break id,
-            std::cmp::Ordering::Less => lo = mid + 1,
-            std::cmp::Ordering::Greater => hi = mid,
-        }
-    };
+unsafe impl Send for PageRank {}
+unsafe impl Sync for PageRank {}
 
-    let mut scores_f = match File::open(TMP_SCORES) {
-        Ok(f) => f,
-        Err(_) => return 0.0,
-    };
-    let mut buf4 = [0u8; 4];
-    if scores_f.seek(SeekFrom::Start(id * 4)).is_err() {
-        return 0.0;
+impl PageRank {
+    pub fn open(id_map_path: &str, scores_path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let id_file = File::open(id_map_path)?;
+        let id_mmap = unsafe { MmapOptions::new().populate().map(&id_file)? };
+        let len = id_mmap.len() / 16;
+        let ptr = id_mmap.as_ptr() as *const (u64, u64);
+
+        let scores_file = File::open(scores_path)?;
+        let scores_mmap = unsafe { MmapOptions::new().populate().map(&scores_file)? };
+        let scores_ptr = scores_mmap.as_ptr() as *const f32;
+
+        Ok(Self {
+            _id_mmap: id_mmap,
+            ptr,
+            len,
+            _scores_mmap: scores_mmap,
+            scores_ptr,
+        })
     }
-    if scores_f.read_exact(&mut buf4).is_err() {
-        return 0.0;
+
+    pub fn pairs(&self) -> &[(u64, u64)] {
+        unsafe { std::slice::from_raw_parts(self.ptr, self.len) }
     }
-    f32::from_le_bytes(buf4)
+
+    pub fn lookup(&self, hash: u64) -> Option<u64> {
+        let pairs = self.pairs();
+        pairs
+            .binary_search_by_key(&hash, |&(h, _)| h)
+            .ok()
+            .map(|i| pairs[i].1)
+    }
+
+    pub fn get_score(&self, url: &str) -> f32 {
+        let hash = url_to_id(&normalize_url(url.trim()));
+        println!("HASH: {}", hash);
+        let node_id = match self.lookup(hash) {
+            Some(id) => id,
+            None => return 0.0,
+        };
+        println!("ID: {}", node_id);
+        unsafe { *self.scores_ptr.add(node_id as usize) }
+    }
 }
 
 /*

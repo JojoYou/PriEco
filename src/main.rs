@@ -50,7 +50,6 @@ use rocket::{
 };
 use rocket_dyn_templates::Template;
 use tokenizers::{PaddingDirection, PaddingParams, PaddingStrategy, Tokenizer};
-use tokio::sync::Mutex;
 
 /*
   Import own libraries
@@ -58,12 +57,13 @@ use tokio::sync::Mutex;
 use prieco_rs::{
     blob,
     globals::{
-        ANALYTICS, BLOB_STORAGE, EmbeddingService, PRIECO_CONFIG, TANTIVY_READER, TANTIVY_WRITER,
-        VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_MODEL, VECTOR_EMBEDDING_TOKENIZER, colors, icons,
-        pagerank_warmup_lookup_cache,
+        ANALYTICS, BLOB_STORAGE, EmbeddingService, PAGERANK, PRIECO_CONFIG, TANTIVY_READER,
+        TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_MODEL, VECTOR_EMBEDDING_TOKENIZER,
+        colors,
+        icons::{self},
     },
     insert::db_insert,
-    pagerank,
+    pagerank::{self},
     web::routes::{apis::*, assets::*, pages::*},
 };
 
@@ -143,7 +143,7 @@ async fn rocket() -> _ {
         "{}: Blob storage\n{}: Database inserter\n{}: Pagerank\n",
         icons::BLOB,
         icons::DB_INSERT,
-        icons::PAGERANK
+        icons::PAGERANK_ICON
     );
 
     // Load config
@@ -152,7 +152,7 @@ async fn rocket() -> _ {
     // Vector Embeding
     let embedding_service = EmbeddingService {
         tokenizer: Arc::new(tokio::sync::Mutex::new(create_tokenizer())),
-        model: Arc::new(Mutex::new(create_embeder())),
+        model: Arc::new(tokio::sync::Mutex::new(create_embeder())),
     };
 
     // Spawn Thread Manager
@@ -219,9 +219,10 @@ fn thread_manager() {
     let _ = BLOB_STORAGE;
     let _ = TANTIVY_READER;
     let _ = TANTIVY_WRITER;
+    println!("Starting PageRank!");
+    // let _ = PAGERANK.read().get_score("https://www.google.com/");
     println!("Starting GPU!");
     let _ = VECTOR_CENTROPOIDS.search(&vec![0.0; 384], 1, 1);
-    let _ = pagerank_warmup_lookup_cache();
 
     // Blob storage
     let blob_thread = {
@@ -263,7 +264,7 @@ fn thread_manager() {
     let _ = blob_thread.join();
     let _ = insert_thread.join();
     let _ = pagerank_thread.join();
-    println!("{}Blob thread finished!{}", colors::GREEN, colors::RESET);
+    println!("{}Threads finished!{}", colors::GREEN, colors::RESET);
 }
 
 /* Helper functions */

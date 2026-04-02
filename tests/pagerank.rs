@@ -154,10 +154,11 @@ fn run_pipeline(tmp: &TmpDir, edges: &[(&str, &str)]) -> (u64, HashMap<String, f
     let scores_a = format!("{}/scores_a.bin", tmp.path());
     let scores_b = format!("{}/scores_b.bin", tmp.path());
     let final_s = format!("{}/pageranks.bin.zst", tmp.path());
+    let total_nodes = format!("{}/total_nodes.txt", tmp.path());
 
     // Phase 1
     let hash_shards = hashing::run_in(&conn_dir, &edges_dir).unwrap();
-    let n = merge::run_with(&hash_shards, &id_map, &nodes_dir, &merged_dir).unwrap();
+    let n = merge::run_with(&hash_shards, &id_map, &nodes_dir, &merged_dir, &total_nodes).unwrap();
     translate::run_with(hash_shards, &id_map, &edges_s, &edges_dir).unwrap();
 
     // Phase 2 — pass csr_dir so flush() writes shards there, not into csr_edges path
@@ -199,19 +200,20 @@ fn run_incremental(
 
     let id_map = format!("{}/id_map.bin.zst", tmp.path());
     let edges_s = format!("{}/edges_sorted.bin.zst", tmp.path());
+    let total_nodes = format!("{}/total_nodes.txt", tmp.path());
 
     // Batch 1
     let conn1 = tmp.sub("conn1");
     write_connections(&conn1, "c.txt", batch1);
     let sh1 = hashing::run_in(&conn1, &edges_dir).unwrap();
-    let _ = merge::run_with(&sh1, &id_map, &tmp.sub("n1"), &tmp.sub("m1")).unwrap();
+    let _ = merge::run_with(&sh1, &id_map, &tmp.sub("n1"), &tmp.sub("m1"), &total_nodes).unwrap();
     translate::run_with(sh1, &id_map, &edges_s, &edges_dir).unwrap();
 
     // Batch 2
     let conn2 = tmp.sub("conn2");
     write_connections(&conn2, "c.txt", batch2);
     let sh2 = hashing::run_in(&conn2, &edges_dir).unwrap();
-    let n = merge::run_with(&sh2, &id_map, &tmp.sub("n2"), &tmp.sub("m2")).unwrap();
+    let n = merge::run_with(&sh2, &id_map, &tmp.sub("n2"), &tmp.sub("m2"), &total_nodes).unwrap();
     translate::run_with(sh2, &id_map, &edges_s, &edges_dir).unwrap();
 
     // Build and score
@@ -402,7 +404,15 @@ fn merge_first_run_no_existing_id_map() {
     write_connections(&conn, "c.txt", &[("A", "B"), ("B", "C")]);
     let shards = hashing::run_in(&conn, &tmp.sub("edges")).unwrap();
     let id_map = format!("{}/id_map.bin.zst", tmp.path());
-    let n = merge::run_with(&shards, &id_map, &tmp.sub("nodes"), &tmp.sub("merged")).unwrap();
+    let total_nodes = format!("{}/total_nodes.txt", tmp.path());
+    let n = merge::run_with(
+        &shards,
+        &id_map,
+        &tmp.sub("nodes"),
+        &tmp.sub("merged"),
+        &total_nodes,
+    )
+    .unwrap();
     assert_eq!(n, 3);
 }
 
@@ -417,7 +427,16 @@ fn merge_ids_are_unique() {
     );
     let shards = hashing::run_in(&conn, &tmp.sub("edges")).unwrap();
     let id_map = format!("{}/id_map.bin.zst", tmp.path());
-    merge::run_with(&shards, &id_map, &tmp.sub("nodes"), &tmp.sub("merged")).unwrap();
+    let total_nodes = format!("{}/total_nodes.txt", tmp.path());
+
+    merge::run_with(
+        &shards,
+        &id_map,
+        &tmp.sub("nodes"),
+        &tmp.sub("merged"),
+        &total_nodes,
+    )
+    .unwrap();
     let map = read_id_map(&id_map);
     assert_eq!(map.len(), 4);
     let mut ids: Vec<u64> = map.values().cloned().collect();
@@ -440,7 +459,16 @@ fn merge_id_map_sorted_by_hash() {
     write_connections(&conn, "c.txt", &edge_refs);
     let shards = hashing::run_in(&conn, &tmp.sub("edges")).unwrap();
     let id_map = format!("{}/id_map.bin.zst", tmp.path());
-    merge::run_with(&shards, &id_map, &tmp.sub("nodes"), &tmp.sub("merged")).unwrap();
+    let total_nodes = format!("{}/total_nodes.txt", tmp.path());
+
+    merge::run_with(
+        &shards,
+        &id_map,
+        &tmp.sub("nodes"),
+        &tmp.sub("merged"),
+        &total_nodes,
+    )
+    .unwrap();
 
     let mut prev = 0u64;
     let mut dec = zstd_reader(&id_map).unwrap();
@@ -459,13 +487,15 @@ fn merge_incremental_preserves_existing_ids() {
     write_connections(&conn1, "c.txt", &[("A", "B")]);
     let sh1 = hashing::run_in(&conn1, &tmp.sub("e1")).unwrap();
     let id_map = format!("{}/id_map.bin.zst", tmp.path());
-    merge::run_with(&sh1, &id_map, &tmp.sub("n1"), &tmp.sub("m1")).unwrap();
+    let total_nodes = format!("{}/total_nodes.txt", tmp.path());
+
+    merge::run_with(&sh1, &id_map, &tmp.sub("n1"), &tmp.sub("m1"), &total_nodes).unwrap();
     let map_before = read_id_map(&id_map);
 
     let conn2 = tmp.sub("conn2");
     write_connections(&conn2, "c.txt", &[("C", "D")]);
     let sh2 = hashing::run_in(&conn2, &tmp.sub("e2")).unwrap();
-    merge::run_with(&sh2, &id_map, &tmp.sub("n2"), &tmp.sub("m2")).unwrap();
+    merge::run_with(&sh2, &id_map, &tmp.sub("n2"), &tmp.sub("m2"), &total_nodes).unwrap();
     let map_after = read_id_map(&id_map);
 
     for (hash, old_id) in &map_before {
@@ -484,12 +514,14 @@ fn merge_overlapping_batches_no_duplicate_ids() {
     write_connections(&conn1, "c.txt", &[("A", "B"), ("B", "C")]);
     let sh1 = hashing::run_in(&conn1, &tmp.sub("e1")).unwrap();
     let id_map = format!("{}/id_map.bin.zst", tmp.path());
-    let n1 = merge::run_with(&sh1, &id_map, &tmp.sub("n1"), &tmp.sub("m1")).unwrap();
+    let total_nodes = format!("{}/total_nodes.txt", tmp.path());
+
+    let n1 = merge::run_with(&sh1, &id_map, &tmp.sub("n1"), &tmp.sub("m1"), &total_nodes).unwrap();
 
     let conn2 = tmp.sub("conn2");
     write_connections(&conn2, "c.txt", &[("B", "C"), ("C", "D")]);
     let sh2 = hashing::run_in(&conn2, &tmp.sub("e2")).unwrap();
-    let n2 = merge::run_with(&sh2, &id_map, &tmp.sub("n2"), &tmp.sub("m2")).unwrap();
+    let n2 = merge::run_with(&sh2, &id_map, &tmp.sub("n2"), &tmp.sub("m2"), &total_nodes).unwrap();
 
     assert_eq!(n1, 3);
     assert_eq!(n2, 4);
@@ -512,7 +544,16 @@ fn translate_first_run_no_existing_edges() {
     let edges_dir = tmp.sub("edges");
     let shards = hashing::run_in(&conn, &edges_dir).unwrap();
     let id_map = format!("{}/id_map.bin.zst", tmp.path());
-    let _ = merge::run_with(&shards, &id_map, &tmp.sub("nodes"), &tmp.sub("merged")).unwrap();
+    let total_nodes = format!("{}/total_nodes.txt", tmp.path());
+
+    let _ = merge::run_with(
+        &shards,
+        &id_map,
+        &tmp.sub("nodes"),
+        &tmp.sub("merged"),
+        &total_nodes,
+    )
+    .unwrap();
     let edges_s = format!("{}/edges_sorted.bin.zst", tmp.path());
     translate::run_with(shards, &id_map, &edges_s, &edges_dir).unwrap();
     assert_eq!(read_pairs_zstd(&edges_s).len(), 3);
@@ -530,7 +571,16 @@ fn translate_edges_are_sorted_and_deduped() {
     let edges_dir = tmp.sub("edges");
     let shards = hashing::run_in(&conn, &edges_dir).unwrap();
     let id_map = format!("{}/id_map.bin.zst", tmp.path());
-    let _ = merge::run_with(&shards, &id_map, &tmp.sub("nodes"), &tmp.sub("merged")).unwrap();
+    let total_nodes = format!("{}/total_nodes.txt", tmp.path());
+
+    let _ = merge::run_with(
+        &shards,
+        &id_map,
+        &tmp.sub("nodes"),
+        &tmp.sub("merged"),
+        &total_nodes,
+    )
+    .unwrap();
     let edges_s = format!("{}/edges_sorted.bin.zst", tmp.path());
     translate::run_with(shards, &id_map, &edges_s, &edges_dir).unwrap();
 
@@ -549,7 +599,16 @@ fn translate_self_loops_absent_from_output() {
     let edges_dir = tmp.sub("edges");
     let shards = hashing::run_in(&conn, &edges_dir).unwrap();
     let id_map = format!("{}/id_map.bin.zst", tmp.path());
-    let _ = merge::run_with(&shards, &id_map, &tmp.sub("nodes"), &tmp.sub("merged")).unwrap();
+    let total_nodes = format!("{}/total_nodes.txt", tmp.path());
+
+    let _ = merge::run_with(
+        &shards,
+        &id_map,
+        &tmp.sub("nodes"),
+        &tmp.sub("merged"),
+        &total_nodes,
+    )
+    .unwrap();
     let edges_s = format!("{}/edges_sorted.bin.zst", tmp.path());
     translate::run_with(shards, &id_map, &edges_s, &edges_dir).unwrap();
 

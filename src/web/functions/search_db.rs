@@ -6,7 +6,7 @@
   License: AGPL v3.0
 
   Date Created: 2025-09-20
-  Last Modified: 2026-02-19
+  Last Modified: 2026-03-31
 
   Usage: Run run() with parameters
   TODO:
@@ -36,8 +36,8 @@ use twox_hash::XxHash3_64;
 */
 use crate::{
     globals::{
-        EmbeddingService, RERANKER, ROCKSDB_INDEX, SearchResult, TANTIVY_INDEX, TANTIVY_READER,
-        TOP_DOMAINS, VECTOR_CENTROPOIDS, WebDocument, colors, lookup_in,
+        EmbeddingService, PAGERANK, RERANKER, ROCKSDB_INDEX, SearchResult, TANTIVY_INDEX,
+        TANTIVY_READER, TOP_DOMAINS, VECTOR_CENTROPOIDS, WebDocument, colors,
     },
     web::functions::{
         general::get_domain,
@@ -304,9 +304,11 @@ pub async fn run_json(
     let candidates = results.len().min(RERANK_CUTOFF);
     for doc in &mut results[..candidates] {
         // Pagerank
-        let page_rank_score: f32 = lookup_in(&doc.url);
+        /*let s = Instant::now();
+        let page_rank_score: f32 = PAGERANK.read().get_score(&doc.url);
         let page_rank_boost = 1.0 + page_rank_score;
         doc.search_score *= page_rank_boost;
+        println!("PageRank search: {}s", s.elapsed().as_secs_f32());*/
 
         let passage = format!("{} {}", doc.title, doc.description);
         let raw = RERANKER.score(query, &passage);

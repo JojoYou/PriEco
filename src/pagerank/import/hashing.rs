@@ -17,15 +17,16 @@
 */
 use std::{
     fs::{File, read_dir, remove_file},
-    io::{BufRead, BufReader, Error, ErrorKind, Write},
+    io::{BufRead, BufReader, BufWriter, Error, ErrorKind, Write},
 };
 
 /*
   Import own libraries
 */
 use crate::{
-    globals::colors,
-    pagerank::compute::{BUFFER_SIZE, CONNECTIONS_DIR, EDGES_DIR, zstd_writer},
+    globals::{colors, icons},
+    normalize_url,
+    pagerank::compute::{BUFFER_SIZE, CONNECTIONS_DIR, EDGES_DIR},
     url_to_id,
 };
 
@@ -47,7 +48,7 @@ pub fn run() -> Result<Vec<String>, Box<dyn std::error::Error>> {
 */
 pub fn run_in(conn_dir: &str, edges_dir: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let mut file_buffer: Vec<(u64, u64)> = Vec::with_capacity(BUFFER_SIZE);
-    let mut hash_shards_paths: Vec<String> = Vec::with_capacity(1_000); // Keeps track of hash files
+    let mut hash_shards_paths: Vec<String> = Vec::with_capacity(1_000);
 
     // Get files from connection dir
     let files: Vec<_> = read_dir(conn_dir)?
@@ -57,7 +58,13 @@ pub fn run_in(conn_dir: &str, edges_dir: &str) -> Result<Vec<String>, Box<dyn st
         })
         .collect();
     if files.is_empty() {
-        println!("{}No files in {}{}", colors::RED, conn_dir, colors::RESET);
+        println!(
+            "{}: {}No files in {}{}",
+            icons::PAGERANK_ICON,
+            colors::RED,
+            conn_dir,
+            colors::RESET
+        );
         return Err(Error::new(ErrorKind::NotFound, format!("No files in {}", conn_dir)).into());
     }
 
@@ -66,7 +73,14 @@ pub fn run_in(conn_dir: &str, edges_dir: &str) -> Result<Vec<String>, Box<dyn st
         let file = match File::open(&path) {
             Ok(f) => f,
             Err(e) => {
-                println!("{}Skip {}:{} {}", colors::YELLOW, path, colors::RESET, e);
+                println!(
+                    "{}: {}Skip {}:{} {}",
+                    icons::PAGERANK_ICON,
+                    colors::YELLOW,
+                    path,
+                    colors::RESET,
+                    e
+                );
                 continue;
             }
         };
@@ -79,8 +93,8 @@ pub fn run_in(conn_dir: &str, edges_dir: &str) -> Result<Vec<String>, Box<dyn st
             };
 
             if let Some((from, to)) = line.split_once("->") {
-                let fh = url_to_id(from.trim());
-                let th = url_to_id(to.trim());
+                let fh = url_to_id(&normalize_url(from.trim()));
+                let th = url_to_id(&normalize_url(to.trim()));
                 if fh == th {
                     continue;
                 }
@@ -114,20 +128,14 @@ fn flush_hash(
     buffer.sort_unstable();
     buffer.dedup();
 
-    let path = format!(
-        "{}/inc_hash_shard_{}.bin.zst",
-        edges_dir,
-        shards_paths.len()
-    );
-    let mut enc = zstd_writer(&path)?;
+    let path = format!("{}/inc_hash_shard_{}.bin", edges_dir, shards_paths.len());
+    let mut writer = BufWriter::with_capacity(1 << 20, File::create(&path)?);
 
-    // Write from to urls, hashed next to each other
     for (a, b) in buffer.iter() {
-        enc.write_all(&a.to_le_bytes())?;
-        enc.write_all(&b.to_le_bytes())?;
+        writer.write_all(&a.to_le_bytes())?;
+        writer.write_all(&b.to_le_bytes())?;
     }
 
-    enc.finish()?;
     shards_paths.push(path);
     buffer.clear();
 
