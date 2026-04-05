@@ -66,7 +66,7 @@ use tantivy::{
 };
 use tokenizers::Tokenizer;
 use tokio::task;
-use twox_hash::XxHash3_64;
+use twox_hash::XxHash3_64;use zstd::decode_all;
 
 /*
   Import own libraries
@@ -74,7 +74,7 @@ use twox_hash::XxHash3_64;
 use crate::{
     normalize_url,
     pagerank::compute::{FINAL_SCORES, ID_MAP_FILE},
-    set_up, url_to_id,
+    set_up, url_to_id,insert::db_insert::{ID_SIZE,RECORD_SIZE},
 };
 
 /*
@@ -744,8 +744,8 @@ extern "C" __global__ void topk_argmax(
     pub fn search(
         &self,
         query: &[f32],
-        n: usize, // how many results to return
-        t: usize, // how many centroid buckets to probe
+        n: usize,
+        t: usize,
     ) -> Result<Vec<(u64, f32)>, Box<dyn std::error::Error>> {
         assert!(t <= 32, "t must be <=32");
         let dims = self.dims;
@@ -770,7 +770,7 @@ extern "C" __global__ void topk_argmax(
         }
         self.stream.synchronize()?;
 
-        //  GEMM: sims = centroids^T · query  →  (num_centroids × 1)
+        // GEMM: sims = centroids^T · query → (num_centroids × 1)
         let mut sims_gpu = self.stream.alloc_zeros::<f32>(self.num_centroids)?;
         unsafe {
             self.blas.gemm(
@@ -817,78 +817,67 @@ extern "C" __global__ void topk_argmax(
         self.stream.memcpy_dtoh(&topk_gpu, &mut topk_cpu)?;
         let centroid_ids: Vec<usize> = topk_cpu.into_iter().map(|x| x as usize).collect();
 
-        // Normalize query on CPU for the brute-force cosine scan
-        let norm = query.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-10);
+        // Normalize query on CPU for cosine scan
+        let norm: f32 = query.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-10);
         let query_norm: Vec<f32> = query.iter().map(|x| x / norm).collect();
 
-        // Scan buckets, compute cosine sim, collect candidates
-        let mut candidates: Vec<(u64, f32)> = {
-            let all: Vec<Vec<(u64, f32)>> = centroid_ids
-                .par_iter()
-                .filter_map(|&cid| {
-                    let bucket_dir = format!("{}/bucket_{:06}", &PRIECO_CONFIG.vector_path, cid);
-                    let ids_path = format!("{}/ids.bin", bucket_dir);
-                    let vecs_path = format!("{}/vectors.bin", bucket_dir);
-
-                    if !Path::new(&ids_path).exists() || cid == 080159 {
-                        return None;
-                    }
-
-                    let ids_file = File::open(&ids_path).ok()?;
-                    let vecs_file = File::open(&vecs_path).ok()?;
-                    let ids_mmap = unsafe { Mmap::map(&ids_file).ok()? };
-                    let vecs_mmap = unsafe { Mmap::map(&vecs_file).ok()? };
-
-                    let ids: &[u64] = bytemuck::cast_slice(&ids_mmap);
-                    let vecs: &[f32] = bytemuck::cast_slice(&vecs_mmap);
-
-                    let count = ids.len();
-                    let mut bucket_results = Vec::with_capacity(count);
-
-                    for i in 0..count {
-                        let id = ids[i];
-                        let slice = &vecs[i * dims..(i + 1) * dims];
-
-                        let dot: f32 = slice
-                            .iter()
-                            .zip(query_norm.iter())
-                            .map(|(v, q)| v * q)
-                            .sum();
-                        let vnorm: f32 = slice.iter().map(|v| v * v).sum();
-                        let sim = dot / vnorm.sqrt().max(1e-10);
-
-                        bucket_results.push((id, sim));
-                    }
-
-                    Some(bucket_results)
-                })
-                .collect();
-
-            // Flatten and dedup
-            let mut flat: Vec<(u64, f32)> = all.into_iter().flatten().collect();
-            flat.sort_unstable_by_key(|(id, _)| *id);
-            flat.dedup_by(|a, b| {
-                if a.0 == b.0 {
-                    if a.1 > b.1 {
-                        b.1 = a.1;
-                    }
-                    true
-                } else {
-                    false
+        // Scan probed buckets in parallel, cosine similarity
+        let all: Vec<Vec<(u64, f32)>> = centroid_ids
+            .par_iter()
+            .filter_map(|&cid| {
+                let zst_path = format!(
+                    "{}/bucket_{:06}.bin.zst",
+                    &PRIECO_CONFIG.vector_path, cid
+                );
+                if !Path::new(&zst_path).exists() || cid == 080159 {
+                    return None;
                 }
-            });
-            flat
-        };
 
+                let compressed = std::fs::read(&zst_path).ok()?;
+                let data = decode_all(compressed.as_slice()).ok()?;
+                let count = data.len() / RECORD_SIZE;
+                let mut results = Vec::with_capacity(count);
+
+                for i in 0..count {
+                    let base = i * RECORD_SIZE;
+                    let id = u64::from_le_bytes(data[base..base + ID_SIZE].try_into().unwrap());
+                    let slice: &[f32] =
+                        bytemuck::cast_slice(&data[base + ID_SIZE..base + RECORD_SIZE]);
+
+                    let dot: f32 = slice
+                        .iter()
+                        .zip(query_norm.iter())
+                        .map(|(v, q)| v * q)
+                        .sum();
+                    let vnorm: f32 = slice.iter().map(|v| v * v).sum::<f32>().sqrt().max(1e-10);
+                    results.push((id, dot / vnorm));
+                }
+
+                Some(results)
+            })
+            .collect();
+
+        // Flatten, dedup, sort, truncate
+        let mut candidates: Vec<(u64, f32)> = all.into_iter().flatten().collect();
+        candidates.sort_unstable_by_key(|(id, _)| *id);
+        candidates.dedup_by(|a, b| {
+            if a.0 == b.0 {
+                if a.1 > b.1 {
+                    b.1 = a.1;
+                }
+                true
+            } else {
+                false
+            }
+        });
         candidates.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         if n > 0 {
             candidates.truncate(n);
         }
 
-        Ok(candidates) // (id, cosine_similarity)
+        Ok(candidates)
     }
 }
-
 #[cfg(not(feature = "cuda"))]
 pub struct CentroidIndex;
 
