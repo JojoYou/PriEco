@@ -8,7 +8,10 @@ use crate::{
     web::functions::general::call_api_future_json,
 };
 
-pub async fn run(query: &str, loc: &str) -> Vec<WebScrollResult> {
+pub async fn run(
+    query: &str,
+    loc: &str,
+) -> Result<Vec<WebScrollResult>, Box<dyn std::error::Error + Send + Sync>> {
     let client = match Client::builder()
         .user_agent("PriEco/1.0.0 ( support@jojoyou.org )")
         .timeout(Duration::from_secs(2))
@@ -25,7 +28,7 @@ pub async fn run(query: &str, loc: &str) -> Vec<WebScrollResult> {
                 colors::RESET,
                 err
             );
-            return Vec::new();
+            return Ok(Vec::new());
         }
     };
     let yadore_option = call_api_future_json(        client
@@ -37,15 +40,15 @@ pub async fn run(query: &str, loc: &str) -> Vec<WebScrollResult> {
     let yadore_json = match yadore_option {
         Some(json) => json,
         None => {
-            return Vec::new(); // Failed
+            return Ok(Vec::new()); // Failed
         }
     };
 
     if yadore_json.get("error").is_some() {
-        return Vec::new(); // Failed
+        return Ok(Vec::new()); // Failed
     }
 
-    format_yadore(yadore_json)
+    Ok(format_yadore(yadore_json))
 }
 
 fn format_yadore(json: Value) -> Vec<WebScrollResult> {

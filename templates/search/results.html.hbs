@@ -58,6 +58,31 @@
             {{/each}}
           </div>
         {{/if}}
+
+        {{#if (and (eq @index 5) ../news)}}
+          <div class="products">
+            <p>📰 News</p>
+          </div>
+          <div class="yadore">
+            {{#each ../news}}
+              <div class="yadore_item">
+                <a href="{{ url }}" rel='noopener noreferrer' {{{ ../newtab }}}>
+                  <button>
+                    {{#if image}}
+                      <img src="proxy?u={{ image }}" alt="News Thumbnail" loading="lazy" class="news_img">
+                    {{else}}
+                      <img alt="No image" loading="lazy">
+                    {{/if}}
+                  </button>
+                  <div class="yadore_text">
+                    <p class="news_text">{{ description }}</p> 
+                  </div>
+                </a>
+              </div>
+            {{/each}}
+          </div>
+        {{/if}}
+
       {{/each}}
     </div>
   </div>

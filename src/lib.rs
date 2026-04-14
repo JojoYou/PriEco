@@ -61,6 +61,7 @@ pub mod web {
         pub mod search_api {
             pub mod all;
             pub mod img;
+            pub mod news;
             pub mod yadore;
         }
     }

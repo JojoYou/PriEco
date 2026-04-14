@@ -14,7 +14,7 @@
   right: -110vw;
   backdrop-filter: blur(20px);
   transition: all 0.3s ease;
-  z-index: 10000;
+  z-index: 10001;
 }
 
 #open-settings:checked~.settings {

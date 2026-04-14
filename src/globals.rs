@@ -66,15 +66,17 @@ use tantivy::{
 };
 use tokenizers::Tokenizer;
 use tokio::task;
-use twox_hash::XxHash3_64;use zstd::decode_all;
+use twox_hash::XxHash3_64;
+use zstd::decode_all;
 
 /*
   Import own libraries
 */
 use crate::{
+    insert::db_insert::{ID_SIZE, RECORD_SIZE},
     normalize_url,
     pagerank::compute::{FINAL_SCORES, ID_MAP_FILE},
-    set_up, url_to_id,insert::db_insert::{ID_SIZE,RECORD_SIZE},
+    set_up, url_to_id,
 };
 
 /*
@@ -825,10 +827,7 @@ extern "C" __global__ void topk_argmax(
         let all: Vec<Vec<(u64, f32)>> = centroid_ids
             .par_iter()
             .filter_map(|&cid| {
-                let zst_path = format!(
-                    "{}/bucket_{:06}.bin.zst",
-                    &PRIECO_CONFIG.vector_path, cid
-                );
+                let zst_path = format!("{}/bucket_{:06}.bin.zst", &PRIECO_CONFIG.vector_path, cid);
                 if !Path::new(&zst_path).exists() || cid == 080159 {
                     return None;
                 }

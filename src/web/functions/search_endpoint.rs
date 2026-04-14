@@ -29,7 +29,7 @@ use serde_json::{Value, json};
 use crate::{
     globals::{EmbeddingService, SearchResult},
     web::functions::{
-        search_api::{img, yadore},
+        search_api::{img, news, yadore},
         search_db,
     },
 };
@@ -162,6 +162,19 @@ async fn all_search(
 
     context.insert(String::from("results"), json!(&results_vec));
 
+    /*
+      External APIs
+    */
+    let (yadore_result, news_result) = tokio::join!(yadore::run(q, loc), news::run(q, lang, loc));
+
     // Yadore Ads
-    context.insert(String::from("yadore"), json!(&yadore::run(q, loc).await));
+    if let Ok(yadore_data) = yadore_result {
+        context.insert(String::from("yadore"), json!(&yadore_data));
+    }
+
+    // News
+    // News
+    if let Ok(news_data) = news_result {
+        context.insert(String::from("news"), json!(&news_data));
+    }
 }

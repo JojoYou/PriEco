@@ -202,3 +202,12 @@
   top: -130px;
   left: 1950px;
 }
+
+.news_img {
+  object-fit: cover;
+}
+
+.news_text {
+  font-size: 13px;
+  padding: 10px;
+}
