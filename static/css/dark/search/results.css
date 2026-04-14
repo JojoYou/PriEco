@@ -1,19 +1,25 @@
 .placeholder {
   background: #202124;
 }
+
 .output_text,
 .yadore_title {
   color: #bdc2ca;
 }
+
 .output_text h3 {
   color: #8ab4f8;
 }
+
 .sx-kp,
 .sx-kp-tab,
-.sx-album-info-title {
+.sx-album-info-title,
+[data-sxpr-top-bar] .sx-search-suggestions,
+.sx-ta-places {
   background: #202124 !important;
   color: #bdc2ca !important;
 }
+
 .sx-kp-heading,
 .sx-title,
 .products,
@@ -21,6 +27,25 @@
 .sx-kp-attributions a {
   color: #fff !important;
 }
+
 .products img {
   filter: brightness(0) invert(1);
+}
+
+[data-sxpr-top-bar] .sx-search-suggestions h2 {
+  color: #fff;
+}
+
+[data-sxpr-top-bar] .sx-search-suggestions p {
+  color: #bdc2ca;
+}
+
+[data-sxpr-top-bar] .sx-search-suggestions a {
+  background: #181a1b;
+  color: #fff;
+  border-radius: 10px;
+}
+
+.sx-ta-places div {
+  color: #bdc2ca;
 }

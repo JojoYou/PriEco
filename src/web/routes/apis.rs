@@ -292,7 +292,7 @@ fn resize_image(
 */
 #[get("/cache-ver")]
 pub fn cache_ver() -> String {
-    String::from("0.1.5")
+    String::from("0.1.7")
 }
 
 /*

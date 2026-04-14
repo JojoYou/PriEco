@@ -1,5 +1,7 @@
 {{#if all_results}}
   <div class="div_output">
+    {{!-- Search expander widgets --}}
+    <div data-sxpr-top-bar></div>
     <div class="results">
       {{#each results}}
         <div class='output'>
@@ -23,10 +25,11 @@
         </div>
 
         {{!-- Insert the knowledge panel after the first result --}}
-        {{#if @first}}
+        {{#if @first}} 
           <div class="knowledge_panel" data-sxpr-knowledge-panel>
             <!-- Knowledge panel will render here -->
           </div>
+          <div data-sxpr-instant-answers></div>
         {{/if}}
 
         {{!-- Insert Yadore products --}}

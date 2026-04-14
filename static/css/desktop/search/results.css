@@ -1,150 +1,204 @@
 .div_output {
-    margin: 130px 0 0 170px;
+  margin: 130px 0 0 170px;
 }
+
 .placeholder {
-    height: 100px;
-    display: block !important;
-    border-radius: 20px;
-    padding: 15px 0 20px 0;
-    animation: placeholderPulse 1.5s ease-in-out infinite;
+  height: 100px;
+  display: block !important;
+  border-radius: 20px;
+  padding: 15px 0 20px 0;
+  animation: placeholderPulse 1.5s ease-in-out infinite;
 }
+
 @keyframes placeholderPulse {
-    0% {
-        opacity: 0.3;
-    }
-    50% {
-        opacity: 1;
-    }
-    100% {
-        opacity: 0.3;
-    }
+  0% {
+    opacity: 0.3;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.3;
+  }
 }
+
 .placeholder div {
-    width: 100px;
-    height: 10px;
-    background: #bdc2ca;
-    border-radius: 0 20px 20px 0;
+  width: 100px;
+  height: 10px;
+  background: #bdc2ca;
+  border-radius: 0 20px 20px 0;
 }
+
 .placeholder div:nth-child(3) {
-    width: 200px;
+  width: 200px;
 }
+
 .output {
-    display: flex;
-    width: 632px;
-    margin-bottom: 30px;
+  display: flex;
+  width: 632px;
+  margin-bottom: 30px;
 }
+
 .output img {
-    width: 92px;
-    height: 92px;
-    object-fit: cover;
-    border-radius: 20px;
+  width: 92px;
+  height: 92px;
+  object-fit: cover;
+  border-radius: 20px;
 }
-.output a:hover ~ .output h3 {
-    text-decoration: underline;
+
+.output a:hover~.output h3 {
+  text-decoration: underline;
 }
+
 .output_text {
-    display: flex;
-    flex-direction: column;
-    width: 540px;
-    font-size: 14px;
-    line-height: 21px;
-    text-wrap: balance;
+  display: flex;
+  flex-direction: column;
+  width: 540px;
+  font-size: 14px;
+  line-height: 21px;
+  text-wrap: balance;
 }
+
 .output_text h3 {
-    font-weight: unset;
-    font-size: 20px;
-    margin: 8px 0;
-    cursor: pointer;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  font-weight: unset;
+  font-size: 20px;
+  margin: 8px 0;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
 .output_url {
-    display: flex;
-    align-items: center;
+  display: flex;
+  align-items: center;
 }
+
 .output_url img {
-    width: 25px;
-    height: 25px;
-    margin-right: 10px;
-    border-radius: 3px;
-    object-fit: contain;
+  width: 25px;
+  height: 25px;
+  margin-right: 10px;
+  border-radius: 3px;
+  object-fit: contain;
 }
 
 .output_url p {
-    width: 510px;
-    font-size: 10px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  width: 510px;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
 .knowledge_panel {
-    width: 500px;
-    position: absolute;
-    top: 130px;
-    left: 950px;
+  width: 500px;
+  position: absolute;
+  left: -1000px;
 }
+
 .sx-search-suggestions {
-    border-radius: 20px;
-    padding: 10px;
+  border-radius: 20px;
+  padding: 10px;
 }
+
 .products {
-    display: flex;
-    margin: -10px 0 10px 0;
+  display: flex;
+  margin: -10px 0 10px 0;
 }
+
 .products img {
-    margin-left: 5px;
+  margin-left: 5px;
 }
+
 .yadore {
-    width: 632px;
-    height: 270px;
-    margin-bottom: 15px;
-    display: flex;
-    overflow: auto hidden;
-    border-radius: 20px;
-    background: none;
+  width: 632px;
+  height: 270px;
+  margin-bottom: 15px;
+  display: flex;
+  overflow: auto hidden;
+  border-radius: 20px;
+  background: none;
 }
+
 .yadore_item {
-    width: 148px;
-    margin-right: 20px;
+  width: 148px;
+  margin-right: 20px;
 }
+
 .yadore_item button {
-    width: 146px;
-    height: 146px;
-    border: none;
-    border-radius: 20px;
-    overflow: hidden;
-    cursor: pointer;
+  width: 146px;
+  height: 146px;
+  border: none;
+  border-radius: 20px;
+  overflow: hidden;
+  cursor: pointer;
 }
+
 .yadore_item img {
-    width: 100%;
-    height: 100%;
+  width: 100%;
+  height: 100%;
 }
+
 .yadore_title {
-    margin-top: 4px;
-    line-height: 24px;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+  margin-top: 4px;
+  line-height: 24px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
+
 .yadore_price {
-    font-size: 14px;
-    font-weight: 700;
-    margin: 10px 0 5px 0;
+  font-size: 14px;
+  font-weight: 700;
+  margin: 10px 0 5px 0;
 }
+
 .yadore_domain {
-    display: flex;
+  display: flex;
 }
+
 .yadore_domain p {
-    color: #5e5e5e;
-    font-size: 14px;
-    overflow: hidden;
+  color: #5e5e5e;
+  font-size: 14px;
+  overflow: hidden;
 }
+
 .yadore_domain img {
-    border-radius: 100%;
-    width: 16px;
-    height: 16px;
-    object-fit: cover;
-    margin-right: 5px;
+  border-radius: 100%;
+  width: 16px;
+  height: 16px;
+  object-fit: cover;
+  margin-right: 5px;
+}
+
+.sx-search-suggestions {
+  border: solid 2px;
+}
+
+.sx-overflow-gradient {
+  opacity: 0;
+}
+
+[data-sxpr-top-bar] .sx-search-suggestions {
+  width: 1280px;
+
+}
+
+[data-sxpr-top-bar] a {
+  border: none;
+  padding: 10px;
+}
+
+.sx-ia-widget-tripadvisor {
+  width: 632px;
+  margin-bottom: 30px;
+
+}
+
+.sx-kp {
+  top: -130px;
+  left: 1950px;
 }
