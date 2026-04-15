@@ -171,5 +171,14 @@
 
 .news_text {
   font-size: 13px;
-  padding: 10px;
+  margin: 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.news_res {
+  width: calc(100vw - 126px);
 }

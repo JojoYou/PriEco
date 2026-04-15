@@ -124,3 +124,31 @@
     {{/each}}
   </div>
 {{/if}}
+
+  {{#if new_results}}
+  <div class="div_output">
+    <div class="results">
+      {{#each news}}
+        <div class='output'>
+            <div class="news_res output_text">
+              <div class="output_url">
+                {{#if favicon}}
+                  <img loading='lazy' alt="‎" src='{{ favicon }}'>
+                {{/if}}
+                <a href='{{ url }}' rel='noopener noreferrer' {{{ newtab }}} class="link">
+                  <b>{{ domain }}</b>
+                </a>
+              </div>
+              <a href='{{ url }}' rel='noopener noreferrer' {{{ newtab }}} class="link">
+                <h3>{{ title }}</h3>
+              </a>
+              <p>{{{ description }}}</p>
+            </div>
+            {{#if image}}
+              <img src="proxy?u={{ image }}" alt="News image" loading="lazy" class="news_img">
+            {{/if}}
+        </div>
+      {{/each}}
+    </div>
+  </div>
+{{/if}}

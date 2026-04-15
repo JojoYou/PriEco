@@ -20,7 +20,7 @@ use std::collections::HashMap;
 /*
   Import external libraries
 */
-use rocket::State;
+use rocket::{State, serde::json::Json};
 use serde_json::{Value, json};
 
 /*
@@ -52,7 +52,7 @@ pub async fn run(
     }
 
     let mut context: HashMap<String, Value> = HashMap::with_capacity(100);
-
+    println!("Type: {}", t);
     match t {
         "img" => {
             context.insert(String::from("img_results"), json!(true));
@@ -60,6 +60,23 @@ pub async fn run(
                 String::from("images"),
                 json!(&img::run(&q.to_lowercase().replace(" ", "+")).await),
             );
+        }
+        "new" => {
+            context.insert(String::from("new_results"), json!(true));
+            match news::run(q, lang, loc, 50).await {
+                Ok(n) => context.insert(String::from("news"), json!(&n)),
+                Err(e) => context.insert(
+                    String::from("news"),
+                    json!([{
+                        "title": "No news found",
+                        "description":format!("We know nothing new about {}",q),
+                        "url": "",
+                        "domain": "PriEco",
+                        "favicon": "",
+                        "image": ""
+                    }]),
+                ),
+            };
         }
         _ => {
             all_search(&mut context, q, lang, loc, embedding_service).await;
@@ -165,7 +182,8 @@ async fn all_search(
     /*
       External APIs
     */
-    let (yadore_result, news_result) = tokio::join!(yadore::run(q, loc), news::run(q, lang, loc));
+    let (yadore_result, news_result) =
+        tokio::join!(yadore::run(q, loc), news::run(q, lang, loc, 20));
 
     // Yadore Ads
     if let Ok(yadore_data) = yadore_result {

@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="{{ css_theme }}search/results.css?v={{ css_version }}">
 <link rel="stylesheet" href="{{ css_path }}search/images.css?v={{ css_version }}">
 <link rel="stylesheet" href="{{ css_theme }}search/images.css?v={{ css_version }}">
-{{#if all_active}}
+{{#if (or all_active new_active)}}
   <div id="js_load_results" class="div_output">
     {{#each placeholder_number}}
       <div class="placeholder output">

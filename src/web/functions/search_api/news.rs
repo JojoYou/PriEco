@@ -21,6 +21,7 @@
 */
 use dotenv_codegen::dotenv;
 use reqwest::Client;
+use rocket::form::validate::Len;
 use serde::{Deserialize, Serialize};
 
 /*
@@ -59,6 +60,7 @@ pub async fn run(
     query: &str,
     lang: &str,
     loc: &str,
+    count: u32,
 ) -> Result<Vec<Article>, Box<dyn std::error::Error + Send + Sync>> {
     let client = Client::new();
 
@@ -76,7 +78,7 @@ pub async fn run(
             ("language", final_lang),
             ("country", final_loc.as_str()), // .as_str() keeps the array types uniform
             ("page_number", "1"),
-            ("page_size", "20"),
+            ("page_size", &count.to_string()),
             ("apiKey", dotenv!("NEWS_API_KEY")),
         ])
         .send()
@@ -88,6 +90,8 @@ pub async fn run(
     if resp.status != "ok" {
         return Err(format!("News API returned non-ok status: {}", resp.status).into());
     }
+
+    println!("News: {}", resp.news.len());
 
     Ok(resp.news)
 }
