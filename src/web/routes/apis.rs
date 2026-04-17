@@ -15,7 +15,7 @@
 /*
   Import system libraries
 */
-use std::{io::Cursor, path::Path};
+use std::{fs::read_to_string, io::Cursor, path::Path};
 
 /*
   Import external libraries
@@ -34,6 +34,7 @@ use rocket::{
 */
 use crate::{
     globals::{ANALYTICS, EmbeddingService, UserAgent},
+    read_file,
     web::{
         functions::{general::is_valid_url, search_db},
         routes::pages::ClientIp,
@@ -292,7 +293,9 @@ fn resize_image(
 */
 #[get("/cache-ver")]
 pub fn cache_ver() -> String {
-    String::from("0.1.9")
+    read_to_string("cache_version.txt")
+        .map(|v| v.trim().to_string())
+        .unwrap_or_else(|_| String::from("unknown"))
 }
 
 /*

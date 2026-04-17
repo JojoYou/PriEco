@@ -12,7 +12,7 @@ checkbox_index.addEventListener("change", () => {
 });
 
 // Language selection
-document.getElementById("lang_select").addEventListener("change", function () {
+document.getElementById("lang_select").addEventListener("change", function() {
   document.cookie =
     "lang=" +
     this.value +
@@ -20,7 +20,7 @@ document.getElementById("lang_select").addEventListener("change", function () {
   location.reload();
 });
 // Location selection
-document.getElementById("loc_select").addEventListener("change", function () {
+document.getElementById("loc_select").addEventListener("change", function() {
   document.cookie =
     "loc=" + this.value + "; path=/; SameSite=Strict; Secure; max-age=31536000";
   location.reload();
@@ -81,26 +81,29 @@ window.addEventListener("resize", () => {
 const r = document.querySelectorAll('input[name="theme"]'),
   cookie = (n, v) =>
     v !== undefined
-      ? (document.cookie = `${n}=${v};path=/;SameSite=Strict;Secure;max-age=${30 * 24 * 60 * 60}`)
+      ? (document.cookie = `${n}=${v};path=/;SameSite=Lax;Secure;max-age=${30 * 24 * 60 * 60}`)
       : document.cookie
-          .split("; ")
-          .find((c) => c.startsWith(n + "="))
-          ?.split("=")[1],
+        .split("; ")
+        .find((c) => c.startsWith(n + "="))
+        ?.split("=")[1],
   del = (n) => (document.cookie = `${n}=;path=/;max-age=0`),
   swapCSS = (t) =>
     document
       .querySelectorAll('link[rel="stylesheet"]')
       .forEach(
         (l) =>
-          (l.href = l.href.replace(
-            /static\/css\/(light|dark|system)\//,
-            `static/css/${t}/`,
-          )),
+        (l.href = l.href.replace(
+          /static\/css\/(light|dark|system)\//,
+          `static/css/${t}/`,
+        )),
       );
 
 let t = cookie("theme") || "system";
 r.forEach((x) => (x.checked = x.value === t));
-swapCSS(t);
+const currentHref = document.querySelector('link[rel="stylesheet"]')?.href || "";
+if (!currentHref.includes(`/css/${t}/`)) {
+  swapCSS(t);
+}
 
 r.forEach((x) =>
   x.addEventListener("change", (e) => {
