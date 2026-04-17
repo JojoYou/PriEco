@@ -19,7 +19,6 @@ codegen-units = 1
 
 # Size
 strip = true
-panic = "abort"
 debug = 0
 lto = true
 
@@ -83,3 +82,4 @@ image = "0.25.8" # Image manipulation
 [features]
 default = []
 cuda = ["dep:cudarc"] # Compile:  RUSTFLAGS='-C target-cpu=native' cargo build --release --features cuda
+
