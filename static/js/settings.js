@@ -110,6 +110,7 @@ r.forEach((x) =>
     e.target.value === "system"
       ? del("theme")
       : cookie("theme", e.target.value);
+    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) { navigator.serviceWorker.controller.postMessage({ action: "clearCache" }); }
     swapCSS(e.target.value);
   }),
 );

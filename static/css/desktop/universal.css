@@ -36,6 +36,21 @@ a {
   border-radius: 20px;
 }
 
+.open-settings-btn {
+  display: none;
+}
+
+.settings {
+  width: 20vw;
+  min-width: 300px;
+  height: 101vh;
+  position: fixed;
+  top: -5px;
+  right: -110vw;
+  backdrop-filter: blur(20px);
+  transition: all 0.3s ease;
+  z-index: 83;
+}
 
 .footer {
   width: 100%;
