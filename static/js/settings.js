@@ -87,24 +87,15 @@ const r = document.querySelectorAll('input[name="theme"]'),
         .find((c) => c.startsWith(n + "="))
         ?.split("=")[1],
   del = (n) => (document.cookie = `${n}=;path=/;max-age=0`),
-  swapCSS = (t) =>
-    document
-      .querySelectorAll('link[rel="stylesheet"]')
-      .forEach(
-        (l) =>
-        (l.href = l.href.replace(
-          /static\/css\/(light|dark|system)\//,
-          `static/css/${t}/`,
-        )),
-      );
+  swapCSS = (theme) =>
+    document.querySelectorAll('link[rel="stylesheet"]').forEach((l) => {
+      ["light", "dark", "system"].forEach((t) => {
+        l.href = l.href.split(`/css/${t}/`).join(`/css/${theme}/`);
+      });
+    });
 
 let t = cookie("theme") || "system";
 r.forEach((x) => (x.checked = x.value === t));
-const currentHref = document.querySelector('link[rel="stylesheet"]')?.href || "";
-if (!currentHref.includes(`/css/${t}/`)) {
-  swapCSS(t);
-}
-
 r.forEach((x) =>
   x.addEventListener("change", (e) => {
     e.target.value === "system"
@@ -114,3 +105,4 @@ r.forEach((x) =>
     swapCSS(e.target.value);
   }),
 );
+
