@@ -160,7 +160,7 @@ pub async fn run(query: &str, lang: &str, loc: &str) -> Option<Vec<SearchResult>
     println!("Using API: {}", selected_api);
 
     let client = match Client::builder()
-        .user_agent("PriEco/1.0.0 ( support@jojoyou.org )")
+        .user_agent("PriEco/1.0.0 ( support@prieco.net )")
         .timeout(Duration::from_secs(2))
         .gzip(true)
         .brotli(true)

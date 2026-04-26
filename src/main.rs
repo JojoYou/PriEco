@@ -2,7 +2,7 @@
   File: main.rs
   Description: Sets up configuration for PriEco, starts web server and threads
 
-  Author: Roman Lancos <support@jojoyou.org>
+  Author: Roman Lancos <support@prieco.net>
   License: AGPL v3.0
 
   Date Created: 2025-09-20

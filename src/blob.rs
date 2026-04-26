@@ -2,7 +2,7 @@
   File: blob/blob.rs
   Description:
 
-  Author: Roman Lancos <support@jojoyou.org>
+  Author: Roman Lancos <support@prieco.net>
   License: AGPL v3.0
 
   Date Created: 2025-02-07

@@ -13,7 +13,7 @@ pub async fn run(
     loc: &str,
 ) -> Result<Vec<WebScrollResult>, Box<dyn std::error::Error + Send + Sync>> {
     let client = match Client::builder()
-        .user_agent("PriEco/1.0.0 ( support@jojoyou.org )")
+        .user_agent("PriEco/1.0.0 ( support@prieco.net )")
         .timeout(Duration::from_secs(2))
         .gzip(true)
         .brotli(true)

@@ -2,7 +2,7 @@
   File: pagerank/compute.rs
   Description: Import & Calculate pagerank on a new connections
 
-  Author: Roman Lancos <support@jojoyou.org>
+  Author: Roman Lancos <support@prieco.net>
   License: AGPL v3.0
 
   Date Created:: 2026-02-26

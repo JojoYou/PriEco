@@ -2,7 +2,7 @@
   File: set_up.rs
   Description: Loads config or questions user
 
-  Author: Roman Lancos <support@jojoyou.org>
+  Author: Roman Lancos <support@prieco.net>
   License: AGPL v3.0
 
   Date Created: 2026-01-31

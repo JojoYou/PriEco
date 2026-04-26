@@ -2,7 +2,7 @@
   File: lib.rs
   Description: Joins whole project & Holds universal functions
 
-  Author: Roman Lancos <support@jojoyou.org>
+  Author: Roman Lancos <support@prieco.net>
   License: AGPL v3.0
 
   Date Created: 2025-09-20

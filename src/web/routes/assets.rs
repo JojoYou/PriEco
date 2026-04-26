@@ -2,7 +2,7 @@
   File: web/routes/assets.rs
   Description: Handles PriEco's static assets
 
-  Author: Roman Lancos <support@jojoyou.org>
+  Author: Roman Lancos <support@prieco.net>
   License: AGPL v3.0
 
   Date Created: 2026-01-31
@@ -88,7 +88,7 @@ pub async fn unduck_js() -> Option<NamedFile> {
 #[get("/.well-known/security.txt")]
 pub async fn security() -> RawText<&'static str> {
     RawText(
-        "Contact: mailto:support@jojoyou.org\nExpires: 2026-04-16T12:00:00.000Z\nPreferred-Languages: en,sk,cs",
+        "Contact: mailto:support@prieco.net\nExpires: 2027-04-16T12:00:00.000Z\nPreferred-Languages: en,sk,cs",
     )
 }
 

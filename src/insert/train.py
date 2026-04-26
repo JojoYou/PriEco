@@ -1,7 +1,7 @@
 # Script to train centropoids from sample vectors
 # THIS SCRIPT ISN'T CALLED BY PriEco
 # Is here for reproducability
-# Author: Roman Lancos <support@jojoyou.org>
+# Author: Roman Lancos <support@prieco.net>
 #  License: AGPL v3.0
 # Date Created: 2026-02-19
 # Last Modified: 2026-02-19
