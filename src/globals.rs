@@ -454,7 +454,7 @@ pub static BLOB_STORAGE: Lazy<Arc<DB>> = Lazy::new(|| {
 
         // HDD tuning - reduce compaction frequency
         options.set_level_zero_file_num_compaction_trigger(10);
-        options.set_max_bytes_for_level_base(256 * 1024 * 1024);
+        options.set_max_bytes_for_level_base(1280 * 1024 * 1024);
 
         // Single background job - avoid random seeks from parallel compaction
         options.set_max_background_jobs(1);
@@ -481,6 +481,12 @@ pub static ROCKSDB_INDEX: Lazy<Arc<DB>> = Lazy::new(|| {
     Arc::new({
         let mut rocksdb_opts = Options::default();
         rocksdb_opts.create_if_missing(true);
+        rocksdb_opts.set_write_buffer_size(256 * 1024 * 1024);
+        rocksdb_opts.set_max_write_buffer_number(4);
+        rocksdb_opts.set_min_write_buffer_number_to_merge(2);
+
+        rocksdb_opts.set_disable_auto_compactions(true);
+
         DB::open(&rocksdb_opts, PRIECO_CONFIG.rocksdb_path.clone()).expect("Faile to open RocksDB")
     })
 });
@@ -516,7 +522,7 @@ pub static TANTIVY_READER: Lazy<Arc<IndexReader>> = Lazy::new(|| {
 pub static TANTIVY_WRITER: Lazy<Arc<Mutex<IndexWriter>>> = Lazy::new(|| {
     Arc::new(Mutex::new(
         TANTIVY_INDEX
-            .writer_with_num_threads(num_cpus::get(), TANTIVY_HEAP_SIZE)
+            .writer_with_num_threads(1, TANTIVY_HEAP_SIZE)
             .expect("Failed to create Tantivy writer"),
     ))
 });

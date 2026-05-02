@@ -94,6 +94,13 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
         return Ok(());
     }
 
+    let doc_id_field = TANTIVY_INDEX.schema().get_field("doc_id").unwrap();
+    let title_field = TANTIVY_INDEX.schema().get_field("title").unwrap();
+    let description_field = TANTIVY_INDEX.schema().get_field("description").unwrap();
+    let content_field = TANTIVY_INDEX.schema().get_field("content").unwrap();
+    let keywords_field = TANTIVY_INDEX.schema().get_field("keywords").unwrap();
+    let safe_s_field = TANTIVY_INDEX.schema().get_field("safe_s").unwrap();
+
     // Process files
     let mut vector_idx_buffer: HashMap<u64, Vec<f32>> = HashMap::with_capacity(1_000_000);
     for file_name in &files {
@@ -156,13 +163,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
             ROCKSDB_INDEX.put(id.to_be_bytes(), serde_json::to_vec(&doc)?)?;
 
             /* Tantivy */
-            let doc_id_field = TANTIVY_INDEX.schema().get_field("doc_id").unwrap();
-            let title_field = TANTIVY_INDEX.schema().get_field("title").unwrap();
-            let description_field = TANTIVY_INDEX.schema().get_field("description").unwrap();
-            let content_field = TANTIVY_INDEX.schema().get_field("content").unwrap();
-            let keywords_field = TANTIVY_INDEX.schema().get_field("keywords").unwrap();
-            let safe_s_field = TANTIVY_INDEX.schema().get_field("safe_s").unwrap();
-
             TANTIVY_WRITER
                 .lock()
                 .delete_term(Term::from_field_u64(doc_id_field, id)); // Ensure uniqness
@@ -255,6 +255,10 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     for file_name in &files {
         let _ = remove_file(file_name);
     }
+
+    println!("{}: Compacting RocksDB...", icons::DB_INSERT);
+    ROCKSDB_INDEX.compact_range(None::<&[u8]>, None::<&[u8]>);
+    let _ = ROCKSDB_INDEX.set_options(&[("disable_auto_compactions", "false")]);
 
     Ok(())
 }
