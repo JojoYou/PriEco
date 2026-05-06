@@ -100,6 +100,17 @@ pub fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host) -> Te
 
     settings::run(&mut context, &Some(ip_addr), cookie_jar, host);
 
+    let no_js = cookie_jar.get("js").is_some();
+    context.insert(String::from("no_js"), json!(no_js));
+
+    if no_js {
+        let mut settings_ctx: HashMap<String, Value> = HashMap::new();
+        settings_ctx.insert("css_version".into(), json!(CSS_VERSION));
+        settings_ctx.insert("js_version".into(), json!(JS_VERSION));
+        settings::run(&mut settings_ctx, &Some(client_ip.0), cookie_jar, host);
+        context.insert(String::from("settings"), json!(settings_ctx));
+    }
+
     Template::render("home", &context)
 }
 
@@ -119,6 +130,7 @@ pub async fn search(
     user_agent: UserAgent<'_>,
     cookie_jar: &CookieJar<'_>,
     host: &Host<'_>,
+    embedding_service: &State<EmbeddingService>,
 ) -> Template {
     let mut context: HashMap<String, Value> = HashMap::from([
         // File versions
@@ -172,6 +184,27 @@ pub async fn search(
         &host.to_string(),
         cookie_jar.get("loc").map(|c| c.value()),
     );
+
+    // No JS enabled
+    let no_js = cookie_jar.get("js").is_some();
+    context.insert(String::from("no_js"), json!(no_js));
+
+    if no_js {
+        let lang = cookie_jar.get("lang").map_or("all", |c| c.value());
+        let loc = cookie_jar.get("loc").map_or("all", |c| c.value());
+
+        // Results
+        let results_ctx = search_endpoint::run(t, q, lang, loc, embedding_service).await;
+        context.insert(String::from("search_results"), json!(results_ctx));
+
+        // Settings
+        let mut settings_ctx: HashMap<String, Value> = HashMap::new();
+        settings_ctx.insert("css_version".into(), json!(CSS_VERSION));
+        settings_ctx.insert("js_version".into(), json!(JS_VERSION));
+
+        settings::run(&mut settings_ctx, &Some(client_ip.0), cookie_jar, host);
+        context.insert(String::from("settings"), json!(settings_ctx));
+    }
 
     Template::render("search", &context)
 }

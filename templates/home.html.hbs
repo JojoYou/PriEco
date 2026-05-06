@@ -2,7 +2,11 @@
 
 <link rel="stylesheet" href="{{ css_path }}settings.css?v={{ css_version }}">
 <link rel="stylesheet" href="{{ css_theme }}settings.css?v={{ css_version }}">
-<div id="js_load_settings"></div>
+{{#if no_js}}
+  {{> settings settings}}
+{{else}}
+  <div id="js_load_settings"></div>
+{{/if}}
 
 <link rel="stylesheet" href="{{ css_path }}home.css?v={{ css_version }}">
 <link rel="stylesheet" href="{{ css_theme }}home.css?v={{ css_version }}">
@@ -22,14 +26,18 @@
         <img src="static/img/icon/search.webp" alt="Search button icon" width="13px">
       </button>
       <input name="q" placeholder="Search" class="search_box" required>
-      <button type="button" aria-label="Clear query button" class="btn_del_query">
-        <img src="static/img/icon/cross.svg" alt="Delete query button">
-      </button>
+            {{#unless no_js}}
+        <button type="button" aria-label="Clear query button" class="btn_del_query">
+          <img src="static/img/icon/cross.svg" alt="Delete query button">
+        </button>
+      {{/unless}}
     </form>
     <div class="autocom-box"></div>
   </div>
 </div>
 
-<script src="static/js/del_query.js?v={{ js_version }}"></script>
+{{#unless no_js}}
+  <script src="static/js/del_query.js?v={{ js_version }}"></script>
+{{/unless}}
 
 {{> footer }}

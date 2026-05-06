@@ -2,8 +2,12 @@
 
 <link rel="stylesheet" href="{{ css_path }}settings.css?v={{ css_version }}">
 <link rel="stylesheet" href="{{ css_theme }}settings.css?v={{ css_version }}">
-<div id="js_load_settings"></div>
 
+{{#if no_js}}
+  {{> settings settings}}
+{{else}}
+  <div id="js_load_settings"></div>
+{{/if}}
 
 {{> search/search_bar }}
 
@@ -11,18 +15,23 @@
 <link rel="stylesheet" href="{{ css_theme }}search/results.css?v={{ css_version }}">
 <link rel="stylesheet" href="{{ css_path }}search/images.css?v={{ css_version }}">
 <link rel="stylesheet" href="{{ css_theme }}search/images.css?v={{ css_version }}">
+
 {{#if (or all_active new_active)}}
-  <div id="js_load_results" class="div_output">
-    {{#each placeholder_number}}
-      <div class="placeholder output">
-        <div></div>
-        <br>
-        <div></div>
-      </div>
-    {{/each}}
-  </div>
+  {{#if no_js}}
+{{> search/results search_results}}
+  {{else}}
+    <div id="js_load_results" class="div_output">
+      {{#each placeholder_number}}
+        <div class="placeholder output">
+          <div></div>
+          <br>
+          <div></div>
+        </div>
+      {{/each}}
+    </div>
+  {{/if}}
 {{/if}}
-
-<script src="static/js/del_query.js?v={{ js_version }}"></script>
-
+{{#unless no_js}}
+  <script src="static/js/del_query.js?v={{ js_version }}"></script>
+{{/unless}}
 {{> footer }}
