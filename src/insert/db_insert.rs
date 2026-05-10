@@ -7,6 +7,8 @@ use std::{
     fs::{File, OpenOptions, create_dir_all, metadata, read_dir, remove_file},
     io::{BufRead, BufReader, BufWriter, Read, Write},
     path::{Path, PathBuf},
+    thread::sleep,
+    time::Duration,
 };
 
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -180,6 +182,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
             inserted += 1;
             if inserted % 1_000 == 0 {
                 println!("{}: Inserted {}", icons::DB_INSERT, inserted);
+                sleep(Duration::from_millis(500));
             }
 
             if vector_idx_buffer.len() >= MAX_VECTORS_IN_VRAM {
@@ -248,6 +251,8 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     merged_count as f64 / total_buckets as f64 * 100.0
                 );
             }
+
+            sleep(Duration::from_millis(300));
         }
         println!("{}: Merge complete", icons::DB_INSERT);
     }
@@ -305,10 +310,12 @@ fn vector_process(
         icons::DB_INSERT,
         bucket_data.len()
     );
-    bucket_data.par_iter().try_for_each(|(bucket_id, items)| {
+    for (bucket_id, items) in bucket_data.iter() {
         append_to_bucket(*bucket_id, items)
-            .map_err(|e| format!("Failed on bucket {}: {}", bucket_id, e))
-    })?;
+            .map_err(|e| format!("Failed on bucket {}: {}", bucket_id, e))?;
+
+        sleep(Duration::from_millis(50));
+    }
 
     chunk_buffer.clear();
     Ok(())

@@ -188,11 +188,11 @@ async fn all_search(
     // Yadore Ads
     if let Ok(yadore_data) = yadore_result {
         context.insert(String::from("yadore"), json!(&yadore_data));
-    }*/
+    }
 
     // News
     let news_result = news::run(q, lang, loc, 20).await;
     if let Ok(news_data) = news_result {
         context.insert(String::from("news"), json!(&news_data));
-    }
+    }*/
 }
