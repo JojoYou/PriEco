@@ -40,7 +40,7 @@
       <br>
       <div class="settings-item">
         <label title="Select your location">Location:</label>
-        <select aria-label="location selection" class="setSelect" id="loc_select">
+        <select name="loc" aria-label="location selection" class="setSelect" id="loc_select">
             <option value="all" {{#if (eq selected_loc "all")}}selected{{/if}}>All 🌍</option>
             <option value="af" {{#if (eq selected_loc "af")}}selected{{/if}}>افغانستان 🇦🇫</option>
             <option value="za" {{#if (eq selected_loc "za")}}selected{{/if}}>Afrika-Borwa 🇿🇦</option>
@@ -284,7 +284,7 @@
       </div>
       <div class="settings-item">
         <label title="Select language in which results and UI will be displayed">Language:</label>
-        <select aria-label="language selection" class="setSelect" id="lang_select">
+        <select name="lang" aria-label="language selection" class="setSelect" id="lang_select">
           <option value="all" {{#if (eq selected_lang "all")}}selected{{/if}}>All 🌍</option>
           <option value="bg" {{#if (eq selected_lang "bg")}}selected{{/if}}>Български 🇧🇬</option>
           <option value="ca" {{#if (eq selected_lang "ca")}}selected{{/if}}>Català 🇦🇩</option>
