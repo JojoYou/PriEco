@@ -18,9 +18,12 @@
       </button>
       <input type="hidden" name="t" value="{{ type }}">
       <input name="q" placeholder="PriEco" value="{{ query }}" class="search_box" data-sxpr-input>
-      <button type="button" aria-label="Clear query button" class="btn_del_query">
+      {{#unless no_js}}
+        <button type="button" aria-label="Clear query button" class="btn_del_query">
           <img src="static/img/icon/cross.svg" alt="Delete query button">
         </button>
+      {{/unless}}
+
     </form>
 
     <!-- Type bar -->

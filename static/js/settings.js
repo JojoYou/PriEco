@@ -106,3 +106,5 @@ r.forEach((x) =>
   }),
 );
 
+// No JS
+let c = document.getElementById("check_js"); c && (c.checked = /\bjs=1/.test(document.cookie), c.onchange = () => (document.cookie = `js=${c.checked ? "1;max-age=31536000" : ";max-age=0"};path=/;SameSite=Strict;Secure`, location.reload()));

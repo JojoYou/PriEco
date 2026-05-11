@@ -3,6 +3,7 @@
 
 <!-- Settings -->
 <section class="settings">
+<form action="/settings_update" method="POST">
   <div class="settings-header">
     <img src="static/img/icon/gear.svg" alt="Settings icon" width="17px">
     <p>Settings</p>
@@ -30,12 +31,15 @@
       </div>
     </div>
 
+  {{#if no_js}}
+    <button type="submit" class="settings-save">Save</button>
+  {{/if}}
 
     <div class="settings-group">
       <h3>General</h3>
       <br>
       <div class="settings-item">
-        <label title="Select your location">🌍 Location:</label>
+        <label title="Select your location">Location:</label>
         <select aria-label="location selection" class="setSelect" id="loc_select">
             <option value="all" {{#if (eq selected_loc "all")}}selected{{/if}}>All 🌍</option>
             <option value="af" {{#if (eq selected_loc "af")}}selected{{/if}}>افغانستان 🇦🇫</option>
@@ -279,7 +283,7 @@
         </select>
       </div>
       <div class="settings-item">
-        <label title="Select language in which results and UI will be displayed">💬 Language:</label>
+        <label title="Select language in which results and UI will be displayed">Language:</label>
         <select aria-label="language selection" class="setSelect" id="lang_select">
           <option value="all" {{#if (eq selected_lang "all")}}selected{{/if}}>All 🌍</option>
           <option value="bg" {{#if (eq selected_lang "bg")}}selected{{/if}}>Български 🇧🇬</option>
@@ -338,8 +342,21 @@
       </div>
     </div>
 
+      <div class="settings-group">
+      <h3>Privacy</h3>
+      <br>
+        <div class="settings-item">
+        <label for="check_js" title="Instruct PriEco to not use JavaScript. Works best in Tor browser.">No JS:</label>
+        <div class="checkbox_cute">
+          <div class="check">
+           <input id="check_js" type="checkbox">
+            <label for="check_js"></label>
+          </div>
+        </div>
+      </div>
+      </div>
   </div>
+  </form>
 </section>
-
 <link rel="preload" href="/pv" hidden>
 

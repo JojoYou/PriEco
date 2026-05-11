@@ -198,6 +198,7 @@ async fn rocket() -> _ {
                 pageview,
                 // Settings
                 settings_htmls,
+                settings_update,
                 // Proxy
                 proxy_get,
                 proxy_post,

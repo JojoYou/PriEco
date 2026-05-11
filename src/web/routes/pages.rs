@@ -17,15 +17,21 @@
 */
 use std::{collections::HashMap, net::IpAddr};
 
-use chrono::Utc;
 /*
   Import external libraries
 */
+use chrono::Utc;
 use rocket::{
-    Request, State, get, head,
-    http::{CookieJar, uri::Host},
+    Request, State,
+    form::{Form, FromForm},
+    get, head,
+    http::{Cookie, CookieJar, SameSite, uri::Host},
+    post,
     request::{FromRequest, Outcome},
+    response::Redirect,
     serde::json::Value as RocketValue,
+    time::Duration,
+    uri,
 };
 use rocket_dyn_templates::Template;
 use serde_json::{Value, json};
@@ -72,6 +78,17 @@ impl<'r> FromRequest<'r> for ClientIp {
     }
 }
 
+// Settings
+#[derive(FromForm)]
+pub struct SettingsForm<'r> {
+    newtab: Option<&'r str>,
+    index: Option<&'r str>,
+    theme: Option<&'r str>,
+    lang: Option<&'r str>,
+    loc: Option<&'r str>,
+    js: Option<&'r str>,
+}
+
 /*
   Description: Responds if PriEco is alive
 
@@ -107,6 +124,8 @@ pub fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host) -> Te
         let mut settings_ctx: HashMap<String, Value> = HashMap::new();
         settings_ctx.insert("css_version".into(), json!(CSS_VERSION));
         settings_ctx.insert("js_version".into(), json!(JS_VERSION));
+        settings_ctx.insert(String::from("no_js"), json!(no_js));
+
         settings::run(&mut settings_ctx, &Some(client_ip.0), cookie_jar, host);
         context.insert(String::from("settings"), json!(settings_ctx));
     }
@@ -174,17 +193,6 @@ pub async fn search(
     // Detect bang query
     context.insert("bang".to_string(), json!(q.contains('!')));
 
-    // Aplly cookies' settings to context
-    settings::run(&mut context, &Some(client_ip.0), cookie_jar, host);
-
-    // Analytics
-    ANALYTICS.record_visitor(
-        &client_ip.0.to_string(),
-        user_agent.0,
-        &host.to_string(),
-        cookie_jar.get("loc").map(|c| c.value()),
-    );
-
     // No JS enabled
     let no_js = cookie_jar.get("js").is_some();
     context.insert(String::from("no_js"), json!(no_js));
@@ -201,10 +209,22 @@ pub async fn search(
         let mut settings_ctx: HashMap<String, Value> = HashMap::new();
         settings_ctx.insert("css_version".into(), json!(CSS_VERSION));
         settings_ctx.insert("js_version".into(), json!(JS_VERSION));
+        settings_ctx.insert(String::from("no_js"), json!(no_js));
 
         settings::run(&mut settings_ctx, &Some(client_ip.0), cookie_jar, host);
         context.insert(String::from("settings"), json!(settings_ctx));
     }
+
+    // Aplly cookies' settings to context
+    settings::run(&mut context, &Some(client_ip.0), cookie_jar, host);
+
+    // Analytics
+    ANALYTICS.record_visitor(
+        &client_ip.0.to_string(),
+        user_agent.0,
+        &host.to_string(),
+        cookie_jar.get("loc").map(|c| c.value()),
+    );
 
     Template::render("search", &context)
 }
@@ -396,6 +416,67 @@ pub fn settings_htmls(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     settings::run(&mut context, &None, cookie_jar, host);
 
     Template::render("settings", &context)
+}
+
+#[post("/settings_update", data = "<form>")]
+pub fn settings_update(form: Form<SettingsForm<'_>>, cookie_jar: &CookieJar<'_>) -> Redirect {
+    // Helpers
+    let mut remove_cookie = |name: &str| {
+        let mut cookie = Cookie::build((name.to_string(), ""))
+            .path("/")
+            .same_site(SameSite::Strict)
+            .secure(true)
+            .build();
+        cookie.make_removal();
+        cookie_jar.add(cookie);
+    };
+
+    let mut add_cookie = |name: &str, value: &str| {
+        cookie_jar.add(
+            Cookie::build((name.to_string(), value.to_string()))
+                .path("/")
+                .same_site(SameSite::Strict)
+                .secure(true)
+                .max_age(Duration::days(365))
+                .build(),
+        );
+    };
+
+    if form.newtab.is_some() {
+        add_cookie("newtab", "1");
+    } else {
+        remove_cookie("newtab");
+    }
+
+    if form.index.is_some() {
+        add_cookie("index", "1");
+    } else {
+        remove_cookie("index");
+    }
+
+    if let Some(theme) = form.theme {
+        if theme == "system" {
+            remove_cookie("theme");
+        } else {
+            add_cookie("theme", theme);
+        }
+    }
+
+    if let Some(lang) = form.lang {
+        add_cookie("lang", lang);
+    }
+
+    if let Some(loc) = form.loc {
+        add_cookie("loc", loc);
+    }
+
+    if form.js.is_some() {
+        add_cookie("js", "1");
+    } else {
+        remove_cookie("js");
+    }
+
+    Redirect::to(uri!("/"))
 }
 
 /*

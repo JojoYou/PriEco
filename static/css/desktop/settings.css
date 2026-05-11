@@ -255,3 +255,13 @@
   opacity: 1;
   border: solid 1px gray;
 }
+
+.settings-save {
+  margin-bottom: 10px;
+  width: 100%;
+  border: none;
+  background: #3edce2;
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
