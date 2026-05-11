@@ -107,4 +107,22 @@ r.forEach((x) =>
 );
 
 // No JS
-let c = document.getElementById("check_js"); c && (c.checked = /\bjs=1/.test(document.cookie), c.onchange = () => (document.cookie = `js=${c.checked ? "1;max-age=31536000" : ";max-age=0"};path=/;SameSite=Strict;Secure`, location.reload()));
+let c = document.getElementById("check_js");
+if (c) {
+  c.checked = /\bjs=1/.test(document.cookie);
+  c.onchange = async () => {
+    document.cookie = `js=${c.checked ? "1;max-age=31536000" : ";max-age=0"};path=/;SameSite=Strict;Secure`;
+    if (c.checked && "serviceWorker" in navigator) {
+      try {
+        await caches.delete("prieco-cache");
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (let registration of registrations) {
+          await registration.unregister();
+        }
+      } catch (err) {
+        console.warn("Failed to clear SW:", err);
+      }
+    }
+    location.reload();
+  };
+}

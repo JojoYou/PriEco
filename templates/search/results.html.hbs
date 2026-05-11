@@ -8,12 +8,12 @@
             <div class="output_text">
               <div class="output_url">
                 <img loading='lazy' alt="‎" src='{{ favicon }}'>
-                <a href='{{ url }}' rel='noopener noreferrer' {{{ newtab }}} class="link">
+                <a href='{{ url }}' rel='noopener noreferrer' {{{ @root.newtab }}} class="link">
                 <b>{{ domain }}</b>
                 <p>{{ display_url }}</p>
                 </a>
               </div>
-              <a href='{{ url }}' rel='noopener noreferrer' {{{ newtab }}} class="link" data-sxpr-link>
+              <a href='{{ url }}' rel='noopener noreferrer' {{{ @root.newtab }}} class="link" data-sxpr-link>
                 <h3>{{ title }}</h3>
               </a>
               <p>{{{ description }}}</p>
@@ -66,7 +66,7 @@
           <div class="yadore">
             {{#each ../news}}
               <div class="yadore_item">
-                <a href="{{ url }}" rel='noopener noreferrer' {{{ ../newtab }}}>
+                <a href="{{ url }}" rel='noopener noreferrer' {{{ @root.newtab }}}>
                   <button>
                     {{#if image}}
                       <img src="proxy?u={{ image }}" alt="News Thumbnail" loading="lazy" class="news_img">
@@ -94,7 +94,7 @@
       <div class="div_single_img">
         <div tabindex="0" class="div_img_thumb">
           <img src="{{ thumbnail }}" alt="‎" class="thumb" loading="lazy">
-          <a href="{{ site_url }}" rel='noopener noreferrer' {{{ newtab }}} class="img_link">
+          <a href="{{ site_url }}" rel='noopener noreferrer' {{{ @root.newtab }}} class="img_link">
             <img src="/proxy?u={{ favicon }}" alt="‎" loading="lazy">
             <p>{{ site_domain }}</p>
           </a>
@@ -107,11 +107,11 @@
           <p>From website: {{ site_domain }}</p>
           <br>
           <div class="div_full_img_btn">
-            <a href="{{ site_url }}" rel='noopener noreferrer' {{{ newtab }}}>
+            <a href="{{ site_url }}" rel='noopener noreferrer' {{{ @root.newtab }}}>
               <button>Go to website</button>
             </a>
             <br>
-            <a href="{{ image }}" rel='noopener noreferrer' {{{ newtab }}}>
+            <a href="{{ image }}" rel='noopener noreferrer' {{{ @root.newtab }}}>
               <button>Go to image</button>
             </a>
           </div>
@@ -132,11 +132,11 @@
                 {{#if favicon}}
                   <img loading='lazy' alt="‎" src='{{ favicon }}'>
                 {{/if}}
-                <a href='{{ url }}' rel='noopener noreferrer' {{{ newtab }}} class="link">
+                <a href='{{ url }}' rel='noopener noreferrer' {{{ @root.newtab }}} class="link">
                   <b>{{ domain }}</b>
                 </a>
               </div>
-              <a href='{{ url }}' rel='noopener noreferrer' {{{ newtab }}} class="link">
+              <a href='{{ url }}' rel='noopener noreferrer' {{{ @root.newtab }}} class="link">
                 <h3>{{ title }}</h3>
               </a>
               <p>{{{ description }}}</p>

@@ -100,10 +100,10 @@ impl Fairing for GlobalHeaders {
         res.set_header(Header::new(
             "Content-Security-Policy",
             "default-src 'self'; \
-             script-src 'self' https://liwan.prieco.net; \
+             script-src 'self'; \
              style-src 'self'; \
              img-src 'self' data:; \
-             connect-src 'self' https://liwan.prieco.net; \
+             connect-src 'self'; \
              frame-src 'self'; \
              frame-ancestors 'self'; \
              form-action 'self'; \
@@ -178,7 +178,8 @@ async fn rocket() -> _ {
             "/",
             routes![
                 // Assets
-                sw_js, // Service worker (Browser cache + unduck)
+                set_preferences, // Set cookie preferences
+                sw_js,           // Service worker (Browser cache + unduck)
                 unduck_js,
                 security, // Security.txt
                 robots,   // Robots.txt

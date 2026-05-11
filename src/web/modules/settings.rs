@@ -133,6 +133,7 @@ pub fn run(
     );
 
     if cookie_jar.get("newtab").is_some() {
+        context.insert(String::from("check_newtab"), json!(1));
         context.insert(String::from("newtab"), json!("target='_blank'"));
     }
 
@@ -166,4 +167,8 @@ pub fn run(
             "static/css/system/"
         }),
     );
+
+    if cookie_jar.get("js").is_some() {
+        context.insert(String::from("check_js"), json!(1));
+    }
 }

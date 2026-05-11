@@ -485,8 +485,6 @@ pub static ROCKSDB_INDEX: Lazy<Arc<DB>> = Lazy::new(|| {
         rocksdb_opts.set_max_write_buffer_number(4);
         rocksdb_opts.set_min_write_buffer_number_to_merge(2);
 
-        rocksdb_opts.set_disable_auto_compactions(true);
-
         DB::open(&rocksdb_opts, PRIECO_CONFIG.rocksdb_path.clone()).expect("Faile to open RocksDB")
     })
 });
@@ -522,7 +520,7 @@ pub static TANTIVY_READER: Lazy<Arc<IndexReader>> = Lazy::new(|| {
 pub static TANTIVY_WRITER: Lazy<Arc<Mutex<IndexWriter>>> = Lazy::new(|| {
     Arc::new(Mutex::new(
         TANTIVY_INDEX
-            .writer_with_num_threads(1, TANTIVY_HEAP_SIZE)
+            .writer(TANTIVY_HEAP_SIZE)
             .expect("Failed to create Tantivy writer"),
     ))
 });

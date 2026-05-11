@@ -326,7 +326,7 @@
         <label for="check_newtab" title="Open all links in a new tab?">New tab:</label>
         <div class="checkbox_cute">
           <div class="check">
-           <input id="check_newtab" type="checkbox">
+            <input id="check_newtab" name="newtab" type="checkbox" {{#if check_newtab}}checked{{/if}}>
             <label for="check_newtab"></label>
           </div>
         </div>
@@ -349,7 +349,7 @@
         <label for="check_js" title="Instruct PriEco to not use JavaScript. Works best in Tor browser.">No JS:</label>
         <div class="checkbox_cute">
           <div class="check">
-           <input id="check_js" type="checkbox">
+            <input id="check_js" name="js" type="checkbox" {{#if check_js}}checked{{/if}}>
             <label for="check_js"></label>
           </div>
         </div>

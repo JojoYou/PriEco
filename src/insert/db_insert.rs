@@ -7,14 +7,14 @@ use std::{
     fs::{File, OpenOptions, create_dir_all, metadata, read_dir, remove_file},
     io::{BufRead, BufReader, BufWriter, Read, Write},
     path::{Path, PathBuf},
-    thread::sleep,
     time::Duration,
 };
 
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 /*
   Import external libraries
 */
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rocksdb::{WriteBatch, WriteOptions};
 use tantivy::Term;
 use zstd::stream::{Encoder as ZstdEncoder, decode_all};
 
@@ -103,6 +103,11 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     let keywords_field = TANTIVY_INDEX.schema().get_field("keywords").unwrap();
     let safe_s_field = TANTIVY_INDEX.schema().get_field("safe_s").unwrap();
 
+    // Create local RocksDB writer
+    let mut rocksdb_write_opts = WriteOptions::default();
+    rocksdb_write_opts.disable_wal(true);
+    let mut rocksdb_batch = WriteBatch::default();
+
     // Process files
     let mut vector_idx_buffer: HashMap<u64, Vec<f32>> = HashMap::with_capacity(1_000_000);
     for file_name in &files {
@@ -162,7 +167,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                 search_score: 0.0,
             };
 
-            ROCKSDB_INDEX.put(id.to_be_bytes(), serde_json::to_vec(&doc)?)?;
+            rocksdb_batch.put(id.to_be_bytes(), serde_json::to_vec(&doc)?);
 
             /* Tantivy */
             TANTIVY_WRITER
@@ -181,8 +186,9 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
 
             inserted += 1;
             if inserted % 1_000 == 0 {
+                ROCKSDB_INDEX.write_opt(rocksdb_batch, &rocksdb_write_opts)?;
+                rocksdb_batch = WriteBatch::default();
                 println!("{}: Inserted {}", icons::DB_INSERT, inserted);
-                sleep(Duration::from_millis(500));
             }
 
             if vector_idx_buffer.len() >= MAX_VECTORS_IN_VRAM {
@@ -204,11 +210,11 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
         }
 
         // Commit after file
-        println!(
-            "{}: Commiting {} vectors",
-            icons::DB_INSERT,
-            vector_idx_buffer.len()
-        );
+        if !rocksdb_batch.is_empty() {
+            ROCKSDB_INDEX.write_opt(rocksdb_batch, &rocksdb_write_opts)?;
+            rocksdb_batch = WriteBatch::default();
+        }
+        println!("{}: RocksDB commited", icons::DB_INSERT);
 
         TANTIVY_WRITER.lock().commit()?;
         println!(
@@ -251,8 +257,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     merged_count as f64 / total_buckets as f64 * 100.0
                 );
             }
-
-            sleep(Duration::from_millis(300));
         }
         println!("{}: Merge complete", icons::DB_INSERT);
     }
@@ -260,10 +264,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     for file_name in &files {
         let _ = remove_file(file_name);
     }
-
-    println!("{}: Compacting RocksDB...", icons::DB_INSERT);
-    ROCKSDB_INDEX.compact_range(None::<&[u8]>, None::<&[u8]>);
-    let _ = ROCKSDB_INDEX.set_options(&[("disable_auto_compactions", "false")]);
 
     Ok(())
 }
@@ -313,8 +313,6 @@ fn vector_process(
     for (bucket_id, items) in bucket_data.iter() {
         append_to_bucket(*bucket_id, items)
             .map_err(|e| format!("Failed on bucket {}: {}", bucket_id, e))?;
-
-        sleep(Duration::from_millis(50));
     }
 
     chunk_buffer.clear();

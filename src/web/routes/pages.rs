@@ -25,7 +25,10 @@ use rocket::{
     Request, State,
     form::{Form, FromForm},
     get, head,
-    http::{Cookie, CookieJar, SameSite, uri::Host},
+    http::{
+        Cookie, CookieJar, SameSite,
+        uri::{Host, Origin},
+    },
     post,
     request::{FromRequest, Outcome},
     response::Redirect,
@@ -149,6 +152,7 @@ pub async fn search(
     user_agent: UserAgent<'_>,
     cookie_jar: &CookieJar<'_>,
     host: &Host<'_>,
+    uri: &Origin<'_>,
     embedding_service: &State<EmbeddingService>,
 ) -> Template {
     let mut context: HashMap<String, Value> = HashMap::from([
@@ -161,6 +165,10 @@ pub async fn search(
         (String::from("query"), json!(q)),
         (String::from("query_enc"), json!(encode(q).into_owned())),
         (String::from("type"), json!(t)),
+        (
+            String::from("current_path"),
+            json!(encode(&uri.to_string()).into_owned()),
+        ),
         // Data from cookies
         (
             String::from("lang"),
@@ -204,6 +212,7 @@ pub async fn search(
         // Results
         let results_ctx = search_endpoint::run(t, q, lang, loc, embedding_service).await;
         context.insert(String::from("search_results"), json!(results_ctx));
+        ANALYTICS.record_query();
 
         // Settings
         let mut settings_ctx: HashMap<String, Value> = HashMap::new();
@@ -477,6 +486,75 @@ pub fn settings_update(form: Form<SettingsForm<'_>>, cookie_jar: &CookieJar<'_>)
     }
 
     Redirect::to(uri!("/"))
+}
+
+#[get("/set?<lang>&<loc>&<theme>&<newtab>&<js>&<index>&<return_to>")]
+pub fn set_preferences(
+    lang: Option<String>,
+    loc: Option<String>,
+    theme: Option<String>,
+    newtab: Option<u8>,
+    js: Option<u8>,
+    index: Option<u8>,
+    return_to: Option<String>,
+    cookie_jar: &CookieJar<'_>,
+) -> Redirect {
+    let apply_cookie = |name: &str, value: String| {
+        cookie_jar.add(
+            Cookie::build((name.to_string(), value))
+                .path("/")
+                .same_site(SameSite::Strict)
+                .secure(true)
+                .max_age(Duration::days(365))
+                .build(),
+        );
+    };
+    let remove_cookie = |name: &str| {
+        let mut cookie = Cookie::from(name.to_string());
+        cookie.set_path("/");
+        cookie_jar.remove(cookie);
+    };
+
+    if let Some(v) = lang {
+        apply_cookie("lang", v);
+    }
+    if let Some(v) = loc {
+        apply_cookie("loc", v);
+    }
+    if let Some(v) = theme {
+        apply_cookie("theme", v);
+    }
+
+    if let Some(v) = newtab {
+        if v == 1 {
+            apply_cookie("newtab", "1".to_string());
+        } else {
+            remove_cookie("newtab");
+        }
+    }
+
+    if let Some(v) = js {
+        if v == 1 {
+            apply_cookie("js", "1".to_string());
+        } else {
+            remove_cookie("js");
+        }
+    }
+
+    if let Some(v) = index {
+        if v == 1 {
+            apply_cookie("index", "1".to_string());
+        } else {
+            remove_cookie("index");
+        }
+    }
+
+    let redirect_url = match return_to {
+        Some(url) if url.starts_with('/') => url,
+        _ => String::from("/"),
+    };
+
+    Redirect::to(redirect_url)
 }
 
 /*
