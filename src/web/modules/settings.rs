@@ -171,4 +171,8 @@ pub fn run(
     if cookie_jar.get("js").is_some() {
         context.insert(String::from("check_js"), json!(1));
     }
+
+    if cookie_jar.get("post").is_some() {
+        context.insert(String::from("check_post"), json!(1));
+    }
 }

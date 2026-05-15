@@ -192,6 +192,7 @@ async fn rocket() -> _ {
                 index_head,
                 // Search
                 search,
+                search_post,
                 results_htmls,
                 api,
                 stats,

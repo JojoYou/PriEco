@@ -346,7 +346,7 @@
       <h3>Privacy</h3>
       <br>
         <div class="settings-item">
-        <label for="check_js" title="Instruct PriEco to not use JavaScript. Works best in Tor browser.">No JS:</label>
+        <label for="check_js" title="Instruct PriEco to not use JavaScript. Works best in Tor browser.">No JavaScript:</label>
         <div class="checkbox_cute">
           <div class="check">
             <input id="check_js" name="js" type="checkbox" {{#if check_js}}checked{{/if}}>
@@ -354,6 +354,16 @@
           </div>
         </div>
       </div>
+      <br>
+        <div class="settings-item">
+    <label for="check_post" title="Use POST instead of GET requests.">POST:</label>
+    <div class="checkbox_cute">
+      <div class="check">
+        <input id="check_post" name="post" type="checkbox" {{#if check_post}}checked{{/if}}>
+        <label for="check_post"></label>
+      </div>
+    </div>
+  </div>
       </div>
   </div>
   </form>

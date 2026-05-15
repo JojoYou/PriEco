@@ -126,3 +126,25 @@ if (c) {
     location.reload();
   };
 }
+
+// POST
+let check_post = document.getElementById("check_post");
+if (check_post) {
+  check_post.checked = /\bpost=1/.test(document.cookie);
+  check_post.onchange = async () => {
+    document.cookie = `post=${check_post.checked ? "1;max-age=31536000" : ";max-age=0"};path=/;SameSite=Strict;Secure`;
+    if ("serviceWorker" in navigator) {
+      try {
+        await caches.delete("prieco-cache");
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (let registration of registrations) {
+          await registration.unregister();
+        }
+      } catch (err) {
+        console.warn("Failed to clear SW:", err);
+      }
+    }
+
+    location.reload();
+  };
+}

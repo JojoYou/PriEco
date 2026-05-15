@@ -81,17 +81,6 @@ impl<'r> FromRequest<'r> for ClientIp {
     }
 }
 
-// Settings
-#[derive(FromForm)]
-pub struct SettingsForm<'r> {
-    newtab: Option<&'r str>,
-    index: Option<&'r str>,
-    theme: Option<&'r str>,
-    lang: Option<&'r str>,
-    loc: Option<&'r str>,
-    js: Option<&'r str>,
-}
-
 /*
   Description: Responds if PriEco is alive
 
@@ -142,6 +131,39 @@ pub fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host) -> Te
   Input: Search type, Search query
   Output: Privacy Policy page html
 */
+// Handle POST request
+#[derive(FromForm)]
+pub struct SearchForm<'r> {
+    t: &'r str,
+    q: &'r str,
+    sxprmedia: Option<&'r str>,
+    sxprsearchsugg: Option<&'r str>,
+}
+#[post("/search", data = "<form>")]
+pub async fn search_post(
+    form: Form<SearchForm<'_>>,
+    client_ip: ClientIp,
+    user_agent: UserAgent<'_>,
+    cookie_jar: &CookieJar<'_>,
+    host: &Host<'_>,
+    uri: &Origin<'_>,
+    embedding_service: &State<EmbeddingService>,
+) -> Template {
+    search(
+        form.t,
+        form.q,
+        form.sxprmedia,
+        form.sxprsearchsugg,
+        client_ip,
+        user_agent,
+        cookie_jar,
+        host,
+        uri,
+        embedding_service,
+    )
+    .await
+}
+
 #[get("/search?<t>&<q>&<sxprmedia>&<sxprsearchsugg>")]
 pub async fn search(
     t: &str,
@@ -427,6 +449,17 @@ pub fn settings_htmls(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     Template::render("settings", &context)
 }
 
+// No JS settings
+#[derive(FromForm)]
+pub struct SettingsForm<'r> {
+    newtab: Option<&'r str>,
+    index: Option<&'r str>,
+    theme: Option<&'r str>,
+    lang: Option<&'r str>,
+    loc: Option<&'r str>,
+    js: Option<&'r str>,
+    post: Option<&'r str>,
+}
 #[post("/settings_update", data = "<form>")]
 pub fn settings_update(form: Form<SettingsForm<'_>>, cookie_jar: &CookieJar<'_>) -> Redirect {
     // Helpers
@@ -485,10 +518,16 @@ pub fn settings_update(form: Form<SettingsForm<'_>>, cookie_jar: &CookieJar<'_>)
         remove_cookie("js");
     }
 
+    if form.post.is_some() {
+        add_cookie("post", "1");
+    } else {
+        remove_cookie("post");
+    }
+
     Redirect::to(uri!("/"))
 }
 
-#[get("/set?<lang>&<loc>&<theme>&<newtab>&<js>&<index>&<return_to>")]
+#[get("/set?<lang>&<loc>&<theme>&<newtab>&<js>&<index>&<post>&<return_to>")]
 pub fn set_preferences(
     lang: Option<String>,
     loc: Option<String>,
@@ -496,6 +535,7 @@ pub fn set_preferences(
     newtab: Option<u8>,
     js: Option<u8>,
     index: Option<u8>,
+    post: Option<u8>,
     return_to: Option<String>,
     cookie_jar: &CookieJar<'_>,
 ) -> Redirect {
@@ -546,6 +586,14 @@ pub fn set_preferences(
             apply_cookie("index", "1".to_string());
         } else {
             remove_cookie("index");
+        }
+    }
+
+    if let Some(v) = post {
+        if v == 1 {
+            apply_cookie("post", "1".to_string());
+        } else {
+            remove_cookie("post");
         }
     }
 

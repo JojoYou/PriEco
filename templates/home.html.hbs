@@ -20,7 +20,7 @@
   <div class="div_search_bar">
     <img src="static/img/prieco.webp" class="logo" alt="PriEco logo">
     <span class="title">PriEco</span>
-    <form action="search" class="search_bar">
+    <form action="search" method="{{#if check_post}}POST{{else}}GET{{/if}}" class="search_bar">
       <input type="hidden" name="t" value="all">
       <button aria-label="search button" class="search_button">
         <img src="static/img/icon/search.webp" alt="Search button icon" width="13px">
