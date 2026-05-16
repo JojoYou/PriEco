@@ -12,6 +12,7 @@
   TODO:
 */
 
+use tantivy::indexer::NoMergePolicy;
 /*
   Set global allovator
   Reason: Default was insufficient for deallocating RAM from crawler HTTP connections
@@ -222,6 +223,9 @@ fn thread_manager() {
     let _ = BLOB_STORAGE;
     let _ = TANTIVY_READER;
     let _ = TANTIVY_WRITER;
+    TANTIVY_WRITER
+        .lock()
+        .set_merge_policy(Box::new(NoMergePolicy));
     println!("Starting PageRank!");
     let _ = PAGERANK.read().get_score("https://www.google.com/");
     println!("Starting GPU!");
@@ -240,6 +244,9 @@ fn thread_manager() {
     // Result database inserter
     let insert_thread = {
         spawn(move || {
+            unsafe {
+                libc::syscall(libc::SYS_ioprio_set, 1, 0, (3 << 13) | 7);
+            }
             while !stop_requested() {
                 if let Err(e) = db_insert::run() {
                     println!(

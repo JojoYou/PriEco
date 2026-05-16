@@ -62,6 +62,7 @@ use serde::{Deserialize, Serialize};
 use tantivy::{
     Index, IndexReader, IndexWriter, ReloadPolicy,
     directory::MmapDirectory,
+    indexer::NoMergePolicy,
     schema::{FAST, INDEXED, STORED, STRING, Schema, TEXT},
 };
 use tokenizers::Tokenizer;

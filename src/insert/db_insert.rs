@@ -197,12 +197,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     icons::DB_INSERT,
                     vector_idx_buffer.len()
                 );
-                TANTIVY_WRITER.lock().commit()?;
-                println!(
-                    "{}: Tantivy commited {} vectors",
-                    icons::DB_INSERT,
-                    vector_idx_buffer.len()
-                );
 
                 vector_process(&mut vector_idx_buffer)?;
                 println!("{}: Vector idx commited", icons::DB_INSERT);

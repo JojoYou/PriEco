@@ -41,6 +41,7 @@ rand = { version = "0.9.0", features = [
 dashmap = "6.1.0"# Multi threaded hashmap
 rayon = "1.11.0" # Paralel code execution
 memmap2 = "0.9.10"
+libc = "0.2.186"
 
 # Web server
 rocket = { version = "0.5.1", features = ["json"] } # Web server
