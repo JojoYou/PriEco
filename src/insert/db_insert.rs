@@ -13,6 +13,7 @@ use std::{
 /*
   Import external libraries
 */
+use ahash::AHashSet;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rocksdb::{WriteBatch, WriteOptions};
 use tantivy::Term;
@@ -107,6 +108,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut rocksdb_write_opts = WriteOptions::default();
     rocksdb_write_opts.disable_wal(true);
     let mut rocksdb_batch = WriteBatch::default();
+    let mut batch_ids: AHashSet<u64> = AHashSet::with_capacity(2_000); // Monitoring batch
 
     // Process files
     let mut vector_idx_buffer: HashMap<u64, Vec<f32>> = HashMap::with_capacity(1_000_000);
@@ -121,6 +123,14 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
             // Create a web document with checks
             let parts: Vec<&str> = line.split("<-->").collect();
             if parts.len() != 15 {
+                continue;
+            }
+
+            let url = sanitize_string(parts[0]);
+            let id = url_to_id(&url);
+
+            // Preserve uniqness
+            if batch_ids.contains(&id) || ROCKSDB_INDEX.get(id.to_be_bytes())?.is_some() {
                 continue;
             }
 
@@ -140,9 +150,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
             if points.len() != 4 {
                 continue;
             }
-
-            let url = sanitize_string(parts[0]);
-            let id = url_to_id(&url);
 
             let doc = WebDocument {
                 url: url.clone(),
@@ -167,12 +174,11 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                 search_score: 0.0,
             };
 
+            batch_ids.insert(id);
+
             rocksdb_batch.put(id.to_be_bytes(), serde_json::to_vec(&doc)?);
 
             /* Tantivy */
-            TANTIVY_WRITER
-                .lock()
-                .delete_term(Term::from_field_u64(doc_id_field, id)); // Ensure uniqness
             TANTIVY_WRITER.lock().add_document(tantivy::doc!(
                 doc_id_field => id ,
                 title_field => doc.title.clone(),
@@ -188,6 +194,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
             if inserted % 1_000 == 0 {
                 ROCKSDB_INDEX.write_opt(rocksdb_batch, &rocksdb_write_opts)?;
                 rocksdb_batch = WriteBatch::default();
+                batch_ids.clear();
                 println!("{}: Inserted {}", icons::DB_INSERT, inserted);
             }
 
@@ -204,6 +211,8 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
         }
 
         // Commit after file
+        batch_ids.clear();
+
         if !rocksdb_batch.is_empty() {
             ROCKSDB_INDEX.write_opt(rocksdb_batch, &rocksdb_write_opts)?;
             rocksdb_batch = WriteBatch::default();
