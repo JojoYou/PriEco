@@ -26,13 +26,11 @@ use serde_json::{Value, json};
 /*
   Import own libraries
 */
-use crate::{
-    globals::{EmbeddingService, SearchResult},
-    web::functions::{
-        search_api::{img, news, yadore},
-        search_db,
-    },
+use crate::web::functions::{
+    search_api::{img, news},
+    search_db,
 };
+use prieco_core::{EmbeddingService, SearchResult};
 
 /*
   Description: Decides what kind of search to perform

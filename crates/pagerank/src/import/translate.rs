@@ -27,10 +27,8 @@ use std::{
 /*
   Import own libraries
 */
-use crate::{
-    globals::icons,
-    pagerank::compute::{BUFFER_SIZE, EDGES_DIR, EDGES_SORTED, ID_MAP_FILE, read_u64_pair},
-};
+use crate::compute::{BUFFER_SIZE, EDGES_DIR, EDGES_SORTED, read_u64_pair};
+use prieco_core::{ID_MAP_FILE, icons};
 
 pub fn run(hash_shards: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
     run_with(hash_shards, ID_MAP_FILE, EDGES_SORTED, EDGES_DIR)

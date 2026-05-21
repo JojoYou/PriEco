@@ -1,0 +1,21 @@
+[package]
+name = "prieco-insert"
+version = "3.0.0"
+edition = "2024"
+
+[dependencies]
+prieco-core = { workspace = true }
+
+ahash = { workspace = true }
+rayon = { workspace = true }
+rocksdb = { workspace = true }
+tantivy = { workspace = true }
+zip = { workspace = true }
+zstd = { workspace = true }
+serde_json = { workspace = true }
+bytemuck = { workspace = true }
+tokio = {workspace =true}
+
+[features]
+default = []
+cuda = ["prieco-core/cuda"]

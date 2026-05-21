@@ -9,11 +9,8 @@ use std::{
     time::Duration,
 };
 
-use crate::{
-    globals::{SearchResult, colors},
-    read_file,
-    web::functions::general::{call_api_future_json, get_domain},
-};
+use crate::web::functions::general::{call_api_future_json, get_domain};
+use prieco_core::{SearchResult, colors, read_file};
 
 pub async fn run(query: &str, lang: &str, loc: &str) -> Option<Vec<SearchResult>> {
     ////

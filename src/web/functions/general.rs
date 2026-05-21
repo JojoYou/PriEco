@@ -28,7 +28,7 @@ use serde_json::Value;
 use twox_hash::XxHash64;
 use url::Url;
 
-use crate::globals::colors;
+use prieco_core::globals::colors;
 
 /*
   Description: Checks if URL is valid

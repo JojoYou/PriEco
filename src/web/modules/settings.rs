@@ -29,10 +29,8 @@ use serde_json::json;
 /*
   Import own libraries
 */
-use crate::{
-    globals::{COUNTRY_TO_LANG, IP_TO_LOC},
-    web::functions::general::set_cookie,
-};
+use crate::web::functions::general::set_cookie;
+use prieco_core::globals::{COUNTRY_TO_LANG, IP_TO_LOC};
 
 /*
   Description: Integrates settings to the page

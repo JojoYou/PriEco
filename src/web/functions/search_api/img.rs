@@ -7,14 +7,8 @@ use std::{
     time::Duration,
 };
 
-use crate::{
-    globals::{
-        ARTISTS_DB, ARTISTS_TABLE, ImgResult,
-        colors::{self},
-    },
-    read_file,
-    web::functions::general::get_domain,
-};
+use crate::web::functions::general::get_domain;
+use prieco_core::{ARTISTS_DB, ARTISTS_TABLE, ImgResult, colors, read_file};
 
 pub async fn run(query: &str) -> Vec<ImgResult> {
     ////

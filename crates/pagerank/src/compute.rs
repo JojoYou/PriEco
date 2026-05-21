@@ -33,8 +33,13 @@ use zstd::{Decoder, Encoder};
   Import own libraries
 */
 use crate::{
+    import::{hashing, merge, translate},
+    iter::iterate,
+    nodes::csr,
+};
+use prieco_core::{
+    FINAL_SCORES, ID_MAP_FILE,
     globals::{PAGERANK, PageRank, colors, icons},
-    pagerank::{import, iter, nodes},
     read_file, write_file,
 };
 
@@ -54,12 +59,10 @@ pub const MERGED_DIR: &str = "pagerank/merged";
 pub const EDGES_SORTED: &str = "pagerank/edges_sorted.bin.zst";
 pub const CSR_EDGES: &str = "pagerank/csr_edges.bin.zst";
 pub const CSR_OFFSETS: &str = "pagerank/csr_offsets.bin";
-pub const ID_MAP_FILE: &str = "pagerank/id_map.bin";
 pub const SCORES_A: &str = "pagerank/scores_a.bin";
 pub const SCORES_B: &str = "pagerank/scores_b.bin";
 pub const TOTAL_NODES: &str = "pagerank/total_nodes.txt";
 pub const OUT_DEGREE: &str = "pagerank/out_degree.bin.zst";
-pub const FINAL_SCORES: &str = "pagerank/pageranks.bin";
 
 pub const DIRS: [&str; 5] = [
     PAGERANK_DIR,
@@ -70,33 +73,30 @@ pub const DIRS: [&str; 5] = [
 ];
 
 pub struct IdMap {
-    _mmap: Mmap,
-    ptr: *const (u64, u64),
-    len: usize,
+    pairs: Vec<(u64, u64)>,
 }
 
 impl IdMap {
-    pub fn open(path: &str) -> Result<Self, Box<dyn Error>> {
-        let file = File::open(path)?;
-        let mmap = unsafe { MmapOptions::new().map(&file)? };
-        let len = mmap.len() / 16;
-        let ptr = mmap.as_ptr() as *const (u64, u64);
-        Ok(Self {
-            _mmap: mmap,
-            ptr,
-            len,
-        })
+    pub fn open(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut dec = zstd_reader(path)?;
+        let mut pairs = Vec::new();
+
+        while let Ok(Some(pair)) = read_u64_pair_zstd(&mut dec) {
+            pairs.push(pair);
+        }
+
+        Ok(Self { pairs })
     }
 
     pub fn pairs(&self) -> &[(u64, u64)] {
-        unsafe { std::slice::from_raw_parts(self.ptr, self.len) }
+        &self.pairs
     }
 
     pub fn lookup(&self, hash: u64) -> Option<u64> {
-        self.pairs()
+        self.pairs
             .binary_search_by_key(&hash, |&(h, _)| h)
             .ok()
-            .map(|i| self.pairs()[i].1)
+            .map(|i| self.pairs[i].1)
     }
 }
 
@@ -212,7 +212,7 @@ pub fn run() {
     );
     let total_nodes_usize = total_nodes as usize;
     if !Path::new(CSR_EDGES).exists() {
-        match nodes::csr::run(total_nodes_usize) {
+        match crate::nodes::csr::run(total_nodes_usize) {
             Ok(_) => (),
             Err(e) => {
                 println!("{}: {}", icons::PAGERANK_ICON, e);
@@ -239,7 +239,7 @@ pub fn run() {
         "{}: Phase 3: streaming power iteration…",
         icons::PAGERANK_ICON
     );
-    let final_file: String = match iter::iterate::run(total_nodes_usize) {
+    let final_file: String = match crate::iter::iterate::run(total_nodes_usize) {
         Ok(file) => file,
         Err(e) => {
             println!("{}: {}", icons::PAGERANK_ICON, e);
@@ -280,16 +280,16 @@ pub fn run() {
 */
 fn import() -> Result<u64, Box<dyn std::error::Error>> {
     println!("{}: Phase 1: Pass A: Hashing!", icons::PAGERANK_ICON);
-    let hash_shards = import::hashing::run()?;
+    let hash_shards = hashing::run()?;
 
     println!("{}: Phase 1: Pass B: Merging!", icons::PAGERANK_ICON);
-    let total_nodes = import::merge::run(&hash_shards)?;
+    let total_nodes = merge::run(&hash_shards)?;
 
     println!(
         "{}: Phase 1: Pass C: Translating edges!",
         icons::PAGERANK_ICON
     );
-    import::translate::run(hash_shards)?;
+    translate::run(hash_shards)?;
 
     Ok(total_nodes)
 }
@@ -303,10 +303,14 @@ fn import() -> Result<u64, Box<dyn std::error::Error>> {
 */
 pub fn zstd_writer(
     path: &str,
-) -> Result<Encoder<'static, BufWriter<File>>, Box<dyn std::error::Error>> {
+) -> Result<
+    zstd::stream::write::AutoFinishEncoder<'static, BufWriter<File>>,
+    Box<dyn std::error::Error>,
+> {
     let f = File::create(path)?;
     let writer = BufWriter::with_capacity(1 << 20, f);
-    let encoder = Encoder::new(writer, 19)?; // Lvl 19 compression
+
+    let encoder = Encoder::new(writer, 19)?.auto_finish(); // Lvl 19 compression
 
     Ok(encoder)
 }

@@ -30,13 +30,11 @@ use zstd::{Decoder, Encoder};
 /*
   Import own libraries
 */
-use crate::{
-    globals::icons,
-    pagerank::compute::{
-        BUFFER_SIZE, CSR_EDGES, CSR_OFFSETS, EDGES_DIR, EDGES_SORTED, OUT_DEGREE,
-        read_u64_pair_zstd, zstd_reader,
-    },
+use crate::compute::{
+    BUFFER_SIZE, CSR_EDGES, CSR_OFFSETS, EDGES_DIR, EDGES_SORTED, OUT_DEGREE, read_u64_pair_zstd,
+    zstd_reader,
 };
+use prieco_core::globals::icons;
 
 /*
   Tuning constants

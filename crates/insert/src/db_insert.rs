@@ -16,18 +16,17 @@ use std::{
 use ahash::AHashSet;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rocksdb::{WriteBatch, WriteOptions};
-use tantivy::Term;
+use tantivy::{IndexWriter, Term, index::SegmentId};
+use zip::ZipArchive;
 use zstd::stream::{Encoder as ZstdEncoder, decode_all};
 
 /*
   Import own libraries
 */
-use crate::{
-    file_exists,
-    globals::{
-        INSERTER_IMPORT_DIR, PRIECO_CONFIG, ROCKSDB_INDEX, TANTIVY_INDEX, TANTIVY_WRITER,
-        VECTOR_CENTROPOIDS, VECTOR_DIM, WebDocument, icons,
-    },
+use prieco_core::{
+    ID_SIZE, INSERTER_IMPORT_DIR, PRIECO_CONFIG, RECORD_SIZE, ROCKSDB_INDEX, TANTIVY_HEAP_SIZE,
+    TANTIVY_INDEX, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_DIM, WebDocument, file_exists,
+    globals::{colors, icons},
     url_to_id,
 };
 
@@ -38,9 +37,6 @@ const SKIP_MERGE_FILE: &str = "dont_merge.txt";
 const MAX_VECTORS_IN_VRAM: usize = 1_500_000;
 const BATCH_SIZE_FOR_GPU: usize = 1_500;
 const ZSTD_LEVEL: i32 = 3;
-pub const ID_SIZE: usize = 8;
-const VEC_BYTES: usize = VECTOR_DIM * 4;
-pub const RECORD_SIZE: usize = ID_SIZE + VEC_BYTES;
 
 /*
   Structs
@@ -86,7 +82,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
         if entry.file_type()?.is_file() {
             let path = entry.path();
             if let Some(s) = path.to_str() {
-                if s.contains(".txt") {
+                if s.contains(".zip") {
                     files.push(s.to_string());
                 }
             }
@@ -113,122 +109,147 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Process files
     let mut vector_idx_buffer: HashMap<u64, Vec<f32>> = HashMap::with_capacity(1_000_000);
     for file_name in &files {
-        let file = File::open(&file_name)?;
-        let reader = BufReader::new(file);
-        let mut inserted = 0;
+        println!("{}: Opening {}", icons::DB_INSERT, file_name);
+        let zip_file = File::open(file_name)?;
+        let mut archive = ZipArchive::new(zip_file)?;
 
-        for line in reader.lines() {
-            let line = line?;
-
-            // Create a web document with checks
-            let parts: Vec<&str> = line.split("<-->").collect();
-            if parts.len() != 15 {
+        for entry_idx in 0..archive.len() {
+            let entry = archive.by_index(entry_idx)?;
+            let entry_name = entry.name().to_string();
+            if !entry_name.ends_with(".txt") {
                 continue;
             }
+            println!("{}: Processing entry {}", icons::DB_INSERT, entry_name);
 
-            let url = sanitize_string(parts[0]);
-            let id = url_to_id(&url);
+            let reader = BufReader::with_capacity(1 << 20, entry);
+            let mut inserted = 0;
 
-            // Preserve uniqness
-            if batch_ids.contains(&id) || ROCKSDB_INDEX.get(id.to_be_bytes())?.is_some() {
-                continue;
+            for line in reader.lines() {
+                let line = line?;
+
+                // Create a web document with checks
+                let parts: Vec<&str> = line.split("<-->").collect();
+                if parts.len() != 15 {
+                    continue;
+                }
+
+                let url = sanitize_string(parts[0]);
+                let id = url_to_id(&url);
+
+                // Preserve uniqness
+                if batch_ids.contains(&id) || ROCKSDB_INDEX.get(id.to_be_bytes())?.is_some() {
+                    continue;
+                }
+
+                let vector: Vec<f32> = parts[14]
+                    .split_whitespace()
+                    .filter_map(|s| s.parse().ok())
+                    .collect();
+                if vector.len() != VECTOR_DIM {
+                    continue;
+                }
+
+                let points: Vec<f32> = parts[11]
+                    .replace(['[', ']'], "")
+                    .split(", ")
+                    .filter_map(|s| s.parse().ok())
+                    .collect();
+                if points.len() != 4 {
+                    continue;
+                }
+
+                let doc = WebDocument {
+                    url: url.clone(),
+                    title: sanitize_string(parts[1]),
+                    description: sanitize_string(parts[2]),
+                    content: sanitize_string(parts[3]),
+                    favicon: sanitize_string(parts[4]),
+                    image: sanitize_string(parts[5]),
+                    keywords: sanitize_string(parts[6]),
+                    safe_s: if parts[7] == "true" { true } else { false },
+                    html: parts[8].to_string(),
+                    lang: parts[9].to_string(),
+                    loc: parts[10].to_string(),
+                    impressions: 0,
+                    clicks: 0,
+                    confidence: points[0],
+                    effort: points[1],
+                    qna: points[2],
+                    sts: points[3],
+                    load: parts[12].parse().unwrap_or_default(),
+                    date: parts[13].parse().unwrap_or(0),
+                    search_score: 0.0,
+                };
+
+                batch_ids.insert(id);
+
+                rocksdb_batch.put(id.to_be_bytes(), serde_json::to_vec(&doc)?);
+
+                /* Tantivy */
+                TANTIVY_WRITER.lock().add_document(tantivy::doc!(
+                    doc_id_field => id ,
+                    title_field => doc.title.clone(),
+                    description_field => doc.description.clone(),
+                    content_field => doc.content.clone(),
+                    keywords_field => doc.keywords.clone(),
+                    safe_s_field => doc.safe_s
+                ))?;
+
+                vector_idx_buffer.insert(id, vector);
+
+                inserted += 1;
+                if inserted % 1_000 == 0 {
+                    ROCKSDB_INDEX.write_opt(rocksdb_batch, &rocksdb_write_opts)?;
+                    rocksdb_batch = WriteBatch::default();
+                    batch_ids.clear();
+                    println!("{}: Inserted {}", icons::DB_INSERT, inserted);
+                }
+
+                if vector_idx_buffer.len() >= MAX_VECTORS_IN_VRAM {
+                    println!(
+                        "{}: Commiting {} vectors",
+                        icons::DB_INSERT,
+                        vector_idx_buffer.len()
+                    );
+
+                    vector_process(&mut vector_idx_buffer)?;
+                    println!("{}: Vector idx commited", icons::DB_INSERT);
+                }
             }
 
-            let vector: Vec<f32> = parts[14]
-                .split_whitespace()
-                .filter_map(|s| s.parse().ok())
-                .collect();
-            if vector.len() != VECTOR_DIM {
-                continue;
-            }
+            // Commit after file
+            batch_ids.clear();
 
-            let points: Vec<f32> = parts[11]
-                .replace(['[', ']'], "")
-                .split(", ")
-                .filter_map(|s| s.parse().ok())
-                .collect();
-            if points.len() != 4 {
-                continue;
-            }
-
-            let doc = WebDocument {
-                url: url.clone(),
-                title: sanitize_string(parts[1]),
-                description: sanitize_string(parts[2]),
-                content: sanitize_string(parts[3]),
-                favicon: sanitize_string(parts[4]),
-                image: sanitize_string(parts[5]),
-                keywords: sanitize_string(parts[6]),
-                safe_s: if parts[7] == "true" { true } else { false },
-                html: parts[8].to_string(),
-                lang: parts[9].to_string(),
-                loc: parts[10].to_string(),
-                impressions: 0,
-                clicks: 0,
-                confidence: points[0],
-                effort: points[1],
-                qna: points[2],
-                sts: points[3],
-                load: parts[12].parse().unwrap_or_default(),
-                date: parts[13].parse().unwrap_or(0),
-                search_score: 0.0,
-            };
-
-            batch_ids.insert(id);
-
-            rocksdb_batch.put(id.to_be_bytes(), serde_json::to_vec(&doc)?);
-
-            /* Tantivy */
-            TANTIVY_WRITER.lock().add_document(tantivy::doc!(
-                doc_id_field => id ,
-                title_field => doc.title.clone(),
-                description_field => doc.description.clone(),
-                content_field => doc.content.clone(),
-                keywords_field => doc.keywords.clone(),
-                safe_s_field => doc.safe_s
-            ))?;
-
-            vector_idx_buffer.insert(id, vector);
-
-            inserted += 1;
-            if inserted % 1_000 == 0 {
+            if !rocksdb_batch.is_empty() {
                 ROCKSDB_INDEX.write_opt(rocksdb_batch, &rocksdb_write_opts)?;
                 rocksdb_batch = WriteBatch::default();
-                batch_ids.clear();
-                println!("{}: Inserted {}", icons::DB_INSERT, inserted);
             }
+            println!("{}: RocksDB commited", icons::DB_INSERT);
 
-            if vector_idx_buffer.len() >= MAX_VECTORS_IN_VRAM {
-                println!(
-                    "{}: Commiting {} vectors",
-                    icons::DB_INSERT,
-                    vector_idx_buffer.len()
-                );
+            TANTIVY_WRITER.lock().commit()?;
+            println!(
+                "{}: Tantivy commited {} vectors",
+                icons::DB_INSERT,
+                vector_idx_buffer.len()
+            );
 
-                vector_process(&mut vector_idx_buffer)?;
-                println!("{}: Vector idx commited", icons::DB_INSERT);
-            }
+            vector_process(&mut vector_idx_buffer)?;
+            println!("{}: Vector idx commited", icons::DB_INSERT);
         }
 
-        // Commit after file
-        batch_ids.clear();
-
-        if !rocksdb_batch.is_empty() {
-            ROCKSDB_INDEX.write_opt(rocksdb_batch, &rocksdb_write_opts)?;
-            rocksdb_batch = WriteBatch::default();
-        }
-        println!("{}: RocksDB commited", icons::DB_INSERT);
-
-        TANTIVY_WRITER.lock().commit()?;
-        println!(
-            "{}: Tantivy commited {} vectors",
-            icons::DB_INSERT,
-            vector_idx_buffer.len()
-        );
-
-        vector_process(&mut vector_idx_buffer)?;
-        println!("{}: Vector idx commited", icons::DB_INSERT);
+        drop(archive);
+        remove_file(file_name)?;
+        println!("{}: Removed {}", icons::DB_INSERT, file_name);
     }
+
+    println!("{}: Merging tantivy...", icons::DB_INSERT);
+    let segments = TANTIVY_INDEX.searchable_segments()?;
+    let segment_ids: Vec<SegmentId> = segments.iter().map(|s| s.id()).collect();
+    let mut writer: IndexWriter = TANTIVY_INDEX.writer(TANTIVY_HEAP_SIZE)?;
+    tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(writer.merge(&segment_ids))
+    })?;
+    writer.wait_merging_threads()?;
 
     if !file_exists(SKIP_MERGE_FILE) {
         println!(
@@ -262,10 +283,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
             }
         }
         println!("{}: Merge complete", icons::DB_INSERT);
-    }
-
-    for file_name in &files {
-        let _ = remove_file(file_name);
     }
 
     Ok(())
@@ -371,7 +388,7 @@ fn merge_bucket(bucket_id: usize) -> Result<(), Box<dyn Error + Send + Sync>> {
     {
         let mut f = BufReader::with_capacity(1 << 20, File::open(&staging_path)?);
         let mut id_buf = [0u8; ID_SIZE];
-        let mut skip = vec![0u8; VEC_BYTES];
+        let mut skip = vec![0u8; VECTOR_DIM * 4];
         while f.read_exact(&mut id_buf).is_ok() {
             staging_ids.insert(u64::from_le_bytes(id_buf), ());
             f.read_exact(&mut skip)?;

@@ -1,7 +1,7 @@
 [package]
 name = "prieco_rs"
-version = "2.0.0"
-authors = ["Roman Láncoš <support@jojoyou.org>"]
+version = "3.0.0"
+authors = ["Roman Láncoš <support@prieco.net>"]
 edition = "2024"
 
 readme = "README.md"
@@ -9,6 +9,15 @@ license-file = "LICENSE"
 
 repository = "https://codeberg.org/JojoYou/PriEco"
 homepage = "https://prieco.net"
+
+[workspace]
+members = [
+    "crates/core",
+    "crates/blob",
+    "crates/pagerank",
+    "crates/insert"
+]
+resolver = "2"
 
 [profile.release]
 #debug = true # Profiling
@@ -22,10 +31,13 @@ strip = true
 debug = 0
 lto = true
 
-[lib]
-path = "src/lib.rs"
 
-[dependencies]
+[workspace.dependencies]
+# Mapping
+prieco-core = { path = "crates/core" }
+prieco-blob = { path = "crates/blob" }
+prieco-pagerank = { path = "crates/pagerank" }
+prieco-insert = { path = "crates/insert" }
 
 # Essentials
 tikv-jemallocator = "0.6.0" # Memory allocator
@@ -34,10 +46,7 @@ num_cpus = "1.17.0" # Number of CPU cores
 once_cell = "1.20.3" # Global variables
 parking_lot = "0.12.5" # Global variables mutexes
 reqwest = { version = "0.12.23", features = ["json", "gzip", "brotli", "deflate"] } # Out HTTP reqvest client
-rand = { version = "0.9.0", features = [
-  "std",
-  "std_rng",
-] } # Random number generator
+rand = { version = "0.9.0", features = ["std", "std_rng"] } # Random number generator
 dashmap = "6.1.0"# Multi threaded hashmap
 rayon = "1.11.0" # Paralel code execution
 memmap2 = "0.9.10"
@@ -58,13 +67,13 @@ tar = "0.4.44" # Tar archive
 # Database
 rocksdb = "0.24.0" # Results' data
 tantivy = "0.25.0" # Full-text index
-
+zip = "8.6.0" # Stream zip results files to index
 redb = "3.0.1"            # Key-Value
 
 # Vector embedding
 ort = { path = "vendor/ort-1.16.3"  , features = ["cuda", "load-dynamic"] } # Query to vector
 tokenizers = "0.21.1" # Ort model tokenizer
-cudarc = { version = "0.19.2", optional = true, features = ["cublas", "nvrtc", "cuda-version-from-build-system"] } # Nvidia GPU, used for comparing cosine distance between vectors
+cudarc = { version = "0.19.2",  features = ["cublas", "nvrtc", "cuda-version-from-build-system"] } # Nvidia GPU, used for comparing cosine distance between vectors
 ndarray = "0.15.1"
 bytemuck = "1.25.0"
 
@@ -79,8 +88,38 @@ mime_guess = "2.0.5"
 chrono = "0.4.43" # Datetime
 image = "0.25.8" # Image manipulation
 
-# I want to be able to develop on any device while PriEco in production requires Nvidia GPU
+
 [features]
 default = []
-cuda = ["dep:cudarc"] # Compile:  RUSTFLAGS='-C target-cpu=native' cargo build --release --features cuda
+cuda = ["prieco-insert/cuda", "prieco-pagerank/cuda"]  # Compile:  RUSTFLAGS='-C target-cpu=native' cargo build --release --features cuda
 
+
+[dependencies]
+prieco-core = { workspace = true }
+prieco-blob = { workspace = true }
+prieco-pagerank = { workspace = true }
+prieco-insert = { workspace = true }
+
+rocket = { workspace = true }
+rocket_dyn_templates = { workspace = true }
+tikv-jemallocator = { workspace = true }
+num_cpus = { workspace = true }
+dotenv_codegen = { workspace = true }
+reqwest = { workspace = true }
+rand = { workspace = true }
+socket2 = { workspace = true }
+brotli = { workspace = true }
+urlencoding = { workspace = true }
+image = { workspace = true }
+libc = { workspace = true }
+ort = { workspace = true }
+tokenizers = { workspace = true }
+chrono = { workspace = true }
+serde_json = { workspace = true }
+twox-hash = { workspace = true }
+url = { workspace = true }
+ahash = { workspace = true }
+tantivy = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+redb = { workspace = true }

@@ -1,0 +1,10 @@
+[package]
+name = "prieco-blob"
+version = "3.0.0"
+edition = "2024"
+
+[dependencies]
+prieco-core = { workspace = true }
+rocksdb = { workspace = true }
+flate2 = "1.1.9"
+tar = "0.4.44"

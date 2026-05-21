@@ -32,13 +32,13 @@ use rocket::{
 /*
   Import own libraries
 */
-use crate::{
+use crate::web::{
+    functions::{general::is_valid_url, search_db},
+    routes::pages::ClientIp,
+};
+use prieco_core::{
     globals::{ANALYTICS, EmbeddingService, UserAgent},
     read_file,
-    web::{
-        functions::{general::is_valid_url, search_db},
-        routes::pages::ClientIp,
-    },
 };
 
 /*

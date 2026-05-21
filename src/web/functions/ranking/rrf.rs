@@ -1,6 +1,8 @@
 // reciprocal_rank_fusion
-use crate::{globals::WebDocument, web::functions::general::get_domain};
 use std::collections::{HashMap, HashSet};
+
+use crate::web::functions::general::get_domain;
+use prieco_core::WebDocument;
 
 pub fn run(
     query: &str,

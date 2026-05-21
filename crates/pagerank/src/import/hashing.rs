@@ -23,11 +23,10 @@ use std::{
 /*
   Import own libraries
 */
-use crate::{
+use crate::compute::{BUFFER_SIZE, CONNECTIONS_DIR, EDGES_DIR};
+use prieco_core::{
     globals::{colors, icons},
-    normalize_url,
-    pagerank::compute::{BUFFER_SIZE, CONNECTIONS_DIR, EDGES_DIR},
-    url_to_id,
+    normalize_url, url_to_id,
 };
 
 /*

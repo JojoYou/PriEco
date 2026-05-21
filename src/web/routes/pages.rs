@@ -43,9 +43,9 @@ use urlencoding::encode;
 /*
   Import own libraries
 */
-use crate::{
-    globals::{ANALYTICS, CSS_VERSION, EmbeddingService, JS_VERSION, ROCKSDB_INDEX, UserAgent},
-    web::{functions::search_endpoint, modules::settings},
+use crate::web::{functions::search_endpoint, modules::settings};
+use prieco_core::globals::{
+    ANALYTICS, CSS_VERSION, EmbeddingService, JS_VERSION, ROCKSDB_INDEX, UserAgent,
 };
 
 /*

@@ -19,10 +19,8 @@ use std::{
     process::exit,
 };
 
-use crate::{
-    file_exists,
-    globals::{PriEcoConfig, colors},
-};
+use crate::globals::{PriEcoConfig, colors};
+use crate::helpers::file_exists;
 
 const CONFIG_FILE: &str = "settings.conf";
 const TOTAL_QUESTIONS: usize = 5;

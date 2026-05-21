@@ -34,15 +34,16 @@ use twox_hash::XxHash3_64;
 /*
   Import own libraries
 */
-use crate::{
+use crate::web::functions::{
+    general::get_domain,
+    ranking::{self},
+};
+use prieco_core::{
     globals::{
         EmbeddingService, PAGERANK, RERANKER, ROCKSDB_INDEX, SearchResult, TANTIVY_INDEX,
         TANTIVY_READER, TOP_DOMAINS, VECTOR_CENTROPOIDS, WebDocument, colors,
     },
-    web::functions::{
-        general::get_domain,
-        ranking::{self},
-    },
+    url_to_id,
 };
 
 /*
@@ -516,11 +517,6 @@ fn fetch_documents(id_score: Vec<(u64, f32)>, idx_type: &str) -> Vec<WebDocument
     documents
 }
 
-fn url_to_id(url: &str) -> u64 {
-    let mut h = XxHash3_64::with_seed(0);
-    h.write(url.as_bytes());
-    h.finish()
-}
 fn sanitize_string(s: &str) -> String {
     s.replace('"', "").replace('\'', "")
 }

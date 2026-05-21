@@ -3,10 +3,8 @@ use reqwest::Client;
 use serde_json::Value;
 use std::time::Duration;
 
-use crate::{
-    globals::{WebScrollResult, colors},
-    web::functions::general::call_api_future_json,
-};
+use crate::web::functions::general::call_api_future_json;
+use prieco_core::{WebScrollResult, colors};
 
 pub async fn run(
     query: &str,

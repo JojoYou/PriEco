@@ -30,7 +30,10 @@ use tar::Archive;
 /*
   Import own libraries
 */
-use crate::globals::{BLOB_IMPORT_DIR, BLOB_STORAGE, colors, icons};
+use prieco_core::{
+    BLOB_IMPORT_DIR, BLOB_STORAGE,
+    globals::{colors, icons},
+};
 
 pub fn run() {
     match find_next_directory() {

@@ -28,10 +28,8 @@ use zstd::Decoder;
 /*
   Import own libraries
 */
-use crate::{
-    globals::icons,
-    pagerank::compute::{CSR_EDGES, CSR_OFFSETS, OUT_DEGREE, SCORES_A, SCORES_B, zstd_reader},
-};
+use crate::compute::{CSR_EDGES, CSR_OFFSETS, OUT_DEGREE, SCORES_A, SCORES_B, zstd_reader};
+use prieco_core::globals::icons;
 
 /*
   Constants

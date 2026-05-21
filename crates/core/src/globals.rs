@@ -73,12 +73,9 @@ use zstd::decode_all;
 /*
   Import own libraries
 */
-use crate::{
-    insert::db_insert::{ID_SIZE, RECORD_SIZE},
-    normalize_url,
-    pagerank::compute::{FINAL_SCORES, ID_MAP_FILE},
-    set_up, url_to_id,
-};
+use crate::constants::{FINAL_SCORES, ID_MAP_FILE, ID_SIZE, RECORD_SIZE};
+use crate::helpers::{normalize_url, url_to_id};
+use crate::set_up;
 
 /*
   Constants
@@ -205,8 +202,8 @@ pub struct PriEcoConfig {
 /*
  Vector embeder
 */
-pub static VECTOR_EMBEDDING_TOKENIZER: &[u8] = include_bytes!("../data/tokenizer.json");
-pub static VECTOR_EMBEDDING_MODEL: &[u8] = include_bytes!("../data/model_int8.onnx");
+pub static VECTOR_EMBEDDING_TOKENIZER: &[u8] = include_bytes!("../../../data/tokenizer.json");
+pub static VECTOR_EMBEDDING_MODEL: &[u8] = include_bytes!("../../../data/model_int8.onnx");
 #[derive(Clone)]
 pub struct EmbeddingService {
     pub tokenizer: Arc<tokio::sync::Mutex<Tokenizer>>,
@@ -529,11 +526,10 @@ pub static TANTIVY_WRITER: Lazy<Arc<Mutex<IndexWriter>>> = Lazy::new(|| {
 /*
   Inserter
 */
-pub const INSERTER_IMPORT_DIR: &str = "results_import";
+pub const INSERTER_IMPORT_DIR: &str = "/mnt/ssd/results/imp";
 pub const TANTIVY_HEAP_SIZE: usize = 1_240_000_000;
-pub const VECTOR_DIM: usize = 384;
 
-pub static CENTROPOIDS_BIN: &[u8] = include_bytes!("../data/ivf/centroids.bin");
+pub static CENTROPOIDS_BIN: &[u8] = include_bytes!("../../../data/ivf/centroids.bin");
 
 pub static VECTOR_CENTROPOIDS: Lazy<Arc<CentroidIndex>> =
     Lazy::new(|| Arc::new(CentroidIndex::new(CENTROPOIDS_BIN).unwrap()));
@@ -974,8 +970,8 @@ impl PageRank {
 /*
   Reranker
 */
-pub static BGE_MODEL: &[u8] = include_bytes!("../data/bge/model.onnx");
-pub static BGE_TOKENIZER: &[u8] = include_bytes!("../data/bge/tokenizer.json");
+pub static BGE_MODEL: &[u8] = include_bytes!("../../../data/bge/model.onnx");
+pub static BGE_TOKENIZER: &[u8] = include_bytes!("../../../data/bge/tokenizer.json");
 pub static RERANKER: Lazy<Reranker> = Lazy::new(Reranker::new);
 
 pub struct Reranker {
@@ -1038,7 +1034,7 @@ pub static ARTISTS_DB: Lazy<Arc<Database>> =
 pub const ARTISTS_TABLE: TableDefinition<&str, &str> = TableDefinition::new("artists");
 
 pub static TOP_DOMAINS: Lazy<AHashSet<&'static str>> =
-    Lazy::new(|| include_str!("../data/domains.txt").lines().collect());
+    Lazy::new(|| include_str!("../../../data/domains.txt").lines().collect());
 
 /*
   Analytics

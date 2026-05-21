@@ -12,7 +12,6 @@
   TODO:
 */
 
-use tantivy::indexer::NoMergePolicy;
 /*
   Set global allovator
   Reason: Default was insufficient for deallocating RAM from crawler HTTP connections
@@ -55,18 +54,16 @@ use tokenizers::{PaddingDirection, PaddingParams, PaddingStrategy, Tokenizer};
 /*
   Import own libraries
 */
-use prieco_rs::{
-    blob,
-    globals::{
-        ANALYTICS, BLOB_STORAGE, EmbeddingService, PAGERANK, PRIECO_CONFIG, TANTIVY_READER,
-        TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_MODEL, VECTOR_EMBEDDING_TOKENIZER,
-        colors,
-        icons::{self},
-    },
-    insert::db_insert,
-    pagerank::{self},
-    web::routes::{apis::*, assets::*, pages::*},
+pub mod web;
+use crate::web::routes::{apis::*, assets::*, pages::*};
+use prieco_blob as blob;
+use prieco_core::{
+    ANALYTICS, BLOB_STORAGE, EmbeddingService, PAGERANK, PRIECO_CONFIG, TANTIVY_READER,
+    TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_MODEL, VECTOR_EMBEDDING_TOKENIZER, colors,
+    icons,
 };
+use prieco_insert::db_insert;
+use prieco_pagerank as pagerank;
 
 /*
   Set PriEco web server headers
@@ -223,9 +220,6 @@ fn thread_manager() {
     let _ = BLOB_STORAGE;
     let _ = TANTIVY_READER;
     let _ = TANTIVY_WRITER;
-    TANTIVY_WRITER
-        .lock()
-        .set_merge_policy(Box::new(NoMergePolicy));
     println!("Starting PageRank!");
     let _ = PAGERANK.read().get_score("https://www.google.com/");
     println!("Starting GPU!");

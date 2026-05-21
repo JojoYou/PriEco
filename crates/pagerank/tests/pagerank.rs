@@ -13,13 +13,13 @@ use std::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
-use prieco_rs::pagerank::{
+use prieco_core::{normalize_url, url_to_id};
+use prieco_pagerank::{
     compute::{read_u64_pair_zstd, zstd_reader, zstd_writer},
     import::{hashing, merge, translate},
     iter::iterate,
     nodes::csr,
 };
-use prieco_rs::url_to_id;
 
 // ── RAII cleanup guard ────────────────────────────────────────────────────────
 // Deletes the temp directory when dropped, even if the test panics.
@@ -64,7 +64,6 @@ fn write_pairs_zstd(path: &str, pairs: &[(u64, u64)]) {
         enc.write_all(&a.to_le_bytes()).unwrap();
         enc.write_all(&b.to_le_bytes()).unwrap();
     }
-    enc.finish().unwrap();
 }
 
 fn read_pairs_zstd(path: &str) -> Vec<(u64, u64)> {
@@ -117,11 +116,10 @@ fn compress_scores(src: &str, n: u64, dst: &str) {
         rdr.read_exact(&mut buf).unwrap();
         enc.write_all(&buf).unwrap();
     }
-    enc.finish().unwrap();
 }
 
 fn lookup_score(url: &str, id_map: &str, scores: &str) -> Option<f32> {
-    let target = url_to_id(url);
+    let target = url_to_id(&normalize_url(url));
     let map = read_id_map(id_map);
     let id = *map.get(&target)?;
     let mut dec = zstd_reader(scores).unwrap();

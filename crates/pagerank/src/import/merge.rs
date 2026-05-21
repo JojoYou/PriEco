@@ -10,9 +10,8 @@ use std::{
 /*
   Import own libraries
 */
-use crate::pagerank::compute::{
-    BUFFER_SIZE, ID_MAP_FILE, IdMap, MERGED_DIR, NODES_DIR, TOTAL_NODES, read_u64_pair,
-};
+use crate::compute::{BUFFER_SIZE, IdMap, MERGED_DIR, NODES_DIR, TOTAL_NODES, read_u64_pair};
+use prieco_core::ID_MAP_FILE;
 
 /*
   Description: Classical call, split like this so that the tests could call it with custom paths
@@ -120,7 +119,11 @@ pub fn run_with(
             };
 
             if last_seen != Some(nh) {
-                if old_map.as_ref().and_then(|m| m.lookup(nh)).is_none() {
+                if old_map
+                    .as_ref()
+                    .and_then(|m: &IdMap| m.lookup(nh))
+                    .is_none()
+                {
                     new_entries.push((nh, next_new_id));
                     next_new_id += 1;
                 }
@@ -133,7 +136,7 @@ pub fn run_with(
           Merge-write old mmap pairs + new_entries
         */
         let mut out = BufWriter::with_capacity(1 << 20, File::create(&merged_id_map)?);
-        let old_pairs = old_map.as_ref().map(|m| m.pairs()).unwrap_or(&[]);
+        let old_pairs = old_map.as_ref().map(|m: &IdMap| m.pairs()).unwrap_or(&[]);
         let mut oi = 0;
         let mut ni = 0;
 

@@ -1,4 +1,4 @@
-use crate::globals::WebDocument;
+use prieco_core::WebDocument;
 
 pub fn run(results: &mut Vec<WebDocument>, query: &str, lang: &str, loc: &str) {
     // Calculate custom ranking boost
