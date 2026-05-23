@@ -80,9 +80,9 @@ fn read_pairs_zstd(path: &str) -> Vec<(u64, u64)> {
 
 fn read_id_map(path: &str) -> HashMap<u64, u64> {
     let mut map = HashMap::new();
-    let mut dec = zstd_reader(path).unwrap();
+    let mut f = BufReader::new(File::open(path).unwrap());
     let mut buf = [0u8; 16];
-    while dec.read_exact(&mut buf).is_ok() {
+    while f.read_exact(&mut buf).is_ok() {
         let hash = u64::from_le_bytes(buf[0..8].try_into().unwrap());
         let id = u64::from_le_bytes(buf[8..16].try_into().unwrap());
         map.insert(hash, id);
@@ -96,6 +96,19 @@ fn write_connections(dir: &str, filename: &str, edges: &[(&str, &str)]) {
     for (a, b) in edges {
         writeln!(f, "{}->{}", a, b).unwrap();
     }
+}
+
+fn read_pairs_raw(path: &str) -> Vec<(u64, u64)> {
+    let mut out = Vec::new();
+    let mut f = BufReader::new(File::open(path).unwrap());
+    let mut buf = [0u8; 16];
+    while f.read_exact(&mut buf).is_ok() {
+        out.push((
+            u64::from_le_bytes(buf[0..8].try_into().unwrap()),
+            u64::from_le_bytes(buf[8..16].try_into().unwrap()),
+        ));
+    }
+    out
 }
 
 // ── Score helpers ─────────────────────────────────────────────────────────────
@@ -146,7 +159,7 @@ fn run_pipeline(tmp: &TmpDir, edges: &[(&str, &str)]) -> (u64, HashMap<String, f
 
     let id_map = format!("{}/id_map.bin.zst", tmp.path());
     let edges_s = format!("{}/edges_sorted.bin.zst", tmp.path());
-    let csr_off = format!("{}/csr_offsets.bin.zst", tmp.path());
+    let csr_off = format!("{}/csr_offsets.bin", tmp.path());
     let csr_e = format!("{}/csr_edges.bin", tmp.path());
     let out_deg = format!("{}/out_degree.bin.zst", tmp.path());
     let scores_a = format!("{}/scores_a.bin", tmp.path());
@@ -157,6 +170,7 @@ fn run_pipeline(tmp: &TmpDir, edges: &[(&str, &str)]) -> (u64, HashMap<String, f
     // Phase 1
     let hash_shards = hashing::run_in(&conn_dir, &edges_dir).unwrap();
     let n = merge::run_with(&hash_shards, &id_map, &nodes_dir, &merged_dir, &total_nodes).unwrap();
+    fs::write(&total_nodes, n.to_string()).unwrap();
     translate::run_with(hash_shards, &id_map, &edges_s, &edges_dir).unwrap();
 
     // Phase 2 — pass csr_dir so flush() writes shards there, not into csr_edges path
@@ -205,6 +219,8 @@ fn run_incremental(
     write_connections(&conn1, "c.txt", batch1);
     let sh1 = hashing::run_in(&conn1, &edges_dir).unwrap();
     let _ = merge::run_with(&sh1, &id_map, &tmp.sub("n1"), &tmp.sub("m1"), &total_nodes).unwrap();
+    let n1 = read_id_map(&id_map).len();
+    fs::write(&total_nodes, n1.to_string()).unwrap();
     translate::run_with(sh1, &id_map, &edges_s, &edges_dir).unwrap();
 
     // Batch 2
@@ -212,10 +228,11 @@ fn run_incremental(
     write_connections(&conn2, "c.txt", batch2);
     let sh2 = hashing::run_in(&conn2, &edges_dir).unwrap();
     let n = merge::run_with(&sh2, &id_map, &tmp.sub("n2"), &tmp.sub("m2"), &total_nodes).unwrap();
+    fs::write(&total_nodes, n.to_string()).unwrap();
     translate::run_with(sh2, &id_map, &edges_s, &edges_dir).unwrap();
 
     // Build and score
-    let csr_off = format!("{}/csr_offsets.bin.zst", tmp.path());
+    let csr_off = format!("{}/csr_offsets.bin", tmp.path());
     let csr_e = format!("{}/csr_edges.bin", tmp.path());
     let out_deg = format!("{}/out_degree.bin.zst", tmp.path());
     let scores_a = format!("{}/scores_a.bin", tmp.path());
@@ -335,7 +352,7 @@ fn hash_self_loops_not_included() {
     let conn = tmp.sub("conn");
     write_connections(&conn, "c.txt", &[("A", "A"), ("A", "B"), ("B", "B")]);
     let shards = hashing::run_in(&conn, &tmp.sub("edges")).unwrap();
-    let mut pairs: Vec<(u64, u64)> = shards.iter().flat_map(|s| read_pairs_zstd(s)).collect();
+    let mut pairs: Vec<(u64, u64)> = shards.iter().flat_map(|s| read_pairs_raw(s)).collect();
     pairs.sort_unstable();
     pairs.dedup();
     assert_eq!(pairs.len(), 1, "only A->B should survive");
@@ -348,10 +365,10 @@ fn hash_duplicate_edges_deduped_within_shard() {
     let edges: Vec<(&str, &str)> = vec![("X", "Y"); 20];
     write_connections(&conn, "c.txt", &edges);
     let shards = hashing::run_in(&conn, &tmp.sub("edges")).unwrap();
-    let mut all: Vec<(u64, u64)> = shards.iter().flat_map(|s| read_pairs_zstd(s)).collect();
-    all.sort_unstable();
-    all.dedup();
-    assert_eq!(all.len(), 1);
+    let mut pairs: Vec<(u64, u64)> = shards.iter().flat_map(|s| read_pairs_raw(s)).collect();
+    pairs.sort_unstable();
+    pairs.dedup();
+    assert_eq!(pairs.len(), 1);
 }
 
 #[test]
@@ -361,7 +378,7 @@ fn hash_multiple_connection_files() {
     write_connections(&conn, "c1.txt", &[("A", "B")]);
     write_connections(&conn, "c2.txt", &[("B", "C"), ("C", "A")]);
     let shards = hashing::run_in(&conn, &tmp.sub("edges")).unwrap();
-    let mut pairs: Vec<(u64, u64)> = shards.iter().flat_map(|s| read_pairs_zstd(s)).collect();
+    let mut pairs: Vec<(u64, u64)> = shards.iter().flat_map(|s| read_pairs_raw(s)).collect();
     pairs.sort_unstable();
     pairs.dedup();
     assert_eq!(pairs.len(), 3);
@@ -487,13 +504,18 @@ fn merge_incremental_preserves_existing_ids() {
     let id_map = format!("{}/id_map.bin.zst", tmp.path());
     let total_nodes = format!("{}/total_nodes.txt", tmp.path());
 
-    merge::run_with(&sh1, &id_map, &tmp.sub("n1"), &tmp.sub("m1"), &total_nodes).unwrap();
+    let n1 = merge::run_with(&sh1, &id_map, &tmp.sub("n1"), &tmp.sub("m1"), &total_nodes).unwrap();
+    std::fs::write(&total_nodes, n1.to_string()).unwrap();
+
     let map_before = read_id_map(&id_map);
 
     let conn2 = tmp.sub("conn2");
     write_connections(&conn2, "c.txt", &[("C", "D")]);
     let sh2 = hashing::run_in(&conn2, &tmp.sub("e2")).unwrap();
-    merge::run_with(&sh2, &id_map, &tmp.sub("n2"), &tmp.sub("m2"), &total_nodes).unwrap();
+
+    let n2 = merge::run_with(&sh2, &id_map, &tmp.sub("n2"), &tmp.sub("m2"), &total_nodes).unwrap();
+    std::fs::write(&total_nodes, n2.to_string()).unwrap();
+
     let map_after = read_id_map(&id_map);
 
     for (hash, old_id) in &map_before {
@@ -515,11 +537,14 @@ fn merge_overlapping_batches_no_duplicate_ids() {
     let total_nodes = format!("{}/total_nodes.txt", tmp.path());
 
     let n1 = merge::run_with(&sh1, &id_map, &tmp.sub("n1"), &tmp.sub("m1"), &total_nodes).unwrap();
+    std::fs::write(&total_nodes, n1.to_string()).unwrap();
 
     let conn2 = tmp.sub("conn2");
     write_connections(&conn2, "c.txt", &[("B", "C"), ("C", "D")]);
     let sh2 = hashing::run_in(&conn2, &tmp.sub("e2")).unwrap();
+
     let n2 = merge::run_with(&sh2, &id_map, &tmp.sub("n2"), &tmp.sub("m2"), &total_nodes).unwrap();
+    std::fs::write(&total_nodes, n2.to_string()).unwrap();
 
     assert_eq!(n1, 3);
     assert_eq!(n2, 4);
@@ -639,22 +664,25 @@ fn build_csr_for_test(
 
     let offsets: Vec<u64> = {
         let mut v = Vec::new();
-        let mut dec = zstd_reader(&csr_off).unwrap();
-        let mut buf = [0u8; 8];
-        while dec.read_exact(&mut buf).is_ok() {
-            v.push(u64::from_le_bytes(buf));
-        }
-        v
-    };
-    let csr_edges: Vec<u64> = {
-        let mut v = Vec::new();
-        let mut f = BufReader::new(File::open(&csr_e).unwrap());
+        let mut f = BufReader::new(File::open(&csr_off).unwrap());
         let mut buf = [0u8; 8];
         while f.read_exact(&mut buf).is_ok() {
             v.push(u64::from_le_bytes(buf));
         }
         v
     };
+
+    let csr_edges: Vec<u64> = {
+        let mut v = Vec::new();
+        // Change from BufReader to zstd_reader
+        let mut dec = zstd_reader(&csr_e).unwrap();
+        let mut buf = [0u8; 8];
+        while dec.read_exact(&mut buf).is_ok() {
+            v.push(u64::from_le_bytes(buf));
+        }
+        v
+    };
+
     let out_degree: Vec<u32> = {
         let mut v = Vec::new();
         let mut dec = zstd_reader(&out_deg).unwrap();

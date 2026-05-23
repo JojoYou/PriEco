@@ -1,21 +1,10 @@
-[package]
-name = "prieco_rs"
-version = "3.0.0"
-authors = ["Roman Láncoš <support@prieco.net>"]
-edition = "2024"
-
-readme = "README.md"
-license-file = "LICENSE"
-
-repository = "https://codeberg.org/JojoYou/PriEco"
-homepage = "https://prieco.net"
-
 [workspace]
 members = [
     "crates/core",
     "crates/blob",
     "crates/pagerank",
-    "crates/insert"
+    "crates/insert",
+    "crates/web"
 ]
 resolver = "2"
 
@@ -34,10 +23,10 @@ lto = true
 
 [workspace.dependencies]
 # Mapping
-prieco-core = { path = "crates/core" }
-prieco-blob = { path = "crates/blob" }
-prieco-pagerank = { path = "crates/pagerank" }
-prieco-insert = { path = "crates/insert" }
+prieco_core = { path = "crates/core" }
+prieco_blob = { path = "crates/blob" }
+prieco_pagerank = { path = "crates/pagerank" }
+prieco_insert = { path = "crates/insert" }
 
 # Essentials
 tikv-jemallocator = "0.6.0" # Memory allocator
@@ -87,39 +76,3 @@ zstd = "0.13.3" # Zstandard compression
 mime_guess = "2.0.5"
 chrono = "0.4.43" # Datetime
 image = "0.25.8" # Image manipulation
-
-
-[features]
-default = []
-cuda = ["prieco-insert/cuda", "prieco-pagerank/cuda"]  # Compile:  RUSTFLAGS='-C target-cpu=native' cargo build --release --features cuda
-
-
-[dependencies]
-prieco-core = { workspace = true }
-prieco-blob = { workspace = true }
-prieco-pagerank = { workspace = true }
-prieco-insert = { workspace = true }
-
-rocket = { workspace = true }
-rocket_dyn_templates = { workspace = true }
-tikv-jemallocator = { workspace = true }
-num_cpus = { workspace = true }
-dotenv_codegen = { workspace = true }
-reqwest = { workspace = true }
-rand = { workspace = true }
-socket2 = { workspace = true }
-brotli = { workspace = true }
-urlencoding = { workspace = true }
-image = { workspace = true }
-libc = { workspace = true }
-ort = { workspace = true }
-tokenizers = { workspace = true }
-chrono = { workspace = true }
-serde_json = { workspace = true }
-twox-hash = { workspace = true }
-url = { workspace = true }
-ahash = { workspace = true }
-tantivy = { workspace = true }
-tokio = { workspace = true }
-serde = { workspace = true }
-redb = { workspace = true }

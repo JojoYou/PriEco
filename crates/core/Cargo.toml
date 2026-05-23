@@ -1,7 +1,14 @@
 [package]
-name = "prieco-core"
+name = "prieco_core"
 version = "3.0.0"
+authors = ["Roman Láncoš <support@prieco.net>"]
 edition = "2024"
+
+readme = "README.md"
+license-file = "LICENSE"
+
+repository = "https://codeberg.org/JojoYou/PriEco"
+homepage = "https://prieco.net"
 
 [dependencies]
 # Inherit from workspace

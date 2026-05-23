@@ -78,11 +78,14 @@ pub struct IdMap {
 
 impl IdMap {
     pub fn open(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut dec = zstd_reader(path)?;
+        let mut f = BufReader::with_capacity(1 << 20, File::open(path)?);
         let mut pairs = Vec::new();
+        let mut buf = [0u8; 16];
 
-        while let Ok(Some(pair)) = read_u64_pair_zstd(&mut dec) {
-            pairs.push(pair);
+        while f.read_exact(&mut buf).is_ok() {
+            let hash = u64::from_le_bytes(buf[0..8].try_into().unwrap());
+            let id = u64::from_le_bytes(buf[8..16].try_into().unwrap());
+            pairs.push((hash, id));
         }
 
         Ok(Self { pairs })

@@ -1,10 +1,17 @@
 [package]
-name = "prieco-insert"
+name = "prieco_insert"
 version = "3.0.0"
+authors = ["Roman Láncoš <support@prieco.net>"]
 edition = "2024"
 
+readme = "README.md"
+license-file = "LICENSE"
+
+repository = "https://codeberg.org/JojoYou/PriEco"
+homepage = "https://prieco.net"
+
 [dependencies]
-prieco-core = { workspace = true }
+prieco_core = { workspace = true }
 
 ahash = { workspace = true }
 rayon = { workspace = true }
@@ -18,4 +25,4 @@ tokio = {workspace =true}
 
 [features]
 default = []
-cuda = ["prieco-core/cuda"]
+cuda = ["prieco_core/cuda"]

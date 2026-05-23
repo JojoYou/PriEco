@@ -467,7 +467,7 @@ fn flush(
     shards: &mut Vec<String>,
     scratch_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    buffer.sort_unstable_by_key(|p| p.0);
+    buffer.sort_unstable();
     let path = format!("{}/csr_shard_{}.bin.zst", scratch_dir, shards.len());
     let f = File::create(&path)?;
     let mut enc = Encoder::new(BufWriter::with_capacity(1 << 23, f), 3)?;

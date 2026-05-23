@@ -1,0 +1,45 @@
+[package]
+name = "prieco_web"
+version = "3.0.0"
+authors = ["Roman Láncoš <support@prieco.net>"]
+edition = "2024"
+
+readme = "README.md"
+license-file = "LICENSE"
+
+repository = "https://codeberg.org/JojoYou/PriEco"
+homepage = "https://prieco.net"
+
+[dependencies]
+prieco_core = { workspace = true }
+prieco_blob = { workspace = true }
+prieco_pagerank = { workspace = true }
+prieco_insert = { workspace = true }
+
+rocket = { workspace = true }
+rocket_dyn_templates = { workspace = true }
+tikv-jemallocator = { workspace = true }
+num_cpus = { workspace = true }
+dotenv_codegen = { workspace = true }
+reqwest = { workspace = true }
+rand = { workspace = true }
+socket2 = { workspace = true }
+brotli = { workspace = true }
+urlencoding = { workspace = true }
+image = { workspace = true }
+libc = { workspace = true }
+ort = { workspace = true }
+tokenizers = { workspace = true }
+chrono = { workspace = true }
+serde_json = { workspace = true }
+twox-hash = { workspace = true }
+url = { workspace = true }
+ahash = { workspace = true }
+tantivy = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+redb = { workspace = true }
+
+[features]
+default = []
+cuda = ["prieco_insert/cuda", "prieco_pagerank/cuda"]  # Compile:  RUSTFLAGS='-C target-cpu=native' cargo build --release --features cuda
