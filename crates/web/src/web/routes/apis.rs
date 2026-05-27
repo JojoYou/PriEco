@@ -20,6 +20,7 @@ use std::{fs::read_to_string, io::Cursor, path::Path};
 /*
   Import external libraries
 */
+use dotenv_codegen::dotenv;
 use image::GenericImageView;
 use reqwest::Client;
 use rocket::{
@@ -28,6 +29,7 @@ use rocket::{
     post,
     serde::json::{Json, Value as RocketValue},
 };
+use serde_json::json;
 
 /*
   Import own libraries
@@ -55,13 +57,29 @@ pub async fn api(
     q: &str,
     embedding_service: &State<EmbeddingService>,
 ) -> Json<Vec<RocketValue>> {
-    if !["IWaebywkZHaQikH9YfznSanMS9c2H8dHvAtlDWWzKSfWOu83DdVfidb5khjn"].contains(&a) {
+    if ![dotenv!("RESULTI_API_KEY"), dotenv!("URUKY_API_KEY")].contains(&a) {
         return Json(vec![]);
     }
 
     ANALYTICS.record_api_request();
 
-    let (_, results) = search_db::run_json(q, lang, loc, embedding_service).await;
+    let (_, full_results) = search_db::run_json(q, lang, loc, embedding_service).await;
+
+    let results: Vec<serde_json::Value> = full_results
+        .into_iter()
+        .map(|res| {
+            json!({
+                "url": res["url"],
+                "title": res["title"],
+                "description": res["description"],
+                "lang": res["lang"],
+                "loc": res["loc"],
+                "safe_s": res["safe_s"],
+                "image": res["image"]
+            })
+        })
+        .collect();
+
     Json(results)
 }
 
