@@ -288,6 +288,20 @@ pub async fn run_json(
     let mut results: Vec<WebDocument> =
         ranking::rrf::run(query, dir_results, tantivy_results, vector_results, 60.0);
 
+    // Temp remove blocked terms
+    let blocked_terms: &[&str] = &["porn"];
+    results.retain(|doc| {
+        let haystack = format!(
+            "{} {} {} {} {}",
+            doc.title.to_lowercase(),
+            doc.description.to_lowercase(),
+            doc.url.to_lowercase(),
+            doc.content.to_lowercase(),
+            doc.keywords.to_lowercase(),
+        );
+        !blocked_terms.iter().any(|term| haystack.contains(term))
+    });
+
     if results.is_empty() {
         println!("No results → confidence = 0.0 (force fallback)");
         return Vec::new();
