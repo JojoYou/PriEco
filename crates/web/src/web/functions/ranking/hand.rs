@@ -1,6 +1,59 @@
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::Path;
+use std::sync::RwLock;
+
 use prieco_core::WebDocument;
 
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+pub struct RankingWeights {
+    pub domain_match_boost: f64,
+    pub homepage_boost: f64,
+    pub lang_boost: f64,
+    pub loc_boost: f64,
+    pub tld_loc_boost: f64,
+    pub wiki_boost: f64,
+    pub https_boost: f64,
+    pub dev_com_boost: f64,
+    pub org_net_boost: f64,
+    pub bad_url_penalty: f64,
+    pub path_depth_penalty: f64,
+    pub confidence_multi: f64,
+    pub effort_multi: f64,
+}
+
+impl Default for RankingWeights {
+    fn default() -> Self {
+        Self {
+            domain_match_boost: 2.113558988326024,
+            homepage_boost: 1.4230979467849703,
+            lang_boost: 1.2899835972534415,
+            loc_boost: 1.2,
+            tld_loc_boost: 1.2,
+            wiki_boost: 1.601354822470506,
+            https_boost: 1.2711760497750604,
+            dev_com_boost: 1.04,
+            org_net_boost: 1.169052088311432,
+            bad_url_penalty: 1.024054745363097,
+            path_depth_penalty: 0.9781518099262154,
+            confidence_multi: 0.08486777149833168,
+            effort_multi: 0.08,
+        }
+    }
+}
+
+static ACTIVE_WEIGHTS: Lazy<RwLock<RankingWeights>> =
+    Lazy::new(|| RwLock::new(RankingWeights::default()));
+
 pub fn run(results: &mut Vec<WebDocument>, query: &str, lang: &str, loc: &str) {
+    // Training
+    check_for_updated_weights(); // PHP might have generated new weights to be tested
+    let weights = {
+        let w = ACTIVE_WEIGHTS.read().unwrap();
+        *w
+    };
+
     // Calculate custom ranking boost
     for doc in results.iter_mut() {
         let clean_url = strip_url_noise(&doc.url);
@@ -15,23 +68,24 @@ pub fn run(results: &mut Vec<WebDocument>, query: &str, lang: &str, loc: &str) {
             .and_then(|d| d.strip_prefix("www.").or(Some(d)))
             .and_then(|d| d.split('.').next())
             .unwrap_or("");
+
         if domain_root.eq_ignore_ascii_case(query) && clean_url.matches('/').count() <= 3 {
-            boost *= 2.2;
+            boost *= weights.domain_match_boost;
         }
 
         // Homepage
         if is_effectively_homepage(clean_url) {
-            boost *= 1.4;
+            boost *= weights.homepage_boost;
         }
 
         // Language
         if doc.lang == lang {
-            boost *= 1.4;
+            boost *= weights.lang_boost;
         }
 
         // Location
         if doc.loc == loc {
-            boost *= 1.2;
+            boost *= weights.loc_boost;
         }
         let tld_matches_loc = clean_url
             .split("://")
@@ -39,24 +93,24 @@ pub fn run(results: &mut Vec<WebDocument>, query: &str, lang: &str, loc: &str) {
             .and_then(|s| s.trim_end_matches('/').split('.').last())
             .map_or(false, |tld| tld.eq_ignore_ascii_case(loc));
         if tld_matches_loc {
-            boost *= 1.2;
+            boost *= weights.tld_loc_boost;
         }
 
         // Wikipedia authority signal
         if clean_url.contains(".wikipedia.org/wiki/") {
-            boost *= 1.3;
+            boost *= weights.wiki_boost;
         }
 
         // SSL
         if clean_url.starts_with("https://") {
-            boost *= 1.05;
+            boost *= weights.https_boost;
         }
 
         // TLD quality
         if clean_url.contains(".dev") || clean_url.contains(".com") {
-            boost *= 1.04;
+            boost *= weights.dev_com_boost;
         } else if clean_url.contains(".org") || clean_url.contains(".net") {
-            boost *= 1.02;
+            boost *= weights.org_net_boost;
         }
 
         // Load speed
@@ -69,12 +123,20 @@ pub fn run(results: &mut Vec<WebDocument>, query: &str, lang: &str, loc: &str) {
         };
 
         // Bad URL patterns
-        if clean_url.contains('_') || clean_url.contains(",,") || clean_url.contains(':') {
-            boost *= 0.9;
+        let url_body = clean_url.split("://").nth(1).unwrap_or(clean_url);
+        if url_body.contains('_') || url_body.contains(",,") || url_body.contains(':') {
+            boost *= weights.bad_url_penalty;
         }
 
-        boost *= 1.0 + sigmoid(doc.confidence as f64 / 200.0) * 0.15;
-        boost *= 1.0 + sigmoid(doc.effort as f64 / 200.0) * 0.08;
+        // Deep url
+        let path_depth = clean_url.matches('/').count();
+        if path_depth > 2 {
+            let extra_slashes = (path_depth - 2) as i32;
+            boost *= weights.path_depth_penalty.powi(extra_slashes);
+        }
+
+        boost *= 1.0 + sigmoid(doc.confidence as f64 / 200.0) * weights.confidence_multi;
+        boost *= 1.0 + sigmoid(doc.effort as f64 / 200.0) * weights.effort_multi;
 
         doc.search_score = (doc.search_score as f64 * boost) as f32;
     }
@@ -86,6 +148,26 @@ pub fn run(results: &mut Vec<WebDocument>, query: &str, lang: &str, loc: &str) {
     });
 }
 
+/* Training */
+fn check_for_updated_weights() {
+    let ready_path = Path::new("weights.ready");
+    let json_path = Path::new("weights.json");
+
+    if ready_path.exists() {
+        // PHP generated new weights to be tested
+        if let Ok(json_data) = fs::read_to_string(json_path) {
+            if let Ok(new_weights) = serde_json::from_str::<RankingWeights>(&json_data) {
+                if let Ok(mut current_weights) = ACTIVE_WEIGHTS.write() {
+                    *current_weights = new_weights;
+                    println!("⚡ PriEco swapped ranking weights.");
+                }
+            } else {
+                eprintln!("❌ Failed to parse weights.json format.");
+            }
+        }
+        let _ = fs::remove_file(ready_path); // Remove the trigger file to signal PHP to proceed
+    }
+}
 /* Helper functions */
 fn strip_url_noise(url: &str) -> &str {
     let url = url.split('?').next().unwrap_or(url);

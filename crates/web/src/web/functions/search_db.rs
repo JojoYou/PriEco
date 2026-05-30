@@ -26,6 +26,8 @@ use std::{
   Import external libraries
 */
 use ahash::AHashSet;
+use once_cell::sync::Lazy;
+use parking_lot::RwLock;
 use rocket::{State, serde::json::Json};
 use serde_json::Value as Json_Value;
 use tantivy::{collector::TopDocs, query::QueryParser, schema::Value};
@@ -54,6 +56,12 @@ const MAX_IVF: usize = 200;
 const NPROBS: usize = 4;
 const RERANK_CUTOFF: usize = 30;
 const MAX_PER_DOMAIN: usize = 5;
+
+/*
+  Structures
+*/
+pub static QUERY_CACHE: Lazy<RwLock<HashMap<String, Vec<WebDocument>>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
 /*
   Description: Gets database results and confidence score
@@ -136,34 +144,65 @@ pub async fn run_json(
     loc: &str,
     embedding_service: &State<EmbeddingService>,
 ) -> Vec<Json_Value> {
-    // Query to embed (vector)
-    let embed: Vec<f32> = match embedding_service.embed_query(&query).await {
-        Ok(embed) => embed,
-        Err(e) => {
-            println!(
-                "{}Failed to embed query!{}  {}",
-                colors::YELLOW,
-                colors::RESET,
-                e
-            );
-            return Vec::new();
-        }
+    // Cache
+    let cache_key = format!("{}_{}_{}", query, lang, loc);
+    let cached_data = {
+        let cache = QUERY_CACHE.read();
+        cache.get(&cache_key).cloned()
     };
 
-    let q_clone = query.to_string();
-    let mut q_clone2 = q_clone.clone();
-    let q_clone3 = q_clone.clone();
+    let mut results = if let Some(cached) = cached_data {
+        cached
+    } else {
+        // Query to embed (vector)
+        let embed: Vec<f32> = match embedding_service.embed_query(&query).await {
+            Ok(embed) => embed,
+            Err(e) => {
+                println!(
+                    "{}Failed to embed query!{}  {}",
+                    colors::YELLOW,
+                    colors::RESET,
+                    e
+                );
+                return Vec::new();
+            }
+        };
 
-    let total_start = Instant::now();
+        let q_clone = query.to_string();
+        let mut q_clone2 = q_clone.clone();
+        let q_clone3 = q_clone.clone();
 
-    let dir_task = tokio::task::spawn_blocking(move || {
-        let start = Instant::now();
-        let trimmed = sanitize_string(q_clone.trim()).to_lowercase();
-        let mut id_score_vec: Vec<(u64, f32)> = Vec::new();
+        let total_start = Instant::now();
 
-        // Filter: site:
-        if trimmed.starts_with("site:") {
-            let domain = trimmed.to_lowercase().replace("site:", "");
+        let dir_task = tokio::task::spawn_blocking(move || {
+            let start = Instant::now();
+            let trimmed = sanitize_string(q_clone.trim()).to_lowercase();
+            let mut id_score_vec: Vec<(u64, f32)> = Vec::new();
+
+            // Filter: site:
+            if trimmed.starts_with("site:") {
+                let domain = trimmed.to_lowercase().replace("site:", "");
+                let prefixes = [
+                    "",
+                    "www.",
+                    "http://",
+                    "http://www.",
+                    "https://",
+                    "https://www.",
+                ];
+                for prefix in &prefixes {
+                    let url = format!("{}{}/", prefix, domain);
+                    let id = url_to_id(&url);
+                    id_score_vec.push((id, 0.0));
+                }
+                return fetch_documents(id_score_vec, "DIR");
+            }
+
+            let tlds = [
+                ".com", ".net", ".org", ".io", ".co", ".dev", ".app", ".ai", ".info", ".biz",
+                ".me", ".tv", ".us", ".uk", ".ca", ".de", ".fr", ".nl", ".eu", ".xyz", ".tech",
+                ".online", ".site",
+            ];
             let prefixes = [
                 "",
                 "www.",
@@ -172,135 +211,124 @@ pub async fn run_json(
                 "https://",
                 "https://www.",
             ];
-            for prefix in &prefixes {
-                let url = format!("{}{}/", prefix, domain);
-                let id = url_to_id(&url);
-                id_score_vec.push((id, 0.0));
+            for tld in &tlds {
+                for prefix in &prefixes {
+                    let url = format!("{}{}{}/", prefix, trimmed, tld);
+                    let id = url_to_id(&url);
+                    id_score_vec.push((id, 0.0));
+                }
             }
-            return fetch_documents(id_score_vec, "DIR");
-        }
+            let results: Vec<WebDocument> = fetch_documents(id_score_vec, "DIR");
+            let elapsed = start.elapsed().as_secs_f32();
+            println!("DIR lookup took {elapsed:.3}s");
+            stdout().flush().ok();
 
-        let tlds = [
-            ".com", ".net", ".org", ".io", ".co", ".dev", ".app", ".ai", ".info", ".biz", ".me",
-            ".tv", ".us", ".uk", ".ca", ".de", ".fr", ".nl", ".eu", ".xyz", ".tech", ".online",
-            ".site",
-        ];
-        let prefixes = [
-            "",
-            "www.",
-            "http://",
-            "http://www.",
-            "https://",
-            "https://www.",
-        ];
-        for tld in &tlds {
-            for prefix in &prefixes {
-                let url = format!("{}{}{}/", prefix, trimmed, tld);
-                let id = url_to_id(&url);
-                id_score_vec.push((id, 0.0));
+            results
+        });
+
+        let tantivy_task = tokio::task::spawn_blocking(move || {
+            let start = Instant::now();
+
+            // Filter: site:
+            if q_clone2.starts_with("site:") {
+                q_clone2 = q_clone2.replace("site:", "");
+
+                q_clone2 = q_clone2
+                    .rsplit_once('.')
+                    .map(|(left, _)| left.to_string())
+                    .unwrap_or(q_clone2);
+                q_clone2 = q_clone2
+                    .rsplit_once('.')
+                    .map(|(_, right)| right.to_string())
+                    .unwrap_or(q_clone2);
             }
+
+            let res = search_tantivy(&q_clone2, MAX_FTS).unwrap_or_default();
+
+            let elapsed = start.elapsed().as_secs_f32();
+            println!("Tantivy took {elapsed:.3}s");
+            stdout().flush().ok();
+            res
+        });
+
+        let vector_task = tokio::task::spawn_blocking(move || {
+            if q_clone3.contains('"')
+                || q_clone3.contains("site:")
+                || q_clone3.contains("filetype:")
+                || q_clone3.contains("inurl:")
+                || q_clone3.contains("intitle:")
+                || q_clone3.starts_with('-')
+            {
+                return Vec::new();
+            }
+            let start = Instant::now();
+
+            // search vector DB
+            let mut s = Instant::now();
+            let res: Vec<(u64, f32)> = VECTOR_CENTROPOIDS
+                .search(&embed, 0, NPROBS)
+                .unwrap_or_default();
+            println!("Nprobs: {}", s.elapsed().as_secs_f32());
+            s = Instant::now();
+            let res_trimmed: Vec<(u64, f32)> = res.iter().take(MAX_IVF).cloned().collect();
+
+            let docs: Vec<WebDocument> = fetch_documents(res_trimmed, "IVF");
+            println!("Fetch docs: {}", s.elapsed().as_secs_f32());
+
+            let elapsed = start.elapsed().as_secs_f32();
+            println!("Vector search took {elapsed:.3}s");
+            stdout().flush().ok();
+
+            docs
+        });
+
+        let (tantivy_results, vector_id_similarity, dir_results) =
+            tokio::join!(tantivy_task, vector_task, dir_task);
+
+        let total_elapsed = total_start.elapsed().as_secs_f32();
+        println!("Total concurrent time {total_elapsed:.3}s");
+
+        let mut dir_results: Vec<WebDocument> = dir_results.unwrap();
+        let mut tantivy_results: Vec<WebDocument> = tantivy_results.unwrap();
+        let mut vector_results: Vec<WebDocument> = vector_id_similarity.unwrap();
+
+        // Sort each result vector in-place by search_score descending
+        dir_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+        tantivy_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+        vector_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+
+        println!("DIR: {}", dir_results.len());
+        println!("Tantivy: {}", tantivy_results.len());
+        println!("IVF: {}", vector_results.len());
+
+        // Stage: 1
+        // RRF Merge & Deduplicate
+        let mut results: Vec<WebDocument> =
+            ranking::rrf::run(query, dir_results, tantivy_results, vector_results, 60.0);
+
+        // Temp remove blocked terms
+        let blocked_terms: &[&str] = &["porn"];
+        results.retain(|doc| {
+            let haystack = format!(
+                "{} {} {} {} {}",
+                doc.title.to_lowercase(),
+                doc.description.to_lowercase(),
+                doc.url.to_lowercase(),
+                doc.content.to_lowercase(),
+                doc.keywords.to_lowercase(),
+            );
+            !blocked_terms.iter().any(|term| haystack.contains(term))
+        });
+        {
+            let mut cache = QUERY_CACHE.write();
+            if cache.len() > 10_000 {
+                cache.clear();
+            }
+            cache.insert(cache_key, results.clone());
         }
-        let results: Vec<WebDocument> = fetch_documents(id_score_vec, "DIR");
-        let elapsed = start.elapsed().as_secs_f32();
-        println!("DIR lookup took {elapsed:.3}s");
-        stdout().flush().ok();
 
         results
-    });
-
-    let tantivy_task = tokio::task::spawn_blocking(move || {
-        let start = Instant::now();
-
-        // Filter: site:
-        if q_clone2.starts_with("site:") {
-            q_clone2 = q_clone2.replace("site:", "");
-
-            q_clone2 = q_clone2
-                .rsplit_once('.')
-                .map(|(left, _)| left.to_string())
-                .unwrap_or(q_clone2);
-            q_clone2 = q_clone2
-                .rsplit_once('.')
-                .map(|(_, right)| right.to_string())
-                .unwrap_or(q_clone2);
-        }
-
-        let res = search_tantivy(&q_clone2, MAX_FTS).unwrap_or_default();
-
-        let elapsed = start.elapsed().as_secs_f32();
-        println!("Tantivy took {elapsed:.3}s");
-        stdout().flush().ok();
-        res
-    });
-
-    let vector_task = tokio::task::spawn_blocking(move || {
-        if q_clone3.contains('"')
-            || q_clone3.contains("site:")
-            || q_clone3.contains("filetype:")
-            || q_clone3.contains("inurl:")
-            || q_clone3.contains("intitle:")
-            || q_clone3.starts_with('-')
-        {
-            return Vec::new();
-        }
-        let start = Instant::now();
-
-        // search vector DB
-        let mut s = Instant::now();
-        let res: Vec<(u64, f32)> = VECTOR_CENTROPOIDS
-            .search(&embed, 0, NPROBS)
-            .unwrap_or_default();
-        println!("Nprobs: {}", s.elapsed().as_secs_f32());
-        s = Instant::now();
-        let res_trimmed: Vec<(u64, f32)> = res.iter().take(MAX_IVF).cloned().collect();
-
-        let docs: Vec<WebDocument> = fetch_documents(res_trimmed, "IVF");
-        println!("Fetch docs: {}", s.elapsed().as_secs_f32());
-
-        let elapsed = start.elapsed().as_secs_f32();
-        println!("Vector search took {elapsed:.3}s");
-        stdout().flush().ok();
-
-        docs
-    });
-
-    let (tantivy_results, vector_id_similarity, dir_results) =
-        tokio::join!(tantivy_task, vector_task, dir_task);
-
-    let total_elapsed = total_start.elapsed().as_secs_f32();
-    println!("Total concurrent time {total_elapsed:.3}s");
-
-    let mut dir_results: Vec<WebDocument> = dir_results.unwrap();
-    let mut tantivy_results: Vec<WebDocument> = tantivy_results.unwrap();
-    let mut vector_results: Vec<WebDocument> = vector_id_similarity.unwrap();
-
-    // Sort each result vector in-place by search_score descending
-    dir_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
-    tantivy_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
-    vector_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
-
-    println!("DIR: {}", dir_results.len());
-    println!("Tantivy: {}", tantivy_results.len());
-    println!("IVF: {}", vector_results.len());
-
-    // Stage: 1
-    // RRF Merge & Deduplicate
-    let mut results: Vec<WebDocument> =
-        ranking::rrf::run(query, dir_results, tantivy_results, vector_results, 60.0);
-
-    // Temp remove blocked terms
-    let blocked_terms: &[&str] = &["porn"];
-    results.retain(|doc| {
-        let haystack = format!(
-            "{} {} {} {} {}",
-            doc.title.to_lowercase(),
-            doc.description.to_lowercase(),
-            doc.url.to_lowercase(),
-            doc.content.to_lowercase(),
-            doc.keywords.to_lowercase(),
-        );
-        !blocked_terms.iter().any(|term| haystack.contains(term))
-    });
+    };
 
     if results.is_empty() {
         println!("No results → confidence = 0.0 (force fallback)");

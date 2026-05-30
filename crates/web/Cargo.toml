@@ -39,6 +39,8 @@ tantivy = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 redb = { workspace = true }
+once_cell = { workspace = true }
+parking_lot = { workspace = true }
 
 [features]
 default = []
