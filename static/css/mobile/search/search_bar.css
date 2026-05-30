@@ -136,3 +136,7 @@
 .type_active img {
   filter: invert(56%) sepia(24%) saturate(1094%) hue-rotate(133deg) brightness(97%) contrast(84%) !important;
 }
+
+.type_btns form {
+  visibility: hidden;
+}

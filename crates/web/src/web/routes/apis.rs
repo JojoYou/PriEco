@@ -63,7 +63,7 @@ pub async fn api(
 
     ANALYTICS.record_api_request();
 
-    let (_, full_results) = search_db::run_json(q, lang, loc, embedding_service).await;
+    let full_results = search_db::run_json(q, lang, loc, embedding_service).await;
 
     let results: Vec<serde_json::Value> = full_results
         .into_iter()

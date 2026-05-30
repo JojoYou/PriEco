@@ -67,8 +67,8 @@ pub async fn run(
     lang: &str,
     loc: &str,
     embedding_service: &State<EmbeddingService>,
-) -> f64 {
-    let (confidence_score, local_results) = run_json(q, lang, loc, embedding_service).await; // Get results from database
+) {
+    let local_results = run_json(q, lang, loc, embedding_service).await; // Get results from database
 
     // Create final results
     if let Some(arr) = Json(Json_Value::from(local_results)).as_array() {
@@ -122,8 +122,6 @@ pub async fn run(
             });
         }
     }
-
-    confidence_score // Return confidence score
 }
 
 /*
@@ -137,7 +135,7 @@ pub async fn run_json(
     lang: &str,
     loc: &str,
     embedding_service: &State<EmbeddingService>,
-) -> (f64, Vec<Json_Value>) {
+) -> Vec<Json_Value> {
     // Query to embed (vector)
     let embed: Vec<f32> = match embedding_service.embed_query(&query).await {
         Ok(embed) => embed,
@@ -148,7 +146,7 @@ pub async fn run_json(
                 colors::RESET,
                 e
             );
-            return (0.0, Vec::new());
+            return Vec::new();
         }
     };
 
@@ -292,7 +290,7 @@ pub async fn run_json(
 
     if results.is_empty() {
         println!("No results → confidence = 0.0 (force fallback)");
-        return (0.0, Vec::new());
+        return Vec::new();
     }
 
     // Stage: 2
@@ -343,10 +341,7 @@ pub async fn run_json(
     }
 
     // Trim results
-    let shown_results = results.iter().take(20).cloned().collect();
-
-    // Calculate confidence score of the results to know if call external APIs
-    let confidence = calculate_confidence(&shown_results, lang, loc);
+    let shown_results: Vec<_> = results.iter().take(20).cloned().collect();
     let serialized_sites: Vec<_> = shown_results
         .into_iter()
         .filter_map(|s| match serde_json::to_value(s) {
@@ -363,57 +358,7 @@ pub async fn run_json(
         })
         .collect();
 
-    (confidence, serialized_sites)
-}
-
-fn calculate_confidence(sites: &Vec<WebDocument>, lang: &str, loc: &str) -> f64 {
-    let mut confidence_score = 0.0;
-    // -------------- Language ---------------
-    let mut incorrect_lang = 0;
-    // ---------- Domain Diversity ----------
-    let mut unique_domains: AHashSet<String> = AHashSet::with_capacity(sites.len());
-    for result in sites.iter() {
-        if lang != "all" && lang != result.lang {
-            incorrect_lang += 1;
-        }
-        let domain = get_domain(&result.url, true);
-        unique_domains.insert(domain);
-    }
-    let domain_ratio = unique_domains.len() as f64 / sites.len() as f64;
-
-    confidence_score += (domain_ratio.min(1.0)) * 0.4; // Weight: 0.4
-
-    let correct_lang = sites.len() - incorrect_lang;
-    let lang_ratio = (correct_lang.min(10) as f64) / 10.0;
-    confidence_score += lang_ratio.min(1.0) * 0.4;
-
-    // ---------- Authority (Top Domains) ----------
-    let mut top_domains_count = 0;
-    for domain in &unique_domains {
-        if TOP_DOMAINS.contains(domain.as_str()) {
-            top_domains_count += 1;
-        }
-    }
-    let authority_ratio = top_domains_count as f64 / sites.len() as f64;
-    // Weight: 0.3
-    confidence_score += (authority_ratio.min(1.0)) * 0.3;
-
-    // ---------- Score Drop Ratio ----------
-    let scores: Vec<f64> = sites.iter().map(|r| r.search_score as f64).collect();
-
-    let mut drop_score = 0.0;
-    if scores.len() >= 4 {
-        let mid = scores.len() / 2;
-        let first_half_avg = scores[..mid].iter().sum::<f64>() / mid as f64;
-        let second_half_avg = scores[mid..].iter().sum::<f64>() / (scores.len() - mid) as f64;
-        let ratio = first_half_avg / second_half_avg;
-        // Cap at 3.0 so extreme values don’t dominate
-        drop_score = ratio.min(3.0) / 3.0;
-    }
-    // Weight: 0.3
-    confidence_score += drop_score * 0.3;
-
-    confidence_score
+    serialized_sites
 }
 
 /* Index search functions */
