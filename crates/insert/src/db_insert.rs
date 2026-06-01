@@ -242,6 +242,13 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
         println!("{}: Removed {}", icons::DB_INSERT, file_name);
     }
 
+    println!("{}: Merging tantivy...", icons::DB_INSERT);
+    let segments = TANTIVY_INDEX.searchable_segments()?;
+    let segment_ids: Vec<SegmentId> = segments.iter().map(|s| s.id()).collect();
+    let mut writer = TANTIVY_WRITER.lock();
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(writer.merge(&segment_ids))?;
+
     if !file_exists(SKIP_MERGE_FILE) {
         println!(
             "{}: Merging staging files into buckets...",
