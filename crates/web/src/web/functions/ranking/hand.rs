@@ -26,18 +26,18 @@ pub struct RankingWeights {
 impl Default for RankingWeights {
     fn default() -> Self {
         Self {
-            domain_match_boost: 2.113558988326024,
-            homepage_boost: 1.4230979467849703,
-            lang_boost: 1.2899835972534415,
-            loc_boost: 1.2,
+            domain_match_boost: 2.164824041987222,
+            homepage_boost: 1.6227153067582822,
+            lang_boost: 1.2422396900328991,
+            loc_boost: 0.9794162380413227,
             tld_loc_boost: 1.2,
-            wiki_boost: 1.601354822470506,
-            https_boost: 1.2711760497750604,
+            wiki_boost: 1.3977276102163492,
+            https_boost: 1.2874976244929701,
             dev_com_boost: 1.04,
-            org_net_boost: 1.169052088311432,
-            bad_url_penalty: 1.024054745363097,
-            path_depth_penalty: 0.9781518099262154,
-            confidence_multi: 0.08486777149833168,
+            org_net_boost: 1.02,
+            bad_url_penalty: 1.1601573817712056,
+            path_depth_penalty: 1.096907068787565,
+            confidence_multi: 0.01,
             effort_multi: 0.08,
         }
     }
