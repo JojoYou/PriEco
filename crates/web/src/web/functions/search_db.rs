@@ -321,7 +321,7 @@ pub async fn run_json(
         });
         {
             let mut cache = QUERY_CACHE.write();
-            if cache.len() > 10_000 {
+            if cache.len() > 5_000 {
                 cache.clear();
             }
             cache.insert(cache_key, results.clone());

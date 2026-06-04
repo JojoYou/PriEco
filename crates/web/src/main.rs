@@ -250,7 +250,7 @@ fn thread_manager() {
                         colors::RESET
                     );
                 };
-                sleep(Duration::from_hours(3));
+                sleep(Duration::from_mins(1));
             }
         })
     };

@@ -100,9 +100,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     let keywords_field = TANTIVY_INDEX.schema().get_field("keywords").unwrap();
     let safe_s_field = TANTIVY_INDEX.schema().get_field("safe_s").unwrap();
 
-    // Create local RocksDB writer
-    let mut rocksdb_write_opts = WriteOptions::default();
-    rocksdb_write_opts.disable_wal(true);
+    // Create local RocksDB batch
     let mut rocksdb_batch = WriteBatch::default();
     let mut batch_ids: AHashSet<u64> = AHashSet::with_capacity(2_000); // Monitoring batch
 
@@ -199,7 +197,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
 
                 inserted += 1;
                 if inserted % 1_000 == 0 {
-                    ROCKSDB_INDEX.write_opt(rocksdb_batch, &rocksdb_write_opts)?;
+                    ROCKSDB_INDEX.write(rocksdb_batch)?;
                     rocksdb_batch = WriteBatch::default();
                     batch_ids.clear();
                     println!("{}: Inserted {}", icons::DB_INSERT, inserted);
@@ -221,9 +219,10 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
             batch_ids.clear();
 
             if !rocksdb_batch.is_empty() {
-                ROCKSDB_INDEX.write_opt(rocksdb_batch, &rocksdb_write_opts)?;
+                ROCKSDB_INDEX.write(rocksdb_batch)?;
                 rocksdb_batch = WriteBatch::default();
             }
+            ROCKSDB_INDEX.flush()?;
             println!("{}: RocksDB commited", icons::DB_INSERT);
 
             TANTIVY_WRITER.lock().commit()?;
@@ -241,13 +240,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
         remove_file(file_name)?;
         println!("{}: Removed {}", icons::DB_INSERT, file_name);
     }
-
-    println!("{}: Merging tantivy...", icons::DB_INSERT);
-    let segments = TANTIVY_INDEX.searchable_segments()?;
-    let segment_ids: Vec<SegmentId> = segments.iter().map(|s| s.id()).collect();
-    let mut writer = TANTIVY_WRITER.lock();
-    let rt = tokio::runtime::Runtime::new()?;
-    rt.block_on(writer.merge(&segment_ids))?;
 
     if !file_exists(SKIP_MERGE_FILE) {
         println!(
