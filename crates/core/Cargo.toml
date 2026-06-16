@@ -20,7 +20,6 @@ ahash = { workspace = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }
 
-# globals.rs requires these:
 redb = { workspace = true }
 rocksdb = { workspace = true }
 tantivy = { workspace = true }

@@ -1,0 +1,31 @@
+[package]
+name = "prieco_mini_crawler"
+version = "3.0.0"
+authors = ["Roman Láncoš <support@prieco.net>"]
+edition = "2024"
+
+readme = "README.md"
+license-file = "LICENSE"
+
+repository = "https://codeberg.org/JojoYou/PriEco"
+homepage = "https://prieco.net"
+
+[dependencies]
+prieco_core = { workspace = true }
+
+tokio = { workspace = true }
+serde = { workspace = true }
+scraper = { workspace = true }
+ahash = { workspace = true }
+reqwest = { workspace = true }
+zstd = { workspace = true }
+bincode-next = { workspace = true }
+parking_lot = { workspace = true }
+url = { workspace = true }
+once_cell = { workspace = true }
+chrono = { workspace = true }
+regex = { workspace = true }
+whatlang = { workspace = true }
+dashmap = { workspace = true }
+maxminddb = { workspace = true }
+dotenv_codegen = { workspace = true }

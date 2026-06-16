@@ -40,7 +40,6 @@ use crate::web::{
 };
 use prieco_core::{
     globals::{ANALYTICS, EmbeddingService, UserAgent},
-    read_file,
 };
 
 /*

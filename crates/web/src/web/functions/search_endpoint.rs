@@ -20,7 +20,7 @@ use std::collections::HashMap;
 /*
   Import external libraries
 */
-use rocket::{State, serde::json::Json};
+use rocket::{State};
 use serde_json::{Value, json};
 
 /*
@@ -63,7 +63,7 @@ pub async fn run(
             context.insert(String::from("new_results"), json!(true));
             match news::run(q, lang, loc, 50).await {
                 Ok(n) => context.insert(String::from("news"), json!(&n)),
-                Err(e) => context.insert(
+                Err(_) => context.insert(
                     String::from("news"),
                     json!([{
                         "title": "No news found",

@@ -4,7 +4,8 @@ members = [
     "crates/blob",
     "crates/pagerank",
     "crates/insert",
-    "crates/web"
+    "crates/web",
+    "crates/crawler"
 ]
 resolver = "2"
 
@@ -27,6 +28,7 @@ prieco_core = { path = "crates/core" }
 prieco_blob = { path = "crates/blob" }
 prieco_pagerank = { path = "crates/pagerank" }
 prieco_insert = { path = "crates/insert" }
+prieco_mini_crawler = { path = "crates/crawler" }
 
 # Essentials
 tikv-jemallocator = "0.6.0" # Memory allocator
@@ -34,9 +36,9 @@ dotenv_codegen = "0.15.0" # .env file
 num_cpus = "1.17.0" # Number of CPU cores
 once_cell = "1.20.3" # Global variables
 parking_lot = "0.12.5" # Global variables mutexes
-reqwest = { version = "0.12.23", features = ["json", "gzip", "brotli", "deflate"] } # Out HTTP reqvest client
+reqwest = { version = "0.12.23", features = ["json", "gzip", "brotli", "deflate",   "blocking", "cookies", "rustls-tls"] } # Out HTTP reqvest client
 rand = { version = "0.9.0", features = ["std", "std_rng"] } # Random number generator
-dashmap = "6.1.0"# Multi threaded hashmap
+dashmap = "6.1.0" # Multi threaded hashmap
 rayon = "1.11.0" # Paralel code execution
 memmap2 = "0.9.10"
 libc = "0.2.186"
@@ -65,6 +67,13 @@ tokenizers = "0.21.1" # Ort model tokenizer
 cudarc = { version = "0.19.2",  features = ["cublas", "nvrtc", "cuda-version-from-build-system"] } # Nvidia GPU, used for comparing cosine distance between vectors
 ndarray = "0.15.1"
 bytemuck = "1.25.0"
+
+# Mini crawler
+bincode-next = { version = "2.1.0", features = ["serde"] }
+scraper = "0.23.1" # HTML management
+regex = "1.11.1" # Regular expressions
+whatlang = "0.16.4"  # Language detection from text
+maxminddb = "0.24.0" # Reading Maxmind DB for IP to country
 
 # Tools
 ahash = "0.8.12"      # Faster single threaded hashmap

@@ -19,6 +19,7 @@
 */
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
+use tokio::runtime::Runtime;
 #[cfg(not(target_env = "msvc"))]
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
@@ -63,6 +64,7 @@ use prieco_core::{
     icons,
 };
 use prieco_insert::db_insert;
+use prieco_mini_crawler::mini_crawler;
 use prieco_pagerank as pagerank;
 
 /*
@@ -138,10 +140,11 @@ async fn rocket() -> _ {
     );
     println!("Info:");
     println!(
-        "{}: Blob storage\n{}: Database inserter\n{}: Pagerank\n",
+        "{}: Blob storage\n{}: Database inserter\n{}: Pagerank\n{}: Mini crawler\n",
         icons::BLOB,
         icons::DB_INSERT,
-        icons::PAGERANK_ICON
+        icons::PAGERANK_ICON,
+        icons::MINI_CRAWLER_ICON
     );
 
     // Load config
@@ -220,8 +223,7 @@ fn thread_manager() {
     let _ = BLOB_STORAGE;
     let _ = TANTIVY_READER;
     let _ = TANTIVY_WRITER;
-    println!("Starting PageRank!");
-    let _ = PAGERANK.read().get_score("https://www.google.com/");
+    let _ = PAGERANK;
     println!("Starting GPU!");
     let _ = VECTOR_CENTROPOIDS.search(&vec![0.0; 384], 1, 1);
 
@@ -230,7 +232,7 @@ fn thread_manager() {
         spawn(move || {
             while !stop_requested() {
                 blob::run();
-                sleep(Duration::from_hours(3));
+                sleep(Duration::from_mins(1));
             }
         })
     };
@@ -265,9 +267,24 @@ fn thread_manager() {
         })
     };
 
+    // Mini crawler
+    let mini_crawler_thread = {
+        spawn(move || {
+            let rt = Runtime::new().expect("Failed to create Tokio runtime for mini crawler");
+
+            while !stop_requested() {
+                rt.block_on(async {
+                    crate::mini_crawler::run().await;
+                });
+            }
+        })
+    };
+
     let _ = blob_thread.join();
     let _ = insert_thread.join();
     let _ = pagerank_thread.join();
+    let _ = mini_crawler_thread.join();
+
     println!("{}Threads finished!{}", colors::GREEN, colors::RESET);
 }
 

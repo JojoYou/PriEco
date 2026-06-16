@@ -23,7 +23,7 @@ use crate::globals::{PriEcoConfig, colors};
 use crate::helpers::file_exists;
 
 const CONFIG_FILE: &str = "settings.conf";
-const TOTAL_QUESTIONS: usize = 5;
+const TOTAL_QUESTIONS: usize = 7;
 
 pub fn set_up_wizard() -> PriEcoConfig {
     let mut conf = PriEcoConfig {
@@ -32,6 +32,8 @@ pub fn set_up_wizard() -> PriEcoConfig {
         tantivy_path: String::from("idx/tantivy"),
         rocksdb_path: String::from("idx/rocksdb"),
         vector_path: String::from("idx/vectors"),
+        worker_id: String::new(),
+        worker_concurrent: 1,
     };
 
     if file_exists(CONFIG_FILE) {
@@ -42,9 +44,12 @@ pub fn set_up_wizard() -> PriEcoConfig {
     }
 
     println!("Hi beautiful human being 👋");
-    println!("Let's get PriEco set up. I am going to ask you 4 questions. I promise it's simple.");
+    println!(
+        "Let's get PriEco set up. I am going to ask you {} questions. I promise it's simple.",
+        TOTAL_QUESTIONS
+    );
     conf.ip=  match ask(&format!(
- "\n🗨 1/{}: Tell me my IP address. You can use 0.0.0.0 or 127.0.0.1 or something else if you know what you're doing.\n0.0.0.0 (Default if you just press enter) (Let's anyone on your locale network connect to this instance)\n127.0.0.1 (Connection can be established only from current device)\nYou will want to link public domain to this regardless\n\nWhat is my IP:",TOTAL_QUESTIONS),
+ "\n🗨 1/{}: Tell me my IP address. You can use 0.0.0.0 or 127.0.0.1 or something else.\n0.0.0.0 (Default if you just press enter) (Let's anyone on your locale network connect to this instance)\n127.0.0.1 (Connection can be established only from current device)\nYou will want to link public domain to this regardless\n\nWhat is my IP:",TOTAL_QUESTIONS),
  &conf.ip,
 ).parse::<IpAddr
 >() {
@@ -87,6 +92,35 @@ pub fn set_up_wizard() -> PriEcoConfig {
         ),
         &conf.vector_path,
     );
+
+    conf.worker_id = ask(
+        &format!(
+            "\n🗨 6/{}: Worker ID (leave empty if you dont have one):",
+            TOTAL_QUESTIONS
+        ),
+        &conf.worker_id,
+    );
+
+    conf.worker_concurrent = match ask(
+        &format!(
+            "\n🗨 7/{}: Worker Condurent Website downloads (default: 1):",
+            TOTAL_QUESTIONS
+        ),
+        &conf.worker_concurrent.to_string(),
+    )
+    .trim()
+    .parse::<u32>()
+    {
+        Ok(num) => num,
+        Err(_) => {
+            println!(
+                "{}Error: Invalid number of concurrent downloads. Please enter a valid NUMBER.{}",
+                colors::RED,
+                colors::RESET
+            );
+            exit(1)
+        }
+    };
 
     match save_config(&conf) {
         Ok(_) => {

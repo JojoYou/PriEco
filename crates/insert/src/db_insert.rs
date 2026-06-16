@@ -7,16 +7,13 @@ use std::{
     fs::{File, OpenOptions, create_dir_all, metadata, read_dir, remove_file},
     io::{BufRead, BufReader, BufWriter, Read, Write},
     path::{Path, PathBuf},
-    time::Duration,
 };
 
 /*
   Import external libraries
 */
 use ahash::AHashSet;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use rocksdb::{WriteBatch, WriteOptions};
-use tantivy::{IndexWriter, Term, index::SegmentId};
+use rocksdb::{WriteBatch};
 use zip::ZipArchive;
 use zstd::stream::{Encoder as ZstdEncoder, decode_all};
 
@@ -24,9 +21,9 @@ use zstd::stream::{Encoder as ZstdEncoder, decode_all};
   Import own libraries
 */
 use prieco_core::{
-    ID_SIZE, INSERTER_IMPORT_DIR, PRIECO_CONFIG, RECORD_SIZE, ROCKSDB_INDEX, TANTIVY_HEAP_SIZE,
+    ID_SIZE, INSERTER_IMPORT_DIR, PRIECO_CONFIG, RECORD_SIZE, ROCKSDB_INDEX,
     TANTIVY_INDEX, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_DIM, WebDocument, file_exists,
-    globals::{colors, icons},
+    globals::{ icons},
     url_to_id,
 };
 
@@ -136,8 +133,12 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
 
                 // Preserve uniqness
                 if batch_ids.contains(&id) || ROCKSDB_INDEX.get(id.to_be_bytes())?.is_some() {
-                    continue;
+                    println!("{}: SKIP id={} url={} (duplicate)", icons::DB_INSERT, id, url);
+   continue;
                 }
+
+                println!("{}: INSERT id={} url={}", icons::DB_INSERT, id, url);
+
 
                 let vector: Vec<f32> = parts[14]
                     .split_whitespace()

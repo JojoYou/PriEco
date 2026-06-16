@@ -16,7 +16,6 @@
   Import system libraries
 */
 use std::{
-    error::Error,
     fs::{File, create_dir_all, read_dir, remove_file, rename},
     io::{BufReader, BufWriter, ErrorKind, Read, Write, copy},
     path::Path,
@@ -26,7 +25,6 @@ use std::{
 /*
   Import external libraries
 */
-use memmap2::{Mmap, MmapOptions};
 use zstd::{Decoder, Encoder};
 
 /*
@@ -34,8 +32,6 @@ use zstd::{Decoder, Encoder};
 */
 use crate::{
     import::{hashing, merge, translate},
-    iter::iterate,
-    nodes::csr,
 };
 use prieco_core::{
     FINAL_SCORES, ID_MAP_FILE,

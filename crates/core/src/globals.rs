@@ -62,18 +62,20 @@ use serde::{Deserialize, Serialize};
 use tantivy::{
     Index, IndexReader, IndexWriter, ReloadPolicy,
     directory::MmapDirectory,
-    indexer::NoMergePolicy,
     schema::{FAST, INDEXED, STORED, STRING, Schema, TEXT},
 };
 use tokenizers::Tokenizer;
 use tokio::task;
 use twox_hash::XxHash3_64;
+#[cfg(feature = "cuda")]
 use zstd::decode_all;
 
+#[cfg(feature = "cuda")]
+use crate::{ID_SIZE, RECORD_SIZE};
 /*
   Import own libraries
 */
-use crate::constants::{FINAL_SCORES, ID_MAP_FILE, ID_SIZE, RECORD_SIZE};
+use crate::constants::{FINAL_SCORES, ID_MAP_FILE};
 use crate::helpers::{normalize_url, url_to_id};
 use crate::set_up;
 
@@ -100,6 +102,7 @@ pub mod icons {
     pub const BLOB: &str = "🪼";
     pub const DB_INSERT: &str = "💾";
     pub const PAGERANK_ICON: &str = "📋";
+    pub const MINI_CRAWLER_ICON: &str = "👾";
 }
 
 /*
@@ -197,6 +200,8 @@ pub struct PriEcoConfig {
     pub tantivy_path: String,
     pub rocksdb_path: String,
     pub vector_path: String,
+    pub worker_id: String,
+    pub worker_concurrent: u32,
 }
 
 /*
@@ -441,7 +446,7 @@ pub static COUNTRY_TO_LANG: Lazy<Arc<AHashMap<&'static str, &'static str>>> = La
   Blob storage
   Description: RocksDB for html blobs storage. Designed for high capacity HDD, usage of SSD is beneficial too
 */
-pub const BLOB_IMPORT_DIR: &str = "blob/import";
+pub const BLOB_IMPORT_DIR: &str = "/mnt/ssd/archives/imp";
 pub static BLOB_STORAGE: Lazy<Arc<DB>> = Lazy::new(|| {
     Arc::new({
         let mut options = Options::default();
@@ -468,7 +473,7 @@ pub static BLOB_STORAGE: Lazy<Arc<DB>> = Lazy::new(|| {
         // Larger SST files for HDD sequential writes
         options.set_target_file_size_base(128 * 1024 * 1024);
 
-        DB::open(&options, Path::new("blob/blobs")).unwrap()
+        DB::open(&options, Path::new("/mnt/ssd/blobs")).unwrap()
     })
 });
 

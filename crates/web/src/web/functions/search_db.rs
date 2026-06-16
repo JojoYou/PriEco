@@ -17,7 +17,6 @@
 */
 use std::{
     collections::HashMap,
-    hash::Hasher,
     io::{Write, stdout},
     time::Instant,
 };
@@ -25,13 +24,11 @@ use std::{
 /*
   Import external libraries
 */
-use ahash::AHashSet;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use rocket::{State, serde::json::Json};
 use serde_json::Value as Json_Value;
 use tantivy::{collector::TopDocs, query::QueryParser, schema::Value};
-use twox_hash::XxHash3_64;
 
 /*
   Import own libraries
@@ -43,7 +40,7 @@ use crate::web::functions::{
 use prieco_core::{
     globals::{
         EmbeddingService, PAGERANK, RERANKER, ROCKSDB_INDEX, SearchResult, TANTIVY_INDEX,
-        TANTIVY_READER, TOP_DOMAINS, VECTOR_CENTROPOIDS, WebDocument, colors,
+        TANTIVY_READER,  VECTOR_CENTROPOIDS, WebDocument, colors,
     },
     url_to_id,
 };

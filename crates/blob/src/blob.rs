@@ -36,18 +36,36 @@ use prieco_core::{
 };
 
 pub fn run() {
-    match find_next_directory() {
-        Some(dir_path) => {
+    let directories = find_all_directories();
+    if directories.is_empty() {
+        return;
+    }
+
+    for dir_path in directories {
+        println!(
+            "{}{}: Processing: {:?}{}",
+            icons::BLOB,
+            colors::GREEN,
+            dir_path,
+            colors::RESET,
+        );
+
+        if let Err(e) = process_directory(&dir_path) {
             println!(
-                "{}{}: Processing: {:?}{}",
+                "{}{}: Processing directory: {:?} Error: {}{}",
                 icons::BLOB,
-                colors::GREEN,
+                colors::RED,
                 dir_path,
                 colors::RESET,
+                e
             );
-            if let Err(e) = process_directory(&dir_path) {
+
+            return;
+        } else {
+            // Successfully processed - remove the directory
+            if let Err(e) = remove_dir_all(&dir_path) {
                 println!(
-                    "{}{}: Processing directory: {:?} Error: {}{}",
+                    "{}{}: Removing directory: {:?} Error: {}{}",
                     icons::BLOB,
                     colors::RED,
                     dir_path,
@@ -55,28 +73,15 @@ pub fn run() {
                     e
                 );
             } else {
-                // Successfully processed - remove the directory
-                if let Err(e) = remove_dir_all(&dir_path) {
-                    println!(
-                        "{}{}: Rmoving directory: {:?} Error: {}{}",
-                        icons::BLOB,
-                        colors::RED,
-                        dir_path,
-                        colors::RESET,
-                        e
-                    );
-                } else {
-                    println!(
-                        "{}{}: Successfully processed and removed: {:?}{}",
-                        icons::BLOB,
-                        colors::GREEN,
-                        dir_path,
-                        colors::RESET,
-                    );
-                }
+                println!(
+                    "{}{}: Successfully processed and removed: {:?}{}",
+                    icons::BLOB,
+                    colors::GREEN,
+                    dir_path,
+                    colors::RESET,
+                );
             }
         }
-        None => return,
     }
 }
 
@@ -234,17 +239,20 @@ fn process_directory(dir_path: &Path) -> Result<(), Box<dyn std::error::Error>> 
 }
 
 /* Helper functions */
-fn find_next_directory() -> Option<PathBuf> {
+fn find_all_directories() -> Vec<PathBuf> {
     let watch_path = Path::new(BLOB_IMPORT_DIR);
     if !watch_path.exists() {
         let _ = create_dir_all(watch_path);
-        return None;
+        return Vec::new();
     }
-    if let Ok(entries) = read_dir(watch_path) {
-        return entries
-            .filter_map(|e| e.ok())
-            .find(|e| e.path().is_dir())
-            .map(|e| e.path());
-    }
-    None
+
+    read_dir(watch_path)
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().is_dir())
+                .map(|e| e.path())
+                .collect()
+        })
+        .unwrap_or_else(|_| Vec::new())
 }
