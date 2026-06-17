@@ -104,7 +104,7 @@ impl Fairing for GlobalHeaders {
              style-src 'self'; \
              img-src 'self' data:; \
              connect-src 'self'; \
-             frame-src 'self'; \
+             frame-src 'self' https://cartes.app; \
              frame-ancestors 'self'; \
              form-action 'self'; \
              object-src 'none'; \

@@ -37,6 +37,15 @@
         </button>
       </form>
 
+      <form action="search" method="{{#if check_post}}POST{{else}}GET{{/if}}">
+        <input type="hidden" name="t" value="map">
+        <input type="hidden" name="q" value="{{query}}">
+        <button class="{{map_active}}">
+          <img src="static/img/icon/map.svg" alt="map search button">
+          <p>Maps</p>
+        </button>
+      </form>
+
       <button class="btn_settings">
         <label for="open-settings" class="open-settings-btn">
           <img src="static/img/icon/gear.svg" alt="open settings" width="13px">

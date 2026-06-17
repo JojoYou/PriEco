@@ -20,7 +20,7 @@ use std::collections::HashMap;
 /*
   Import external libraries
 */
-use rocket::{State};
+use rocket::State;
 use serde_json::{Value, json};
 
 /*
@@ -76,6 +76,7 @@ pub async fn run(
                 ),
             };
         }
+        "map" => {}
         _ => {
             all_search(&mut context, q, lang, loc, embedding_service).await;
         }

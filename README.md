@@ -6,7 +6,7 @@
 
 A fast, privacy-first, eco-conscious hybrid web search engine written in Rust.
 
-![version](https://img.shields.io/badge/version-2.0.0-red.svg)
+![version](https://img.shields.io/badge/version-3.0.0-red.svg)
 
 [![rust](https://img.shields.io/badge/built_with-Rust-dca282.svg?style=flat-square)](https://www.rust-lang.org/)
 
