@@ -268,8 +268,10 @@ fn thread_manager() {
     };
 
     // Mini crawler
-    let mini_crawler_thread = {
-        spawn(move || {
+    let mini_crawler_thread = if PRIECO_CONFIG.worker_id.is_empty() {
+        None
+    } else {
+        Some(spawn(move || {
             let rt = Runtime::new().expect("Failed to create Tokio runtime for mini crawler");
 
             while !stop_requested() {
@@ -277,13 +279,15 @@ fn thread_manager() {
                     crate::mini_crawler::run().await;
                 });
             }
-        })
+        }))
     };
 
     let _ = blob_thread.join();
     let _ = insert_thread.join();
     let _ = pagerank_thread.join();
-    let _ = mini_crawler_thread.join();
+    if let Some(thread) = mini_crawler_thread {
+        let _ = thread.join();
+    }
 
     println!("{}Threads finished!{}", colors::GREEN, colors::RESET);
 }
