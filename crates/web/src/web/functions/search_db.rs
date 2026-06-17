@@ -40,7 +40,7 @@ use crate::web::functions::{
 use prieco_core::{
     globals::{
         EmbeddingService, PAGERANK, RERANKER, ROCKSDB_INDEX, SearchResult, TANTIVY_INDEX,
-        TANTIVY_READER,  VECTOR_CENTROPOIDS, WebDocument, colors,
+        TANTIVY_READER, VECTOR_CENTROPOIDS, WebDocument, colors,
     },
     url_to_id,
 };
@@ -304,7 +304,7 @@ pub async fn run_json(
             ranking::rrf::run(query, dir_results, tantivy_results, vector_results, 60.0);
 
         // Temp remove blocked terms
-        let blocked_terms: &[&str] = &["porn"];
+        let blocked_terms: &[&str] = &["porn", "sex"];
         results.retain(|doc| {
             let haystack = format!(
                 "{} {} {} {} {}",

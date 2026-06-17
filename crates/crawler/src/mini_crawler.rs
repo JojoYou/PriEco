@@ -1,8 +1,7 @@
 use ahash::AHashMap;
 use dotenv_codegen::dotenv;
 use once_cell::sync::Lazy;
-use prieco_core::{PRIECO_CONFIG, icons};
-use reqwest::Client;
+use prieco_core::{CLIENT, PRIECO_CONFIG, icons};
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -48,21 +47,6 @@ pub struct WorkerBatchResponse {
 }
 
 const MASTER_URL: &str = "https://crawler.prieco.net";
-
-pub static CLIENT: Lazy<Client> = Lazy::new(|| {
-    println!("Created client!");
-    Client::builder()
-        .use_rustls_tls()
-        .connect_timeout(Duration::from_secs(3))
-        .timeout(Duration::from_secs(15))
-        .pool_max_idle_per_host(50)
-        .pool_idle_timeout(Duration::from_secs(90))
-        .tcp_keepalive(Duration::from_secs(60))
-        .tcp_keepalive_interval(Duration::from_secs(30))
-        .http2_keep_alive_timeout(Duration::from_secs(20))
-        .build()
-        .expect("Failed to create client")
-});
 
 pub async fn run() {
     // Fetch URLs

@@ -23,6 +23,7 @@ use std::{
     path::Path,
     str::FromStr,
     sync::Arc,
+    time::Duration as stdDuration,
 };
 #[cfg(feature = "cuda")]
 use std::{
@@ -53,6 +54,7 @@ use parking_lot::{Condvar, Mutex, RwLock};
 #[cfg(feature = "cuda")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use redb::{Database, ReadableDatabase, TableDefinition};
+use reqwest::Client;
 use rocket::{
     Request,
     request::{FromRequest, Outcome},
@@ -203,6 +205,24 @@ pub struct PriEcoConfig {
     pub worker_id: String,
     pub worker_concurrent: u32,
 }
+
+/*
+ Request Client
+*/
+pub static CLIENT: Lazy<Client> = Lazy::new(|| {
+    println!("Created client!");
+    Client::builder()
+        .use_rustls_tls()
+        .connect_timeout(stdDuration::from_secs(3))
+        .timeout(stdDuration::from_secs(15))
+        .pool_max_idle_per_host(50)
+        .pool_idle_timeout(stdDuration::from_secs(90))
+        .tcp_keepalive(stdDuration::from_secs(60))
+        .tcp_keepalive_interval(stdDuration::from_secs(30))
+        .http2_keep_alive_timeout(stdDuration::from_secs(20))
+        .build()
+        .expect("Failed to create client")
+});
 
 /*
  Vector embeder

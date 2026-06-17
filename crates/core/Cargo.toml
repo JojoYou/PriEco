@@ -32,6 +32,7 @@ chrono = { workspace = true }
 ndarray = { workspace = true }
 rocket = { workspace = true }
 memmap2 = { workspace = true }
+reqwest = { workspace = true }
 
 [features]
 default = []

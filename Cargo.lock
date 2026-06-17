@@ -3060,6 +3060,7 @@ dependencies = [
  "parking_lot",
  "rayon",
  "redb",
+ "reqwest",
  "rocket",
  "rocksdb",
  "serde",

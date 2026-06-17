@@ -39,6 +39,7 @@ use crate::web::{
     routes::pages::ClientIp,
 };
 use prieco_core::{
+    CLIENT, colors,
     globals::{ANALYTICS, EmbeddingService, UserAgent},
 };
 
@@ -78,6 +79,29 @@ pub async fn api(
             })
         })
         .collect();
+
+    if !results.is_empty() && a == dotenv!("URUKY_API_KEY") {
+        if let Err(e) = CLIENT
+            .post("https://api.polar.sh/v1/events/ingest")
+            .header(
+                "Authorization",
+                format!("Bearer {}", dotenv!("POLAR_API_KEY")),
+            )
+            .header("Content-Type", "application/json")
+            .json(&json!({
+                "events": [
+                    {
+                        "name": "api_call",
+                        "external_customer_id": dotenv!("URUKY_ID")
+                    }
+                ]
+            }))
+            .send()
+            .await
+        {
+            println!("{}API charging failed!{} {}", colors::RED, colors::RESET, e);
+        }
+    }
 
     Json(results)
 }
