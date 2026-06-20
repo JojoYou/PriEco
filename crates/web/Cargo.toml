@@ -43,6 +43,8 @@ redb = { workspace = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }
 zstd = { workspace = true }
+env_logger = { workspace = true }
+log = { workspace = true }
 
 [features]
 default = []

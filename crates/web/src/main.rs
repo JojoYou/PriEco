@@ -12,6 +12,7 @@
   TODO:
 */
 
+use env_logger::Env;
 /*
   Set global allovator
   Reason: Default was insufficient for deallocating RAM from crawler HTTP connections
@@ -125,6 +126,12 @@ impl Fairing for GlobalHeaders {
 */
 #[launch]
 async fn rocket() -> _ {
+    // Disable foster parenting warning
+    env_logger::Builder::from_env(Env::default().default_filter_or("warn"))
+        .filter_module("html5ever", log::LevelFilter::Error)
+        .filter_module("markup5ever", log::LevelFilter::Error)
+        .init();
+
     // Print banner
     println!(
         "{}{}{}",
