@@ -466,32 +466,24 @@ pub static COUNTRY_TO_LANG: Lazy<Arc<AHashMap<&'static str, &'static str>>> = La
   Blob storage
   Description: RocksDB for html blobs storage. Designed for high capacity HDD, usage of SSD is beneficial too
 */
-pub const BLOB_IMPORT_DIR: &str = "/mnt/ssd/archives/imp";
+pub const BLOB_IMPORT_DIR: &str = "/mnt/usb/archives/imp";
 pub static BLOB_STORAGE: Lazy<Arc<DB>> = Lazy::new(|| {
     Arc::new({
         let mut options = Options::default();
         options.create_if_missing(true);
-
-        // Disable compression. Crawler is responsible for this
         options.set_compression_type(DBCompressionType::None);
 
-        // HDD tuning - reduce compaction frequency
-        options.set_level_zero_file_num_compaction_trigger(10);
-        options.set_max_bytes_for_level_base(1280 * 1024 * 1024);
+        options.set_max_background_jobs(4);
 
-        // Single background job - avoid random seeks from parallel compaction
-        options.set_max_background_jobs(1);
+        options.set_bytes_per_sync(1048576);
 
-        // Large readahead for sequential HDD reads during compaction
-        options.set_compaction_readahead_size(2 * 1024 * 1024);
+        options.set_ratelimiter(50 * 1024 * 1024, 100 * 1000, 10);
 
-        // Large write buffers - reduce flush frequency
-        options.set_write_buffer_size(256 * 1024 * 1024);
-        options.set_max_write_buffer_number(4);
-        options.set_min_write_buffer_number_to_merge(2);
+        options.set_write_buffer_size(64 * 1024 * 1024);
+        options.set_max_write_buffer_number(3);
+        options.set_min_write_buffer_number_to_merge(1);
 
-        // Larger SST files for HDD sequential writes
-        options.set_target_file_size_base(128 * 1024 * 1024);
+        options.set_target_file_size_base(64 * 1024 * 1024);
 
         DB::open(&options, Path::new("/mnt/ssd/blobs")).unwrap()
     })

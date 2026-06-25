@@ -86,7 +86,6 @@ pub fn run() {
 }
 
 fn process_directory(dir_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    // Find all .tar.gz files in the directory
     let entries = read_dir(dir_path)?;
     let tar_files: Vec<PathBuf> = entries
         .filter_map(|e| e.ok())
@@ -108,25 +107,25 @@ fn process_directory(dir_path: &Path) -> Result<(), Box<dyn std::error::Error>> 
 
     let mut buffer: Vec<u8> = Vec::with_capacity(10 * 1024 * 1024);
 
+    let mut write_opts = rocksdb::WriteOptions::default();
+    write_opts.disable_wal(true);
+
     for tar_path in tar_files {
         println!("{}: Processing: {:?}", icons::BLOB, tar_path);
 
-        // Open and decompress the tar.gz file
         let tar_file = File::open(&tar_path)?;
         let decompressor = GzDecoder::new(tar_file);
         let mut archive = Archive::new(decompressor);
 
         let mut files_inserted = 0;
+        let mut batch = rocksdb::WriteBatch::default();
 
-        // Process each entry in the tar archive
         for entry_result in archive.entries()? {
             let mut entry = entry_result?;
 
-            // Get the filename from the tar entry
             let path = entry.path()?;
             let file_name = path.to_str().ok_or("{}: Invalid filename")?;
 
-            // Skip if it's a directory entry
             if entry.header().entry_type().is_dir() {
                 continue;
             }
@@ -140,10 +139,9 @@ fn process_directory(dir_path: &Path) -> Result<(), Box<dyn std::error::Error>> 
                 .unwrap_or(false);
 
             if !has_valid_ext {
-                continue; // Skip files that aren't .zst or .txt
+                continue;
             }
 
-            // Parse the blob ID from filename (stem without extension)
             let name: u64 = Path::new(file_name)
                 .file_name()
                 .and_then(|f| f.to_str())
@@ -152,7 +150,6 @@ fn process_directory(dir_path: &Path) -> Result<(), Box<dyn std::error::Error>> 
                 .and_then(|s| s.parse().ok())
                 .ok_or("{}: Invalid blob ID in filename")?;
 
-            // Determine compression flag from extension
             let flag: u8 = match Path::new(file_name)
                 .file_name()
                 .and_then(|f| f.to_str())
@@ -164,16 +161,17 @@ fn process_directory(dir_path: &Path) -> Result<(), Box<dyn std::error::Error>> 
                 _ => 0,
             };
 
-            // Read file content from tar entry
             buffer.clear();
             buffer.push(flag); // Prepend flag byte
             entry.read_to_end(&mut buffer)?;
 
-            // Insert into RocksDB
-            BLOB_STORAGE.put(name.to_le_bytes(), &buffer)?;
+            batch.put(name.to_le_bytes(), &buffer);
             files_inserted += 1;
 
             if files_inserted % 1000 == 0 {
+                BLOB_STORAGE.write_opt(batch, &write_opts)?;
+                batch = rocksdb::WriteBatch::default();
+
                 println!(
                     "{}: Inserted {} files from {:?}",
                     icons::BLOB,
@@ -196,7 +194,13 @@ fn process_directory(dir_path: &Path) -> Result<(), Box<dyn std::error::Error>> 
                     );
                     return Err(Box::new(e));
                 }
+
+                std::thread::sleep(std::time::Duration::from_millis(10));
             }
+        }
+
+        if !batch.is_empty() {
+            BLOB_STORAGE.write_opt(batch, &write_opts)?;
         }
 
         println!(
@@ -212,8 +216,7 @@ fn process_directory(dir_path: &Path) -> Result<(), Box<dyn std::error::Error>> 
             colors::RESET
         );
 
-        // Flush after each tar file
-        println!("{}: Flushing!", icons::BLOB,);
+        println!("{}: Flushing!", icons::BLOB);
         BLOB_STORAGE.flush()?;
         println!(
             "{}: {}Flushed!{}",
@@ -222,7 +225,6 @@ fn process_directory(dir_path: &Path) -> Result<(), Box<dyn std::error::Error>> 
             colors::RESET
         );
 
-        // Remove the processed tar.gz file
         remove_file(&tar_path)?;
         println!(
             "{}: Removed {:?}",

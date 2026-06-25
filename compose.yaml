@@ -1,0 +1,20 @@
+services:
+  prieco:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: prieco:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/rocksdb:/app/data/rocksdb
+      - ./data/tantivy:/app/data/tantivy
+      - ./data/blobs:/app/data/blobs
+      - ./models:/app/models
+      - ./GeoLite2-Country.mmdb:/app/GeoLite2-Country.mmdb
+    environment:
+      - ROCKET_ADDRESS=0.0.0.0
+      - ROCKET_PORT=8000
+    env_file:
+      - .env
+    restart: unless-stopped
