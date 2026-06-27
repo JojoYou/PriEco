@@ -13,7 +13,7 @@ use std::{
   Import external libraries
 */
 use ahash::AHashSet;
-use rocksdb::{WriteBatch};
+use rocksdb::WriteBatch;
 use zip::ZipArchive;
 use zstd::stream::{Encoder as ZstdEncoder, decode_all};
 
@@ -21,9 +21,8 @@ use zstd::stream::{Encoder as ZstdEncoder, decode_all};
   Import own libraries
 */
 use prieco_core::{
-    ID_SIZE, INSERTER_IMPORT_DIR, PRIECO_CONFIG, RECORD_SIZE, ROCKSDB_INDEX,
-    TANTIVY_INDEX, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_DIM, WebDocument, file_exists,
-    globals::{ icons},
+    ID_SIZE, INSERTER_IMPORT_DIR, PRIECO_CONFIG, RECORD_SIZE, ROCKSDB_INDEX, TANTIVY_INDEX,
+    TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_DIM, WebDocument, file_exists, globals::icons,
     url_to_id,
 };
 
@@ -104,7 +103,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Process files
     let mut vector_idx_buffer: HashMap<u64, Vec<f32>> = HashMap::with_capacity(1_000_000);
     for file_name in &files {
-        println!("{}: Opening {}", icons::DB_INSERT, file_name);
         let zip_file = File::open(file_name)?;
         let mut archive = ZipArchive::new(zip_file)?;
 
@@ -114,7 +112,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
             if !entry_name.ends_with(".txt") {
                 continue;
             }
-            println!("{}: Processing entry {}", icons::DB_INSERT, entry_name);
 
             let reader = BufReader::with_capacity(1 << 20, entry);
             let mut inserted = 0;
@@ -133,12 +130,8 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
 
                 // Preserve uniqness
                 if batch_ids.contains(&id) || ROCKSDB_INDEX.get(id.to_be_bytes())?.is_some() {
-                    println!("{}: SKIP id={} url={} (duplicate)", icons::DB_INSERT, id, url);
-   continue;
+                    continue;
                 }
-
-                println!("{}: INSERT id={} url={}", icons::DB_INSERT, id, url);
-
 
                 let vector: Vec<f32> = parts[14]
                     .split_whitespace()

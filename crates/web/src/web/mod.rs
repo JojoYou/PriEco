@@ -18,6 +18,10 @@ pub mod functions {
         pub mod rrf;
     }
 
+    pub mod additional {
+        pub mod discover;
+    }
+
     pub mod search_api {
         pub mod all;
         pub mod img;
