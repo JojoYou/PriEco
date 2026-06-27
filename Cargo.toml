@@ -14,12 +14,11 @@ resolver = "2"
 # Performance
 opt-level = 3            # Optimization level
 debug-assertions = false # Disables debug code
-codegen-units = 1
 
 # Size
 strip = true
 debug = 0
-lto = true
+lto = "thin"
 
 
 [workspace.dependencies]

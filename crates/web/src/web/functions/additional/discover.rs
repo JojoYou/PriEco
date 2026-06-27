@@ -1,9 +1,8 @@
-use serde_json::Value as Json_Value;
 use tokio::task::JoinSet;
 
-use prieco_core::{CLIENT, ROCKSDB_INDEX, url_to_id};
+use prieco_core::{CLIENT, ROCKSDB_INDEX, WebDocument, url_to_id};
 
-pub async fn discover_and_ping_domains(query: &str) -> Vec<Json_Value> {
+pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
     let trimmed = query.trim();
 
     // Combine & Sanitize
@@ -23,8 +22,61 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<Json_Value> {
     let mut ping_tasks = JoinSet::new();
 
     for tld in &[
-        ".com", ".net", ".org", ".io", ".co", ".dev", ".app", ".ai", ".info", ".biz", ".me", ".tv",
-        ".us", ".uk", ".ca", ".de", ".fr", ".nl", ".eu", ".xyz", ".tech", ".online", ".site",
+        ".com",
+        ".net",
+        ".org",
+        ".info",
+        ".biz",
+        ".co",
+        ".io",
+        ".dev",
+        ".app",
+        ".ai",
+        ".tech",
+        ".xyz",
+        ".cloud",
+        ".software",
+        ".network",
+        ".digital",
+        ".me",
+        ".tv",
+        ".blog",
+        ".design",
+        ".art",
+        ".media",
+        ".video",
+        ".news",
+        ".shop",
+        ".store",
+        ".agency",
+        ".global",
+        ".online",
+        ".site",
+        ".pro",
+        ".company",
+        ".uk",
+        ".de",
+        ".fr",
+        ".nl",
+        ".eu",
+        ".it",
+        ".es",
+        ".pl",
+        ".ch",
+        ".se",
+        ".no",
+        ".dk",
+        ".fi",
+        ".us",
+        ".ca",
+        ".mx",
+        ".br",
+        ".jp",
+        ".cn",
+        ".in",
+        ".au",
+        ".nz",
+        ".sg",
     ] {
         let domain = format!("{}{}", possible_domain, tld);
         let possible_url = format!("https://{}/", domain);
@@ -38,14 +90,12 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<Json_Value> {
 
                 ping_tasks.spawn(async move {
                     // HEAD request
-                    if let Ok(res) = CLIENT.head(&url_clone).send().await {
-                        if res.status().is_success() {
-                            return Some((url_clone, domain_clone));
-                        }
-                    }
-
-                    // Fallback GET
-                    if let Ok(res) = CLIENT.get(&url_clone).send().await {
+                    if let Ok(res) = CLIENT
+                        .head(&url_clone)
+                        .timeout(std::time::Duration::from_secs(1))
+                        .send()
+                        .await
+                    {
                         if res.status().is_success() {
                             return Some((url_clone, domain_clone));
                         }
@@ -64,14 +114,34 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<Json_Value> {
             discovered_urls.push(url.clone());
 
             // Construct results
-            let mock_doc = serde_json::json!({
-                "url": url,
-                "title": format!("Discovery: {}", domain),
-                "description": "Adding to PriEco index...",
-                "image": "",
-                "favicon": format!("https://www.google.com/s2/favicons?domain={}&sz=512", domain),
-                "search_score": 0.95
-            });
+            let mock_doc = WebDocument {
+                url: url.clone(),
+                title: domain.clone(),
+                description: String::from("Adding to PriEco index..."),
+                content: String::new(),
+                favicon: format!(
+                    "https://www.google.com/s2/favicons?domain={}&sz=512",
+                    domain
+                ),
+                image: String::new(),
+                keywords: String::new(),
+                safe_s: true,
+                html: String::new(),
+                lang: String::new(),
+                loc: String::new(),
+                impressions: 0,
+                clicks: 0,
+                confidence: 1.0,
+                effort: 0.0,
+                qna: 0.0,
+                sts: 0.0,
+                load: 0.0,
+                date: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs() as i64,
+                search_score: 0.0,
+            };
 
             discovery_results.push(mock_doc);
         }

@@ -34,6 +34,7 @@ use tantivy::{collector::TopDocs, query::QueryParser, schema::Value};
   Import own libraries
 */
 use crate::web::functions::{
+    additional::discover::discover_and_ping_domains,
     general::get_domain,
     ranking::{self},
 };
@@ -168,6 +169,7 @@ pub async fn run_json(
         let q_clone = query.to_string();
         let mut q_clone2 = q_clone.clone();
         let q_clone3 = q_clone.clone();
+        let q_clone4 = q_clone.to_string();
 
         let total_start = Instant::now();
 
@@ -279,8 +281,12 @@ pub async fn run_json(
             docs
         });
 
-        let (tantivy_results, vector_id_similarity, dir_results) =
-            tokio::join!(tantivy_task, vector_task, dir_task);
+        // Web discovery
+        let discovery_task =
+            tokio::spawn(async move { discover_and_ping_domains(&q_clone4).await });
+
+        let (tantivy_results, vector_id_similarity, dir_results, discovery_results) =
+            tokio::join!(tantivy_task, vector_task, dir_task, discovery_task);
 
         let total_elapsed = total_start.elapsed().as_secs_f32();
         println!("Total concurrent time {total_elapsed:.3}s");
@@ -288,20 +294,29 @@ pub async fn run_json(
         let mut dir_results: Vec<WebDocument> = dir_results.unwrap();
         let mut tantivy_results: Vec<WebDocument> = tantivy_results.unwrap();
         let mut vector_results: Vec<WebDocument> = vector_id_similarity.unwrap();
+        let mut discovery_results: Vec<WebDocument> = discovery_results.unwrap();
 
         // Sort each result vector in-place by search_score descending
         dir_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
         tantivy_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
         vector_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+        discovery_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
 
         println!("DIR: {}", dir_results.len());
         println!("Tantivy: {}", tantivy_results.len());
         println!("IVF: {}", vector_results.len());
+        println!("DIS: {}", discovery_results.len());
 
         // Stage: 1
         // RRF Merge & Deduplicate
-        let mut results: Vec<WebDocument> =
-            ranking::rrf::run(query, dir_results, tantivy_results, vector_results, 60.0);
+        let mut results: Vec<WebDocument> = ranking::rrf::run(
+            query,
+            dir_results,
+            tantivy_results,
+            vector_results,
+            discovery_results,
+            60.0,
+        );
 
         // Temp remove blocked terms
         let blocked_terms: &[&str] = &["porn", "sex"];

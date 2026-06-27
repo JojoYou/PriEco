@@ -9,18 +9,24 @@ pub fn run(
     dir_results: Vec<WebDocument>,
     fts_results: Vec<WebDocument>,
     ivf_results: Vec<WebDocument>,
+    dis_results: Vec<WebDocument>,
     k: f32,
 ) -> Vec<WebDocument> {
+    // Custom searching WEIGHTs
     const DIR_WEIGHT: f32 = 3.0;
+    const DIS_WEIGHT: f32 = 0.5;
+
     let (fts_weight, ivf_weight) = adjust_weights(query);
 
-    let mut scores: HashMap<String, (f32, WebDocument)> =
-        HashMap::with_capacity(dir_results.len() + fts_results.len() + ivf_results.len());
+    let mut scores: HashMap<String, (f32, WebDocument)> = HashMap::with_capacity(
+        dir_results.len() + fts_results.len() + ivf_results.len() + dis_results.len(),
+    );
 
     let sources = [
         (dir_results, DIR_WEIGHT),
         (fts_results, fts_weight),
         (ivf_results, ivf_weight),
+        (dis_results, DIS_WEIGHT),
     ];
 
     for (results, weight) in sources {
