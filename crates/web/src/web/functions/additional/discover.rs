@@ -79,32 +79,40 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
         ".sg",
     ] {
         let domain = format!("{}{}", possible_domain, tld);
-        let possible_url = format!("https://{}/", domain);
+        let canonical_url = format!("https://{}/", domain);
 
-        // RocksDB check (if in, then index could have brought the result)
-        match ROCKSDB_INDEX.get(&url_to_id(&possible_url).to_be_bytes()) {
-            Ok(Some(_)) => continue,
-            _ => {
-                let url_clone = possible_url.clone();
-                let domain_clone = domain.clone();
+        let already_indexed = [
+            canonical_url.clone(),
+            format!("https://www.{}/", domain),
+            format!("http://{}/", domain),
+            format!("http://www.{}/", domain),
+        ]
+        .iter()
+        .any(|url| {
+            matches!(
+                ROCKSDB_INDEX.get(&url_to_id(url).to_be_bytes()),
+                Ok(Some(_))
+            )
+        });
 
-                ping_tasks.spawn(async move {
-                    // HEAD request
-                    if let Ok(res) = CLIENT
-                        .head(&url_clone)
-                        .timeout(std::time::Duration::from_secs(1))
-                        .send()
-                        .await
-                    {
-                        if res.status().is_success() {
-                            return Some((url_clone, domain_clone));
-                        }
-                    }
-
-                    None
-                });
-            }
+        if already_indexed {
+            continue;
         }
+
+        let domain_clone = domain.clone();
+        ping_tasks.spawn(async move {
+            if let Ok(res) = CLIENT
+                .head(&canonical_url)
+                .timeout(std::time::Duration::from_secs(1))
+                .send()
+                .await
+            {
+                if res.status().is_success() {
+                    return Some((canonical_url, domain_clone));
+                }
+            }
+            None
+        });
     }
 
     // Create results

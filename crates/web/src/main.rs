@@ -12,7 +12,6 @@
   TODO:
 */
 
-use env_logger::Env;
 /*
   Set global allovator
   Reason: Default was insufficient for deallocating RAM from crawler HTTP connections
@@ -42,6 +41,7 @@ use std::{
 /*
   Import external libraries
 */
+use env_logger::Env;
 use ort::{Environment, GraphOptimizationLevel, InMemorySession, LoggingLevel, SessionBuilder};
 use rocket::{
     Request, Response,

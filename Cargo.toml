@@ -77,6 +77,9 @@ maxminddb = "0.24.0" # Reading Maxmind DB for IP to country
 env_logger = "0.11.8" # Logger: Used to disable Foster parenting not implemented
 log = "0.4.28"# Logger: Used to disable Foster parenting not implemented
 
+# Search
+symspell = "0.5.2" # Spell checker
+
 # Tools
 ahash = "0.8.12"      # Faster single threaded hashmap
 twox-hash = "2.1.0" # Predictable hash
