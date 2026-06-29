@@ -33,6 +33,7 @@ ndarray = { workspace = true }
 rocket = { workspace = true }
 memmap2 = { workspace = true }
 reqwest = { workspace = true }
+symspell = { workspace = true }
 
 [features]
 default = []

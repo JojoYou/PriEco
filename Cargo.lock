@@ -3189,6 +3189,7 @@ dependencies = [
  "rocksdb",
  "serde",
  "serde_json",
+ "symspell",
  "tantivy",
  "tokenizers",
  "tokio",

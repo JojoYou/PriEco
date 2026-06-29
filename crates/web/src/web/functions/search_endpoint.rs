@@ -27,6 +27,7 @@ use serde_json::{Value, json};
   Import own libraries
 */
 use crate::web::functions::{
+    additional::spell_check::spell_check_query,
     search_api::{img, news},
     search_db,
 };
@@ -92,6 +93,9 @@ async fn all_search(
     loc: &str,
     embedding_service: &State<EmbeddingService>,
 ) {
+    let spell_checked_query = spell_check_query(q);
+    println!("Spell check: {}", spell_checked_query);
+
     context.insert(String::from("all_results"), json!(true)); // Set btn search type
 
     let mut results_vec: Vec<SearchResult> = Vec::with_capacity(100);

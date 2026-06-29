@@ -61,6 +61,7 @@ use rocket::{
 };
 use rocksdb::{DB, DBCompressionType, Options, WriteBatch};
 use serde::{Deserialize, Serialize};
+use symspell::{SymSpell, UnicodeStringStrategy};
 use tantivy::{
     Index, IndexReader, IndexWriter, ReloadPolicy,
     directory::MmapDirectory,
@@ -1052,6 +1053,44 @@ pub const ARTISTS_TABLE: TableDefinition<&str, &str> = TableDefinition::new("art
 
 pub static TOP_DOMAINS: Lazy<AHashSet<&'static str>> =
     Lazy::new(|| include_str!("../../../data/domains.txt").lines().collect());
+
+/*
+  Spell checker
+*/
+pub static SPELL_CHECKER: Lazy<Arc<SymSpell<UnicodeStringStrategy>>> = Lazy::new(|| {
+    let mut symspell: SymSpell<UnicodeStringStrategy> = SymSpell::default();
+
+    let en_dict = include_str!("../../../data/spell_check/frequency_dictionary_en_82_765.txt");
+    let mut word_count = 0;
+    for line in en_dict.lines() {
+        if symspell.load_dictionary_line(line, 0, 1, " ") {
+            word_count += 1;
+        }
+    }
+    println!(
+        "{}Loaded English dictionary ({} words){}",
+        colors::GREEN,
+        word_count,
+        colors::RESET
+    );
+
+    let en_bigrams =
+        include_str!("../../../data/spell_check/frequency_bigramdictionary_en_243_342.txt");
+    let mut bigram_count = 0;
+    for line in en_bigrams.lines() {
+        if symspell.load_bigram_dictionary_line(line, 0, 2, " ") {
+            bigram_count += 1;
+        }
+    }
+    println!(
+        "{}Loaded English bigrams ({} entries){}",
+        colors::GREEN,
+        bigram_count,
+        colors::RESET
+    );
+
+    Arc::new(symspell)
+});
 
 /*
   Analytics
