@@ -369,6 +369,7 @@ pub async fn run_json(
         let passage = format!("{} {}", doc.title, doc.description);
         let raw = RERANKER.score(query, &passage);
         let reranker_prob = 1.0 / (1.0 + (-raw).exp());
+
         doc.search_score = doc.search_score * (0.7 + reranker_prob * 0.6);
         rerank_time_total += reranking_time.elapsed().as_secs_f32();
     }

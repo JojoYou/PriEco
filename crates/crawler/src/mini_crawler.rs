@@ -57,7 +57,7 @@ pub async fn run() {
 
     // Background uploader
     tokio::spawn(async move {
-        // Upload new batch as soon as ready
+        // Upload new batch
         while let Some(task) = upload_rx.recv().await {
             println!(
                 "{}: Uploading batch {} ({} bytes)...",
