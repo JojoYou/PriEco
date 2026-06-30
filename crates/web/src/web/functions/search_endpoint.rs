@@ -27,10 +27,11 @@ use serde_json::{Value, json};
   Import own libraries
 */
 use crate::web::functions::{
+    additional::spell_check::spell_check_query,
     search_api::{img, news},
     search_db,
 };
-use prieco_core::{EmbeddingService, SPELL_CHECKER, SearchResult};
+use prieco_core::{EmbeddingService, SearchResult};
 
 /*
   Description: Decides what kind of search to perform
@@ -95,12 +96,8 @@ async fn all_search(
     embedding_service: &State<EmbeddingService>,
 ) {
     // Spell check
-    let spell_checked_query: String = match SPELL_CHECKER.lookup_compound(q, 2).first() {
-        Some(s) => s.term.clone(),
-        None => String::new(),
-    };
-    if !spell_checked_query.is_empty() && spell_checked_query != q.to_lowercase() {
-        context.insert(String::from("did_you_mean"), json!(spell_checked_query));
+    if let Some(suggestion) = spell_check_query(q) {
+        context.insert(String::from("did_you_mean"), json!(suggestion));
     }
 
     context.insert(String::from("all_results"), json!(true)); // Set btn search type

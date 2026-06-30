@@ -20,6 +20,7 @@ pub mod functions {
 
     pub mod additional {
         pub mod discover;
+        pub mod spell_check;
     }
 
     pub mod search_api {
