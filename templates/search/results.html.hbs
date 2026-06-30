@@ -3,6 +3,17 @@
     {{!-- Search expander widgets --}}
     <div data-sxpr-top-bar></div>
     <div class="results">
+     {{#if did_you_mean}}
+            <p class="spell_check">
+            Did you mean
+            <b><i>
+                <a href="/search?t={{ type }}&q={{ did_you_mean }}">
+                    {{ did_you_mean }}
+                </a>
+              </i></b>?
+            </p>
+       {{/if}}
+
       {{#each results}}
         <div class='output'>
             <div class="output_text">
@@ -25,7 +36,7 @@
         </div>
 
         {{!-- Insert the knowledge panel after the first result --}}
-        {{#if @first}} 
+        {{#if @first}}
           <div class="knowledge_panel" data-sxpr-knowledge-panel>
             <!-- Knowledge panel will render here -->
           </div>
@@ -75,7 +86,7 @@
                     {{/if}}
                   </button>
                   <div class="yadore_text">
-                    <p class="news_text">{{ description }}</p> 
+                    <p class="news_text">{{ description }}</p>
                   </div>
                 </a>
               </div>

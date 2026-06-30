@@ -27,11 +27,10 @@ use serde_json::{Value, json};
   Import own libraries
 */
 use crate::web::functions::{
-    additional::spell_check::spell_check_query,
     search_api::{img, news},
     search_db,
 };
-use prieco_core::{EmbeddingService, SearchResult};
+use prieco_core::{EmbeddingService, SPELL_CHECKER, SearchResult};
 
 /*
   Description: Decides what kind of search to perform
@@ -52,6 +51,8 @@ pub async fn run(
 
     let mut context: HashMap<String, Value> = HashMap::with_capacity(100);
     println!("Type: {}", t);
+    context.insert(String::from("type"), json!(t));
+
     match t {
         "img" => {
             context.insert(String::from("img_results"), json!(true));
@@ -93,8 +94,14 @@ async fn all_search(
     loc: &str,
     embedding_service: &State<EmbeddingService>,
 ) {
-    let spell_checked_query = spell_check_query(q);
-    println!("Spell check: {}", spell_checked_query);
+    // Spell check
+    let spell_checked_query: String = match SPELL_CHECKER.lookup_compound(q, 2).first() {
+        Some(s) => s.term.clone(),
+        None => String::new(),
+    };
+    if !spell_checked_query.is_empty() && spell_checked_query != q.to_lowercase() {
+        context.insert(String::from("did_you_mean"), json!(spell_checked_query));
+    }
 
     context.insert(String::from("all_results"), json!(true)); // Set btn search type
 

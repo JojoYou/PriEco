@@ -283,11 +283,5 @@ fn full_slow_compaction() {
         }
 
         println!("{}: Chunk {} completed.", icons::BLOB, i + 1);
-
-        // Pause
-        if i < 255 {
-            println!("{}: Sleeping for 2 minutes...", icons::BLOB);
-            sleep(Duration::from_secs(120));
-        }
     }
 }

@@ -189,3 +189,7 @@
     width: calc(100vw - 20px);
     height: calc(100vh - 140px);
 }
+
+.spell_check {
+    margin: 10px 0 20px 0;
+}
