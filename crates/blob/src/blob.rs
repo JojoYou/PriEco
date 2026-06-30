@@ -19,6 +19,8 @@ use std::{
     fs::{File, create_dir_all, read_dir, remove_dir_all, remove_file},
     io::Read,
     path::{Path, PathBuf},
+    thread::sleep,
+    time::Duration,
 };
 
 /*
@@ -237,6 +239,9 @@ fn process_directory(dir_path: &Path) -> Result<(), Box<dyn std::error::Error>> 
         );
     }
 
+    println!("Blob Compacting!");
+    full_slow_compaction();
+    println!("{}Done Blob compaction!{}", colors::GREEN, colors::RESET);
     Ok(())
 }
 
@@ -257,4 +262,32 @@ fn find_all_directories() -> Vec<PathBuf> {
                 .collect()
         })
         .unwrap_or_else(|_| Vec::new())
+}
+
+/* Temp */
+fn full_slow_compaction() {
+    for i in 0..=255u8 {
+        let start_key = [i, 0, 0, 0, 0, 0, 0, 0];
+        let end_key: Option<[u8; 8]> = if i == 255 {
+            None
+        } else {
+            Some([i + 1, 0, 0, 0, 0, 0, 0, 0])
+        };
+
+        println!("{}: Compacting chunk {}/256...", icons::BLOB, i + 1);
+
+        if let Some(end) = end_key {
+            BLOB_STORAGE.compact_range(Some(&start_key), Some(&end));
+        } else {
+            BLOB_STORAGE.compact_range(Some(&start_key), None::<&[u8]>);
+        }
+
+        println!("{}: Chunk {} completed.", icons::BLOB, i + 1);
+
+        // Pause
+        if i < 255 {
+            println!("{}: Sleeping for 2 minutes...", icons::BLOB);
+            sleep(Duration::from_secs(120));
+        }
+    }
 }
