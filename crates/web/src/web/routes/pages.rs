@@ -44,8 +44,9 @@ use urlencoding::encode;
   Import own libraries
 */
 use crate::web::{functions::search_endpoint, modules::settings};
-use prieco_core::globals::{
-    ANALYTICS, CSS_VERSION, EmbeddingService, JS_VERSION, ROCKSDB_INDEX, UserAgent,
+use prieco_core::{
+    META_STORAGE,
+    globals::{ANALYTICS, CSS_VERSION, EmbeddingService, JS_VERSION, UserAgent},
 };
 
 /*
@@ -291,9 +292,9 @@ pub async fn results_htmls(
 #[get("/stats")]
 pub async fn stats(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host<'_>) -> Template {
     // Index
-    let index_size_raw: u64 = match ROCKSDB_INDEX.property_int_value("rocksdb.estimate-num-keys") {
-        Ok(Some(v)) => v,
-        _ => 0,
+    let index_size_raw: u64 = match META_STORAGE.env.read_txn() {
+        Ok(rtxn) => META_STORAGE.db.len(&rtxn).unwrap_or(0) as u64,
+        Err(_) => 0,
     };
     let index_display = if index_size_raw >= 1_000_000_000 {
         (

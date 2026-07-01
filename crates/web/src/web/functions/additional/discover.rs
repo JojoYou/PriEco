@@ -1,6 +1,6 @@
 use tokio::task::JoinSet;
 
-use prieco_core::{CLIENT, ROCKSDB_INDEX, WebDocument, url_to_id};
+use prieco_core::{CLIENT, META_STORAGE, WebDocument, url_to_id};
 
 pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
     let trimmed = query.trim();
@@ -81,19 +81,22 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
         let domain = format!("{}{}", possible_domain, tld);
         let canonical_url = format!("https://{}/", domain);
 
-        let already_indexed = [
-            canonical_url.clone(),
-            format!("https://www.{}/", domain),
-            format!("http://{}/", domain),
-            format!("http://www.{}/", domain),
-        ]
-        .iter()
-        .any(|url| {
-            matches!(
-                ROCKSDB_INDEX.get(&url_to_id(url).to_be_bytes()),
-                Ok(Some(_))
-            )
-        });
+        let already_indexed = match META_STORAGE.env.read_txn() {
+            Ok(rtxn) => [
+                canonical_url.clone(),
+                format!("https://www.{}/", domain),
+                format!("http://{}/", domain),
+                format!("http://www.{}/", domain),
+            ]
+            .iter()
+            .any(|url| {
+                matches!(
+                    META_STORAGE.db.get(&rtxn, &url_to_id(url).to_be_bytes()),
+                    Ok(Some(_))
+                )
+            }),
+            Err(_) => false,
+        };
 
         if already_indexed {
             continue;

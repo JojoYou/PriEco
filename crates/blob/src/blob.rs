@@ -16,8 +16,8 @@
   Import system libraries
 */
 use std::{
-    fs::{File, OpenOptions, create_dir_all, read_dir, remove_dir_all, remove_file},
-    io::{Read, Write},
+    fs::{File, create_dir_all, read_dir, remove_dir_all, remove_file},
+    io::Read,
     path::{Path, PathBuf},
 };
 
@@ -25,30 +25,27 @@ use std::{
   Import external libraries
 */
 use flate2::read::GzDecoder;
-use rocksdb::{Direction, IteratorMode};
+use rocksdb::IteratorMode;
 use tar::Archive;
 
 /*
   Import own libraries
 */
 use prieco_core::{
-    BLOB_IMPORT_DIR, BLOB_STORAGE, LMDB_BLOB_STORAGE, META_STORAGE, ROCKSDB_INDEX,
+    BLOB_IMPORT_DIR, BLOB_STORAGE, LMDB_BLOB_STORAGE,
     globals::{colors, icons},
 };
-use zstd::bulk::Compressor;
 
-const MIGRATION_CHECKPOINT: &str = "/mnt/hdd/blobs/.migration_checkpoint";
+const MIGRATION_CHECKPOINT: &str = "migration_checkpoint";
 
 pub fn run() {
-    println!("Migrating!");
-    if let Err(e) = migrate_rocksdb_to_lmdb_meta() {
-        println!("{}Failed to migrate!{} {}", colors::RED, colors::RESET, e);
-    };
+    /*println!("Migrating!");
+    migrate_rocksdb_to_lmdb_blob();
     println!(
         "{}Migration to LMDB completed!{}",
         colors::GREEN,
         colors::RESET
-    );
+    );*/
 
     let directories = find_all_directories();
 
@@ -343,134 +340,4 @@ pub fn migrate_rocksdb_to_lmdb_blob() {
         count,
         colors::RESET
     );
-}
-
-const PROGRESS_FILE: &str = "migration_progress.bin";
-const DICT_FILE: &str = "prieco_zstd.dict";
-const DICT_SIZE: usize = 112_640;
-const SAMPLES_TO_TRAIN: usize = 100_000;
-const ZSTD_LEVEL: i32 = 3;
-
-pub fn migrate_rocksdb_to_lmdb_meta() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    println!(
-        "{}: Starting migration from RocksDB to LMDB (with Zstd Dictionary)...",
-        icons::DB_INSERT
-    );
-
-    let dictionary = if Path::new(DICT_FILE).exists() {
-        println!(
-            "{}: Loading existing Zstd dictionary from disk...",
-            icons::DB_INSERT
-        );
-        std::fs::read(DICT_FILE)?
-    } else {
-        println!(
-            "{}: Training new Zstd dictionary on {} samples. This takes a moment...",
-            icons::DB_INSERT,
-            SAMPLES_TO_TRAIN
-        );
-
-        let mut samples_data = Vec::new();
-        let mut sample_sizes = Vec::new();
-        let iter = ROCKSDB_INDEX.iterator(IteratorMode::Start);
-
-        for item in iter.take(SAMPLES_TO_TRAIN) {
-            let (_, value) = item?;
-            samples_data.extend_from_slice(&value);
-            sample_sizes.push(value.len());
-        }
-
-        let dict = zstd::dict::from_continuous(&samples_data, &sample_sizes, DICT_SIZE)?;
-        let mut file = File::create(DICT_FILE)?;
-        file.write_all(&dict)?;
-        println!(
-            "{}: Dictionary trained and saved to {}",
-            icons::DB_INSERT,
-            DICT_FILE
-        );
-        dict
-    };
-
-    let mut compressor = Compressor::with_dictionary(ZSTD_LEVEL, &dictionary)?;
-
-    let mut last_committed_key: Option<Vec<u8>> = None;
-    if Path::new(PROGRESS_FILE).exists() {
-        let mut file = File::open(PROGRESS_FILE)?;
-        let mut buf = Vec::new();
-        file.read_to_end(&mut buf)?;
-        if !buf.is_empty() {
-            last_committed_key = Some(buf);
-            println!(
-                "{}: Resuming migration from last saved checkpoint.",
-                icons::DB_INSERT
-            );
-        }
-    }
-
-    let iter_mode = match &last_committed_key {
-        Some(key) => IteratorMode::From(key, Direction::Forward),
-        None => IteratorMode::Start,
-    };
-
-    let mut wtxn = META_STORAGE.env.write_txn()?;
-    let mut count = 0;
-    let mut batch_last_key: Option<Vec<u8>> = None;
-
-    let iter = ROCKSDB_INDEX.iterator(iter_mode);
-
-    for item in iter {
-        let (key, value) = item?;
-
-        if count == 0 {
-            if let Some(ref last_key) = last_committed_key {
-                if key.as_ref() == last_key.as_slice() {
-                    continue;
-                }
-            }
-        }
-
-        let compressed_value = compressor.compress(value.as_ref())?;
-
-        META_STORAGE
-            .db
-            .put(&mut wtxn, key.as_ref(), &compressed_value)?;
-
-        batch_last_key = Some(key.to_vec());
-        count += 1;
-
-        if count % 100_000 == 0 {
-            wtxn.commit()?;
-
-            if let Some(ref exact_key) = batch_last_key {
-                let mut file = OpenOptions::new()
-                    .create(true)
-                    .write(true)
-                    .truncate(true)
-                    .open(PROGRESS_FILE)?;
-                file.write_all(exact_key)?;
-                file.flush()?;
-            }
-
-            println!(
-                "{}: Migrated, compressed, and committed {} records...",
-                icons::DB_INSERT,
-                count
-            );
-            wtxn = META_STORAGE.env.write_txn()?;
-        }
-    }
-
-    wtxn.commit()?;
-    META_STORAGE.env.force_sync()?;
-
-    if Path::new(PROGRESS_FILE).exists() {
-        remove_file(PROGRESS_FILE)?;
-    }
-
-    println!(
-        "{}: Migration complete! Total records added in this run: {}",
-        icons::DB_INSERT,
-        count
-    );
-    Ok(())
 }

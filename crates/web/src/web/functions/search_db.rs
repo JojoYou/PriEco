@@ -16,7 +16,7 @@
   Import system libraries
 */
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::{Write, stdout},
     time::Instant,
 };
@@ -26,6 +26,7 @@ use std::{
 */
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
+use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 use rocket::{State, serde::json::Json};
 use serde_json::Value as Json_Value;
 use tantivy::{collector::TopDocs, query::QueryParser, schema::Value};
@@ -39,9 +40,10 @@ use crate::web::functions::{
     ranking::{self},
 };
 use prieco_core::{
+    META_DECODER, META_STORAGE,
     globals::{
-        EmbeddingService, PAGERANK, RERANKER, ROCKSDB_INDEX, SearchResult, TANTIVY_INDEX,
-        TANTIVY_READER, VECTOR_CENTROPOIDS, WebDocument, colors,
+        EmbeddingService, PAGERANK, RERANKER, SearchResult, TANTIVY_INDEX, TANTIVY_READER,
+        VECTOR_CENTROPOIDS, WebDocument, colors,
     },
     url_to_id,
 };
@@ -74,7 +76,7 @@ pub async fn run(
     loc: &str,
     embedding_service: &State<EmbeddingService>,
 ) {
-    let local_results = run_json(q, lang, loc, embedding_service).await; // Get results from database
+    let local_results = run_json(q, lang, loc, embedding_service).await;
 
     // Create final results
     if let Some(arr) = Json(Json_Value::from(local_results)).as_array() {
@@ -194,7 +196,8 @@ pub async fn run_json(
                     let id = url_to_id(&url);
                     id_score_vec.push((id, 0.0));
                 }
-                return fetch_documents(id_score_vec, "DIR");
+
+                return id_score_vec;
             }
 
             let tlds = [
@@ -217,12 +220,12 @@ pub async fn run_json(
                     id_score_vec.push((id, 0.0));
                 }
             }
-            let results: Vec<WebDocument> = fetch_documents(id_score_vec, "DIR");
+
             let elapsed = start.elapsed().as_secs_f32();
             println!("DIR lookup took {elapsed:.3}s");
             stdout().flush().ok();
 
-            results
+            id_score_vec
         });
 
         let tantivy_task = tokio::task::spawn_blocking(move || {
@@ -263,38 +266,48 @@ pub async fn run_json(
             let start = Instant::now();
 
             // search vector DB
-            let mut s = Instant::now();
+            let s = Instant::now();
             let res: Vec<(u64, f32)> = VECTOR_CENTROPOIDS
                 .search(&embed, 0, NPROBS)
                 .unwrap_or_default();
             println!("Nprobs: {}", s.elapsed().as_secs_f32());
-            s = Instant::now();
-            let res_trimmed: Vec<(u64, f32)> = res.iter().take(MAX_IVF).cloned().collect();
 
-            let docs: Vec<WebDocument> = fetch_documents(res_trimmed, "IVF");
-            println!("Fetch docs: {}", s.elapsed().as_secs_f32());
+            let vector_ids: Vec<(u64, f32)> = res.iter().take(MAX_IVF).cloned().collect();
 
             let elapsed = start.elapsed().as_secs_f32();
             println!("Vector search took {elapsed:.3}s");
             stdout().flush().ok();
 
-            docs
+            vector_ids
         });
 
         // Web discovery
         let discovery_task =
             tokio::spawn(async move { discover_and_ping_domains(&q_clone4).await });
 
-        let (tantivy_results, vector_id_similarity, dir_results, discovery_results) =
+        let (tantivy_ids, vector_ids, dir_ids, discovery_results) =
             tokio::join!(tantivy_task, vector_task, dir_task, discovery_task);
 
         let total_elapsed = total_start.elapsed().as_secs_f32();
         println!("Total concurrent time {total_elapsed:.3}s");
 
-        let mut dir_results: Vec<WebDocument> = dir_results.unwrap();
-        let mut tantivy_results: Vec<WebDocument> = tantivy_results.unwrap();
-        let mut vector_results: Vec<WebDocument> = vector_id_similarity.unwrap();
-        let mut discovery_results: Vec<WebDocument> = discovery_results.unwrap();
+        // Fetch documents
+        let mut engines_map: HashMap<&'static str, Vec<(u64, f32)>> = HashMap::new();
+        engines_map.insert("FTS", tantivy_ids.unwrap_or_default());
+        engines_map.insert("IVF", vector_ids.unwrap_or_default());
+        engines_map.insert("DIR", dir_ids.unwrap_or_default());
+
+        let z = Instant::now();
+        let mut fetched_results = fetch_documents(engines_map);
+        println!("Fetch took: {}s", z.elapsed().as_secs_f32());
+
+        // Split
+        let mut dir_results: Vec<WebDocument> = fetched_results.remove("DIR").unwrap_or_default();
+        let mut tantivy_results: Vec<WebDocument> =
+            fetched_results.remove("FTS").unwrap_or_default();
+        let mut vector_results: Vec<WebDocument> =
+            fetched_results.remove("IVF").unwrap_or_default();
+        let mut discovery_results: Vec<WebDocument> = discovery_results.unwrap_or_default();
 
         // Sort each result vector in-place by search_score descending
         dir_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
@@ -417,7 +430,7 @@ pub async fn run_json(
 }
 
 /* Index search functions */
-fn search_tantivy(query_text: &str, limit: usize) -> Option<Vec<WebDocument>> {
+fn search_tantivy(query_text: &str, limit: usize) -> Option<Vec<(u64, f32)>> {
     let schema = TANTIVY_INDEX.schema();
     let title_field = schema.get_field("title").ok()?;
     let description_field = schema.get_field("description").ok()?;
@@ -465,56 +478,94 @@ fn search_tantivy(query_text: &str, limit: usize) -> Option<Vec<WebDocument>> {
         }
     }
 
-    // Single call to fetch_documents
-    let results: Vec<WebDocument> = fetch_documents(id_score_vec, "FTS");
-
-    Some(results)
+    Some(id_score_vec)
 }
 
 /* Helper functions*/
-fn fetch_documents(id_score: Vec<(u64, f32)>, idx_type: &str) -> Vec<WebDocument> {
-    let (ids, scores): (Vec<u64>, Vec<f32>) = id_score.into_iter().unzip();
-    let keys: Vec<[u8; 8]> = ids.iter().map(|id| id.to_be_bytes()).collect();
+fn fetch_documents(
+    engines: HashMap<&'static str, Vec<(u64, f32)>>,
+) -> HashMap<&'static str, Vec<WebDocument>> {
+    let mut unique_ids = HashSet::new();
+    for id_scores in engines.values() {
+        for &(id, _) in id_scores {
+            unique_ids.insert(id);
+        }
+    }
+    let ids_to_fetch: Vec<u64> = unique_ids.into_iter().collect();
 
-    let results = ROCKSDB_INDEX.multi_get(&keys);
+    let chunk_size = 100;
+    let fetched_docs: HashMap<u64, WebDocument> = ids_to_fetch
+        .par_chunks(chunk_size)
+        .flat_map_iter(|chunk| {
+            let rtxn = match META_STORAGE.env.read_txn() {
+                Ok(txn) => txn,
+                Err(_) => return vec![],
+            };
 
-    let mut documents = Vec::with_capacity(ids.len());
+            let mut decompressor =
+                match zstd::bulk::Decompressor::with_prepared_dictionary(&*META_DECODER) {
+                    Ok(d) => d,
+                    Err(_) => return vec![],
+                };
 
-    for ((id, score), result) in ids.iter().zip(scores.iter()).zip(results) {
-        let data = match result {
-            Ok(Some(data)) => data,
-            Ok(None) => {
-                continue;
+            let mut local_docs = Vec::with_capacity(chunk.len());
+
+            for &id in chunk {
+                let key = id.to_be_bytes();
+
+                let compressed_data = match META_STORAGE.db.get(&rtxn, &key) {
+                    Ok(Some(data)) => data,
+                    Ok(None) => continue,
+                    Err(_) => continue,
+                };
+
+                let decompressed_buf = match decompressor.decompress(compressed_data, 1024 * 1024) {
+                    Ok(buf) => buf,
+                    Err(e) => {
+                        println!(
+                            "{}ZSTD DECODE ERROR for ID{} {}: {}",
+                            colors::RED,
+                            colors::RESET,
+                            id,
+                            e
+                        );
+                        continue;
+                    }
+                };
+
+                match serde_json::from_slice::<WebDocument>(&decompressed_buf) {
+                    Ok(doc) => local_docs.push((id, doc)),
+                    Err(e) => println!(
+                        "{}JSON ERROR for ID{} {}: {}",
+                        colors::RED,
+                        colors::RESET,
+                        id,
+                        e
+                    ),
+                }
             }
-            Err(_) => continue,
-        };
+            local_docs
+        })
+        .collect();
 
-        let mut doc: WebDocument = match serde_json::from_slice(&data) {
-            Ok(doc) => doc,
-            Err(e) => {
-                println!(
-                    "{}RocksDB: Failed to deserialize document with ID {}{}: {}",
-                    colors::YELLOW,
-                    id,
-                    colors::RESET,
-                    e
-                );
-                continue;
+    let mut final_results: HashMap<&'static str, Vec<WebDocument>> = HashMap::new();
+    for (engine_name, id_scores) in engines {
+        let mut docs = Vec::with_capacity(id_scores.len());
+        for (id, score) in id_scores {
+            if let Some(mut doc) = fetched_docs.get(&id).cloned() {
+                doc.search_score = match engine_name {
+                    "FTS" => score / (score + 40.0),
+                    "IVF" => ((score - 0.75) / 0.25).clamp(0.0, 1.0),
+                    "DIR" => 0.8,
+                    _ => score,
+                };
+                docs.push(doc);
             }
-        };
-
-        // Normalize score
-        doc.search_score = match idx_type {
-            "FTS" => score / (score + 40.0),
-            "IVF" => ((score - 0.75) / 0.25).clamp(0.0, 1.0),
-            "DIR" => 0.8,
-            _ => *score,
-        };
-
-        documents.push(doc);
+        }
+        final_results.insert(engine_name, docs);
     }
 
-    documents
+    final_results
 }
 
 fn sanitize_string(s: &str) -> String {

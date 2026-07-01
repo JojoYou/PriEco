@@ -30,7 +30,7 @@ pub fn set_up_wizard() -> PriEcoConfig {
         ip: String::from("0.0.0.0"),
         port: 80,
         tantivy_path: String::from("idx/tantivy"),
-        rocksdb_path: String::from("idx/rocksdb"),
+        meta_path: String::from("idx/meta"),
         vector_path: String::from("idx/vectors"),
         worker_id: String::new(),
         worker_concurrent: 1,
@@ -77,12 +77,12 @@ pub fn set_up_wizard() -> PriEcoConfig {
         &conf.tantivy_path,
     );
 
-    conf.rocksdb_path = ask(
+    conf.meta_path = ask(
         &format!(
-            "\n🗨 4/{}: Path for RocksDB database (default {}):",
-            TOTAL_QUESTIONS, &conf.rocksdb_path
+            "\n🗨 4/{}: Path for LMDB database (default {}):",
+            TOTAL_QUESTIONS, &conf.meta_path
         ),
-        &conf.rocksdb_path,
+        &conf.meta_path,
     );
 
     conf.vector_path = ask(

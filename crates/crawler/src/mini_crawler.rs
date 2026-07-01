@@ -1,5 +1,4 @@
 use ahash::AHashMap;
-use dotenv_codegen::dotenv;
 use once_cell::sync::Lazy;
 use prieco_core::{CLIENT, PRIECO_CONFIG, icons};
 use scraper::{Html, Selector};

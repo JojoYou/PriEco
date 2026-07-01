@@ -3359,6 +3359,7 @@ dependencies = [
  "prieco_mini_crawler",
  "prieco_pagerank",
  "rand 0.9.2",
+ "rayon",
  "redb",
  "reqwest",
  "rocket",

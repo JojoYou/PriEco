@@ -15,20 +15,17 @@
 /*
   Import system libraries
 */
+#[cfg(feature = "cuda")]
+use std::io::{Cursor, Read};
 use std::{
     error::Error,
-    fs::{File, create_dir_all},
+    fs::{File, create_dir_all, read},
     hash::{Hash, Hasher},
     net::{Ipv4Addr, Ipv6Addr},
     path::Path,
     str::FromStr,
     sync::Arc,
     time::Duration as stdDuration,
-};
-#[cfg(feature = "cuda")]
-use std::{
-    fs::read,
-    io::{Cursor, Read},
 };
 
 /*
@@ -43,7 +40,7 @@ use cudarc::{
     nvrtc::compile_ptx,
 };
 use dashmap::DashSet;
-use heed::{Database as LMDB_DATABASE, Env, EnvFlags, EnvOpenOptions, types::Bytes};
+use heed::{Database as LMDB_DATABASE, Env, EnvOpenOptions, types::Bytes};
 use memmap2::{Mmap, MmapOptions};
 use ndarray::{Array, Array2, CowArray, IxDyn};
 use once_cell::sync::Lazy;
@@ -73,6 +70,7 @@ use tokio::task;
 use twox_hash::XxHash3_64;
 #[cfg(feature = "cuda")]
 use zstd::decode_all;
+use zstd::dict::DecoderDictionary;
 
 #[cfg(feature = "cuda")]
 use crate::{ID_SIZE, RECORD_SIZE};
@@ -202,7 +200,7 @@ pub struct PriEcoConfig {
     pub ip: String,
     pub port: i32,
     pub tantivy_path: String,
-    pub rocksdb_path: String,
+    pub meta_path: String,
     pub vector_path: String,
     pub worker_id: String,
     pub worker_concurrent: u32,
@@ -520,17 +518,10 @@ pub static LMDB_BLOB_STORAGE: Lazy<BlobStorage> = Lazy::new(|| {
 /*
   Index
 */
-pub static ROCKSDB_INDEX: Lazy<Arc<DB>> = Lazy::new(|| {
-    Arc::new({
-        let mut rocksdb_opts = Options::default();
-        rocksdb_opts.create_if_missing(true);
-        rocksdb_opts.set_write_buffer_size(256 * 1024 * 1024);
-        rocksdb_opts.set_max_write_buffer_number(4);
-        rocksdb_opts.set_min_write_buffer_number_to_merge(2);
-
-        DB::open(&rocksdb_opts, PRIECO_CONFIG.rocksdb_path.clone()).expect("Faile to open RocksDB")
-    })
-});
+pub static META_DICTIONARY: Lazy<Vec<u8>> =
+    Lazy::new(|| read("idx/prieco_zstd.dict").expect("Failed to load zstd dictionary into memory"));
+pub static META_DECODER: Lazy<DecoderDictionary<'static>> =
+    Lazy::new(|| DecoderDictionary::copy(&*META_DICTIONARY));
 
 pub struct MetaStorage {
     pub env: Env,
@@ -541,12 +532,12 @@ unsafe impl Send for MetaStorage {}
 unsafe impl Sync for MetaStorage {}
 
 pub static META_STORAGE: Lazy<MetaStorage> = Lazy::new(|| {
-    create_dir_all("/mnt/exssd/meta").unwrap();
+    create_dir_all(&PRIECO_CONFIG.meta_path).unwrap();
     let env = unsafe {
         EnvOpenOptions::new()
             .map_size(512 * 1024 * 1024 * 1024) // 512 GB
             .max_dbs(1)
-            .open(Path::new("/mnt/exssd/meta"))
+            .open(Path::new(&PRIECO_CONFIG.meta_path))
             .unwrap()
     };
 

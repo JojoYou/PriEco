@@ -46,6 +46,7 @@ zstd = { workspace = true }
 env_logger = { workspace = true }
 log = { workspace = true }
 symspell = { workspace = true }
+rayon = { workspace = true }
 
 [features]
 default = []
