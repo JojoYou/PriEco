@@ -13,5 +13,6 @@ homepage = "https://prieco.net"
 [dependencies]
 prieco_core = { workspace = true }
 rocksdb = { workspace = true }
+zstd = { workspace = true }
 flate2 = "1.1.9"
 tar = "0.4.44"

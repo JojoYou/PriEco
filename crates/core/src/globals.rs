@@ -17,7 +17,7 @@
 */
 use std::{
     error::Error,
-    fs::File,
+    fs::{File, create_dir_all},
     hash::{Hash, Hasher},
     net::{Ipv4Addr, Ipv6Addr},
     path::Path,
@@ -43,6 +43,7 @@ use cudarc::{
     nvrtc::compile_ptx,
 };
 use dashmap::DashSet;
+use heed::{Database as LMDB_DATABASE, Env, EnvFlags, EnvOpenOptions, types::Bytes};
 use memmap2::{Mmap, MmapOptions};
 use ndarray::{Array, Array2, CowArray, IxDyn};
 use once_cell::sync::Lazy;
@@ -490,6 +491,32 @@ pub static BLOB_STORAGE: Lazy<Arc<DB>> = Lazy::new(|| {
     })
 });
 
+pub struct BlobStorage {
+    pub env: Env,
+    pub db: LMDB_DATABASE<Bytes, Bytes>,
+}
+
+// LMDB env and database handles share across threads
+unsafe impl Send for BlobStorage {}
+unsafe impl Sync for BlobStorage {}
+
+pub static LMDB_BLOB_STORAGE: Lazy<BlobStorage> = Lazy::new(|| {
+    create_dir_all("/mnt/hdd/blobs").unwrap();
+    let env = unsafe {
+        EnvOpenOptions::new()
+            .map_size(1 * 1024 * 1024 * 1024 * 1024) // 1 TB
+            .max_dbs(1)
+            .open(Path::new("/mnt/hdd/blobs"))
+            .unwrap()
+    };
+    let mut wtxn = env.write_txn().unwrap();
+    let db = env
+        .create_database::<Bytes, Bytes>(&mut wtxn, Some("blobs"))
+        .unwrap();
+    wtxn.commit().unwrap();
+    BlobStorage { env, db }
+});
+
 /*
   Index
 */
@@ -503,6 +530,33 @@ pub static ROCKSDB_INDEX: Lazy<Arc<DB>> = Lazy::new(|| {
 
         DB::open(&rocksdb_opts, PRIECO_CONFIG.rocksdb_path.clone()).expect("Faile to open RocksDB")
     })
+});
+
+pub struct MetaStorage {
+    pub env: Env,
+    pub db: LMDB_DATABASE<Bytes, Bytes>,
+}
+
+unsafe impl Send for MetaStorage {}
+unsafe impl Sync for MetaStorage {}
+
+pub static META_STORAGE: Lazy<MetaStorage> = Lazy::new(|| {
+    create_dir_all("/mnt/exssd/meta").unwrap();
+    let env = unsafe {
+        EnvOpenOptions::new()
+            .map_size(512 * 1024 * 1024 * 1024) // 512 GB
+            .max_dbs(1)
+            .open(Path::new("/mnt/exssd/meta"))
+            .unwrap()
+    };
+
+    let mut wtxn = env.write_txn().unwrap();
+    let db = env
+        .create_database::<Bytes, Bytes>(&mut wtxn, Some("meta"))
+        .unwrap();
+    wtxn.commit().unwrap();
+
+    MetaStorage { env, db }
 });
 
 pub static TANTIVY_INDEX: Lazy<Arc<Index>> = Lazy::new(|| {
