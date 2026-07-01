@@ -1,11 +1,8 @@
-use tokio::task::JoinSet;
-
 use prieco_core::{CLIENT, META_STORAGE, WebDocument, url_to_id};
 
 pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
     let trimmed = query.trim();
 
-    // Combine & Sanitize
     let possible_domain = trimmed
         .replace('"', "")
         .replace('\'', "")
@@ -19,94 +16,102 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
     }
 
     let mut discovery_results = Vec::new();
-    let mut ping_tasks = JoinSet::new();
+    let mut ping_tasks = tokio::task::JoinSet::new();
 
-    for tld in &[
-        ".com",
-        ".net",
-        ".org",
-        ".info",
-        ".biz",
-        ".co",
-        ".io",
-        ".dev",
-        ".app",
-        ".ai",
-        ".tech",
-        ".xyz",
-        ".cloud",
-        ".software",
-        ".network",
-        ".digital",
-        ".me",
-        ".tv",
-        ".blog",
-        ".design",
-        ".art",
-        ".media",
-        ".video",
-        ".news",
-        ".shop",
-        ".store",
-        ".agency",
-        ".global",
-        ".online",
-        ".site",
-        ".pro",
-        ".company",
-        ".uk",
-        ".de",
-        ".fr",
-        ".nl",
-        ".eu",
-        ".it",
-        ".es",
-        ".pl",
-        ".ch",
-        ".se",
-        ".no",
-        ".dk",
-        ".fi",
-        ".us",
-        ".ca",
-        ".mx",
-        ".br",
-        ".jp",
-        ".cn",
-        ".in",
-        ".au",
-        ".nz",
-        ".sg",
-    ] {
-        let domain = format!("{}{}", possible_domain, tld);
-        let canonical_url = format!("https://{}/", domain);
+    let urls_to_ping: Vec<(String, String)> = {
+        let mut pending = Vec::new();
+        let rtxn_opt = META_STORAGE.env.read_txn().ok();
 
-        let already_indexed = match META_STORAGE.env.read_txn() {
-            Ok(rtxn) => [
-                canonical_url.clone(),
-                format!("https://www.{}/", domain),
-                format!("http://{}/", domain),
-                format!("http://www.{}/", domain),
-            ]
-            .iter()
-            .any(|url| {
-                matches!(
-                    META_STORAGE.db.get(&rtxn, &url_to_id(url).to_be_bytes()),
-                    Ok(Some(_))
-                )
-            }),
-            Err(_) => false,
-        };
+        for tld in &[
+            ".com",
+            ".net",
+            ".org",
+            ".info",
+            ".biz",
+            ".co",
+            ".io",
+            ".dev",
+            ".app",
+            ".ai",
+            ".tech",
+            ".xyz",
+            ".cloud",
+            ".software",
+            ".network",
+            ".digital",
+            ".me",
+            ".tv",
+            ".blog",
+            ".design",
+            ".art",
+            ".media",
+            ".video",
+            ".news",
+            ".shop",
+            ".store",
+            ".agency",
+            ".global",
+            ".online",
+            ".site",
+            ".pro",
+            ".company",
+            ".uk",
+            ".de",
+            ".fr",
+            ".nl",
+            ".eu",
+            ".it",
+            ".es",
+            ".pl",
+            ".ch",
+            ".se",
+            ".no",
+            ".dk",
+            ".fi",
+            ".us",
+            ".ca",
+            ".mx",
+            ".br",
+            ".jp",
+            ".cn",
+            ".in",
+            ".au",
+            ".nz",
+            ".sg",
+        ] {
+            let domain = format!("{}{}", possible_domain, tld);
+            let canonical_url = format!("https://{}/", domain);
 
-        if already_indexed {
-            continue;
+            let already_indexed = if let Some(ref rtxn) = rtxn_opt {
+                [
+                    canonical_url.clone(),
+                    format!("https://www.{}/", domain),
+                    format!("http://{}/", domain),
+                    format!("http://www.{}/", domain),
+                ]
+                .iter()
+                .any(|url| {
+                    matches!(
+                        META_STORAGE.db.get(rtxn, &url_to_id(url).to_be_bytes()),
+                        Ok(Some(_))
+                    )
+                })
+            } else {
+                false
+            };
+
+            if !already_indexed {
+                pending.push((canonical_url, domain));
+            }
         }
+        pending
+    };
 
-        let domain_clone = domain.clone();
+    for (canonical_url, domain_clone) in urls_to_ping {
         ping_tasks.spawn(async move {
             if let Ok(res) = CLIENT
                 .head(&canonical_url)
-                .timeout(std::time::Duration::from_secs(1))
+                .timeout(std::time::Duration::from_millis(400))
                 .send()
                 .await
             {
@@ -118,51 +123,47 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
         });
     }
 
-    // Create results
-    let mut discovered_urls = Vec::new();
-    while let Some(task_res) = ping_tasks.join_next().await {
-        if let Ok(Some((url, domain))) = task_res {
-            discovered_urls.push(url.clone());
-
-            // Construct results
-            let mock_doc = WebDocument {
-                url: url.clone(),
-                title: domain.clone(),
-                description: String::from("Adding to PriEco index..."),
-                content: String::new(),
-                favicon: format!(
-                    "https://www.google.com/s2/favicons?domain={}&sz=512",
-                    domain
-                ),
-                image: String::new(),
-                keywords: String::new(),
-                safe_s: true,
-                html: String::new(),
-                lang: String::new(),
-                loc: String::new(),
-                impressions: 0,
-                clicks: 0,
-                confidence: 1.0,
-                effort: 0.0,
-                qna: 0.0,
-                sts: 0.0,
-                load: 0.0,
-                date: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs() as i64,
-                search_score: 0.0,
-            };
-
-            discovery_results.push(mock_doc);
+    let _ = tokio::time::timeout(std::time::Duration::from_millis(450), async {
+        while let Some(task_res) = ping_tasks.join_next().await {
+            if let Ok(Some((url, domain))) = task_res {
+                let mock_doc = WebDocument {
+                    url: url.clone(),
+                    title: domain.clone(),
+                    description: String::from("Adding to PriEco index..."),
+                    content: String::new(),
+                    favicon: format!(
+                        "https://www.google.com/s2/favicons?domain={}&sz=512",
+                        domain
+                    ),
+                    image: String::new(),
+                    keywords: String::new(),
+                    safe_s: true,
+                    html: String::new(),
+                    lang: String::new(),
+                    loc: String::new(),
+                    impressions: 0,
+                    clicks: 0,
+                    confidence: 1.0,
+                    effort: 0.0,
+                    qna: 0.0,
+                    sts: 0.0,
+                    load: 0.0,
+                    date: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs() as i64,
+                    search_score: 0.0,
+                };
+                discovery_results.push(mock_doc);
+            }
         }
-    }
+    })
+    .await;
 
     // Send URLs to crawler
-    if !discovered_urls.is_empty() {
-        let mut urls_iter = discovered_urls.into_iter();
-        let page_url = urls_iter.next().unwrap();
-        let links: Vec<String> = urls_iter.collect();
+    if !discovery_results.is_empty() {
+        let page_url = discovery_results[0].url.clone();
+        let links: Vec<String> = discovery_results.iter().map(|d| d.url.clone()).collect();
 
         tokio::spawn(async move {
             let payload = serde_json::json!({
@@ -170,13 +171,12 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
                 "links": links
             });
 
-            let res = CLIENT
+            if let Err(e) = CLIENT
                 .post("http://0.0.0.0:8090/web-discovery")
                 .json(&payload)
                 .send()
-                .await;
-
-            if let Err(e) = res {
+                .await
+            {
                 println!("Failed to batch send discovery to crawler queue: {}", e);
             }
         });
