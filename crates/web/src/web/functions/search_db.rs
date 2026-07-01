@@ -200,21 +200,15 @@ pub async fn run_json(
                 return id_score_vec;
             }
 
-            let tlds = [
-                ".com", ".net", ".org", ".io", ".co", ".dev", ".app", ".ai", ".info", ".biz",
-                ".me", ".tv", ".us", ".uk", ".ca", ".de", ".fr", ".nl", ".eu", ".xyz", ".tech",
-                ".online", ".site",
-            ];
-            let prefixes = [
-                "",
-                "www.",
-                "http://",
-                "http://www.",
-                "https://",
-                "https://www.",
-            ];
-            for tld in &tlds {
-                for prefix in &prefixes {
+            for tld in &[".com", ".net", ".org"] {
+                for prefix in &[
+                    "",
+                    "www.",
+                    "http://",
+                    "http://www.",
+                    "https://",
+                    "https://www.",
+                ] {
                     let url = format!("{}{}{}/", prefix, trimmed, tld);
                     let id = url_to_id(&url);
                     id_score_vec.push((id, 0.0));
