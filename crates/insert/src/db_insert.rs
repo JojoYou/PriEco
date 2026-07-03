@@ -12,7 +12,7 @@ use std::{
 /*
   Import external libraries
 */
-use ahash::AHashSet;
+use fjall::PersistMode;
 use zip::ZipArchive;
 use zstd::stream::{Encoder as ZstdEncoder, decode_all};
 
@@ -20,7 +20,7 @@ use zstd::stream::{Encoder as ZstdEncoder, decode_all};
   Import own libraries
 */
 use prieco_core::{
-    ID_SIZE, INSERTER_IMPORT_DIR, META_DICTIONARY, META_STORAGE, PRIECO_CONFIG, RECORD_SIZE,
+    ID_SIZE, INSERTER_IMPORT_DIR, META_DICTIONARY, PRIECO_CONFIG, PRIECO_FJALL, RECORD_SIZE,
     TANTIVY_INDEX, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_DIM, WebDocument, file_exists,
     globals::icons, url_to_id,
 };
@@ -95,10 +95,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     let keywords_field = TANTIVY_INDEX.schema().get_field("keywords").unwrap();
     let safe_s_field = TANTIVY_INDEX.schema().get_field("safe_s").unwrap();
 
-    // Create LMDB Write Transaction and Zstd Compressor
-    let mut wtxn = META_STORAGE.env.write_txn()?;
     let mut compressor = zstd::bulk::Compressor::with_dictionary(3, &META_DICTIONARY)?;
-    let mut batch_ids: AHashSet<u64> = AHashSet::with_capacity(2_000);
 
     // Process files
     let mut vector_idx_buffer: HashMap<u64, Vec<f32>> = HashMap::with_capacity(1_000_000);
@@ -129,9 +126,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                 let id = url_to_id(&url);
 
                 // Preserve uniqness
-                if batch_ids.contains(&id)
-                    || META_STORAGE.db.get(&wtxn, &id.to_be_bytes())?.is_some()
-                {
+                if PRIECO_FJALL.meta.get(&id.to_be_bytes()).unwrap().is_some() {
                     continue;
                 }
 
@@ -175,14 +170,12 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     search_score: 0.0,
                 };
 
-                batch_ids.insert(id);
-
-                /* LMDB */
+                /* FJALL */
                 let doc_bytes = serde_json::to_vec(&doc)?;
                 let compressed_doc = compressor.compress(&doc_bytes)?;
-                META_STORAGE
-                    .db
-                    .put(&mut wtxn, &id.to_be_bytes(), &compressed_doc)?;
+                PRIECO_FJALL
+                    .meta
+                    .insert(&id.to_be_bytes(), &compressed_doc)?;
 
                 /* Tantivy */
                 TANTIVY_WRITER.lock().add_document(tantivy::doc!(
@@ -198,9 +191,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
 
                 inserted += 1;
                 if inserted % 1_000 == 0 {
-                    wtxn.commit()?;
-                    wtxn = META_STORAGE.env.write_txn()?;
-                    batch_ids.clear();
                     println!("{}: Inserted {}", icons::DB_INSERT, inserted);
                 }
 
@@ -217,11 +207,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
             }
 
             // Commit after file
-            batch_ids.clear();
-
-            wtxn.commit()?;
-            META_STORAGE.env.force_sync()?;
-            wtxn = META_STORAGE.env.write_txn()?;
+            PRIECO_FJALL.meta_db.persist(PersistMode::SyncAll)?;
 
             println!("{}: META commited", icons::DB_INSERT);
 

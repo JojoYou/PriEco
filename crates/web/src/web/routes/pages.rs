@@ -45,7 +45,7 @@ use urlencoding::encode;
 */
 use crate::web::{functions::search_endpoint, modules::settings};
 use prieco_core::{
-    META_STORAGE,
+    TANTIVY_INDEX,
     globals::{ANALYTICS, CSS_VERSION, EmbeddingService, JS_VERSION, UserAgent},
 };
 
@@ -292,10 +292,18 @@ pub async fn results_htmls(
 #[get("/stats")]
 pub async fn stats(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host<'_>) -> Template {
     // Index
-    let index_size_raw: u64 = match META_STORAGE.env.read_txn() {
-        Ok(rtxn) => META_STORAGE.db.len(&rtxn).unwrap_or(0) as u64,
+    let index_size_raw: u64 = match TANTIVY_INDEX.reader() {
+        Ok(reader) => {
+            let searcher = reader.searcher();
+            searcher
+                .segment_readers()
+                .iter()
+                .map(|s| s.num_docs() as u64)
+                .sum()
+        }
         Err(_) => 0,
     };
+
     let index_display = if index_size_raw >= 1_000_000_000 {
         (
             format!("{:.2}", index_size_raw as f64 / 1_000_000_000.0),
@@ -464,7 +472,7 @@ pub struct SettingsForm<'r> {
 #[post("/settings_update", data = "<form>")]
 pub fn settings_update(form: Form<SettingsForm<'_>>, cookie_jar: &CookieJar<'_>) -> Redirect {
     // Helpers
-    let mut remove_cookie = |name: &str| {
+    let remove_cookie = |name: &str| {
         let mut cookie = Cookie::build((name.to_string(), ""))
             .path("/")
             .same_site(SameSite::Strict)
@@ -474,7 +482,7 @@ pub fn settings_update(form: Form<SettingsForm<'_>>, cookie_jar: &CookieJar<'_>)
         cookie_jar.add(cookie);
     };
 
-    let mut add_cookie = |name: &str, value: &str| {
+    let add_cookie = |name: &str, value: &str| {
         cookie_jar.add(
             Cookie::build((name.to_string(), value.to_string()))
                 .path("/")

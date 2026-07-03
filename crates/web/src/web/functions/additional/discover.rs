@@ -1,4 +1,4 @@
-use prieco_core::{CLIENT, META_STORAGE, WebDocument, url_to_id};
+use prieco_core::{CLIENT, PRIECO_FJALL, WebDocument, url_to_id};
 
 pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
     let trimmed = query.trim();
@@ -20,7 +20,6 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
 
     let urls_to_ping: Vec<(String, String)> = {
         let mut pending = Vec::new();
-        let rtxn_opt = META_STORAGE.env.read_txn().ok();
 
         for tld in &[
             ".com",
@@ -82,23 +81,19 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
             let domain = format!("{}{}", possible_domain, tld);
             let canonical_url = format!("https://{}/", domain);
 
-            let already_indexed = if let Some(ref rtxn) = rtxn_opt {
-                [
-                    canonical_url.clone(),
-                    format!("https://www.{}/", domain),
-                    format!("http://{}/", domain),
-                    format!("http://www.{}/", domain),
-                ]
-                .iter()
-                .any(|url| {
-                    matches!(
-                        META_STORAGE.db.get(rtxn, &url_to_id(url).to_be_bytes()),
-                        Ok(Some(_))
-                    )
-                })
-            } else {
-                false
-            };
+            let already_indexed = [
+                canonical_url.clone(),
+                format!("https://www.{}/", domain),
+                format!("http://{}/", domain),
+                format!("http://www.{}/", domain),
+            ]
+            .iter()
+            .any(|url| {
+                matches!(
+                    PRIECO_FJALL.meta.get(&url_to_id(url).to_be_bytes()),
+                    Ok(Some(_))
+                )
+            });
 
             if !already_indexed {
                 pending.push((canonical_url, domain));

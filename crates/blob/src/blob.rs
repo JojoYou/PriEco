@@ -21,31 +21,29 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use fjall::PersistMode;
 /*
   Import external libraries
 */
 use flate2::read::GzDecoder;
-use rocksdb::IteratorMode;
 use tar::Archive;
 
 /*
   Import own libraries
 */
 use prieco_core::{
-    BLOB_IMPORT_DIR, BLOB_STORAGE, LMDB_BLOB_STORAGE,
+    BLOB_IMPORT_DIR, BLOB_STORAGE, PRIECO_FJALL,
     globals::{colors, icons},
 };
 
-const MIGRATION_CHECKPOINT: &str = "migration_checkpoint";
-
 pub fn run() {
-    /*println!("Migrating!");
-    migrate_rocksdb_to_lmdb_blob();
+    println!("Migrating!");
+    migrate_blob_to_fjall();
     println!(
         "{}Migration to LMDB completed!{}",
         colors::GREEN,
         colors::RESET
-    );*/
+    );
 
     let directories = find_all_directories();
 
@@ -271,67 +269,57 @@ fn find_all_directories() -> Vec<PathBuf> {
 }
 
 /* Temp */
-pub fn migrate_rocksdb_to_lmdb_blob() {
-    let checkpoint = std::fs::read(MIGRATION_CHECKPOINT).ok();
+const BLOB_V2_PROGRESS_FILE: &str = "blob_v2_migration_progress.bin";
 
-    let iter = match &checkpoint {
-        Some(last_key) => {
-            println!(
-                "{}: Resuming migration from checkpoint ({} bytes key)",
-                icons::BLOB,
-                last_key.len()
-            );
+pub fn migrate_blob_to_fjall() {
+    let last_migrated_key: Option<[u8; 8]> = std::fs::read(BLOB_V2_PROGRESS_FILE)
+        .ok()
+        .and_then(|buf| buf.try_into().ok());
 
-            BLOB_STORAGE.iterator(IteratorMode::From(last_key, rocksdb::Direction::Forward))
-        }
-        None => {
-            println!("{}: Starting fresh migration", icons::BLOB);
-            BLOB_STORAGE.iterator(IteratorMode::Start)
-        }
+    let iter_mode = match &last_migrated_key {
+        Some(key) => rocksdb::IteratorMode::From(key, rocksdb::Direction::Forward),
+        None => rocksdb::IteratorMode::Start,
     };
 
-    let mut count = 0u64;
-    let mut skipped = 0u64;
-    let mut last_key: Option<Box<[u8]>> = None;
-    let mut wtxn = LMDB_BLOB_STORAGE.env.write_txn().unwrap();
-    let mut first = checkpoint.is_some();
+    println!(
+        "{}Starting RocksDB -> Fjall (Blob) migration!{}",
+        colors::BLUE,
+        colors::RESET
+    );
 
-    for item in iter {
+    let mut count: u64 = 0;
+    let mut last_key: Option<[u8; 8]> = None;
+    let mut skip_first = last_migrated_key.is_some();
+
+    for item in BLOB_STORAGE.iterator(iter_mode) {
         let (key, value) = item.unwrap();
+        count += 1;
 
-        if first {
-            first = false;
-            skipped += 1;
+        if skip_first {
+            skip_first = false;
             continue;
         }
 
-        LMDB_BLOB_STORAGE.db.put(&mut wtxn, &*key, &*value).unwrap();
+        let key_arr: [u8; 8] = key.as_ref().try_into().unwrap();
 
-        last_key = Some(key);
-        count += 1;
+        PRIECO_FJALL.blobs.insert(key_arr, &*value).unwrap();
+
+        last_key = Some(key_arr);
 
         if count % 10_000 == 0 {
-            wtxn.commit().unwrap();
-
-            if let Some(ref k) = last_key {
-                std::fs::write(MIGRATION_CHECKPOINT, k.as_ref()).unwrap();
+            if let Some(k) = last_key {
+                std::fs::write(BLOB_V2_PROGRESS_FILE, k).unwrap();
             }
 
-            wtxn = LMDB_BLOB_STORAGE.env.write_txn().unwrap();
-
-            println!(
-                "{}: Migrated {} entries (skipped {} on resume)",
-                icons::BLOB,
-                count,
-                skipped
-            );
+            println!("{}Written!{} {}", colors::BLUE, colors::RESET, count);
         }
     }
 
-    wtxn.commit().unwrap();
-    if let Some(ref k) = last_key {
-        std::fs::write(MIGRATION_CHECKPOINT, k.as_ref()).unwrap();
+    if let Some(k) = last_key {
+        std::fs::write(BLOB_V2_PROGRESS_FILE, k).unwrap();
     }
+
+    PRIECO_FJALL.blob_db.persist(PersistMode::SyncAll).unwrap();
 
     println!(
         "{}: {}Migration complete: {} entries migrated{}",

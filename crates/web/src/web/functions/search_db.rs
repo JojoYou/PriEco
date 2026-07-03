@@ -30,6 +30,7 @@ use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 use rocket::{State, serde::json::Json};
 use serde_json::Value as Json_Value;
 use tantivy::{collector::TopDocs, query::QueryParser, schema::Value};
+use zstd::bulk::Decompressor;
 
 /*
   Import own libraries
@@ -40,7 +41,7 @@ use crate::web::functions::{
     ranking::{self},
 };
 use prieco_core::{
-    META_DECODER, META_STORAGE,
+    META_DECODER, PRIECO_FJALL,
     globals::{
         EmbeddingService, PAGERANK, RERANKER, SearchResult, TANTIVY_INDEX, TANTIVY_READER,
         VECTOR_CENTROPOIDS, WebDocument, colors,
@@ -485,61 +486,62 @@ fn fetch_documents(
             unique_ids.insert(id);
         }
     }
-    let ids_to_fetch: Vec<u64> = unique_ids.into_iter().collect();
+
+    let mut ids_to_fetch: Vec<u64> = unique_ids.into_iter().collect();
+    ids_to_fetch.sort_unstable(); // Optimistic attempt to increase locality
 
     let chunk_size = 100;
     let fetched_docs: HashMap<u64, WebDocument> = ids_to_fetch
         .par_chunks(chunk_size)
-        .flat_map_iter(|chunk| {
-            let rtxn = match META_STORAGE.env.read_txn() {
-                Ok(txn) => txn,
-                Err(_) => return vec![],
-            };
+        .map_init(
+            || Decompressor::with_prepared_dictionary(&*META_DECODER).unwrap(),
+            |decompressor, chunk| {
+                let mut local_docs = Vec::with_capacity(chunk.len());
 
-            let mut decompressor =
-                match zstd::bulk::Decompressor::with_prepared_dictionary(&*META_DECODER) {
-                    Ok(d) => d,
-                    Err(_) => return vec![],
-                };
+                for &id in chunk {
+                    let key = id.to_be_bytes();
 
-            let mut local_docs = Vec::with_capacity(chunk.len());
+                    // Get data
+                    let compressed_data = match PRIECO_FJALL.meta.get(&key) {
+                        Ok(Some(data)) => data,
+                        _ => {
+                            continue;
+                        }
+                    };
 
-            for &id in chunk {
-                let key = id.to_be_bytes();
+                    // Decompress
+                    let decompressed_buf =
+                        match decompressor.decompress(compressed_data.as_ref(), 1024 * 1024) {
+                            Ok(buf) => buf,
+                            Err(e) => {
+                                println!(
+                                    "{}ZSTD DECODE ERROR for ID {}: {}{}",
+                                    colors::RED,
+                                    id,
+                                    e,
+                                    colors::RESET
+                                );
+                                continue;
+                            }
+                        };
 
-                let compressed_data = match META_STORAGE.db.get(&rtxn, &key) {
-                    Ok(Some(data)) => data,
-                    Ok(None) => continue,
-                    Err(_) => continue,
-                };
-
-                let decompressed_buf = match decompressor.decompress(compressed_data, 1024 * 1024) {
-                    Ok(buf) => buf,
-                    Err(e) => {
-                        println!(
-                            "{}ZSTD DECODE ERROR for ID{} {}: {}",
+                    // Deserialize
+                    match serde_json::from_slice::<WebDocument>(&decompressed_buf) {
+                        Ok(doc) => local_docs.push((id, doc)),
+                        Err(e) => println!(
+                            "{}JSON ERROR for ID {}: {}{}",
                             colors::RED,
-                            colors::RESET,
                             id,
-                            e
-                        );
-                        continue;
+                            e,
+                            colors::RESET
+                        ),
                     }
-                };
-
-                match serde_json::from_slice::<WebDocument>(&decompressed_buf) {
-                    Ok(doc) => local_docs.push((id, doc)),
-                    Err(e) => println!(
-                        "{}JSON ERROR for ID{} {}: {}",
-                        colors::RED,
-                        colors::RESET,
-                        id,
-                        e
-                    ),
                 }
-            }
-            local_docs
-        })
+
+                local_docs
+            },
+        )
+        .flatten()
         .collect();
 
     let mut final_results: HashMap<&'static str, Vec<WebDocument>> = HashMap::new();

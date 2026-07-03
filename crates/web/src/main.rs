@@ -60,9 +60,9 @@ pub mod web;
 use crate::web::routes::{apis::*, assets::*, pages::*};
 use prieco_blob as blob;
 use prieco_core::{
-    ANALYTICS, BLOB_STORAGE, EmbeddingService, PAGERANK, PRIECO_CONFIG, TANTIVY_READER,
-    TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_MODEL, VECTOR_EMBEDDING_TOKENIZER, colors,
-    icons,
+    ANALYTICS, EmbeddingService, META_DECODER, PAGERANK, PRIECO_CONFIG, PRIECO_FJALL,
+    TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_MODEL,
+    VECTOR_EMBEDDING_TOKENIZER, colors, icons,
 };
 use prieco_insert::db_insert;
 use prieco_mini_crawler::mini_crawler;
@@ -227,10 +227,13 @@ async fn rocket() -> _ {
 */
 fn thread_manager() {
     // Initialize data
-    let _ = BLOB_STORAGE;
+    let _ = &*PRIECO_FJALL;
+    let _ = &*META_DECODER;
+
     let _ = TANTIVY_READER;
     let _ = TANTIVY_WRITER;
     let _ = PAGERANK;
+
     println!("Starting GPU!");
     let _ = VECTOR_CENTROPOIDS.search(&vec![0.0; 384], 1, 1);
 

@@ -61,7 +61,7 @@ serde = "1.0.219"
 serde_json = "1.0.142"
 
 # Blob storage
-heed = "0.22.1" # LMDB
+fjall = "3.1.5"
 flate2 = "1.1.9" # Streamed file compression and decompression (RAM)
 tar = "0.4.44" # Tar archive
 

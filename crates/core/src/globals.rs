@@ -19,7 +19,7 @@
 use std::io::{Cursor, Read};
 use std::{
     error::Error,
-    fs::{File, create_dir_all, read},
+    fs::{File, read},
     hash::{Hash, Hasher},
     net::{Ipv4Addr, Ipv6Addr},
     path::Path,
@@ -40,7 +40,10 @@ use cudarc::{
     nvrtc::compile_ptx,
 };
 use dashmap::DashSet;
-use heed::{Database as LMDB_DATABASE, Env, EnvOpenOptions, types::Bytes};
+use fjall::{
+    CompressionType, Database as FJALL_DATABASE, Keyspace, KeyspaceCreateOptions,
+    KvSeparationOptions, config::CompressionPolicy,
+};
 use memmap2::{Mmap, MmapOptions};
 use ndarray::{Array, Array2, CowArray, IxDyn};
 use once_cell::sync::Lazy;
@@ -463,6 +466,64 @@ pub static COUNTRY_TO_LANG: Lazy<Arc<AHashMap<&'static str, &'static str>>> = La
 });
 
 /*
+  PriEco Storage
+  Description: FJALL key-value storage. Stores results meta data and html blobs
+*/
+pub static META_DICTIONARY: Lazy<Vec<u8>> =
+    Lazy::new(|| read("idx/prieco_zstd.dict").expect("Failed to load zstd dictionary into memory"));
+pub static META_DECODER: Lazy<DecoderDictionary<'static>> =
+    Lazy::new(|| DecoderDictionary::copy(&*META_DICTIONARY));
+
+pub struct PriecoStorage {
+    pub meta_db: FJALL_DATABASE,
+    pub meta: Keyspace,
+    pub blob_db: FJALL_DATABASE,
+    pub blobs: Keyspace,
+}
+
+pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
+    // Meta storage
+    let meta_db = FJALL_DATABASE::builder(Path::new(&PRIECO_CONFIG.meta_path))
+        .worker_threads(4)
+        .cache_size(4 * 1024 * 1024 * 1024)
+        .open()
+        .expect("Failed to open Meta Fjall DB");
+
+    let meta_opts = KeyspaceCreateOptions::default()
+        .data_block_compression_policy(CompressionPolicy::disabled())
+        .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
+
+    let meta = meta_db.keyspace("meta", || meta_opts).unwrap();
+
+    // Blob storage
+    let blob_db = FJALL_DATABASE::builder(Path::new("/mnt/hdd/blobs"))
+        .worker_threads(2)
+        .cache_size(512 * 1024 * 1024)
+        .open()
+        .expect("Failed to open Blob Fjall DB");
+
+    let blob_opts = KeyspaceCreateOptions::default()
+        .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
+        .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
+        .with_kv_separation(Some(KvSeparationOptions {
+            compression: CompressionType::None,
+            file_target_size: 64 * 1024 * 1024,
+            separation_threshold: 100,
+            staleness_threshold: 0.5,
+            age_cutoff: 0.0,
+        }));
+
+    let blobs = blob_db.keyspace("blobs", || blob_opts).unwrap();
+
+    Arc::new(PriecoStorage {
+        meta_db,
+        meta,
+        blob_db,
+        blobs,
+    })
+});
+
+/*
   Blob storage
   Description: RocksDB for html blobs storage. Designed for high capacity HDD, usage of SSD is beneficial too
 */
@@ -489,71 +550,16 @@ pub static BLOB_STORAGE: Lazy<Arc<DB>> = Lazy::new(|| {
     })
 });
 
-pub struct BlobStorage {
-    pub env: Env,
-    pub db: LMDB_DATABASE<Bytes, Bytes>,
-}
-
-// LMDB env and database handles share across threads
-unsafe impl Send for BlobStorage {}
-unsafe impl Sync for BlobStorage {}
-
-pub static LMDB_BLOB_STORAGE: Lazy<BlobStorage> = Lazy::new(|| {
-    create_dir_all("/mnt/hdd/blobs").unwrap();
-    let env = unsafe {
-        EnvOpenOptions::new()
-            .map_size(1 * 1024 * 1024 * 1024 * 1024) // 1 TB
-            .max_dbs(1)
-            .open(Path::new("/mnt/hdd/blobs"))
-            .unwrap()
-    };
-    let mut wtxn = env.write_txn().unwrap();
-    let db = env
-        .create_database::<Bytes, Bytes>(&mut wtxn, Some("blobs"))
-        .unwrap();
-    wtxn.commit().unwrap();
-    BlobStorage { env, db }
-});
-
 /*
   Index
 */
-pub static META_DICTIONARY: Lazy<Vec<u8>> =
-    Lazy::new(|| read("idx/prieco_zstd.dict").expect("Failed to load zstd dictionary into memory"));
-pub static META_DECODER: Lazy<DecoderDictionary<'static>> =
-    Lazy::new(|| DecoderDictionary::copy(&*META_DICTIONARY));
-
-pub struct MetaStorage {
-    pub env: Env,
-    pub db: LMDB_DATABASE<Bytes, Bytes>,
-}
-
-unsafe impl Send for MetaStorage {}
-unsafe impl Sync for MetaStorage {}
-
-pub static META_STORAGE: Lazy<MetaStorage> = Lazy::new(|| {
-    create_dir_all(&PRIECO_CONFIG.meta_path).unwrap();
-    let env = unsafe {
-        EnvOpenOptions::new()
-            .map_size(512 * 1024 * 1024 * 1024) // 512 GB
-            .max_dbs(1)
-            .open(Path::new(&PRIECO_CONFIG.meta_path))
-            .unwrap()
-    };
-
-    let mut wtxn = env.write_txn().unwrap();
-    let db = env
-        .create_database::<Bytes, Bytes>(&mut wtxn, Some("meta"))
-        .unwrap();
-    wtxn.commit().unwrap();
-
-    MetaStorage { env, db }
-});
-
 pub static TANTIVY_INDEX: Lazy<Arc<Index>> = Lazy::new(|| {
     // Build schema
     let mut builder = Schema::builder();
+
+    // Document ID
     builder.add_u64_field("doc_id", STORED | INDEXED);
+
     builder.add_text_field("url", STRING);
     builder.add_text_field("title", TEXT);
     builder.add_text_field("description", TEXT);
