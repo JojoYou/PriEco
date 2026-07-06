@@ -16,13 +16,12 @@
   Import system libraries
 */
 use std::{
-    error::Error,
     fs::{File, create_dir_all, read_dir, remove_dir_all, remove_file},
     io::Read,
     path::{Path, PathBuf},
 };
 
-use fjall::{Keyspace, PersistMode};
+use fjall::PersistMode;
 /*
   Import external libraries
 */
@@ -33,10 +32,8 @@ use tar::Archive;
   Import own libraries
 */
 use prieco_core::{
-    BLOB_IMPORT_DIR, BLOB_STORAGE, META_DECODER, PRIECO_FJALL, TANTIVY_INDEX, TANTIVY_INDEX2,
-    TANTIVY_WRITER, TANTIVY_WRITER2, WebDocument,
+    BLOB_IMPORT_DIR, BLOB_STORAGE, PRIECO_FJALL,
     globals::{colors, icons},
-    url_to_domain_id,
 };
 
 pub fn run() {
@@ -56,10 +53,10 @@ pub fn run() {
     println!("Migrating tantivy");
     if let Err(e) = rebuild_tantivy_index_v2() {
         println!("Tantivy rebuild: {}", e);
-    };*/
+    };
     println!("Merging tantivy");
     force_merge_index();
-    println!("All blob operations are done!");
+    println!("All blob operations are done!");*/
 
     let directories = find_all_directories();
 
@@ -346,7 +343,7 @@ pub fn migrate_blob_to_fjall() {
         colors::RESET
     );
 }
-
+/*
 pub fn rebuild_tantivy_index_v2() -> Result<(), Box<dyn std::error::Error>> {
     let schema = TANTIVY_INDEX2.schema();
     let doc_id_field = schema.get_field("doc_id")?;
@@ -425,3 +422,4 @@ pub fn force_merge_index() {
         Err(e) => eprintln!("Merge failed: {}", e),
     }
 }
+*/

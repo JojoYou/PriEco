@@ -49,8 +49,8 @@ use memmap2::{Mmap, MmapOptions};
 use ndarray::{Array, Array2, CowArray, IxDyn};
 use once_cell::sync::Lazy;
 use ort::{
-    Environment, ExecutionProvider, GraphOptimizationLevel, InMemorySession, SessionBuilder, Value,
-    tensor::OrtOwnedTensor,
+    Environment, ExecutionProvider, GraphOptimizationLevel, InMemorySession, LoggingLevel,
+    SessionBuilder, Value, tensor::OrtOwnedTensor,
 };
 use parking_lot::{Condvar, Mutex, RwLock};
 #[cfg(feature = "cuda")]
@@ -72,7 +72,7 @@ use tantivy::{
     },
     tokenizer::{TextAnalyzer, Token, TokenStream, Tokenizer as TANTIVY_TOKENIZER},
 };
-use tokenizers::{PaddingParams, PaddingStrategy, Tokenizer};
+use tokenizers::{PaddingParams, PaddingStrategy, Tokenizer, TruncationParams};
 use tokio::task;
 use twox_hash::XxHash3_64;
 #[cfg(feature = "cuda")]
@@ -616,60 +616,6 @@ pub static TANTIVY_WRITER: Lazy<Arc<Mutex<IndexWriter>>> = Lazy::new(|| {
     ))
 });
 
-pub static TANTIVY_INDEX2: Lazy<Arc<Index>> = Lazy::new(|| {
-    // Build schema
-    let mut builder = Schema::builder();
-
-    builder.add_u64_field("doc_id", STORED | INDEXED);
-    builder.add_u64_field("domain_id", INDEXED | FAST);
-
-    let multilingual = TextFieldIndexing::default()
-        .set_tokenizer("multilingual")
-        .set_index_option(IndexRecordOption::WithFreqsAndPositions);
-    let text_opts = TextOptions::default().set_indexing_options(multilingual);
-
-    builder.add_text_field("title", text_opts.clone());
-    builder.add_text_field("description", text_opts.clone());
-    builder.add_text_field("content", text_opts.clone());
-    builder.add_text_field("keywords", text_opts);
-
-    builder.add_text_field("lang", STRING | FAST);
-    builder.add_text_field("loc", STRING | FAST);
-    builder.add_i64_field("date", INDEXED | FAST);
-    builder.add_bool_field("safe_s", INDEXED | FAST);
-
-    let schema = builder.build();
-
-    // Open index
-    let dir = MmapDirectory::open(Path::new("/mnt/ssd/tantivy"))
-        .expect("Failed to open Tantivy V2 directory");
-    let index = Index::open_or_create(dir, schema.clone()).expect("Failed to open Tantivy index");
-
-    index
-        .tokenizers()
-        .register("multilingual", TextAnalyzer::from(Multilingual::new()));
-
-    Arc::new(index)
-});
-
-pub static TANTIVY_READER2: Lazy<Arc<IndexReader>> = Lazy::new(|| {
-    Arc::new(
-        TANTIVY_INDEX2
-            .reader_builder()
-            .reload_policy(ReloadPolicy::OnCommitWithDelay)
-            .try_into()
-            .expect("Failed to create Tantivy reader"),
-    )
-});
-
-pub static TANTIVY_WRITER2: Lazy<Arc<Mutex<IndexWriter>>> = Lazy::new(|| {
-    Arc::new(Mutex::new(
-        TANTIVY_INDEX2
-            .writer(TANTIVY_HEAP_SIZE)
-            .expect("Failed to create Tantivy V2 writer"),
-    ))
-});
-
 // Multilang tokenization
 #[derive(Clone)]
 pub struct Multilingual(Arc<CHARABIA_TOKENIZER<'static>>);
@@ -1162,7 +1108,7 @@ impl PageRank {
 }
 
 /*
-  Reranker
+Reranker
 */
 pub static BGE_MODEL: &[u8] = include_bytes!("../../../data/bge/model.onnx");
 pub static BGE_TOKENIZER: &[u8] = include_bytes!("../../../data/bge/tokenizer.json");
@@ -1177,20 +1123,29 @@ impl Reranker {
     pub fn new() -> Self {
         let environment = Environment::builder()
             .with_name("reranker")
+            .with_log_level(ort::LoggingLevel::Verbose)
             .build()
             .unwrap()
             .into_arc();
 
         let session = SessionBuilder::new(&environment)
-            .unwrap()
-            .with_execution_providers([ExecutionProvider::CUDA(Default::default())])
-            .unwrap()
+            .expect("Failed to create SessionBuilder")
             .with_optimization_level(GraphOptimizationLevel::Level3)
-            .unwrap()
+            .expect("Failed to set optimization level")
+            .with_execution_providers([ExecutionProvider::CUDA(
+                ort::execution_providers::CUDAExecutionProviderOptions {
+                    enable_cuda_graph: false,
+                    arena_extend_strategy:
+                        ort::execution_providers::ArenaExtendStrategy::SameAsRequested,
+                    ..Default::default()
+                },
+            )])
+            .expect("Failed to attach CUDA provider")
             .with_model_from_memory(BGE_MODEL)
-            .unwrap();
+            .expect("Failed to load BGE model");
 
         let mut tokenizer = Tokenizer::from_bytes(BGE_TOKENIZER).unwrap();
+
         tokenizer.with_padding(Some(PaddingParams {
             strategy: PaddingStrategy::BatchLongest,
             ..Default::default()
@@ -1205,8 +1160,8 @@ impl Reranker {
         }
 
         let batch_size = passages.len();
-        let input_pairs: Vec<(&str, &str)> = passages.iter().map(|p| (query, p.as_str())).collect();
 
+        let input_pairs: Vec<(&str, &str)> = passages.iter().map(|p| (query, p.as_str())).collect();
         let encodings = self.tokenizer.encode_batch(input_pairs, true).unwrap();
         let seq_len = encodings[0].get_ids().len();
 
@@ -1223,15 +1178,38 @@ impl Reranker {
         let attention_mask =
             CowArray::from(Array2::from_shape_vec((batch_size, seq_len), mask).unwrap()).into_dyn();
 
-        let inputs = vec![
-            Value::from_array(self.session.allocator(), &input_ids).unwrap(),
-            Value::from_array(self.session.allocator(), &attention_mask).unwrap(),
-        ];
+        let mut io_binding = self.session.bind().unwrap();
 
-        let outputs = self.session.run(inputs).unwrap();
-        let scores = outputs[0].try_extract::<f32>().unwrap();
+        io_binding
+            .bind_input(
+                "input_ids",
+                Value::from_array(self.session.allocator(), &input_ids).unwrap(),
+            )
+            .unwrap();
 
+        io_binding
+            .bind_input(
+                "attention_mask",
+                Value::from_array(self.session.allocator(), &attention_mask).unwrap(),
+            )
+            .unwrap();
+
+        let mem_info = ort::MemoryInfo::new(
+            ort::AllocationDevice::CPU,
+            0,
+            ort::AllocatorType::Arena,
+            ort::MemType::Default,
+        )
+        .unwrap();
+
+        io_binding.bind_output("logits", mem_info).unwrap();
+
+        self.session.run_with_binding(&io_binding).unwrap();
+
+        let outputs = io_binding.outputs().unwrap();
+        let scores = outputs["logits"].try_extract::<f32>().unwrap();
         let view = scores.view();
+
         let mut results = Vec::with_capacity(batch_size);
 
         if view.ndim() == 2 {

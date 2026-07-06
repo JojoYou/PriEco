@@ -45,12 +45,11 @@
   "clean_up_tokenization_spaces": true,
   "cls_token": "<s>",
   "eos_token": "</s>",
-  "extra_special_tokens": {},
   "mask_token": "<mask>",
   "model_max_length": 512,
   "pad_token": "<pad>",
   "sep_token": "</s>",
   "sp_model_kwargs": {},
-  "tokenizer_class": "XLMRobertaTokenizerFast",
+  "tokenizer_class": "XLMRobertaTokenizer",
   "unk_token": "<unk>"
 }

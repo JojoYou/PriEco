@@ -240,8 +240,8 @@ async fn rocket() -> _ {
 */
 fn thread_manager() {
     // Initialize data
-    //let _ = &*PRIECO_FJALL;
-    //let _ = &*META_DECODER;
+    let _ = &*PRIECO_FJALL;
+    let _ = &*META_DECODER;
 
     let _ = TANTIVY_READER;
     let _ = TANTIVY_WRITER;

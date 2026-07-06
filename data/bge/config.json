@@ -1,11 +1,12 @@
 {
+  "_attn_implementation_autoset": true,
+  "_name_or_path": "BAAI/bge-reranker-base",
   "architectures": [
     "XLMRobertaForSequenceClassification"
   ],
   "attention_probs_dropout_prob": 0.1,
   "bos_token_id": 0,
   "classifier_dropout": null,
-  "dtype": "float32",
   "eos_token_id": 2,
   "hidden_act": "gelu",
   "hidden_dropout_prob": 0.1,
@@ -26,7 +27,8 @@
   "output_past": true,
   "pad_token_id": 1,
   "position_embedding_type": "absolute",
-  "transformers_version": "4.57.6",
+  "torch_dtype": "float32",
+  "transformers_version": "4.46.3",
   "type_vocab_size": 1,
   "use_cache": true,
   "vocab_size": 250002

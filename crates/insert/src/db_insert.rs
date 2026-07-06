@@ -21,8 +21,8 @@ use zstd::stream::{Encoder as ZstdEncoder, decode_all};
 */
 use prieco_core::{
     ID_SIZE, INSERTER_IMPORT_DIR, META_DICTIONARY, PRIECO_CONFIG, PRIECO_FJALL, RECORD_SIZE,
-    TANTIVY_INDEX, TANTIVY_INDEX2, TANTIVY_WRITER, TANTIVY_WRITER2, VECTOR_CENTROPOIDS, VECTOR_DIM,
-    WebDocument, file_exists, globals::icons, url_to_id,
+    TANTIVY_INDEX, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_DIM, WebDocument, file_exists,
+    globals::icons, url_to_id,
 };
 
 /*
@@ -360,13 +360,13 @@ fn append_to_bucket(
 
 /* Merge functions */
 pub fn merge_tantivy() {
-    let mut writer = TANTIVY_WRITER2.lock();
+    let mut writer = TANTIVY_WRITER.lock();
 
     println!("Tantivy Merge: Commiting...");
     writer.commit().expect("Failed to commit pending documents");
 
     println!("Tantivy Merge: Fetching segments...");
-    let segment_ids = TANTIVY_INDEX2
+    let segment_ids = TANTIVY_INDEX
         .searchable_segment_ids()
         .expect("Failed to get searchable segment IDs");
 

@@ -16,6 +16,7 @@ use std::{
     os::raw::c_char,
     path::Path,
     sync::Arc,
+    time::Instant,
 };
 
 use tracing::error;
@@ -685,7 +686,6 @@ impl Session {
         'i: 'v,
     {
         // Build arguments to Run()
-
         let input_names_ptr: Vec<*const c_char> = self
             .inputs
             .iter()
@@ -700,6 +700,7 @@ impl Session {
             .map(|output| output.name.clone())
             .map(|n| CString::new(n).unwrap())
             .collect();
+
         let output_names_ptr: Vec<*const c_char> = output_names_cstring
             .iter()
             .map(|n| n.as_ptr() as *const c_char)
