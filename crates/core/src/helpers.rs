@@ -124,6 +124,31 @@ pub fn url_to_id(url: &str) -> u64 {
     h.finish()
 }
 
+pub fn url_to_domain_id(url: &str) -> u64 {
+    let pased_url = match Url::parse(url) {
+        Ok(u) => u,
+        Err(e) => {
+            println!(
+                "{}Failed to generate domain from URL{}: {} Error: {}",
+                colors::RED,
+                colors::RESET,
+                url,
+                e
+            );
+            return 0;
+        }
+    };
+
+    let domain = match pased_url.domain() {
+        Some(d) => d,
+        None => return 0,
+    };
+
+    let mut h = XxHash3_64::with_seed(0);
+    h.write(domain.as_bytes());
+    h.finish()
+}
+
 pub fn normalize_url(raw: &str) -> String {
     let url_str = if !raw.starts_with("http") {
         format!("http://{}", raw)

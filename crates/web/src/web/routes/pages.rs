@@ -21,22 +21,24 @@ use std::{collections::HashMap, net::IpAddr};
   Import external libraries
 */
 use chrono::Utc;
+use dotenv_codegen::dotenv;
 use rocket::{
     Request, State,
     form::{Form, FromForm},
     get, head,
     http::{
-        Cookie, CookieJar, SameSite,
+        Cookie, CookieJar, SameSite, Status,
         uri::{Host, Origin},
     },
     post,
     request::{FromRequest, Outcome},
     response::Redirect,
-    serde::json::Value as RocketValue,
+    serde::json::{Json, Value as RocketValue},
     time::Duration,
     uri,
 };
 use rocket_dyn_templates::Template;
+use serde::Deserialize;
 use serde_json::{Value, json};
 use urlencoding::encode;
 
@@ -45,7 +47,7 @@ use urlencoding::encode;
 */
 use crate::web::{functions::search_endpoint, modules::settings};
 use prieco_core::{
-    TANTIVY_INDEX,
+    CLIENT, TANTIVY_INDEX,
     globals::{ANALYTICS, CSS_VERSION, EmbeddingService, JS_VERSION, UserAgent},
 };
 
@@ -650,6 +652,110 @@ pub fn ext_privacy(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     settings::run(&mut context, &None, cookie_jar, host);
 
     Template::render("ext/privacy", context)
+}
+
+/*
+  Description: PriEco roadmap
+
+  Input:
+  Output: Roadmap page html
+*/
+#[get("/roadmap")]
+pub fn roadmap(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
+    let mut context: HashMap<String, RocketValue> = HashMap::from([
+        (String::from("css_version"), json!(CSS_VERSION)),
+        (String::from("js_version"), json!(JS_VERSION)),
+        (String::from("title_query"), json!("Roadmap | ")),
+    ]);
+
+    settings::run(&mut context, &None, cookie_jar, host);
+
+    Template::render("roadmap", context)
+}
+
+// Sends to Roman Láncoš a signal message with message
+#[derive(FromForm)]
+pub struct RoadmapFeedback<'r> {
+    pub message: &'r str,
+}
+
+#[post("/roadmap/submit", data = "<feedback>")]
+pub async fn submit_roadmap_feedback(feedback: Form<RoadmapFeedback<'_>>) -> Redirect {
+    let signal_message = format!("**New Roadmap Feedback**\n{}", feedback.message);
+
+    let payload = serde_json::json!({
+        "message": signal_message,
+        "number": dotenv!("SIGNAL_BOT_NUMBER"),
+        "recipients": [dotenv!("SIGNAL_RECIPIENT_NUMBER")],
+        "text_mode": "styled",
+    });
+
+    match CLIENT
+        .post("http://localhost:8071/v2/send")
+        .json(&payload)
+        .send()
+        .await
+    {
+        Ok(response) => {
+            if response.status().is_success() {
+                println!("Roadmap feedback successfully forwarded to Signal!");
+            } else {
+                let status_code = response.status();
+                let error_text = response.text().await.unwrap_or_default();
+                println!("Signal API Error ({}): {}", status_code, error_text);
+            }
+        }
+        Err(e) => {
+            println!("Failed to send feedback to Signal (Timeout/Network): {}", e);
+        }
+    }
+
+    Redirect::to(uri!(roadmap))
+}
+
+#[derive(Deserialize)]
+#[serde(crate = "rocket::serde")]
+pub struct RoadmapVote {
+    pub feature: String,
+    pub is_like: bool,
+}
+#[post("/roadmap/vote", format = "json", data = "<vote>")]
+pub async fn submit_roadmap_vote(vote: Json<RoadmapVote>) -> Status {
+    let vote_emoji = if vote.is_like { "👍" } else { "👎" };
+    let signal_message = format!(
+        "**PriEco Roadmap Vote**\n**Feature:** {}\n**Vote:** {}",
+        vote.feature, vote_emoji
+    );
+
+    let payload = serde_json::json!({
+        "message": signal_message,
+        "number": dotenv!("SIGNAL_BOT_NUMBER"),
+        "recipients": [dotenv!("SIGNAL_RECIPIENT_NUMBER")],
+        "text_mode": "styled",
+    });
+
+    match CLIENT
+        .post("http://localhost:8071/v2/send")
+        .json(&payload)
+        .send()
+        .await
+    {
+        Ok(response) => {
+            let status = response.status();
+            if status.is_success() {
+                println!("Vote for '{}' successfully sent to Signal!", vote.feature);
+                Status::Ok
+            } else {
+                let error_text = response.text().await.unwrap_or_default();
+                println!("Signal API Error ({}): {}", status, error_text);
+                Status::InternalServerError
+            }
+        }
+        Err(e) => {
+            println!("Failed to send vote to Signal (Timeout/Network): {}", e);
+            Status::InternalServerError
+        }
+    }
 }
 
 /* Helper functions */

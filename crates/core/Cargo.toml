@@ -35,6 +35,7 @@ memmap2 = { workspace = true }
 reqwest = { workspace = true }
 symspell = { workspace = true }
 fjall = { workspace = true }
+charabia = { workspace = true }
 
 [features]
 default = []

@@ -21,8 +21,8 @@ use zstd::stream::{Encoder as ZstdEncoder, decode_all};
 */
 use prieco_core::{
     ID_SIZE, INSERTER_IMPORT_DIR, META_DICTIONARY, PRIECO_CONFIG, PRIECO_FJALL, RECORD_SIZE,
-    TANTIVY_INDEX, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_DIM, WebDocument, file_exists,
-    globals::icons, url_to_id,
+    TANTIVY_INDEX, TANTIVY_INDEX2, TANTIVY_WRITER, TANTIVY_WRITER2, VECTOR_CENTROPOIDS, VECTOR_DIM,
+    WebDocument, file_exists, globals::icons, url_to_id,
 };
 
 /*
@@ -88,12 +88,16 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
         return Ok(());
     }
 
-    let doc_id_field = TANTIVY_INDEX.schema().get_field("doc_id").unwrap();
-    let title_field = TANTIVY_INDEX.schema().get_field("title").unwrap();
-    let description_field = TANTIVY_INDEX.schema().get_field("description").unwrap();
-    let content_field = TANTIVY_INDEX.schema().get_field("content").unwrap();
-    let keywords_field = TANTIVY_INDEX.schema().get_field("keywords").unwrap();
-    let safe_s_field = TANTIVY_INDEX.schema().get_field("safe_s").unwrap();
+    let schema = TANTIVY_INDEX.schema();
+    let doc_id_field = schema.get_field("doc_id").unwrap();
+    let title_field = schema.get_field("title").unwrap();
+    let description_field = schema.get_field("description").unwrap();
+    let content_field = schema.get_field("content").unwrap();
+    let keywords_field = schema.get_field("keywords").unwrap();
+    let lang_field = schema.get_field("lang").unwrap();
+    let loc_field = schema.get_field("loc").unwrap();
+    let date_field = schema.get_field("date").unwrap();
+    let safe_s_field = schema.get_field("safe_s").unwrap();
 
     let mut compressor = zstd::bulk::Compressor::with_dictionary(3, &META_DICTIONARY)?;
 
@@ -126,7 +130,12 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                 let id = url_to_id(&url);
 
                 // Preserve uniqness
-                if PRIECO_FJALL.meta.get(&id.to_be_bytes()).unwrap().is_some() {
+                if PRIECO_FJALL
+                    .meta_ks
+                    .get(&id.to_be_bytes())
+                    .unwrap()
+                    .is_some()
+                {
                     continue;
                 }
 
@@ -174,17 +183,20 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                 let doc_bytes = serde_json::to_vec(&doc)?;
                 let compressed_doc = compressor.compress(&doc_bytes)?;
                 PRIECO_FJALL
-                    .meta
+                    .meta_ks
                     .insert(&id.to_be_bytes(), &compressed_doc)?;
 
                 /* Tantivy */
                 TANTIVY_WRITER.lock().add_document(tantivy::doc!(
-                    doc_id_field => id ,
-                    title_field => doc.title.clone(),
-                    description_field => doc.description.clone(),
-                    content_field => doc.content.clone(),
-                    keywords_field => doc.keywords.clone(),
-                    safe_s_field => doc.safe_s
+                    doc_id_field => id,
+                        title_field => doc.title.clone(),
+                        description_field => doc.description.clone(),
+                        content_field => doc.content.clone(),
+                        keywords_field => doc.keywords.clone(),
+                        lang_field => doc.lang.clone(),
+                        loc_field => doc.loc.clone(),
+                        date_field => doc.date,
+                        safe_s_field => doc.safe_s
                 ))?;
 
                 vector_idx_buffer.insert(id, vector);
@@ -228,6 +240,14 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     }
 
     if !file_exists(SKIP_MERGE_FILE) {
+        merge_tantivy();
+
+        println!("Compacting Meta...");
+        PRIECO_FJALL
+            .meta_ks
+            .major_compact()
+            .expect("Failed to run major compaction");
+
         println!(
             "{}: Merging staging files into buckets...",
             icons::DB_INSERT
@@ -336,6 +356,28 @@ fn append_to_bucket(
     }
     writer.flush()?;
     Ok(())
+}
+
+/* Merge functions */
+pub fn merge_tantivy() {
+    let mut writer = TANTIVY_WRITER2.lock();
+
+    println!("Tantivy Merge: Commiting...");
+    writer.commit().expect("Failed to commit pending documents");
+
+    println!("Tantivy Merge: Fetching segments...");
+    let segment_ids = TANTIVY_INDEX2
+        .searchable_segment_ids()
+        .expect("Failed to get searchable segment IDs");
+
+    println!(
+        "Tantivy Merge: Found {} segments. Merging...",
+        segment_ids.len()
+    );
+    match writer.merge(&segment_ids).wait() {
+        Ok(_) => println!("Merge completed successfully!"),
+        Err(e) => eprintln!("Merge failed: {}", e),
+    }
 }
 
 fn merge_bucket(bucket_id: usize) -> Result<(), Box<dyn Error + Send + Sync>> {

@@ -8,7 +8,7 @@
   Date Created: 2025-02-07
   Last Modified: 2026-02-07
 
-  Usage: Run() to take archived htmls and insert them into RocksDB
+  Usage: Run() to take archived htmls and insert them into Blob storage
   TODO:
 */
 
@@ -16,12 +16,13 @@
   Import system libraries
 */
 use std::{
+    error::Error,
     fs::{File, create_dir_all, read_dir, remove_dir_all, remove_file},
     io::Read,
     path::{Path, PathBuf},
 };
 
-use fjall::PersistMode;
+use fjall::{Keyspace, PersistMode};
 /*
   Import external libraries
 */
@@ -32,18 +33,33 @@ use tar::Archive;
   Import own libraries
 */
 use prieco_core::{
-    BLOB_IMPORT_DIR, BLOB_STORAGE, PRIECO_FJALL,
+    BLOB_IMPORT_DIR, BLOB_STORAGE, META_DECODER, PRIECO_FJALL, TANTIVY_INDEX, TANTIVY_INDEX2,
+    TANTIVY_WRITER, TANTIVY_WRITER2, WebDocument,
     globals::{colors, icons},
+    url_to_domain_id,
 };
 
 pub fn run() {
-    println!("Migrating!");
+    /*println!("Migrating!");
     migrate_blob_to_fjall();
     println!(
-        "{}Migration to LMDB completed!{}",
+        "{}Migration to BLOB completed!{}",
         colors::GREEN,
         colors::RESET
     );
+    println!("Compacting blobs");
+    PRIECO_FJALL
+        .blobs
+        .major_compact()
+        .expect("Failed to run major compaction");
+
+    println!("Migrating tantivy");
+    if let Err(e) = rebuild_tantivy_index_v2() {
+        println!("Tantivy rebuild: {}", e);
+    };*/
+    println!("Merging tantivy");
+    force_merge_index();
+    println!("All blob operations are done!");
 
     let directories = find_all_directories();
 
@@ -116,10 +132,10 @@ fn process_directory(dir_path: &Path) -> Result<(), Box<dyn std::error::Error>> 
 
     let mut buffer: Vec<u8> = Vec::with_capacity(10 * 1024 * 1024);
 
-    let mut write_opts = rocksdb::WriteOptions::default();
-    write_opts.disable_wal(true);
-
     for tar_path in tar_files {
+        // Create batch
+        let mut batch = PRIECO_FJALL.blob_db.batch();
+
         println!("{}: Processing: {:?}", icons::BLOB, tar_path);
 
         let tar_file = File::open(&tar_path)?;
@@ -127,7 +143,6 @@ fn process_directory(dir_path: &Path) -> Result<(), Box<dyn std::error::Error>> 
         let mut archive = Archive::new(decompressor);
 
         let mut files_inserted = 0;
-        let mut batch = rocksdb::WriteBatch::default();
 
         for entry_result in archive.entries()? {
             let mut entry = entry_result?;
@@ -174,12 +189,12 @@ fn process_directory(dir_path: &Path) -> Result<(), Box<dyn std::error::Error>> 
             buffer.push(flag); // Prepend flag byte
             entry.read_to_end(&mut buffer)?;
 
-            batch.put(name.to_le_bytes(), &buffer);
+            batch.insert(&PRIECO_FJALL.blobs_ks, name.to_le_bytes(), buffer.clone());
             files_inserted += 1;
 
             if files_inserted % 1000 == 0 {
-                BLOB_STORAGE.write_opt(batch, &write_opts)?;
-                batch = rocksdb::WriteBatch::default();
+                batch.commit();
+                batch = PRIECO_FJALL.blob_db.batch();
 
                 println!(
                     "{}: Inserted {} files from {:?}",
@@ -192,24 +207,24 @@ fn process_directory(dir_path: &Path) -> Result<(), Box<dyn std::error::Error>> 
                     ))
                 );
 
-                if let Err(e) = BLOB_STORAGE.get(name.to_le_bytes()) {
+                if PRIECO_FJALL
+                    .meta_ks
+                    .get(&name.to_le_bytes())
+                    .unwrap()
+                    .is_none()
+                {
                     println!(
-                        "{}: {}INTEGRITY CHECK FAILED for key {}! Error:{} {}",
+                        "{}: {}INTEGRITY CHECK FAILED for key {}!{}",
                         icons::BLOB,
                         colors::RED,
                         name,
-                        e,
                         colors::RESET
                     );
-                    return Err(Box::new(e));
+                    return Err(format!("Integrity check failed for blob {}", name).into());
                 }
 
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
-        }
-
-        if !batch.is_empty() {
-            BLOB_STORAGE.write_opt(batch, &write_opts)?;
         }
 
         println!(
@@ -226,7 +241,9 @@ fn process_directory(dir_path: &Path) -> Result<(), Box<dyn std::error::Error>> 
         );
 
         println!("{}: Flushing!", icons::BLOB);
-        BLOB_STORAGE.flush()?;
+        batch.commit();
+        PRIECO_FJALL.blob_db.persist(PersistMode::SyncAll);
+
         println!(
             "{}: {}Flushed!{}",
             icons::BLOB,
@@ -302,7 +319,7 @@ pub fn migrate_blob_to_fjall() {
 
         let key_arr: [u8; 8] = key.as_ref().try_into().unwrap();
 
-        PRIECO_FJALL.blobs.insert(key_arr, &*value).unwrap();
+        PRIECO_FJALL.blobs_ks.insert(key_arr, &*value).unwrap();
 
         last_key = Some(key_arr);
 
@@ -328,4 +345,83 @@ pub fn migrate_blob_to_fjall() {
         count,
         colors::RESET
     );
+}
+
+pub fn rebuild_tantivy_index_v2() -> Result<(), Box<dyn std::error::Error>> {
+    let schema = TANTIVY_INDEX2.schema();
+    let doc_id_field = schema.get_field("doc_id")?;
+    let domain_id_field = schema.get_field("domain_id")?;
+    let title_field = schema.get_field("title")?;
+    let description_field = schema.get_field("description")?;
+    let content_field = schema.get_field("content")?;
+    let keywords_field = schema.get_field("keywords")?;
+    let lang_field = schema.get_field("lang")?;
+    let loc_field = schema.get_field("loc")?;
+    let date_field = schema.get_field("date")?;
+    let safe_s_field = schema.get_field("safe_s")?;
+
+    let mut writer = TANTIVY_WRITER2.lock();
+    let mut count: u64 = 0;
+
+    for guard in PRIECO_FJALL.meta_ks.iter() {
+        let (key, compressed) = guard.into_inner()?;
+        let id = u64::from_be_bytes(key.as_ref().try_into().expect("meta key is not 8 bytes"));
+
+        let mut decoder = zstd::stream::read::Decoder::with_prepared_dictionary(
+            compressed.as_ref(),
+            &META_DECODER,
+        )?;
+        let mut raw = Vec::new();
+        decoder.read_to_end(&mut raw)?;
+
+        let doc: WebDocument = serde_json::from_slice(&raw)?;
+        let domain_id = url_to_domain_id(&doc.url);
+
+        writer.add_document(tantivy::doc!(
+            doc_id_field => id,
+            domain_id_field => domain_id,
+            title_field => doc.title.clone(),
+            description_field => doc.description.clone(),
+            content_field => doc.content.clone(),
+            keywords_field => doc.keywords.clone(),
+            lang_field => doc.lang.clone(),
+            loc_field => doc.loc.clone(),
+            date_field => doc.date,
+            safe_s_field => doc.safe_s
+        ))?;
+
+        count += 1;
+        if count % 250_000 == 0 {
+            writer.commit()?;
+            println!("Indexed {count} documents...");
+        }
+    }
+
+    writer.commit()?;
+    println!("Done. Indexed {count} documents into Tantivy v2.");
+    Ok(())
+}
+
+pub fn force_merge_index() {
+    println!("Preparing to merge index...");
+
+    // 1. Lock the writer
+    let mut writer = TANTIVY_WRITER2.lock();
+
+    // 2. Commit any pending uncommitted documents first
+    writer.commit().expect("Failed to commit pending documents");
+
+    // 3. Fetch all current segment IDs from the index
+    let segment_ids = TANTIVY_INDEX2
+        .searchable_segment_ids()
+        .expect("Failed to get searchable segment IDs");
+
+    println!("Found {} segments. Starting merge...", segment_ids.len());
+
+    // 4. Execute the merge and wait for it to finish
+    // Note: .wait() is required as merge() returns a Future in Tantivy
+    match writer.merge(&segment_ids).wait() {
+        Ok(_) => println!("Merge completed successfully!"),
+        Err(e) => eprintln!("Merge failed: {}", e),
+    }
 }

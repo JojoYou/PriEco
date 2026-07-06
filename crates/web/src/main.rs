@@ -12,6 +12,7 @@
   TODO:
 */
 
+use fjall::PersistMode;
 /*
   Set global allovator
   Reason: Default was insufficient for deallocating RAM from crawler HTTP connections
@@ -45,7 +46,7 @@ use env_logger::Env;
 use ort::{Environment, GraphOptimizationLevel, InMemorySession, LoggingLevel, SessionBuilder};
 use rocket::{
     Request, Response,
-    fairing::{Fairing, Info, Kind},
+    fairing::{AdHoc, Fairing, Info, Kind},
     fs::FileServer,
     http::{Header, Status},
     launch, routes,
@@ -182,6 +183,14 @@ async fn rocket() -> _ {
         .manage(embedding_service)
         .attach(GlobalHeaders)
         .attach(Template::fairing())
+        .attach(AdHoc::on_shutdown("Flush DBs", |_| {
+            Box::pin(async move {
+                println!("Flushing Fjall to disk...");
+                let _ = PRIECO_FJALL.meta_db.persist(PersistMode::SyncAll);
+                let _ = PRIECO_FJALL.blob_db.persist(PersistMode::SyncAll);
+                println!("{}Shutdown!{}", colors::GREEN, colors::RESET);
+            })
+        }))
         .mount(
             "/",
             routes![
@@ -214,6 +223,10 @@ async fn rocket() -> _ {
                 proxy_post,
                 // Extension
                 ext_privacy,
+                // Roadmap
+                roadmap,
+                submit_roadmap_feedback,
+                submit_roadmap_vote
             ],
         )
         .mount("/static", FileServer::from("./static"))
@@ -227,8 +240,8 @@ async fn rocket() -> _ {
 */
 fn thread_manager() {
     // Initialize data
-    let _ = &*PRIECO_FJALL;
-    let _ = &*META_DECODER;
+    //let _ = &*PRIECO_FJALL;
+    //let _ = &*META_DECODER;
 
     let _ = TANTIVY_READER;
     let _ = TANTIVY_WRITER;
@@ -243,6 +256,7 @@ fn thread_manager() {
             while !stop_requested() {
                 blob::run();
                 sleep(Duration::from_mins(1));
+                break;
             }
         })
     };
@@ -428,7 +442,6 @@ pub fn stop_requested() -> bool {
 
     let last = LAST_CHECK.load(Ordering::Relaxed);
     if now - last >= 1 {
-        // Time to re-check the file
         let exists = Path::new("stop.txt").exists();
         STOP_FLAG.store(exists, Ordering::Relaxed);
         LAST_CHECK.store(now, Ordering::Relaxed);

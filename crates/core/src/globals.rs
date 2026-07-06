@@ -25,13 +25,14 @@ use std::{
     path::Path,
     str::FromStr,
     sync::Arc,
-    time::Duration as stdDuration,
+    time::{Duration as stdDuration, Instant},
 };
 
 /*
   Import external libraries
 */
 use ahash::{AHashMap, AHashSet};
+use charabia::{Tokenizer as CHARABIA_TOKENIZER, TokenizerBuilder};
 use chrono::{Duration, NaiveDate, Utc};
 #[cfg(feature = "cuda")]
 use cudarc::{
@@ -66,9 +67,12 @@ use symspell::{SymSpell, UnicodeStringStrategy};
 use tantivy::{
     Index, IndexReader, IndexWriter, ReloadPolicy,
     directory::MmapDirectory,
-    schema::{FAST, INDEXED, STORED, STRING, Schema, TEXT},
+    schema::{
+        FAST, INDEXED, IndexRecordOption, STORED, STRING, Schema, TextFieldIndexing, TextOptions,
+    },
+    tokenizer::{TextAnalyzer, Token, TokenStream, Tokenizer as TANTIVY_TOKENIZER},
 };
-use tokenizers::Tokenizer;
+use tokenizers::{PaddingParams, PaddingStrategy, Tokenizer};
 use tokio::task;
 use twox_hash::XxHash3_64;
 #[cfg(feature = "cuda")]
@@ -466,6 +470,33 @@ pub static COUNTRY_TO_LANG: Lazy<Arc<AHashMap<&'static str, &'static str>>> = La
 });
 
 /*
+  Blob storage Depricated, please remove after migration
+  Description: RocksDB for html blobs storage. Designed for high capacity HDD, usage of SSD is beneficial too
+*/
+pub const BLOB_IMPORT_DIR: &str = "/mnt/usb/archives/imp";
+pub static BLOB_STORAGE: Lazy<Arc<DB>> = Lazy::new(|| {
+    Arc::new({
+        let mut options = Options::default();
+        options.create_if_missing(true);
+        options.set_compression_type(DBCompressionType::None);
+
+        options.set_max_background_jobs(4);
+
+        options.set_bytes_per_sync(1048576);
+
+        options.set_ratelimiter(50 * 1024 * 1024, 100 * 1000, 10);
+
+        options.set_write_buffer_size(64 * 1024 * 1024);
+        options.set_max_write_buffer_number(3);
+        options.set_min_write_buffer_number_to_merge(1);
+
+        options.set_target_file_size_base(64 * 1024 * 1024);
+
+        DB::open(&options, Path::new("/mnt/ssd/blobs")).unwrap()
+    })
+});
+
+/*
   PriEco Storage
   Description: FJALL key-value storage. Stores results meta data and html blobs
 */
@@ -475,10 +506,14 @@ pub static META_DECODER: Lazy<DecoderDictionary<'static>> =
     Lazy::new(|| DecoderDictionary::copy(&*META_DICTIONARY));
 
 pub struct PriecoStorage {
+    // Meta data: Titles, Descriptions, URLs...
     pub meta_db: FJALL_DATABASE,
-    pub meta: Keyspace,
+    pub meta_ks: Keyspace,
+
+    // Blob storage: Compressed web page data
     pub blob_db: FJALL_DATABASE,
-    pub blobs: Keyspace,
+    pub blobs_ks: Keyspace,
+    // Goggles
 }
 
 pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
@@ -507,7 +542,7 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
         .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
         .with_kv_separation(Some(KvSeparationOptions {
             compression: CompressionType::None,
-            file_target_size: 64 * 1024 * 1024,
+            file_target_size: 2048 * 1024 * 1024, // 2GB blobs
             separation_threshold: 100,
             staleness_threshold: 0.5,
             age_cutoff: 0.0,
@@ -517,64 +552,52 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
 
     Arc::new(PriecoStorage {
         meta_db,
-        meta,
+        meta_ks: meta,
         blob_db,
-        blobs,
-    })
-});
-
-/*
-  Blob storage
-  Description: RocksDB for html blobs storage. Designed for high capacity HDD, usage of SSD is beneficial too
-*/
-pub const BLOB_IMPORT_DIR: &str = "/mnt/usb/archives/imp";
-pub static BLOB_STORAGE: Lazy<Arc<DB>> = Lazy::new(|| {
-    Arc::new({
-        let mut options = Options::default();
-        options.create_if_missing(true);
-        options.set_compression_type(DBCompressionType::None);
-
-        options.set_max_background_jobs(4);
-
-        options.set_bytes_per_sync(1048576);
-
-        options.set_ratelimiter(50 * 1024 * 1024, 100 * 1000, 10);
-
-        options.set_write_buffer_size(64 * 1024 * 1024);
-        options.set_max_write_buffer_number(3);
-        options.set_min_write_buffer_number_to_merge(1);
-
-        options.set_target_file_size_base(64 * 1024 * 1024);
-
-        DB::open(&options, Path::new("/mnt/ssd/blobs")).unwrap()
+        blobs_ks: blobs,
     })
 });
 
 /*
   Index
 */
+pub const TANTIVY_HEAP_SIZE: usize = 1_240_000_000;
 pub static TANTIVY_INDEX: Lazy<Arc<Index>> = Lazy::new(|| {
     // Build schema
     let mut builder = Schema::builder();
 
-    // Document ID
     builder.add_u64_field("doc_id", STORED | INDEXED);
+    builder.add_u64_field("domain_id", INDEXED | FAST);
 
-    builder.add_text_field("url", STRING);
-    builder.add_text_field("title", TEXT);
-    builder.add_text_field("description", TEXT);
-    builder.add_text_field("content", TEXT);
-    builder.add_text_field("keywords", TEXT);
+    let multilingual = TextFieldIndexing::default()
+        .set_tokenizer("multilingual")
+        .set_index_option(IndexRecordOption::WithFreqsAndPositions);
+    let text_opts = TextOptions::default().set_indexing_options(multilingual);
+
+    builder.add_text_field("title", text_opts.clone());
+    builder.add_text_field("description", text_opts.clone());
+    builder.add_text_field("content", text_opts.clone());
+    builder.add_text_field("keywords", text_opts);
+
+    builder.add_text_field("lang", STRING | FAST);
+    builder.add_text_field("loc", STRING | FAST);
+    builder.add_i64_field("date", INDEXED | FAST);
     builder.add_bool_field("safe_s", INDEXED | FAST);
+
     let schema = builder.build();
 
     // Open index
-    let dir = MmapDirectory::open(PRIECO_CONFIG.tantivy_path.clone())
-        .expect("Failed to open Tantivy directory");
+    let dir = MmapDirectory::open(Path::new(&PRIECO_CONFIG.tantivy_path))
+        .expect("Failed to open Tantivy V2 directory");
     let index = Index::open_or_create(dir, schema.clone()).expect("Failed to open Tantivy index");
+
+    index
+        .tokenizers()
+        .register("multilingual", TextAnalyzer::from(Multilingual::new()));
 
     Arc::new(index)
 });
+
 pub static TANTIVY_READER: Lazy<Arc<IndexReader>> = Lazy::new(|| {
     Arc::new(
         TANTIVY_INDEX
@@ -584,19 +607,121 @@ pub static TANTIVY_READER: Lazy<Arc<IndexReader>> = Lazy::new(|| {
             .expect("Failed to create Tantivy reader"),
     )
 });
+
 pub static TANTIVY_WRITER: Lazy<Arc<Mutex<IndexWriter>>> = Lazy::new(|| {
     Arc::new(Mutex::new(
         TANTIVY_INDEX
             .writer(TANTIVY_HEAP_SIZE)
-            .expect("Failed to create Tantivy writer"),
+            .expect("Failed to create Tantivy V2 writer"),
     ))
 });
+
+pub static TANTIVY_INDEX2: Lazy<Arc<Index>> = Lazy::new(|| {
+    // Build schema
+    let mut builder = Schema::builder();
+
+    builder.add_u64_field("doc_id", STORED | INDEXED);
+    builder.add_u64_field("domain_id", INDEXED | FAST);
+
+    let multilingual = TextFieldIndexing::default()
+        .set_tokenizer("multilingual")
+        .set_index_option(IndexRecordOption::WithFreqsAndPositions);
+    let text_opts = TextOptions::default().set_indexing_options(multilingual);
+
+    builder.add_text_field("title", text_opts.clone());
+    builder.add_text_field("description", text_opts.clone());
+    builder.add_text_field("content", text_opts.clone());
+    builder.add_text_field("keywords", text_opts);
+
+    builder.add_text_field("lang", STRING | FAST);
+    builder.add_text_field("loc", STRING | FAST);
+    builder.add_i64_field("date", INDEXED | FAST);
+    builder.add_bool_field("safe_s", INDEXED | FAST);
+
+    let schema = builder.build();
+
+    // Open index
+    let dir = MmapDirectory::open(Path::new("/mnt/ssd/tantivy"))
+        .expect("Failed to open Tantivy V2 directory");
+    let index = Index::open_or_create(dir, schema.clone()).expect("Failed to open Tantivy index");
+
+    index
+        .tokenizers()
+        .register("multilingual", TextAnalyzer::from(Multilingual::new()));
+
+    Arc::new(index)
+});
+
+pub static TANTIVY_READER2: Lazy<Arc<IndexReader>> = Lazy::new(|| {
+    Arc::new(
+        TANTIVY_INDEX2
+            .reader_builder()
+            .reload_policy(ReloadPolicy::OnCommitWithDelay)
+            .try_into()
+            .expect("Failed to create Tantivy reader"),
+    )
+});
+
+pub static TANTIVY_WRITER2: Lazy<Arc<Mutex<IndexWriter>>> = Lazy::new(|| {
+    Arc::new(Mutex::new(
+        TANTIVY_INDEX2
+            .writer(TANTIVY_HEAP_SIZE)
+            .expect("Failed to create Tantivy V2 writer"),
+    ))
+});
+
+// Multilang tokenization
+#[derive(Clone)]
+pub struct Multilingual(Arc<CHARABIA_TOKENIZER<'static>>);
+
+impl Multilingual {
+    pub fn new() -> Self {
+        let builder: &'static mut TokenizerBuilder<Vec<u8>> =
+            Box::leak(Box::new(TokenizerBuilder::default()));
+        Self(Arc::new(builder.build()))
+    }
+}
+
+pub struct MultiStream(std::vec::IntoIter<Token>, Option<Token>);
+
+impl TokenStream for MultiStream {
+    fn advance(&mut self) -> bool {
+        self.1 = self.0.next();
+        self.1.is_some()
+    }
+    fn token(&self) -> &Token {
+        self.1.as_ref().unwrap()
+    }
+    fn token_mut(&mut self) -> &mut Token {
+        self.1.as_mut().unwrap()
+    }
+}
+
+impl TANTIVY_TOKENIZER for Multilingual {
+    type TokenStream<'a> = MultiStream;
+
+    fn token_stream<'a>(&mut self, text: &'a str) -> MultiStream {
+        let tokens: Vec<Token> = self
+            .0
+            .tokenize(text)
+            .filter(|t| t.is_word())
+            .enumerate()
+            .map(|(i, t)| Token {
+                offset_from: t.byte_start,
+                offset_to: t.byte_end,
+                position: i,
+                text: t.lemma().to_string(),
+                position_length: 1,
+            })
+            .collect();
+        MultiStream(tokens.into_iter(), None)
+    }
+}
 
 /*
   Inserter
 */
 pub const INSERTER_IMPORT_DIR: &str = "/mnt/ssd/results/imp";
-pub const TANTIVY_HEAP_SIZE: usize = 1_240_000_000;
 
 pub static CENTROPOIDS_BIN: &[u8] = include_bytes!("../../../data/ivf/centroids.bin");
 
@@ -1065,36 +1190,61 @@ impl Reranker {
             .with_model_from_memory(BGE_MODEL)
             .unwrap();
 
-        let tokenizer = Tokenizer::from_bytes(BGE_TOKENIZER).unwrap();
+        let mut tokenizer = Tokenizer::from_bytes(BGE_TOKENIZER).unwrap();
+        tokenizer.with_padding(Some(PaddingParams {
+            strategy: PaddingStrategy::BatchLongest,
+            ..Default::default()
+        }));
+
         Self { session, tokenizer }
     }
 
-    pub fn score(&self, query: &str, passage: &str) -> f32 {
-        let encoding = self.tokenizer.encode((query, passage), true).unwrap();
-        let ids: Vec<i64> = encoding.get_ids().iter().map(|&x| x as i64).collect();
-        let mask: Vec<i64> = encoding
-            .get_attention_mask()
-            .iter()
-            .map(|&x| x as i64)
-            .collect();
-        let seq_len = ids.len();
+    pub fn score_batch(&self, query: &str, passages: &[String]) -> Vec<f32> {
+        if passages.is_empty() {
+            return Vec::new();
+        }
+
+        let batch_size = passages.len();
+        let input_pairs: Vec<(&str, &str)> = passages.iter().map(|p| (query, p.as_str())).collect();
+
+        let encodings = self.tokenizer.encode_batch(input_pairs, true).unwrap();
+        let seq_len = encodings[0].get_ids().len();
+
+        let mut ids = Vec::with_capacity(batch_size * seq_len);
+        let mut mask = Vec::with_capacity(batch_size * seq_len);
+
+        for enc in &encodings {
+            ids.extend(enc.get_ids().iter().map(|&x| x as i64));
+            mask.extend(enc.get_attention_mask().iter().map(|&x| x as i64));
+        }
+
         let input_ids =
-            CowArray::from(Array2::from_shape_vec((1, seq_len), ids).unwrap()).into_dyn();
+            CowArray::from(Array2::from_shape_vec((batch_size, seq_len), ids).unwrap()).into_dyn();
         let attention_mask =
-            CowArray::from(Array2::from_shape_vec((1, seq_len), mask).unwrap()).into_dyn();
+            CowArray::from(Array2::from_shape_vec((batch_size, seq_len), mask).unwrap()).into_dyn();
+
         let inputs = vec![
             Value::from_array(self.session.allocator(), &input_ids).unwrap(),
             Value::from_array(self.session.allocator(), &attention_mask).unwrap(),
         ];
+
         let outputs = self.session.run(inputs).unwrap();
         let scores = outputs[0].try_extract::<f32>().unwrap();
-        scores.view()[[0, 0]]
-    }
 
-    /// Returns sigmoid(raw_score) as a 0-1 relevance probability
-    pub fn score_normalized(&self, query: &str, passage: &str) -> f32 {
-        let raw = self.score(query, passage);
-        1.0 / (1.0 + (-raw).exp())
+        let view = scores.view();
+        let mut results = Vec::with_capacity(batch_size);
+
+        if view.ndim() == 2 {
+            for i in 0..batch_size {
+                results.push(view[[i, 0]]);
+            }
+        } else {
+            for i in 0..batch_size {
+                results.push(view[[i]]);
+            }
+        }
+
+        results
     }
 }
 

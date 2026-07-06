@@ -47,6 +47,7 @@ env_logger = { workspace = true }
 log = { workspace = true }
 symspell = { workspace = true }
 rayon = { workspace = true }
+fjall = { workspace = true }
 
 [features]
 default = []

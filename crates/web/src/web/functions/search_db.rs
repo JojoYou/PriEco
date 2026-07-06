@@ -364,22 +364,27 @@ pub async fn run_json(
     let mut pagerank_time_total: f32 = 0.0;
     let mut rerank_time_total: f32 = 0.0;
     let candidates = results.len().min(RERANK_CUTOFF);
-    for doc in &mut results[..candidates] {
-        // Pagerank
-        let pagerank_time = Instant::now();
-        let page_rank_score: f32 = PAGERANK.read().get_score(&doc.url);
-        let page_rank_boost = 1.0 + page_rank_score;
-        doc.search_score *= page_rank_boost;
-        pagerank_time_total += pagerank_time.elapsed().as_secs_f32();
-
+    if candidates > 0 {
         // Rerank
-        let reranking_time = Instant::now();
-        let passage = format!("{} {}", doc.title, doc.description);
-        let raw = RERANKER.score(query, &passage);
-        let reranker_prob = 1.0 / (1.0 + (-raw).exp());
+        let rerank_start = Instant::now();
+        let passages: Vec<String> = results[..candidates]
+            .iter()
+            .map(|d| format!("{} {}", d.title, d.description))
+            .collect();
 
-        doc.search_score = doc.search_score * (0.7 + reranker_prob * 0.6);
-        rerank_time_total += reranking_time.elapsed().as_secs_f32();
+        let q = query.to_string();
+        let scores = tokio::task::spawn_blocking(move || RERANKER.score_batch(&q, &passages))
+            .await
+            .unwrap_or_else(|_| vec![0.0; candidates]);
+        rerank_time_total = rerank_start.elapsed().as_secs_f32();
+
+        // PageRank
+        let pr_start = Instant::now();
+        for (i, doc) in results[..candidates].iter_mut().enumerate() {
+            doc.search_score *= 1.0 + PAGERANK.read().get_score(&doc.url);
+            doc.search_score *= 0.7 + (1.0 / (1.0 + (-scores[i]).exp())) * 0.6;
+        }
+        pagerank_time_total = pr_start.elapsed().as_secs_f32();
     }
     results[..candidates].sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
     println!(
@@ -502,7 +507,7 @@ fn fetch_documents(
                     let key = id.to_be_bytes();
 
                     // Get data
-                    let compressed_data = match PRIECO_FJALL.meta.get(&key) {
+                    let compressed_data = match PRIECO_FJALL.meta_ks.get(&key) {
                         Ok(Some(data)) => data,
                         _ => {
                             continue;

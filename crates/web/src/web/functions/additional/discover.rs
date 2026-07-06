@@ -90,7 +90,7 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
             .iter()
             .any(|url| {
                 matches!(
-                    PRIECO_FJALL.meta.get(&url_to_id(url).to_be_bytes()),
+                    PRIECO_FJALL.meta_ks.get(&url_to_id(url).to_be_bytes()),
                     Ok(Some(_))
                 )
             });
