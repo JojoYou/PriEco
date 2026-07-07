@@ -240,7 +240,8 @@ pub async fn run_json(
                     .unwrap_or(q_clone2);
             }
 
-            let res = search_tantivy(&q_clone2, MAX_FTS).unwrap_or_default();
+            let res =
+                search_tantivy(&optimize_query_string(&q_clone2), MAX_FTS).unwrap_or_default();
 
             let elapsed = start.elapsed().as_secs_f32();
             println!("Tantivy took {elapsed:.3}s");
@@ -571,4 +572,37 @@ fn fetch_documents(
 
 fn sanitize_string(s: &str) -> String {
     s.replace('"', "").replace('\'', "")
+}
+
+static STOPWORDS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+    let mut set = HashSet::new();
+    let words = [
+        "a", "an", "the", "in", "on", "of", "to", "for", "is", "are", "with", "and", "or", "what",
+        "how", "why", "when", "at", "by",
+    ];
+    for w in words.iter() {
+        set.insert(*w);
+    }
+    set
+});
+
+pub fn optimize_query_string(query: &str) -> String {
+    if query.contains('"') || query.contains("def") || query.contains("definition") {
+        return query.to_string();
+    }
+
+    let terms: Vec<&str> = query.split_whitespace().collect();
+    let mut filtered_terms: Vec<&str> = Vec::with_capacity(terms.len());
+
+    for term in &terms {
+        if !STOPWORDS.contains(term.to_lowercase().as_str()) {
+            filtered_terms.push(*term);
+        }
+    }
+
+    if filtered_terms.is_empty() {
+        return query.to_string();
+    }
+
+    filtered_terms.join(" ")
 }

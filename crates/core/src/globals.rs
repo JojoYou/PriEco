@@ -25,7 +25,7 @@ use std::{
     path::Path,
     str::FromStr,
     sync::Arc,
-    time::{Duration as stdDuration, Instant},
+    time::Duration as stdDuration,
 };
 
 /*
@@ -49,8 +49,8 @@ use memmap2::{Mmap, MmapOptions};
 use ndarray::{Array, Array2, CowArray, IxDyn};
 use once_cell::sync::Lazy;
 use ort::{
-    Environment, ExecutionProvider, GraphOptimizationLevel, InMemorySession, LoggingLevel,
-    SessionBuilder, Value, tensor::OrtOwnedTensor,
+    Environment, ExecutionProvider, GraphOptimizationLevel, InMemorySession, SessionBuilder, Value,
+    tensor::OrtOwnedTensor,
 };
 use parking_lot::{Condvar, Mutex, RwLock};
 #[cfg(feature = "cuda")]
@@ -72,7 +72,7 @@ use tantivy::{
     },
     tokenizer::{TextAnalyzer, Token, TokenStream, Tokenizer as TANTIVY_TOKENIZER},
 };
-use tokenizers::{PaddingParams, PaddingStrategy, Tokenizer, TruncationParams};
+use tokenizers::{PaddingParams, PaddingStrategy, Tokenizer};
 use tokio::task;
 use twox_hash::XxHash3_64;
 #[cfg(feature = "cuda")]
