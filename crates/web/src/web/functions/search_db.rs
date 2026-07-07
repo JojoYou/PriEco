@@ -29,7 +29,12 @@ use parking_lot::RwLock;
 use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 use rocket::{State, serde::json::Json};
 use serde_json::Value as Json_Value;
-use tantivy::{collector::TopDocs, query::QueryParser, schema::Value};
+use tantivy::{
+    Term,
+    collector::TopDocs,
+    query::{BooleanQuery, Occur, Query, QueryParser, TermQuery},
+    schema::{IndexRecordOption, Value},
+};
 use zstd::bulk::Decompressor;
 
 /*
@@ -223,6 +228,7 @@ pub async fn run_json(
             id_score_vec
         });
 
+        let lang_clone = lang.to_string();
         let tantivy_task = tokio::task::spawn_blocking(move || {
             let start = Instant::now();
 
@@ -240,8 +246,8 @@ pub async fn run_json(
                     .unwrap_or(q_clone2);
             }
 
-            let res =
-                search_tantivy(&optimize_query_string(&q_clone2), MAX_FTS).unwrap_or_default();
+            let res = search_tantivy(&optimize_query_string(&q_clone2), &lang_clone, MAX_FTS)
+                .unwrap_or_default();
 
             let elapsed = start.elapsed().as_secs_f32();
             println!("Tantivy took {elapsed:.3}s");
@@ -431,14 +437,16 @@ pub async fn run_json(
 }
 
 /* Index search functions */
-fn search_tantivy(query_text: &str, limit: usize) -> Option<Vec<(u64, f32)>> {
+fn search_tantivy(query_text: &str, lang: &str, limit: usize) -> Option<Vec<(u64, f32)>> {
     let schema = TANTIVY_INDEX.schema();
+    let doc_id = schema.get_field("doc_id").ok()?;
     let title_field = schema.get_field("title").ok()?;
     let description_field = schema.get_field("description").ok()?;
     let content_field = schema.get_field("content").ok()?;
     let keywords_field = schema.get_field("keywords").ok()?;
+
     let safe_s = schema.get_field("safe_s").ok()?;
-    let doc_id = schema.get_field("doc_id").ok()?;
+    let lang_field = schema.get_field("lang").ok()?;
 
     let query_parser = QueryParser::for_index(
         &TANTIVY_INDEX,
@@ -452,8 +460,26 @@ fn search_tantivy(query_text: &str, limit: usize) -> Option<Vec<(u64, f32)>> {
 
     let query = query_parser.parse_query(query_text).ok()?;
 
+    // 3. Conditionally build the final query
+    let final_query: Box<dyn Query> = if lang != "all" {
+        // Create an exact term match for the language
+        let lang_term = Term::from_field_text(lang_field, lang);
+        let lang_query = Box::new(TermQuery::new(lang_term, IndexRecordOption::Basic));
+
+        // Combine the user's text query and the language filter
+        Box::new(BooleanQuery::new(vec![
+            (Occur::Must, query),      // Text query MUST match
+            (Occur::Must, lang_query), // Language MUST match
+        ]))
+    } else {
+        // All lang
+        query
+    };
+
     let searcher = TANTIVY_READER.searcher();
-    let top_docs = searcher.search(&query, &TopDocs::with_limit(limit)).ok()?;
+    let top_docs = searcher
+        .search(&final_query, &TopDocs::with_limit(limit))
+        .ok()?;
 
     let mut id_score_vec: Vec<(u64, f32)> = Vec::with_capacity(top_docs.len());
 
