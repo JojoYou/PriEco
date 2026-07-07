@@ -1,3 +1,15 @@
+// Helper function
+async function clearPriecoCache() {
+  if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ action: "clearCache" });
+    try {
+      await caches.delete("prieco-cache");
+    } catch (err) {
+      console.warn("Failed to clear cache:", err);
+    }
+  }
+}
+
 // Own index
 const checkbox_index = document.getElementById("check_index");
 checkbox_index.checked = document.cookie
@@ -12,19 +24,28 @@ checkbox_index.addEventListener("change", () => {
 });
 
 // Language selection
-document.getElementById("lang_select").addEventListener("change", function() {
-  document.cookie =
-    "lang=" +
-    this.value +
-    "; path=/; SameSite=Strict; Secure; max-age=31536000";
-  location.reload();
-});
+document
+  .getElementById("lang_select")
+  .addEventListener("change", async function () {
+    document.cookie =
+      "lang=" +
+      this.value +
+      "; path=/; SameSite=Strict; Secure; max-age=31536000";
+    await clearPriecoCache();
+    location.reload();
+  });
+
 // Location selection
-document.getElementById("loc_select").addEventListener("change", function() {
-  document.cookie =
-    "loc=" + this.value + "; path=/; SameSite=Strict; Secure; max-age=31536000";
-  location.reload();
-});
+document
+  .getElementById("loc_select")
+  .addEventListener("change", async function () {
+    document.cookie =
+      "loc=" +
+      this.value +
+      "; path=/; SameSite=Strict; Secure; max-age=31536000";
+    await clearPriecoCache();
+    location.reload();
+  });
 
 // Open links in a new tab
 const checkbox_newtab = document.getElementById("check_newtab");
@@ -83,9 +104,9 @@ const r = document.querySelectorAll('input[name="theme"]'),
     v !== undefined
       ? (document.cookie = `${n}=${v};path=/;SameSite=Lax;Secure;max-age=${30 * 24 * 60 * 60}`)
       : document.cookie
-        .split("; ")
-        .find((c) => c.startsWith(n + "="))
-        ?.split("=")[1],
+          .split("; ")
+          .find((c) => c.startsWith(n + "="))
+          ?.split("=")[1],
   del = (n) => (document.cookie = `${n}=;path=/;max-age=0`),
   swapCSS = (theme) =>
     document.querySelectorAll('link[rel="stylesheet"]').forEach((l) => {
@@ -97,11 +118,12 @@ const r = document.querySelectorAll('input[name="theme"]'),
 let t = cookie("theme") || "system";
 r.forEach((x) => (x.checked = x.value === t));
 r.forEach((x) =>
-  x.addEventListener("change", (e) => {
+  x.addEventListener("change", async (e) => {
     e.target.value === "system"
       ? del("theme")
       : cookie("theme", e.target.value);
-    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) { navigator.serviceWorker.controller.postMessage({ action: "clearCache" }); }
+
+    await clearPriecoCache();
     swapCSS(e.target.value);
   }),
 );
@@ -112,15 +134,19 @@ if (c) {
   c.checked = /\bjs=1/.test(document.cookie);
   c.onchange = async () => {
     document.cookie = `js=${c.checked ? "1;max-age=31536000" : ";max-age=0"};path=/;SameSite=Strict;Secure`;
-    if (c.checked && "serviceWorker" in navigator) {
-      try {
-        await caches.delete("prieco-cache");
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        for (let registration of registrations) {
-          await registration.unregister();
+
+    if (c.checked) {
+      await clearPriecoCache();
+      if ("serviceWorker" in navigator) {
+        try {
+          const registrations =
+            await navigator.serviceWorker.getRegistrations();
+          for (let registration of registrations) {
+            await registration.unregister();
+          }
+        } catch (err) {
+          console.warn("Failed to unregister SW:", err);
         }
-      } catch (err) {
-        console.warn("Failed to clear SW:", err);
       }
     }
     location.reload();
@@ -133,18 +159,18 @@ if (check_post) {
   check_post.checked = /\bpost=1/.test(document.cookie);
   check_post.onchange = async () => {
     document.cookie = `post=${check_post.checked ? "1;max-age=31536000" : ";max-age=0"};path=/;SameSite=Strict;Secure`;
+
+    await clearPriecoCache();
     if ("serviceWorker" in navigator) {
       try {
-        await caches.delete("prieco-cache");
         const registrations = await navigator.serviceWorker.getRegistrations();
         for (let registration of registrations) {
           await registration.unregister();
         }
       } catch (err) {
-        console.warn("Failed to clear SW:", err);
+        console.warn("Failed to unregister SW:", err);
       }
     }
-
     location.reload();
   };
 }
