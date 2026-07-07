@@ -16,6 +16,12 @@ pub mod functions {
     pub mod ranking {
         pub mod hand;
         pub mod rrf;
+
+        pub mod meaning {
+            pub mod call;
+            pub mod intent;
+            pub mod optimize;
+        }
     }
 
     pub mod additional {

@@ -32,6 +32,7 @@ use std::{
   Import external libraries
 */
 use ahash::{AHashMap, AHashSet};
+use aho_corasick::{AhoCorasick, MatchKind};
 use charabia::{Tokenizer as CHARABIA_TOKENIZER, TokenizerBuilder};
 use chrono::{Duration, NaiveDate, Utc};
 #[cfg(feature = "cuda")]
@@ -1108,7 +1109,7 @@ impl PageRank {
 }
 
 /*
-Reranker
+  Reranker
 */
 pub static BGE_MODEL: &[u8] = include_bytes!("../../../data/bge/model.onnx");
 pub static BGE_TOKENIZER: &[u8] = include_bytes!("../../../data/bge/tokenizer.json");
@@ -1225,6 +1226,103 @@ impl Reranker {
         results
     }
 }
+
+/*
+  Intent
+*/
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QueryIntent {
+    Informational,           // Learn information
+    Transactional,           // Action purchase, download, sign up
+    CommercialInvestigation, // Research, comparing options
+    Navigational,            // Reach a known domain, page
+    Local,                   // Near me businesses
+    Unknown,                 // Failed to determine
+}
+
+pub struct LangMatcher {
+    pub automaton: AhoCorasick,
+    pub intent_map: Vec<QueryIntent>,
+}
+
+#[derive(Deserialize)]
+struct LanguageKeywords {
+    #[serde(default)]
+    informational_keywords: Vec<String>,
+    #[serde(default)]
+    transactional_keywords: Vec<String>,
+    #[serde(default)]
+    commercial_keywords: Vec<String>,
+    #[serde(default)]
+    local_keywords: Vec<String>,
+    #[serde(default)]
+    navigational_keywords: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct IntentConfig {
+    #[serde(flatten)]
+    languages: AHashMap<String, LanguageKeywords>,
+}
+
+pub static MATCHERS: Lazy<AHashMap<String, LangMatcher>> = Lazy::new(|| {
+    let mut matchers = AHashMap::new();
+
+    let json_data = include_str!("../../../data/intent.json");
+    let config: IntentConfig = serde_json::from_str(&json_data)
+        .expect("Error: intents.json format does not match required schema.");
+
+    for (lang_code, keywords_struct) in config.languages {
+        let mut patterns = Vec::new();
+        let mut intent_map = Vec::new();
+
+        let mut add_patterns = |keywords: Vec<String>, intent: QueryIntent| {
+            for kw in keywords {
+                let trimmed = kw.trim().to_lowercase();
+                if !trimmed.is_empty() {
+                    patterns.push(trimmed);
+                    intent_map.push(intent);
+                }
+            }
+        };
+
+        add_patterns(
+            keywords_struct.informational_keywords,
+            QueryIntent::Informational,
+        );
+        add_patterns(
+            keywords_struct.transactional_keywords,
+            QueryIntent::Transactional,
+        );
+        add_patterns(
+            keywords_struct.commercial_keywords,
+            QueryIntent::CommercialInvestigation,
+        );
+        add_patterns(keywords_struct.local_keywords, QueryIntent::Local);
+        add_patterns(
+            keywords_struct.navigational_keywords,
+            QueryIntent::Navigational,
+        );
+
+        if !patterns.is_empty() {
+            let automaton = AhoCorasick::builder()
+                .ascii_case_insensitive(true)
+                .match_kind(MatchKind::LeftmostFirst)
+                .build(&patterns)
+                .expect("Failed to build AhoCorasick state machine");
+
+            matchers.insert(
+                lang_code,
+                LangMatcher {
+                    automaton,
+                    intent_map,
+                },
+            );
+        }
+    }
+
+    matchers
+});
 
 pub static ARTISTS_DB: Lazy<Arc<Database>> =
     Lazy::new(|| Arc::new(Database::open("kv/artists.redb").unwrap()));

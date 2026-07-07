@@ -36,6 +36,7 @@ reqwest = { workspace = true }
 symspell = { workspace = true }
 fjall = { workspace = true }
 charabia = { workspace = true }
+aho-corasick = { workspace = true }
 
 [features]
 default = []
