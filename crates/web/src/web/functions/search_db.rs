@@ -46,7 +46,7 @@ use crate::web::functions::{
     ranking::{self},
 };
 use prieco_core::{
-    META_DECODER, PRIECO_FJALL, QueryIntent,
+    META_DECODER, PRIECO_FJALL,
     globals::{
         EmbeddingService, PAGERANK, RERANKER, SearchResult, TANTIVY_INDEX, TANTIVY_READER,
         VECTOR_CENTROPOIDS, WebDocument, colors,
@@ -163,7 +163,7 @@ pub async fn run_json(
     let q_clone4 = q_clone.to_string();
 
     // Clasify query intent
-    let intent: QueryIntent = ranking::meaning::call::process_query(&mut fts_query, lang);
+    let (intent, coords) = ranking::meaning::call::process_query(&mut fts_query, lang);
 
     let mut results = if let Some(cached) = cached_data {
         cached
@@ -232,7 +232,6 @@ pub async fn run_json(
         });
 
         let lang_clone = lang.to_string();
-        let loc_clone = loc.to_string();
         let tantivy_task = tokio::task::spawn_blocking(move || {
             let start = Instant::now();
 
@@ -250,8 +249,7 @@ pub async fn run_json(
                     .unwrap_or(fts_query);
             }
 
-            let res = search_tantivy(&fts_query, &lang_clone, &loc_clone, &intent, MAX_FTS)
-                .unwrap_or_default();
+            let res = search_tantivy(&fts_query, &lang_clone, MAX_FTS).unwrap_or_default();
 
             let elapsed = start.elapsed().as_secs_f32();
             println!("Tantivy took {elapsed:.3}s");
@@ -441,13 +439,7 @@ pub async fn run_json(
 }
 
 /* Index search functions */
-fn search_tantivy(
-    query_text: &str,
-    lang: &str,
-    loc: &str,
-    intent: &QueryIntent,
-    limit: usize,
-) -> Option<Vec<(u64, f32)>> {
+fn search_tantivy(query_text: &str, lang: &str, limit: usize) -> Option<Vec<(u64, f32)>> {
     let schema = TANTIVY_INDEX.schema();
     let doc_id = schema.get_field("doc_id").ok()?;
     let title_field = schema.get_field("title").ok()?;

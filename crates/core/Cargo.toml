@@ -39,6 +39,7 @@ charabia = { workspace = true }
 aho-corasick = { workspace = true }
 fst = { workspace = true }
 bincode-next = { workspace = true }
+rkyv = { workspace = true }
 
 [features]
 default = []

@@ -18,10 +18,12 @@
 #[cfg(feature = "cuda")]
 use std::io::{Cursor, Read};
 use std::{
+    collections::HashMap,
     error::Error,
     fs::{File, read},
     hash::{Hash, Hasher},
     net::{Ipv4Addr, Ipv6Addr},
+    ops::Range,
     path::Path,
     str::FromStr,
     sync::Arc,
@@ -59,6 +61,7 @@ use parking_lot::{Condvar, Mutex, RwLock};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use redb::{Database, ReadableDatabase, TableDefinition};
 use reqwest::Client;
+use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use rocket::{
     Request,
     request::{FromRequest, Outcome},
@@ -83,6 +86,7 @@ use zstd::dict::DecoderDictionary;
 
 #[cfg(feature = "cuda")]
 use crate::{ID_SIZE, RECORD_SIZE};
+
 /*
   Import own libraries
 */
@@ -1747,6 +1751,128 @@ pub static MATCHERS: Lazy<AHashMap<String, LangMatcher>> = Lazy::new(|| {
 
     matchers
 });
+
+/*
+  Entities
+*/
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EntityType {
+    PersonName,
+    Business,
+    Place,
+}
+
+#[derive(Debug, Clone)]
+pub struct TaggedEntity {
+    pub range: Range<usize>,
+    pub entity_type: EntityType,
+    pub matched_text: String,
+}
+
+#[derive(Archive, Deserialize, Serialize, RkyvSerialize, RkyvDeserialize, Debug, Clone)]
+#[archive(check_bytes)]
+pub struct GeoCoords {
+    pub country: String,
+    pub lon: f32,
+    pub lat: f32,
+}
+
+#[derive(Archive, Deserialize, Serialize, RkyvSerialize, RkyvDeserialize, Debug, Clone)]
+#[archive(check_bytes)]
+pub struct EntityRegistry {
+    pub places: HashMap<String, Vec<GeoCoords>>,
+}
+
+pub struct QueryUnderstandingPipeline {
+    pub automaton: AhoCorasick,
+    pub metadata_map: Vec<(EntityType, String)>,
+    pub archived_places: &'static rkyv::Archived<EntityRegistry>,
+}
+
+pub static QU_PIPELINE: Lazy<QueryUnderstandingPipeline> = Lazy::new(|| {
+    macro_rules! include_bytes_aligned {
+        ($path:expr) => {{
+            #[repr(C, align(16))]
+            struct Aligned([u8; include_bytes!($path).len()]);
+            static ALIGNED: Aligned = Aligned(*include_bytes!($path));
+            &ALIGNED.0
+        }};
+    }
+
+    let places_bytes = include_bytes_aligned!("../../../data/entities/places.rkyv");
+    let archived_places = rkyv::check_archived_root::<EntityRegistry>(places_bytes).unwrap();
+
+    let keywords_str = include_str!("../../../data/entities/keywords_automaton.txt");
+
+    let mut patterns = Vec::new();
+    let mut metadata_map = Vec::new();
+
+    for line in keywords_str.lines() {
+        if let Some((prefix, value)) = line.split_once('|') {
+            if value.trim().len() < 2 {
+                continue;
+            }
+
+            let etype = match prefix {
+                "BIZ" => EntityType::Business,
+                "NAME" => EntityType::PersonName,
+                _ => continue,
+            };
+            patterns.push(value.to_string());
+            metadata_map.push((etype, value.to_string()));
+        }
+    }
+
+    for place_name in archived_places.places.keys() {
+        let name_str = place_name.as_str().to_lowercase();
+        if name_str.len() > 1 {
+            patterns.push(name_str.clone());
+            metadata_map.push((EntityType::Place, name_str));
+        }
+    }
+
+    let automaton = AhoCorasick::builder()
+        .ascii_case_insensitive(true)
+        .match_kind(MatchKind::LeftmostLongest)
+        .build(&patterns)
+        .unwrap();
+
+    QueryUnderstandingPipeline {
+        automaton,
+        metadata_map,
+        archived_places,
+    }
+});
+impl QueryUnderstandingPipeline {
+    pub fn get_tags(&self, query: &str) -> Vec<TaggedEntity> {
+        let query_lower = query.to_lowercase();
+        let query_bytes = query_lower.as_bytes();
+
+        self.automaton
+            .find_iter(&query_lower)
+            .filter_map(|mat| {
+                let start = mat.start();
+                let end = mat.end();
+
+                let is_start_boundary =
+                    start == 0 || !query_bytes[start - 1].is_ascii_alphanumeric();
+                let is_end_boundary =
+                    end == query_bytes.len() || !query_bytes[end].is_ascii_alphanumeric();
+
+                if is_start_boundary && is_end_boundary {
+                    let (etype, text) = &self.metadata_map[mat.pattern().as_usize()];
+                    Some(TaggedEntity {
+                        range: mat.range(),
+                        entity_type: *etype,
+                        matched_text: text.clone(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+}
 
 pub static ARTISTS_DB: Lazy<Arc<Database>> =
     Lazy::new(|| Arc::new(Database::open("kv/artists.redb").unwrap()));

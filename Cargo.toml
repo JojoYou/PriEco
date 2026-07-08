@@ -78,6 +78,7 @@ symspell = "0.5.2" # Spell checker
 charabia = "0.9.9" # Lang detection tokenizer
 fst = "0.4.7" # Synonyms
 aho-corasick = "1.1.4" # Match intent keywords fast
+rkyv = { version = "0.7.44", features = ["validation"] }  # 0 copy deserialization; Used for places
 
 # Vector embedding
 ort = { path = "vendor/ort-1.16.3" } # Query to vector
@@ -94,7 +95,6 @@ whatlang = "0.16.4"  # Language detection from text
 maxminddb = "0.24.0" # Reading Maxmind DB for IP to country
 env_logger = "0.11.8" # Logger: Used to disable Foster parenting not implemented
 log = "0.4.28"# Logger: Used to disable Foster parenting not implemented
-
 
 
 # Tools

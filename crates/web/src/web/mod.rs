@@ -19,6 +19,7 @@ pub mod functions {
 
         pub mod meaning {
             pub mod call;
+            pub mod entities;
             pub mod intent;
             pub mod optimize;
         }

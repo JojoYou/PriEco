@@ -1,20 +1,31 @@
-use prieco_core::SPELL_CHECKER;
+use prieco_core::{QU_PIPELINE, SPELL_CHECKER};
 use symspell::{Suggestion, Verbosity};
 
 pub fn spell_check_query(q: &str) -> Option<String> {
-    let mut changed = false;
-    let corrected: Vec<String> = q
-        .split_whitespace()
-        .map(|word| match correct_word(word) {
-            Some(c) => {
-                changed = true;
-                c
-            }
-            None => word.to_string(),
-        })
-        .collect();
+    let tags = QU_PIPELINE.get_tags(q);
 
-    changed.then(|| corrected.join(" "))
+    let mut changed = false;
+    let mut corrected_words = Vec::new();
+
+    for word in q.split_whitespace() {
+        let start_idx = word.as_ptr() as usize - q.as_ptr() as usize;
+
+        let is_protected = tags.iter().any(|tag| tag.range.contains(&start_idx));
+
+        if is_protected {
+            corrected_words.push(word.to_string());
+        } else {
+            match correct_word(word) {
+                Some(c) => {
+                    changed = true;
+                    corrected_words.push(c);
+                }
+                None => corrected_words.push(word.to_string()),
+            }
+        }
+    }
+
+    changed.then(|| corrected_words.join(" "))
 }
 
 fn correct_word(word: &str) -> Option<String> {
