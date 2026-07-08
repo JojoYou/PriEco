@@ -46,6 +46,7 @@ use fjall::{
     CompressionType, Database as FJALL_DATABASE, Keyspace, KeyspaceCreateOptions,
     KvSeparationOptions, config::CompressionPolicy,
 };
+use fst::Map as FstMap;
 use memmap2::{Mmap, MmapOptions};
 use ndarray::{Array, Array2, CowArray, IxDyn};
 use once_cell::sync::Lazy;
@@ -669,7 +670,6 @@ impl TANTIVY_TOKENIZER for Multilingual {
   Inserter
 */
 pub const INSERTER_IMPORT_DIR: &str = "/mnt/ssd/results/imp";
-
 pub static CENTROPOIDS_BIN: &[u8] = include_bytes!("../../../data/ivf/centroids.bin");
 
 pub static VECTOR_CENTROPOIDS: Lazy<Arc<CentroidIndex>> =
@@ -1225,6 +1225,430 @@ impl Reranker {
 
         results
     }
+}
+
+/*
+  Synonyms
+*/
+pub struct LangSynonyms {
+    index: FstMap<&'static [u8]>,
+    rows: Vec<Box<[Box<str>]>>,
+}
+
+fn get_synonym_bytes(lang: &str) -> Option<(&'static [u8], &'static [u8])> {
+    match lang {
+        "ar" => Some((
+            include_bytes!("../../../data/synonyms/ar.fst"),
+            include_bytes!("../../../data/synonyms/ar.rows.bin"),
+        )),
+        "bg" => Some((
+            include_bytes!("../../../data/synonyms/bg.fst"),
+            include_bytes!("../../../data/synonyms/bg.rows.bin"),
+        )),
+        "ca" => Some((
+            include_bytes!("../../../data/synonyms/ca.fst"),
+            include_bytes!("../../../data/synonyms/ca.rows.bin"),
+        )),
+        "da" => Some((
+            include_bytes!("../../../data/synonyms/da.fst"),
+            include_bytes!("../../../data/synonyms/da.rows.bin"),
+        )),
+        "en" => Some((
+            include_bytes!("../../../data/synonyms/en.fst"),
+            include_bytes!("../../../data/synonyms/en.rows.bin"),
+        )),
+        "et" => Some((
+            include_bytes!("../../../data/synonyms/et.fst"),
+            include_bytes!("../../../data/synonyms/et.rows.bin"),
+        )),
+        "fi" => Some((
+            include_bytes!("../../../data/synonyms/fi.fst"),
+            include_bytes!("../../../data/synonyms/fi.rows.bin"),
+        )),
+        "he" => Some((
+            include_bytes!("../../../data/synonyms/he.fst"),
+            include_bytes!("../../../data/synonyms/he.rows.bin"),
+        )),
+        "hr" => Some((
+            include_bytes!("../../../data/synonyms/hr.fst"),
+            include_bytes!("../../../data/synonyms/hr.rows.bin"),
+        )),
+        "hu" => Some((
+            include_bytes!("../../../data/synonyms/hu.fst"),
+            include_bytes!("../../../data/synonyms/hu.rows.bin"),
+        )),
+        "is" => Some((
+            include_bytes!("../../../data/synonyms/is.fst"),
+            include_bytes!("../../../data/synonyms/is.rows.bin"),
+        )),
+        "lt" => Some((
+            include_bytes!("../../../data/synonyms/lt.fst"),
+            include_bytes!("../../../data/synonyms/lt.rows.bin"),
+        )),
+        "lv" => Some((
+            include_bytes!("../../../data/synonyms/lv.fst"),
+            include_bytes!("../../../data/synonyms/lv.rows.bin"),
+        )),
+        "nb" => Some((
+            include_bytes!("../../../data/synonyms/nb.fst"),
+            include_bytes!("../../../data/synonyms/nb.rows.bin"),
+        )),
+        "nn" => Some((
+            include_bytes!("../../../data/synonyms/nn.fst"),
+            include_bytes!("../../../data/synonyms/nn.rows.bin"),
+        )),
+        "no" => Some((
+            include_bytes!("../../../data/synonyms/no.fst"),
+            include_bytes!("../../../data/synonyms/no.rows.bin"),
+        )),
+        "ro" => Some((
+            include_bytes!("../../../data/synonyms/ro.fst"),
+            include_bytes!("../../../data/synonyms/ro.rows.bin"),
+        )),
+        "sk" => Some((
+            include_bytes!("../../../data/synonyms/sk.fst"),
+            include_bytes!("../../../data/synonyms/sk.rows.bin"),
+        )),
+        "sl" => Some((
+            include_bytes!("../../../data/synonyms/sl.fst"),
+            include_bytes!("../../../data/synonyms/sl.rows.bin"),
+        )),
+        "sr" => Some((
+            include_bytes!("../../../data/synonyms/sr.fst"),
+            include_bytes!("../../../data/synonyms/sr.rows.bin"),
+        )),
+        "sv" => Some((
+            include_bytes!("../../../data/synonyms/sv.fst"),
+            include_bytes!("../../../data/synonyms/sv.rows.bin"),
+        )),
+        _ => None,
+    }
+}
+
+pub static LOCAL_NO_EXPAND: Lazy<AHashSet<&'static str>> = Lazy::new(|| {
+    let words = vec![
+        // 🇬🇧English (en)
+        "near",
+        "nearby",
+        "close",
+        "closest",
+        "around",
+        "by",
+        "at",
+        "vicinity",
+        "me",
+        "my",
+        "here",
+        "myself",
+        "area",
+        "neighborhood",
+        "town",
+        "city",
+        "location",
+        "place",
+        "district",
+        "street",
+        "zip",
+        "open",
+        "now",
+        "today",
+        "tonight",
+        "hours",
+        "map",
+        "directions",
+        "distance",
+        "walking",
+        "driving",
+        "route",
+        "miles",
+        "km",
+        // 🇸🇰 Slovak (sk) & 🇨🇿 Czech (cs - similar behavior)
+        "blízko",
+        "blizko",
+        "najbližšie",
+        "najblizsie",
+        "pri",
+        "okolo",
+        "mne",
+        "mi",
+        "tu",
+        "oblasť",
+        "oblast",
+        "mesto",
+        "miesto",
+        "ulica",
+        "otvorené",
+        "otvorene",
+        "teraz",
+        "dnes",
+        "večer",
+        "hodiny",
+        "mapa",
+        "trasa",
+        "vzdialenosť",
+        // 🇭🇷 Croatian (hr) & 🇷🇸 Serbian (sr)
+        "blizu",
+        "najbliže",
+        "oko",
+        "kod",
+        "meni",
+        "mi",
+        "ovdje",
+        "ovde",
+        "područje",
+        "grad",
+        "mjesto",
+        "mesto",
+        "otvoreno",
+        "sada",
+        "danas",
+        "večeras",
+        "mapa",
+        "karta",
+        "ruta",
+        "udaljenost",
+        // 🇸🇮 Slovenian (sl)
+        "blizu",
+        "najbližje",
+        "okoli",
+        "pri",
+        "meni",
+        "mi",
+        "tukaj",
+        "območje",
+        "mesto",
+        "kraj",
+        "odprto",
+        "zdaj",
+        "danes",
+        "zemljevid",
+        // 🇧🇬 Bulgarian (bg)
+        "близо",
+        "най-близо",
+        "около",
+        "при",
+        "мен",
+        "ми",
+        "тук",
+        "район",
+        "град",
+        "място",
+        "отворено",
+        "сега",
+        "днес",
+        "карта",
+        // 🇷🇴 Romanian (ro)
+        "aproape",
+        "lângă",
+        "langa",
+        "în jur",
+        "mine",
+        "aici",
+        "zonă",
+        "zona",
+        "oraș",
+        "oras",
+        "loc",
+        "stradă",
+        "deschis",
+        "acum",
+        "astăzi",
+        "hartă",
+        "harta",
+        // 🇭🇺 Hungarian (hu)
+        "közel",
+        "legközelebb",
+        "körül",
+        "mellett",
+        "nekem",
+        "itt",
+        "terület",
+        "város",
+        "hely",
+        "utca",
+        "nyitva",
+        "most",
+        "ma",
+        "térkép",
+        // 🇸🇪 Swedish (sv), 🇳🇴 Norwegian (no/nb/nn), 🇩🇰 Danish (da)
+        "nära",
+        "nær",
+        "närmaste",
+        "nærmeste",
+        "runt",
+        "rundt",
+        "mig",
+        "meg",
+        "här",
+        "her",
+        "område",
+        "stad",
+        "by",
+        "plats",
+        "sted",
+        "öppen",
+        "åpen",
+        "åben",
+        "nu",
+        "idag",
+        "i dag",
+        "karta",
+        "kart",
+        "kort",
+        "väg",
+        "vei",
+        // 🇫🇮 Finnish (fi)
+        "lähellä",
+        "lähin",
+        "ympärillä",
+        "minua",
+        "minun",
+        "täällä",
+        "alue",
+        "kaupunki",
+        "paikka",
+        "katu",
+        "auki",
+        "avoinna",
+        "nyt",
+        "tänään",
+        "kartta",
+        // 🇪🇪 Estonian (et)
+        "lähedal",
+        "lähim",
+        "ümber",
+        "minu",
+        "siin",
+        "piirkond",
+        "linn",
+        "koht",
+        "avatud",
+        "praegu",
+        "täna",
+        "kaart",
+        // 🇱🇻 Latvian (lv) & 🇱🇹 Lithuanian (lt)
+        "tuvu",
+        "tuvākais",
+        "arti",
+        "arčiausiai",
+        "aplink",
+        "man",
+        "šeit",
+        "čia",
+        "rajons",
+        "rajonas",
+        "pilsēta",
+        "miestas",
+        "vieta",
+        "atvērts",
+        "atidaryta",
+        "tagad",
+        "dabar",
+        "šodien",
+        "šiandien",
+        "karte",
+        "žemėlapis",
+        // 🇮🇸 Icelandic (is)
+        "nálægt",
+        "næst",
+        "kringum",
+        "mig",
+        "hér",
+        "svæði",
+        "borg",
+        "staður",
+        "opið",
+        "núna",
+        "í dag",
+        "kort",
+        // 🇦🇩 Catalan (ca)
+        "prop",
+        "a prop",
+        "més proper",
+        "voltant",
+        "mi",
+        "aquí",
+        "àrea",
+        "ciutat",
+        "lloc",
+        "carrer",
+        "obert",
+        "ara",
+        "avui",
+        "mapa",
+        // 🇮🇱 Hebrew (he)
+        "קרוב",
+        "הכי קרוב",
+        "סביב",
+        "לי",
+        "שלי",
+        "כאן",
+        "אזור",
+        "עיר",
+        "מקום",
+        "רחוב",
+        "פתוח",
+        "עכשיו",
+        "היום",
+        "מפה",
+        "כיוונים",
+        // 🇸🇦 Arabic (ar)
+        "قريب",
+        "الأقرب",
+        "حولي",
+        "بجانبي",
+        "لي",
+        "هنا",
+        "منطقة",
+        "مدينة",
+        "مكان",
+        "شارع",
+        "مفتوح",
+        "الآن",
+        "اليوم",
+        "خريطة",
+        "اتجاهات",
+    ];
+
+    let mut set = AHashSet::with_capacity(words.len());
+    for w in words {
+        set.insert(w);
+    }
+    set
+});
+
+impl LangSynonyms {
+    fn load(lang: &str) -> Option<Arc<LangSynonyms>> {
+        let (fst_bytes, rows_bytes) = get_synonym_bytes(lang)?;
+
+        let index = FstMap::new(fst_bytes).ok()?;
+
+        let (rows, _bytes_read): (Vec<Box<[Box<str>]>>, usize) =
+            bincode_next::decode_from_slice(rows_bytes, bincode_next::config::standard()).ok()?;
+
+        Some(Arc::new(LangSynonyms { index, rows }))
+    }
+
+    pub fn lookup(&self, term: &str) -> Option<&[Box<str>]> {
+        let id = self.index.get(term)?;
+        self.rows.get(id as usize).map(|r| r.as_ref())
+    }
+}
+
+static SYNONYM_STORES: Lazy<RwLock<std::collections::HashMap<String, Option<Arc<LangSynonyms>>>>> =
+    Lazy::new(|| RwLock::new(std::collections::HashMap::new()));
+pub fn get_store(lang: &str) -> Option<Arc<LangSynonyms>> {
+    {
+        let cache = SYNONYM_STORES.read();
+        if let Some(entry) = cache.get(lang) {
+            return entry.clone();
+        }
+    }
+    let loaded = LangSynonyms::load(lang);
+    SYNONYM_STORES
+        .write()
+        .insert(lang.to_string(), loaded.clone());
+    loaded
 }
 
 /*

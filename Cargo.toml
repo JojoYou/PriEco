@@ -76,6 +76,7 @@ symspell = "0.5.2" # Spell checker
 
 # Full text Search
 charabia = "0.9.9" # Lang detection tokenizer
+fst = "0.4.7" # Synonyms
 aho-corasick = "1.1.4" # Match intent keywords fast
 
 # Vector embedding

@@ -1,10 +1,6 @@
 use prieco_core::{MATCHERS, QueryIntent};
 
-pub fn intent(query: &str, lang: &str, is_dir_hit: bool) -> QueryIntent {
-    if is_dir_hit {
-        return QueryIntent::Navigational;
-    }
-
+pub fn intent(query: &str, lang: &str) -> QueryIntent {
     let lower_query = query.to_lowercase();
 
     let target_lang = if MATCHERS.contains_key(lang) {

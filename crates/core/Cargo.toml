@@ -37,6 +37,8 @@ symspell = { workspace = true }
 fjall = { workspace = true }
 charabia = { workspace = true }
 aho-corasick = { workspace = true }
+fst = { workspace = true }
+bincode-next = { workspace = true }
 
 [features]
 default = []

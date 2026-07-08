@@ -16,7 +16,6 @@ use std::{
     os::raw::c_char,
     path::Path,
     sync::Arc,
-    time::Instant,
 };
 
 use tracing::error;

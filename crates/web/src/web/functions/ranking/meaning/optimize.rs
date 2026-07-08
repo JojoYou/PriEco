@@ -1,5 +1,6 @@
 use ahash::AHashSet;
 use once_cell::sync::Lazy;
+use prieco_core::{LOCAL_NO_EXPAND, QueryIntent, get_store};
 
 static STOPWORDS: Lazy<AHashSet<&'static str>> = Lazy::new(|| {
     let mut set = AHashSet::new();
@@ -13,7 +14,7 @@ static STOPWORDS: Lazy<AHashSet<&'static str>> = Lazy::new(|| {
     set
 });
 
-pub fn optimize(query: &mut String) {
+pub fn synynyms_and_optimize(query: &mut String, lang: &str, intent: &QueryIntent) {
     if query.contains('"')
         || query.contains("def")
         || query.contains("definition")
@@ -24,18 +25,36 @@ pub fn optimize(query: &mut String) {
         return;
     }
 
-    let terms: Vec<&str> = query.split_whitespace().collect();
-    let mut filtered_terms: Vec<&str> = Vec::with_capacity(terms.len());
+    let store = get_store(lang);
 
-    for term in &terms {
-        if !STOPWORDS.contains(term.to_lowercase().as_str()) {
-            filtered_terms.push(*term);
+    let lower = query.to_lowercase();
+    let mut groups: Vec<String> = Vec::new();
+
+    for term in lower.split_whitespace() {
+        if STOPWORDS.contains(term) {
+            continue;
+        }
+
+        // Local intent Bypass
+        if intent == &QueryIntent::Local && LOCAL_NO_EXPAND.contains(term) {
+            groups.push(format!("\"{}\"^2.0", term));
+            continue;
+        }
+
+        // Synonym Expansion
+        match store.as_ref().and_then(|s| s.lookup(term)) {
+            Some(synonyms) if !synonyms.is_empty() => {
+                let mut parts = vec![format!("\"{}\"^2.0", term)];
+                parts.extend(synonyms.iter().take(2).map(|s| format!("\"{}\"^1.0", s)));
+                groups.push(format!("({})", parts.join(" OR ")));
+            }
+            _ => {
+                groups.push(format!("\"{}\"^2.0", term));
+            }
         }
     }
 
-    if filtered_terms.is_empty() {
-        return;
+    if !groups.is_empty() {
+        *query = groups.join(" ");
     }
-
-    *query = filtered_terms.join(" ");
 }

@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::RwLock;
 
-use prieco_core::WebDocument;
+use prieco_core::{QueryIntent, WebDocument};
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub struct RankingWeights {
@@ -46,7 +46,13 @@ impl Default for RankingWeights {
 static ACTIVE_WEIGHTS: Lazy<RwLock<RankingWeights>> =
     Lazy::new(|| RwLock::new(RankingWeights::default()));
 
-pub fn run(results: &mut Vec<WebDocument>, query: &str, lang: &str, loc: &str) {
+pub fn run(
+    results: &mut Vec<WebDocument>,
+    query: &str,
+    lang: &str,
+    loc: &str,
+    intent: &QueryIntent,
+) {
     // Training
     check_for_updated_weights(); // PHP might have generated new weights to be tested
     let weights = {
@@ -61,21 +67,59 @@ pub fn run(results: &mut Vec<WebDocument>, query: &str, lang: &str, loc: &str) {
         let mut boost: f64 = 1.0; // Multiplicative base
 
         // (https://www/)query(.tld/)
-        let domain_root = clean_url
-            .split("://")
-            .nth(1)
-            .and_then(|s| s.split('/').next())
-            .and_then(|d| d.strip_prefix("www.").or(Some(d)))
-            .and_then(|d| d.split('.').next())
-            .unwrap_or("");
+        if *intent == QueryIntent::Navigational {
+            // Extract the core domain name (e.g., "facebook" from "https://www.facebook.com/login")
+            let domain_root = clean_url
+                .split("://")
+                .nth(1)
+                .and_then(|s| s.split('/').next())
+                .and_then(|d| d.strip_prefix("www.").or(Some(d)))
+                .and_then(|d| d.split('.').next())
+                .unwrap_or("");
 
-        if domain_root.eq_ignore_ascii_case(query) && clean_url.matches('/').count() <= 3 {
-            boost *= weights.domain_match_boost;
+            if domain_root.eq_ignore_ascii_case(query) {
+                boost *= weights.domain_match_boost;
+            }
+
+            // Homepage
+            if is_effectively_homepage(clean_url) {
+                boost *= weights.homepage_boost;
+            }
         }
 
-        // Homepage
-        if is_effectively_homepage(clean_url) {
-            boost *= weights.homepage_boost;
+        // Shopping intent
+        if *intent == QueryIntent::CommercialInvestigation {
+            if clean_url.contains("/product/")
+                || clean_url.contains("/item/")
+                || clean_url.contains("review")
+            {
+                boost *= 1.2;
+            }
+
+            if clean_url.contains(".com")
+                || clean_url.contains(".shop")
+                || clean_url.contains(".store")
+            {
+                boost *= 1.1;
+            }
+        }
+
+        // Informational: learning
+        if *intent == QueryIntent::Informational {
+            if clean_url.contains(".wikipedia.org") {
+                boost *= 1.4;
+            }
+
+            if clean_url.contains(".org")
+                || clean_url.contains(".edu")
+                || clean_url.contains(".gov")
+            {
+                boost *= 1.25;
+            }
+
+            if clean_url.contains(".shop") || clean_url.contains("/product/") {
+                boost *= 0.8;
+            }
         }
 
         // Language
@@ -84,9 +128,10 @@ pub fn run(results: &mut Vec<WebDocument>, query: &str, lang: &str, loc: &str) {
         }
 
         // Location
-        if doc.loc == loc {
+        if *intent == QueryIntent::Local && doc.loc == loc {
             boost *= weights.loc_boost;
         }
+
         let tld_matches_loc = clean_url
             .split("://")
             .nth(1)
