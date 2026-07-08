@@ -46,7 +46,7 @@ use crate::web::functions::{
     ranking::{self},
 };
 use prieco_core::{
-    META_DECODER, PRIECO_FJALL,
+    META_DECODER, PRIECO_FJALL, QueryIntent,
     globals::{
         EmbeddingService, PAGERANK, RERANKER, SearchResult, TANTIVY_INDEX, TANTIVY_READER,
         VECTOR_CENTROPOIDS, WebDocument, colors,
@@ -232,6 +232,7 @@ pub async fn run_json(
         });
 
         let lang_clone = lang.to_string();
+        let loc_clone = loc.to_string();
         let tantivy_task = tokio::task::spawn_blocking(move || {
             let start = Instant::now();
 
@@ -249,7 +250,8 @@ pub async fn run_json(
                     .unwrap_or(fts_query);
             }
 
-            let res = search_tantivy(&fts_query, &lang_clone, MAX_FTS).unwrap_or_default();
+            let res = search_tantivy(&fts_query, &lang_clone, &loc_clone, &intent, MAX_FTS)
+                .unwrap_or_default();
 
             let elapsed = start.elapsed().as_secs_f32();
             println!("Tantivy took {elapsed:.3}s");
@@ -439,7 +441,13 @@ pub async fn run_json(
 }
 
 /* Index search functions */
-fn search_tantivy(query_text: &str, lang: &str, limit: usize) -> Option<Vec<(u64, f32)>> {
+fn search_tantivy(
+    query_text: &str,
+    lang: &str,
+    loc: &str,
+    intent: &QueryIntent,
+    limit: usize,
+) -> Option<Vec<(u64, f32)>> {
     let schema = TANTIVY_INDEX.schema();
     let doc_id = schema.get_field("doc_id").ok()?;
     let title_field = schema.get_field("title").ok()?;
@@ -447,10 +455,10 @@ fn search_tantivy(query_text: &str, lang: &str, limit: usize) -> Option<Vec<(u64
     let content_field = schema.get_field("content").ok()?;
     let keywords_field = schema.get_field("keywords").ok()?;
 
-    let safe_s = schema.get_field("safe_s").ok()?;
     let lang_field = schema.get_field("lang").ok()?;
+    let loc_field = schema.get_field("loc").ok()?;
 
-    let query_parser = QueryParser::for_index(
+    let mut query_parser = QueryParser::for_index(
         &TANTIVY_INDEX,
         vec![
             title_field,
@@ -460,22 +468,34 @@ fn search_tantivy(query_text: &str, lang: &str, limit: usize) -> Option<Vec<(u64
         ],
     );
 
-    let query = query_parser.parse_query(query_text).ok()?;
+    query_parser.set_field_boost(title_field, 3.0);
+    query_parser.set_field_boost(description_field, 1.5);
+    query_parser.set_field_boost(keywords_field, 1.2);
 
-    // 3. Conditionally build the final query
-    let final_query: Box<dyn Query> = if lang != "all" {
-        // Create an exact term match for the language
+    let parsed_query = query_parser.parse_query(query_text).ok()?;
+
+    let mut clauses: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Must, parsed_query)];
+
+    if lang != "all" && !lang.is_empty() {
         let lang_term = Term::from_field_text(lang_field, lang);
-        let lang_query = Box::new(TermQuery::new(lang_term, IndexRecordOption::Basic));
+        clauses.push((
+            Occur::Must,
+            Box::new(TermQuery::new(lang_term, IndexRecordOption::Basic)),
+        ));
+    }
 
-        // Combine the user's text query and the language filter
-        Box::new(BooleanQuery::new(vec![
-            (Occur::Must, query),      // Text query MUST match
-            (Occur::Must, lang_query), // Language MUST match
-        ]))
+    if intent == &QueryIntent::Local && loc != "all" && !loc.is_empty() {
+        let loc_term = Term::from_field_text(loc_field, loc);
+        clauses.push((
+            Occur::Must,
+            Box::new(TermQuery::new(loc_term, IndexRecordOption::Basic)),
+        ));
+    }
+
+    let final_query: Box<dyn Query> = if clauses.len() == 1 {
+        clauses.pop().unwrap().1
     } else {
-        // All lang
-        query
+        Box::new(BooleanQuery::new(clauses))
     };
 
     let searcher = TANTIVY_READER.searcher();

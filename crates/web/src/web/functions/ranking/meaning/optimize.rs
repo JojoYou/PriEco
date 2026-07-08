@@ -69,10 +69,16 @@ pub fn synynyms_and_optimize(
         }
 
         let entity_text = &query[tag.range.clone()];
+        let exact_phrase = format!("\"{}\"", entity_text);
+        let fast_entity_query = format!(
+            "(title:{exact} OR description:{exact} OR keywords:{exact})",
+            exact = exact_phrase
+        );
+
         match tag.entity_type {
-            EntityType::Business => groups.push(format!("\"{}\"^3.0", entity_text)),
-            EntityType::Place => groups.push(format!("\"{}\"^2.5", entity_text)),
-            EntityType::PersonName => groups.push(format!("\"{}\"^2.5", entity_text)),
+            EntityType::Business => groups.push(format!("{}^3.0", fast_entity_query)),
+            EntityType::Place => groups.push(format!("{}^2.5", fast_entity_query)),
+            EntityType::PersonName => groups.push(format!("{}^2.5", fast_entity_query)),
         }
 
         last_idx = tag.range.end;
