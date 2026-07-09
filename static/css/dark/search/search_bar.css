@@ -1,20 +1,35 @@
 .div_search_bar,
 .footer-content-left a {
-  background: #202124;
+    background: #202124;
 }
 .search_button,
 .search_box {
-  background: #181a1b;
-  color: #fff;
-  border: solid 1px #111;
-  box-shadow: 0 1px 3px rgba(23, 23, 23, 0.24);
+    background: #181a1b;
+    color: #fff;
+    border: solid 1px #111;
+    box-shadow: 0 1px 3px rgba(23, 23, 23, 0.24);
 }
 .type_btns button p {
-  color: #fff;
+    color: #fff;
 }
 .search_button img,
 .type_btns button img,
 .btn_del_query img,
 .open-settings-btn img {
-  filter: brightness(0) invert(1);
+    filter: brightness(0) invert(1);
+}
+.donate_box {
+    background:
+        linear-gradient(#181a1b, #181a1b) padding-box,
+        linear-gradient(#03d781, #3edce2) border-box;
+}
+.donate_box,
+#money:checked ~ .menu label[for="money"],
+#crypto:checked ~ .menu label[for="crypto"] {
+    color: #fff;
+}
+.option,
+.copy_btn {
+    background: #202124;
+    color: #fff;
 }

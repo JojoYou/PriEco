@@ -12,7 +12,6 @@
   TODO:
 */
 
-use fjall::PersistMode;
 /*
   Set global allovator
   Reason: Default was insufficient for deallocating RAM from crawler HTTP connections
@@ -43,6 +42,7 @@ use std::{
   Import external libraries
 */
 use env_logger::Env;
+use fjall::PersistMode;
 use ort::{Environment, GraphOptimizationLevel, InMemorySession, LoggingLevel, SessionBuilder};
 use rocket::{
     Request, Response,
@@ -226,7 +226,9 @@ async fn rocket() -> _ {
                 // Roadmap
                 roadmap,
                 submit_roadmap_feedback,
-                submit_roadmap_vote
+                submit_roadmap_vote,
+                // Thanks page
+                thanks
             ],
         )
         .mount("/static", FileServer::from("./static"))
@@ -240,8 +242,8 @@ async fn rocket() -> _ {
 */
 fn thread_manager() {
     // Initialize data
-    let _ = &*PRIECO_FJALL;
-    let _ = &*META_DECODER;
+    //let _ = &*PRIECO_FJALL;
+    //let _ = &*META_DECODER;
 
     let _ = TANTIVY_READER;
     let _ = TANTIVY_WRITER;

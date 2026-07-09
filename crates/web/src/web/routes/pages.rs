@@ -758,6 +758,25 @@ pub async fn submit_roadmap_vote(vote: Json<RoadmapVote>) -> Status {
     }
 }
 
+/*
+  Description: PriEco big thank you for money tranfer, usually donation
+
+  Input:
+  Output: Thank you html
+*/
+#[get("/thanks")]
+pub fn thanks(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
+    let mut context: HashMap<String, RocketValue> = HashMap::from([
+        (String::from("css_version"), json!(CSS_VERSION)),
+        (String::from("js_version"), json!(JS_VERSION)),
+        (String::from("title_query"), json!("Thank You! | ")),
+    ]);
+
+    settings::run(&mut context, &None, cookie_jar, host);
+
+    Template::render("legal/thanks", context)
+}
+
 /* Helper functions */
 pub fn country_info(code: &str) -> (&'static str, &'static str) {
     match code.to_lowercase().as_str() {

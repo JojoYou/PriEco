@@ -137,3 +137,170 @@
     filter: invert(56%) sepia(24%) saturate(1094%) hue-rotate(133deg)
         brightness(97%) contrast(84%) !important;
 }
+.donate {
+    position: absolute;
+    top: 10px;
+    left: 20px;
+    display: inline-block;
+    padding: 5px 8px;
+    border-radius: 30px;
+    cursor: pointer;
+    font-weight: bold;
+    background: linear-gradient(#3edce2, #03d781);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    border: none;
+}
+
+.donate::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 2px;
+    border-radius: inherit;
+    -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+}
+
+.donate_box {
+    position: absolute;
+    top: 55px;
+    right: 20px;
+    width: 340px;
+    padding: 20px;
+    border: 4px solid transparent;
+    border-radius: 18px;
+    background:
+        linear-gradient(#111, #111) padding-box,
+        linear-gradient(#03d781, #3edce2) border-box;
+    color: #fff;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-18px) scale(0.97);
+    transition: 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.donate:focus ~ .donate_box,
+.donate_box:hover {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+}
+
+.donate_box h2 {
+    margin: 0 0 20px;
+    text-align: center;
+    font-size: 22px;
+}
+
+.menu {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #2c2c2c;
+}
+
+.btn {
+    flex: 1;
+    position: relative;
+    padding: 10px 4px;
+    text-align: center;
+    color: #888;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.25s;
+}
+
+.btn::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    background: linear-gradient(to right, #03d781, #3edce2);
+    transform: scaleX(0);
+    transition: 0.25s;
+}
+
+#money:checked ~ .menu label[for="money"]::after,
+#crypto:checked ~ .menu label[for="crypto"]::after {
+    transform: scaleX(1);
+}
+
+.slider {
+    position: relative;
+    min-height: 200px;
+    overflow: hidden scroll;
+}
+
+.panel {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    transition: 0.4s;
+}
+
+.crypto_panel {
+    opacity: 0;
+    transform: translateX(100%);
+    max-height: 200px;
+}
+
+#crypto:checked ~ .menu + .slider .money_panel {
+    opacity: 0;
+    transform: translateX(-100%);
+}
+#crypto:checked ~ .menu + .slider .crypto_panel {
+    opacity: 1;
+    transform: none;
+}
+#money:checked ~ .menu + .slider .crypto_panel {
+    opacity: 0;
+    transform: translateX(100%);
+}
+
+.option {
+    display: block;
+    margin-bottom: 10px;
+    padding: 14px;
+    border-radius: 10px;
+    text-align: center;
+    text-decoration: none;
+}
+
+.crypto_item {
+    margin-bottom: 18px;
+}
+.coin {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+.crypto_address {
+    width: 100%;
+    margin-bottom: 8px;
+    padding: 10px;
+    box-sizing: border-box;
+    border: 1px solid #333;
+    border-radius: 8px;
+    background: #1b1b1b;
+    color: #ddd;
+    font: 13px monospace;
+}
+
+.copy_btn {
+    width: 100%;
+    padding: 10px;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+    font: 600 16px inherit;
+}

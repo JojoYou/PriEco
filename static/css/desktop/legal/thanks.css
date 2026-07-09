@@ -1,0 +1,32 @@
+.thanks {
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    background: linear-gradient(135deg, #0f5132 0%, #2e8b57 45%, #7ac142 100%);
+    border-radius: 0 0 40px 40px;
+    color: #fff;
+}
+
+.thanks h1 {
+    font-size: 10vw;
+}
+.thanks p {
+    font-size: 3vw;
+}
+
+.thanks-heart {
+    display: inline-block;
+    animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.15);
+    }
+}

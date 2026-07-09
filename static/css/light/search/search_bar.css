@@ -1,17 +1,32 @@
 .div_search_bar {
-  background: #eaeaf2;
+    background: #eaeaf2;
 }
 .search_box,
 .search_button {
-  background: #fff;
-  color: #000;
+    background: #fff;
+    color: #000;
 }
 .search_box {
-  box-shadow: 0 1px 3px rgba(23, 23, 23, 0.24);
+    box-shadow: 0 1px 3px rgba(23, 23, 23, 0.24);
 }
 .search_button::before {
-  box-shadow: 1px 1px 3px rgba(23, 23, 23, 0.24);
+    box-shadow: 1px 1px 3px rgba(23, 23, 23, 0.24);
 }
 .type_btns button p {
-  color: #4b4b4b;
+    color: #4b4b4b;
+}
+.donate_box {
+    background:
+        linear-gradient(#eaeaf2, #eaeaf2) padding-box,
+        linear-gradient(#03d781, #3edce2) border-box;
+}
+.donate_box,
+#money:checked ~ .menu label[for="money"],
+#crypto:checked ~ .menu label[for="crypto"] {
+    color: #000;
+}
+.option,
+.copy_btn {
+    background: #f2f4f7;
+    color: #000;
 }

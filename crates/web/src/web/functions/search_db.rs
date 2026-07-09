@@ -380,7 +380,7 @@ pub async fn run_json(
         let rerank_start = Instant::now();
         let passages: Vec<String> = results[..candidates]
             .iter()
-            .map(|d| format!("{} {}", d.title, d.description))
+            .map(|d| format!("{} {} {}", d.title, d.description, d.content))
             .collect();
 
         let q = query.to_string();
