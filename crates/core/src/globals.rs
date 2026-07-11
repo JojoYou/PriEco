@@ -545,13 +545,11 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
     let goggles_ks = meta_db.keyspace("goggles", || goggles_opts).unwrap();
 
     // Blob storage
-    let blob_db = FJALL_DATABASE::builder(Path::new(
-        "/var/home/roman/Documents/Development/Web/PriEco/prieco_rs/mnt/hdd/blobs",
-    ))
-    .worker_threads(2)
-    .cache_size(512 * 1024 * 1024)
-    .open()
-    .expect("Failed to open Blob Fjall DB");
+    let blob_db = FJALL_DATABASE::builder(Path::new("/mnt/hdd/blobs"))
+        .worker_threads(2)
+        .cache_size(512 * 1024 * 1024)
+        .open()
+        .expect("Failed to open Blob Fjall DB");
 
     let blob_opts = KeyspaceCreateOptions::default()
         .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
