@@ -77,7 +77,7 @@ use tantivy::{
     },
     tokenizer::{TextAnalyzer, Token, TokenStream, Tokenizer as TANTIVY_TOKENIZER},
 };
-use tokenizers::{PaddingParams, PaddingStrategy, Tokenizer};
+use tokenizers::{PaddingParams, PaddingStrategy, Tokenizer, TruncationParams};
 use tokio::task;
 use twox_hash::XxHash3_64;
 #[cfg(feature = "cuda")]
@@ -516,10 +516,12 @@ pub struct PriecoStorage {
     pub meta_db: FJALL_DATABASE,
     pub meta_ks: Keyspace,
 
+    // Goggles
+    pub goggles_ks: Keyspace,
+
     // Blob storage: Compressed web page data
     pub blob_db: FJALL_DATABASE,
     pub blobs_ks: Keyspace,
-    // Goggles
 }
 
 pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
@@ -534,14 +536,22 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
         .data_block_compression_policy(CompressionPolicy::disabled())
         .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
 
-    let meta = meta_db.keyspace("meta", || meta_opts).unwrap();
+    let meta_ks = meta_db.keyspace("meta", || meta_opts).unwrap();
+
+    // Goggles storage
+    let goggles_opts = KeyspaceCreateOptions::default()
+        .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
+        .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
+    let goggles_ks = meta_db.keyspace("goggles", || goggles_opts).unwrap();
 
     // Blob storage
-    let blob_db = FJALL_DATABASE::builder(Path::new("/mnt/hdd/blobs"))
-        .worker_threads(2)
-        .cache_size(512 * 1024 * 1024)
-        .open()
-        .expect("Failed to open Blob Fjall DB");
+    let blob_db = FJALL_DATABASE::builder(Path::new(
+        "/var/home/roman/Documents/Development/Web/PriEco/prieco_rs/mnt/hdd/blobs",
+    ))
+    .worker_threads(2)
+    .cache_size(512 * 1024 * 1024)
+    .open()
+    .expect("Failed to open Blob Fjall DB");
 
     let blob_opts = KeyspaceCreateOptions::default()
         .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
@@ -554,13 +564,14 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
             age_cutoff: 0.0,
         }));
 
-    let blobs = blob_db.keyspace("blobs", || blob_opts).unwrap();
+    let blobs_ks = blob_db.keyspace("blobs", || blob_opts).unwrap();
 
     Arc::new(PriecoStorage {
         meta_db,
-        meta_ks: meta,
+        meta_ks,
+        goggles_ks,
         blob_db,
-        blobs_ks: blobs,
+        blobs_ks,
     })
 });
 
@@ -1153,6 +1164,11 @@ impl Reranker {
 
         tokenizer.with_padding(Some(PaddingParams {
             strategy: PaddingStrategy::BatchLongest,
+            ..Default::default()
+        }));
+
+        tokenizer.with_truncation(Some(TruncationParams {
+            max_length: 512,
             ..Default::default()
         }));
 

@@ -3774,6 +3774,8 @@ dependencies = [
 name = "prieco_blob"
 version = "3.0.0"
 dependencies = [
+ "ahash 0.8.12",
+ "bincode-next",
  "fjall",
  "flate2",
  "prieco_core",

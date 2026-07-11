@@ -15,7 +15,7 @@
 /*
   Import system libraries
 */
-use std::{fs::read_to_string, io::Cursor, path::Path};
+use std::{fs::read_to_string, io::Cursor, path::Path, sync::Arc};
 
 /*
   Import external libraries
@@ -35,7 +35,7 @@ use serde_json::json;
   Import own libraries
 */
 use crate::web::{
-    functions::{general::is_valid_url, search_db},
+    functions::{general::is_valid_url, ranking::goggles::resolve_active, search_db},
     routes::pages::ClientIp,
 };
 use prieco_core::{
@@ -56,6 +56,7 @@ pub async fn api(
     loc: &str,
     q: &str,
     embedding_service: &State<EmbeddingService>,
+    cookie_jar: &CookieJar<'_>,
 ) -> Json<Vec<RocketValue>> {
     if ![dotenv!("RESULTI_API_KEY"), dotenv!("URUKY_API_KEY")].contains(&a) {
         return Json(vec![]);
@@ -63,7 +64,8 @@ pub async fn api(
 
     ANALYTICS.record_api_request();
 
-    let full_results = search_db::run_json(q, lang, loc, embedding_service).await;
+    let goggle = resolve_active(cookie_jar).map(Arc::new);
+    let full_results = search_db::run_json(q, lang, loc, embedding_service, goggle).await;
 
     let results: Vec<serde_json::Value> = full_results
         .into_iter()

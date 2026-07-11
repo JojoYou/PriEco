@@ -18,6 +18,7 @@
 use std::{
     collections::{HashMap, HashSet},
     io::{Write, stdout},
+    sync::Arc,
     time::Instant,
 };
 
@@ -32,7 +33,7 @@ use serde_json::Value as Json_Value;
 use tantivy::{
     Term,
     collector::TopDocs,
-    query::{BooleanQuery, Occur, Query, QueryParser, TermQuery},
+    query::{BooleanQuery, Occur, Query, QueryParser, TermQuery, TermSetQuery},
     schema::{IndexRecordOption, Value},
 };
 use zstd::bulk::Decompressor;
@@ -43,7 +44,10 @@ use zstd::bulk::Decompressor;
 use crate::web::functions::{
     additional::discover::discover_and_ping_domains,
     general::get_domain,
-    ranking::{self},
+    ranking::{
+        self,
+        goggles::{ParsedGoggle, resolve_active},
+    },
 };
 use prieco_core::{
     META_DECODER, PRIECO_FJALL, QueryIntent,
@@ -51,7 +55,7 @@ use prieco_core::{
         EmbeddingService, PAGERANK, RERANKER, SearchResult, TANTIVY_INDEX, TANTIVY_READER,
         VECTOR_CENTROPOIDS, WebDocument, colors,
     },
-    url_to_id,
+    url_to_domain_id, url_to_id,
 };
 
 /*
@@ -81,8 +85,9 @@ pub async fn run(
     lang: &str,
     loc: &str,
     embedding_service: &State<EmbeddingService>,
+    goggle: Option<Arc<ParsedGoggle>>,
 ) {
-    let local_results = run_json(q, lang, loc, embedding_service).await;
+    let local_results = run_json(q, lang, loc, embedding_service, goggle).await;
 
     // Create final results
     if let Some(arr) = Json(Json_Value::from(local_results)).as_array() {
@@ -149,6 +154,7 @@ pub async fn run_json(
     lang: &str,
     loc: &str,
     embedding_service: &State<EmbeddingService>,
+    goggle: Option<Arc<ParsedGoggle>>,
 ) -> Vec<Json_Value> {
     // Cache
     let cache_key = format!("{}_{}_{}", query, lang, loc);
@@ -233,6 +239,7 @@ pub async fn run_json(
 
         let lang_clone = lang.to_string();
         let loc_clone = loc.to_string();
+        let goggle_clone = goggle.clone();
         let tantivy_task = tokio::task::spawn_blocking(move || {
             let start = Instant::now();
 
@@ -250,8 +257,15 @@ pub async fn run_json(
                     .unwrap_or(fts_query);
             }
 
-            let res = search_tantivy(&fts_query, &lang_clone, &loc_clone, &intent, MAX_FTS)
-                .unwrap_or_default();
+            let res = search_tantivy(
+                &fts_query,
+                &lang_clone,
+                &loc_clone,
+                &intent,
+                MAX_FTS,
+                goggle_clone,
+            )
+            .unwrap_or_default();
 
             let elapsed = start.elapsed().as_secs_f32();
             println!("Tantivy took {elapsed:.3}s");
@@ -361,6 +375,19 @@ pub async fn run_json(
         results
     };
 
+    // Goggle Discard filter
+    if let Some(g) = &goggle {
+        if g.discard_by_default {
+            results.retain(|doc| {
+                let domain_id = url_to_domain_id(&doc.url);
+                g.site_boost.contains_key(&domain_id)
+                    || g.path_boost
+                        .iter()
+                        .any(|(p, _)| doc.url.contains(p.as_str()))
+            });
+        }
+    }
+
     if results.is_empty() {
         println!("No results → confidence = 0.0 (force fallback)");
         return Vec::new();
@@ -368,7 +395,7 @@ pub async fn run_json(
 
     // Stage: 2
     // Hand ranking
-    ranking::hand::run(&mut results, query, lang, loc, &intent);
+    ranking::hand::run(&mut results, query, lang, loc, &intent, goggle);
 
     // Stage: 3
     // Reranker + PageRank
@@ -447,9 +474,12 @@ fn search_tantivy(
     loc: &str,
     intent: &QueryIntent,
     limit: usize,
+    goggle: Option<Arc<ParsedGoggle>>,
 ) -> Option<Vec<(u64, f32)>> {
     let schema = TANTIVY_INDEX.schema();
     let doc_id = schema.get_field("doc_id").ok()?;
+    let domain_id_field = schema.get_field("domain_id").ok()?;
+
     let title_field = schema.get_field("title").ok()?;
     let description_field = schema.get_field("description").ok()?;
     let content_field = schema.get_field("content").ok()?;
@@ -486,6 +516,17 @@ fn search_tantivy(
             Occur::Must,
             Box::new(TermQuery::new(loc_term, IndexRecordOption::Basic)),
         ));
+    }
+
+    if let Some(g) = goggle {
+        if g.discard_by_default && !g.site_boost.is_empty() {
+            let terms: Vec<Term> = g
+                .site_boost
+                .keys()
+                .map(|id| Term::from_field_u64(domain_id_field, *id))
+                .collect();
+            clauses.push((Occur::Must, Box::new(TermSetQuery::new(terms))));
+        }
     }
 
     let final_query: Box<dyn Query> = if clauses.len() == 1 {

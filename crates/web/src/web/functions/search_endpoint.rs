@@ -15,7 +15,7 @@
 /*
   Import system libraries
 */
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 /*
   Import external libraries
@@ -28,6 +28,7 @@ use serde_json::{Value, json};
 */
 use crate::web::functions::{
     additional::spell_check::spell_check_query,
+    ranking::goggles::ParsedGoggle,
     search_api::{img, news},
     search_db,
 };
@@ -44,6 +45,7 @@ pub async fn run(
     lang: &str,
     loc: &str,
     embedding_service: &State<EmbeddingService>,
+    goggle: Option<Arc<ParsedGoggle>>,
 ) -> HashMap<String, Value> {
     // Don't perform a search on bang
     if q.contains("!") {
@@ -81,7 +83,7 @@ pub async fn run(
         }
         "map" => {}
         _ => {
-            all_search(&mut context, q, lang, loc, embedding_service).await;
+            all_search(&mut context, q, lang, loc, embedding_service, goggle).await;
         }
     }
 
@@ -94,6 +96,7 @@ async fn all_search(
     lang: &str,
     loc: &str,
     embedding_service: &State<EmbeddingService>,
+    goggle: Option<Arc<ParsedGoggle>>,
 ) {
     // Spell check
     if let Some(suggestion) = spell_check_query(q) {
@@ -104,7 +107,7 @@ async fn all_search(
 
     let mut results_vec: Vec<SearchResult> = Vec::with_capacity(100);
 
-    let _ = search_db::run(&mut results_vec, q, lang, loc, &embedding_service).await; // Search database: Modify results + return confidence score
+    let _ = search_db::run(&mut results_vec, q, lang, loc, &embedding_service, goggle).await; // Search database: Modify results + return confidence score
 
     // If PriEco confidence is too low, use other indexes too
     /*if !cookie_jar.get("index").is_some() && index_confidence < 0.95 {

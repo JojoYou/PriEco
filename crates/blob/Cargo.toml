@@ -18,6 +18,8 @@ fjall = { workspace = true }
 tantivy = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+bincode-next = { workspace = true }
+ahash = { workspace = true }
 
 flate2 = "1.1.9"
 tar = "0.4.44"

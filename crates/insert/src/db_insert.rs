@@ -22,7 +22,7 @@ use zstd::stream::{Encoder as ZstdEncoder, decode_all};
 use prieco_core::{
     ID_SIZE, INSERTER_IMPORT_DIR, META_DICTIONARY, PRIECO_CONFIG, PRIECO_FJALL, RECORD_SIZE,
     TANTIVY_INDEX, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_DIM, WebDocument, file_exists,
-    globals::icons, url_to_id,
+    globals::icons, url_to_domain_id, url_to_id,
 };
 
 /*
@@ -90,6 +90,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     let schema = TANTIVY_INDEX.schema();
     let doc_id_field = schema.get_field("doc_id").unwrap();
+    let domain_id_field = schema.get_field("domain_id").unwrap();
     let title_field = schema.get_field("title").unwrap();
     let description_field = schema.get_field("description").unwrap();
     let content_field = schema.get_field("content").unwrap();
@@ -189,6 +190,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                 /* Tantivy */
                 TANTIVY_WRITER.lock().add_document(tantivy::doc!(
                     doc_id_field => id,
+                    domain_id_field => url_to_domain_id(&url),
                         title_field => doc.title.clone(),
                         description_field => doc.description.clone(),
                         content_field => doc.content.clone(),

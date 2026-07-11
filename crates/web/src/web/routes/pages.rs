@@ -15,7 +15,7 @@
 /*
   Import system libraries
 */
-use std::{collections::HashMap, net::IpAddr};
+use std::{collections::HashMap, net::IpAddr, sync::Arc};
 
 /*
   Import external libraries
@@ -38,14 +38,20 @@ use rocket::{
     uri,
 };
 use rocket_dyn_templates::Template;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use urlencoding::encode;
 
 /*
   Import own libraries
 */
-use crate::web::{functions::search_endpoint, modules::settings};
+use crate::web::{
+    functions::{
+        ranking::goggles::{fetch_and_store, list_public, resolve_active},
+        search_endpoint,
+    },
+    modules::settings,
+};
 use prieco_core::{
     CLIENT, TANTIVY_INDEX,
     globals::{ANALYTICS, CSS_VERSION, EmbeddingService, JS_VERSION, UserAgent},
@@ -233,9 +239,10 @@ pub async fn search(
     if no_js {
         let lang = cookie_jar.get("lang").map_or("all", |c| c.value());
         let loc = cookie_jar.get("loc").map_or("all", |c| c.value());
+        let goggle = resolve_active(cookie_jar).map(Arc::new);
 
         // Results
-        let results_ctx = search_endpoint::run(t, q, lang, loc, embedding_service).await;
+        let results_ctx = search_endpoint::run(t, q, lang, loc, embedding_service, goggle).await;
         context.insert(String::from("search_results"), json!(results_ctx));
         ANALYTICS.record_query();
 
@@ -276,12 +283,14 @@ pub async fn results_htmls(
     lang: &str,
     loc: &str,
     embedding_service: &State<EmbeddingService>,
+    cookie_jar: &CookieJar<'_>,
 ) -> Template {
     ANALYTICS.record_query();
 
+    let goggle = resolve_active(cookie_jar).map(Arc::new);
     Template::render(
         "search/results",
-        search_endpoint::run(t, q, lang, loc, embedding_service).await,
+        search_endpoint::run(t, q, lang, loc, embedding_service, goggle).await,
     )
 }
 
@@ -756,6 +765,55 @@ pub async fn submit_roadmap_vote(vote: Json<RoadmapVote>) -> Status {
             Status::InternalServerError
         }
     }
+}
+
+/*
+  Description: PriEco Goggles store
+
+  Input:
+  Output: Goggle store html
+*/
+
+#[derive(Serialize)]
+struct GoggleView {
+    name: String,
+    author: String,
+    description: String,
+    source_url: String,
+}
+
+#[get("/goggles")]
+pub fn goggles(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
+    let goggles_list: Vec<GoggleView> = list_public()
+        .into_iter()
+        .map(|g| GoggleView {
+            name: g.name,
+            author: g.author,
+            description: g.description,
+            source_url: g.source_url,
+        })
+        .collect();
+
+    let mut context: HashMap<String, RocketValue> = HashMap::from([
+        (String::from("css_version"), json!(CSS_VERSION)),
+        (String::from("js_version"), json!(JS_VERSION)),
+        (String::from("title_query"), json!("Thank You! | ")),
+        (String::from("goggles"), json!(goggles_list)),
+    ]);
+    settings::run(&mut context, &None, cookie_jar, host);
+    Template::render("search/goggles", context)
+}
+#[get("/goggles/load?<url>")]
+pub async fn load_goggle(url: String, cookie_jar: &CookieJar<'_>) -> Redirect {
+    match fetch_and_store(url).await {
+        Ok(goggle) => {
+            cookie_jar.add(Cookie::new("active_goggle", goggle.id.to_string()));
+        }
+        Err(e) => {
+            println!("Failed to load goggle: {:?}", e);
+        }
+    }
+    Redirect::to("/goggles")
 }
 
 /*

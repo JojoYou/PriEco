@@ -1,0 +1,44 @@
+{{> header }}
+
+  <link href="{{ css_path }}goggles.css" rel="stylesheet" type="text/css">
+
+  <div class="background"></div>
+
+  <div class="container">
+    <h1 class="title">Goggles</h1>
+    <p>Goggles are search filters using which you can prioritize, degrade, or even block domains in PriEco</p>
+    <p>They are open source, publicly hosted in a Git repository or freely online</p>
+    <p>Here you can find known Goggles you can apply to your searches</p>
+    <p>While using PriEco you can create your own Goggles or modify known ones just for you</p>
+    <p>Credit to <a href="https://search.brave.com/goggles/discover" target="_blank" class="link">Brave search</a> for creating them</p>
+    <p>PriEco adopted their standard so that your Goggles are cross compatible</p>
+
+ <div class="goggle-add">
+        <form action="/goggles/load" method="get">
+            <input type="url" name="url" placeholder="Paste a Goggle URL (raw .goggle file)" required>
+            <button type="submit">Add Goggle</button>
+        </form>
+    </div>
+
+    <div class="goggles-grid">
+{{#each goggles}}
+    <section class="center-wrapper">
+        <h2>{{this.name}}</h2>
+        <i>{{this.author}}</i>
+        <br>
+        <p>{{this.description}}</p>
+        <a href="{{this.source_url}}" target="_blank">Source</a>
+        <form action="/goggles/load" method="get">
+            <input type="hidden" name="url" value="{{this.source_url}}">
+            <button type="submit">Apply</button>
+        </form>
+    </section>
+{{/each}}
+</div>
+
+ </div>
+  {{> footer }}
+
+</body>
+
+</html>

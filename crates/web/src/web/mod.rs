@@ -23,6 +23,8 @@ pub mod functions {
             pub mod intent;
             pub mod optimize;
         }
+
+        pub mod goggles;
     }
 
     pub mod additional {

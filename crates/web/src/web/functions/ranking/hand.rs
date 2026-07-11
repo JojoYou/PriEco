@@ -1,10 +1,12 @@
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::Path;
 use std::sync::RwLock;
+use std::{fs, sync::Arc};
 
-use prieco_core::{QueryIntent, WebDocument};
+use prieco_core::{QueryIntent, WebDocument, url_to_domain_id};
+
+use crate::web::functions::ranking::goggles::ParsedGoggle;
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub struct RankingWeights {
@@ -52,6 +54,7 @@ pub fn run(
     lang: &str,
     loc: &str,
     intent: &QueryIntent,
+    goggle: Option<Arc<ParsedGoggle>>,
 ) {
     // Training
     check_for_updated_weights(); // PHP might have generated new weights to be tested
@@ -182,6 +185,22 @@ pub fn run(
 
         boost *= 1.0 + sigmoid(doc.confidence as f64 / 200.0) * weights.confidence_multi;
         boost *= 1.0 + sigmoid(doc.effort as f64 / 200.0) * weights.effort_multi;
+
+        // Goggles
+        if let Some(ref g) = goggle {
+            let domain_id = url_to_domain_id(&doc.url);
+            if let Some(b) = g.site_boost.get(&domain_id) {
+                boost *= 1.0 + b;
+            }
+            if let Some(d) = g.site_downrank.get(&domain_id) {
+                boost *= 1.0 / (1.0 + d);
+            }
+            for (pattern, b) in &g.path_boost {
+                if clean_url.contains(pattern.as_str()) {
+                    boost *= 1.0 + b;
+                }
+            }
+        }
 
         doc.search_score = (doc.search_score as f64 * boost) as f32;
     }
