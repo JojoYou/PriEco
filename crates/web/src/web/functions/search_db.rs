@@ -44,10 +44,7 @@ use zstd::bulk::Decompressor;
 use crate::web::functions::{
     additional::discover::discover_and_ping_domains,
     general::get_domain,
-    ranking::{
-        self,
-        goggles::{ParsedGoggle, resolve_active},
-    },
+    ranking::{self, goggles::GoggleRules},
 };
 use prieco_core::{
     META_DECODER, PRIECO_FJALL, QueryIntent,
@@ -85,9 +82,9 @@ pub async fn run(
     lang: &str,
     loc: &str,
     embedding_service: &State<EmbeddingService>,
-    goggle: Option<Arc<ParsedGoggle>>,
+    goggles: Vec<Arc<GoggleRules>>,
 ) {
-    let local_results = run_json(q, lang, loc, embedding_service, goggle).await;
+    let local_results = run_json(q, lang, loc, embedding_service, goggles).await;
 
     // Create final results
     if let Some(arr) = Json(Json_Value::from(local_results)).as_array() {
@@ -154,7 +151,7 @@ pub async fn run_json(
     lang: &str,
     loc: &str,
     embedding_service: &State<EmbeddingService>,
-    goggle: Option<Arc<ParsedGoggle>>,
+    goggles: Vec<Arc<GoggleRules>>,
 ) -> Vec<Json_Value> {
     // Cache
     let cache_key = format!("{}_{}_{}", query, lang, loc);
@@ -239,7 +236,7 @@ pub async fn run_json(
 
         let lang_clone = lang.to_string();
         let loc_clone = loc.to_string();
-        let goggle_clone = goggle.clone();
+        let goggles_clone = goggles.clone();
         let tantivy_task = tokio::task::spawn_blocking(move || {
             let start = Instant::now();
 
@@ -263,7 +260,7 @@ pub async fn run_json(
                 &loc_clone,
                 &intent,
                 MAX_FTS,
-                goggle_clone,
+                &goggles_clone,
             )
             .unwrap_or_default();
 
@@ -376,17 +373,23 @@ pub async fn run_json(
     };
 
     // Goggle Discard filter
-    if let Some(g) = &goggle {
-        if g.discard_by_default {
-            results.retain(|doc| {
-                let domain_id = url_to_domain_id(&doc.url);
-                g.site_boost.contains_key(&domain_id)
-                    || g.path_boost
-                        .iter()
-                        .any(|(p, _)| doc.url.contains(p.as_str()))
+    results.retain(|doc| {
+        let domain_id = url_to_domain_id(&doc.url);
+
+        if goggles.iter().any(|g| g.discard.contains(&domain_id)) {
+            return false;
+        }
+
+        let discard_active = goggles.iter().any(|g| g.discard_by_default);
+        if discard_active {
+            return goggles.iter().any(|g| {
+                g.boost.contains_key(&domain_id)
+                    || g.path.iter().any(|(p, _)| path_matches(&doc.url, p))
             });
         }
-    }
+
+        true
+    });
 
     if results.is_empty() {
         println!("No results → confidence = 0.0 (force fallback)");
@@ -395,7 +398,7 @@ pub async fn run_json(
 
     // Stage: 2
     // Hand ranking
-    ranking::hand::run(&mut results, query, lang, loc, &intent, goggle);
+    ranking::hand::run(&mut results, query, lang, loc, &intent, &goggles);
 
     // Stage: 3
     // Reranker + PageRank
@@ -474,7 +477,7 @@ fn search_tantivy(
     loc: &str,
     intent: &QueryIntent,
     limit: usize,
-    goggle: Option<Arc<ParsedGoggle>>,
+    goggles: &[Arc<GoggleRules>],
 ) -> Option<Vec<(u64, f32)>> {
     let schema = TANTIVY_INDEX.schema();
     let doc_id = schema.get_field("doc_id").ok()?;
@@ -518,13 +521,18 @@ fn search_tantivy(
         ));
     }
 
-    if let Some(g) = goggle {
-        if g.discard_by_default && !g.site_boost.is_empty() {
-            let terms: Vec<Term> = g
-                .site_boost
-                .keys()
-                .map(|id| Term::from_field_u64(domain_id_field, *id))
-                .collect();
+    let discard_goggles: Vec<&GoggleRules> = goggles
+        .iter()
+        .map(|g| g.as_ref())
+        .filter(|g| g.discard_by_default)
+        .collect();
+    if !discard_goggles.is_empty() {
+        let terms: Vec<Term> = discard_goggles
+            .iter()
+            .flat_map(|g| g.boost.keys())
+            .map(|id| Term::from_field_u64(domain_id_field, *id))
+            .collect();
+        if !terms.is_empty() {
             clauses.push((Occur::Must, Box::new(TermSetQuery::new(terms))));
         }
     }
@@ -657,4 +665,17 @@ fn fetch_documents(
 
 fn sanitize_string(s: &str) -> String {
     s.replace('"', "").replace('\'', "")
+}
+
+pub fn path_matches(url: &str, pattern: &str) -> bool {
+    if let Some(rest) = pattern.strip_prefix('^') {
+        if let Some(core) = rest.strip_suffix('$') {
+            return url == core; // Exact match
+        }
+        return url.starts_with(rest); // Anchored start
+    }
+    if let Some(core) = pattern.strip_suffix('$') {
+        return url.ends_with(core); // Anchored end
+    }
+    url.contains(pattern)
 }

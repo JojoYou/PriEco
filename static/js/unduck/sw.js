@@ -61,7 +61,7 @@ async function trackAndEvict(url) {
 
   const idx = metadata.urls.indexOf(url);
   if (idx > -1) metadata.urls.splice(idx, 1);
-  metadata.urls.push(url); // most recent at end
+  metadata.urls.push(url);
 
   while (metadata.urls.length > MAX_CACHE_ITEMS) {
     const evicted = metadata.urls.shift();
@@ -169,7 +169,9 @@ self.addEventListener("fetch", (event) => {
     url.pathname === CACHE_VER_URL ||
     url.pathname == "/settings_html" ||
     url.pathname == "/stats" ||
-    url.pathname == "/pv"
+    url.pathname === "/pv" ||
+    url.pathname === "/goggles" ||
+    url.pathname === "/goggles/load"
   )
     return;
   if (event.request.method !== "GET" || url.origin !== self.location.origin)
@@ -222,13 +224,9 @@ self.addEventListener("message", (event) => {
         self.clients
           .matchAll()
           .then((clients) =>
-            clients.forEach((c) =>
-              c.postMessage({ action: "cacheCleared" }),
-            ),
+            clients.forEach((c) => c.postMessage({ action: "cacheCleared" })),
           );
       }),
     );
   }
 });
-
-

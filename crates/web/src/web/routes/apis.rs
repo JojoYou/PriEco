@@ -15,7 +15,7 @@
 /*
   Import system libraries
 */
-use std::{fs::read_to_string, io::Cursor, path::Path, sync::Arc};
+use std::{fs::read_to_string, io::Cursor, path::Path};
 
 /*
   Import external libraries
@@ -35,7 +35,11 @@ use serde_json::json;
   Import own libraries
 */
 use crate::web::{
-    functions::{general::is_valid_url, ranking::goggles::resolve_active, search_db},
+    functions::{
+        general::is_valid_url,
+        ranking::goggles::{get_goggle_ids, load_goggles},
+        search_db,
+    },
     routes::pages::ClientIp,
 };
 use prieco_core::{
@@ -49,14 +53,15 @@ use prieco_core::{
   Input: API key, language, location, query
   Output: JSON
 */
-#[get("/api?<a>&<lang>&<loc>&<q>")]
+#[get("/api?<a>&<lang>&<loc>&<q>&<goggles>")]
 pub async fn api(
     a: &str,
     lang: &str,
     loc: &str,
     q: &str,
+    goggles: Option<&str>,
+
     embedding_service: &State<EmbeddingService>,
-    cookie_jar: &CookieJar<'_>,
 ) -> Json<Vec<RocketValue>> {
     if ![dotenv!("RESULTI_API_KEY"), dotenv!("URUKY_API_KEY")].contains(&a) {
         return Json(vec![]);
@@ -64,8 +69,9 @@ pub async fn api(
 
     ANALYTICS.record_api_request();
 
-    let goggle = resolve_active(cookie_jar).map(Arc::new);
-    let full_results = search_db::run_json(q, lang, loc, embedding_service, goggle).await;
+    let active_goggles = load_goggles(&get_goggle_ids(goggles, None));
+
+    let full_results = search_db::run_json(q, lang, loc, embedding_service, active_goggles).await;
 
     let results: Vec<serde_json::Value> = full_results
         .into_iter()

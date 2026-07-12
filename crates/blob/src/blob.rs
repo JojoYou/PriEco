@@ -18,16 +18,15 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
-    fs::{self, File, create_dir_all, read_dir, remove_dir_all, remove_file},
-    hash::{BuildHasher, DefaultHasher, Hash, Hasher},
-    io::{Cursor, Read, Seek, SeekFrom},
+    fs::{self, File, create_dir_all, read_dir, remove_file},
+    hash::{BuildHasher, Hash, Hasher},
+    io::{Cursor, Read},
     os::unix::fs::FileExt,
     path::{Path, PathBuf},
     thread,
     time::Duration,
 };
 
-use ahash::AHashMap;
 /*
   Import external libraries
 */
@@ -40,7 +39,7 @@ use tar::Archive;
   Import own libraries
 */
 use prieco_core::{
-    BLOB_IMPORT_DIR, BLOB_STORAGE, META_DICTIONARY, PRIECO_FJALL, WebDocument,
+    BLOB_IMPORT_DIR, BLOB_STORAGE, META_DICTIONARY, PRIECO_FJALL,
     globals::{colors, icons},
 };
 
@@ -198,7 +197,7 @@ fn process_directory(
             files_inserted += 1;
 
             if files_inserted % 1000 == 0 {
-                batch.commit();
+                let _ = batch.commit();
                 batch = PRIECO_FJALL.blob_db.batch();
 
                 println!(
@@ -242,8 +241,8 @@ fn process_directory(
         );
 
         println!("{}: Flushing!", icons::BLOB);
-        batch.commit();
-        PRIECO_FJALL.blob_db.persist(PersistMode::SyncAll);
+        let _ = batch.commit();
+        let _ = PRIECO_FJALL.blob_db.persist(PersistMode::SyncAll);
 
         println!(
             "{}: {}Flushed!{}",

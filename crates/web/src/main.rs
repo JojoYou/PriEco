@@ -230,6 +230,8 @@ async fn rocket() -> _ {
                 // Goggles
                 goggles,
                 load_goggle,
+                apply_goggles,
+                goggles_tint,
                 // Thanks page
                 thanks
             ],

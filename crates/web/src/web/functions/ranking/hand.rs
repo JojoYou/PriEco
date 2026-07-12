@@ -6,7 +6,8 @@ use std::{fs, sync::Arc};
 
 use prieco_core::{QueryIntent, WebDocument, url_to_domain_id};
 
-use crate::web::functions::ranking::goggles::ParsedGoggle;
+use crate::web::functions::ranking::goggles::GoggleRules;
+use crate::web::functions::search_db::path_matches;
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub struct RankingWeights {
@@ -54,7 +55,7 @@ pub fn run(
     lang: &str,
     loc: &str,
     intent: &QueryIntent,
-    goggle: Option<Arc<ParsedGoggle>>,
+    goggles: &[Arc<GoggleRules>],
 ) {
     // Training
     check_for_updated_weights(); // PHP might have generated new weights to be tested
@@ -187,17 +188,29 @@ pub fn run(
         boost *= 1.0 + sigmoid(doc.effort as f64 / 200.0) * weights.effort_multi;
 
         // Goggles
-        if let Some(ref g) = goggle {
+        if !goggles.is_empty() {
             let domain_id = url_to_domain_id(&doc.url);
-            if let Some(b) = g.site_boost.get(&domain_id) {
-                boost *= 1.0 + b;
+            let important_goggle = goggles.iter().find(|g| g.important.contains(&domain_id));
+
+            if let Some(g) = important_goggle {
+                if let Some(b) = g.boost.get(&domain_id) {
+                    boost = 1.0 + (b.min(5.0) * 0.15);
+                } else if let Some(d) = g.downrank.get(&domain_id) {
+                    boost = 1.0 / (1.0 + d.min(5.0));
+                }
+            } else {
+                for g in goggles {
+                    if let Some(b) = g.boost.get(&domain_id) {
+                        boost *= 1.0 + (b.min(5.0) * 0.15);
+                    }
+                    if let Some(d) = g.downrank.get(&domain_id) {
+                        boost *= 1.0 / (1.0 + d.min(5.0));
+                    }
+                }
             }
-            if let Some(d) = g.site_downrank.get(&domain_id) {
-                boost *= 1.0 / (1.0 + d);
-            }
-            for (pattern, b) in &g.path_boost {
-                if clean_url.contains(pattern.as_str()) {
-                    boost *= 1.0 + b;
+            for (pattern, b) in goggles.iter().flat_map(|g| &g.path) {
+                if path_matches(clean_url, pattern) {
+                    boost *= 1.0 + (b.min(5.0) * 0.15);
                 }
             }
         }

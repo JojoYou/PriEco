@@ -31,6 +31,26 @@ h2 {
     font-weight: 400;
     color: #ffffff;
 }
+
+.goggle-add input {
+    background-color: rgba(20, 30, 35, 0.4);
+    border: solid 1px #ffffff24;
+    border-radius: 20px 0 0 20px;
+    padding: 1rem;
+    color: white;
+    margin-top: 1rem;
+}
+.goggle-add button {
+    background-color: rgba(20, 30, 35, 0.4);
+    border: solid 1px #ffffff24;
+    border-radius: 0 20px 20px 0;
+    padding: 1rem;
+    margin-top: 1rem;
+    margin-left: -5px;
+    color: white;
+    cursor: pointer;
+}
+
 .goggles-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -61,4 +81,8 @@ h2 {
     .goggles-grid {
         grid-template-columns: 1fr;
     }
+}
+.checkbox_cute {
+    margin-top: 10px;
+    float: right;
 }

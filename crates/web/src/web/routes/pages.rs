@@ -15,7 +15,7 @@
 /*
   Import system libraries
 */
-use std::{collections::HashMap, net::IpAddr, sync::Arc};
+use std::{collections::HashMap, net::IpAddr};
 
 /*
   Import external libraries
@@ -27,7 +27,7 @@ use rocket::{
     form::{Form, FromForm},
     get, head,
     http::{
-        Cookie, CookieJar, SameSite, Status,
+        ContentType, Cookie, CookieJar, SameSite, Status,
         uri::{Host, Origin},
     },
     post,
@@ -47,7 +47,9 @@ use urlencoding::encode;
 */
 use crate::web::{
     functions::{
-        ranking::goggles::{fetch_and_store, list_public, resolve_active},
+        ranking::goggles::{
+            fetch_and_store, get_goggle_ids, list_public, load_goggles, refresh_stale_goggles,
+        },
         search_endpoint,
     },
     modules::settings,
@@ -239,10 +241,11 @@ pub async fn search(
     if no_js {
         let lang = cookie_jar.get("lang").map_or("all", |c| c.value());
         let loc = cookie_jar.get("loc").map_or("all", |c| c.value());
-        let goggle = resolve_active(cookie_jar).map(Arc::new);
+        let active_goggles = load_goggles(&get_goggle_ids(None, Some(cookie_jar)));
 
         // Results
-        let results_ctx = search_endpoint::run(t, q, lang, loc, embedding_service, goggle).await;
+        let results_ctx =
+            search_endpoint::run(t, q, lang, loc, embedding_service, active_goggles).await;
         context.insert(String::from("search_results"), json!(results_ctx));
         ANALYTICS.record_query();
 
@@ -276,21 +279,25 @@ pub async fn search(
   Input: Search type, Search query, Location, Language
   Output: Results html
 */
-#[get("/results_html?<t>&<q>&<loc>&<lang>")]
+#[get("/results_html?<t>&<q>&<loc>&<lang>&<goggles>")]
 pub async fn results_htmls(
     t: &str,
     q: &str,
     lang: &str,
     loc: &str,
+    goggles: Option<&str>,
+
     embedding_service: &State<EmbeddingService>,
     cookie_jar: &CookieJar<'_>,
 ) -> Template {
     ANALYTICS.record_query();
 
-    let goggle = resolve_active(cookie_jar).map(Arc::new);
+    // Goggles
+    let active_goggles = load_goggles(&get_goggle_ids(goggles, Some(cookie_jar)));
+
     Template::render(
         "search/results",
-        search_endpoint::run(t, q, lang, loc, embedding_service, goggle).await,
+        search_endpoint::run(t, q, lang, loc, embedding_service, active_goggles).await,
     )
 }
 
@@ -773,47 +780,117 @@ pub async fn submit_roadmap_vote(vote: Json<RoadmapVote>) -> Status {
   Input:
   Output: Goggle store html
 */
-
 #[derive(Serialize)]
 struct GoggleView {
+    id: u64,
     name: String,
     author: String,
     description: String,
     source_url: String,
+    avatar: String,
+    checked: bool,
 }
 
 #[get("/goggles")]
 pub fn goggles(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
+    tokio::spawn(async {
+        refresh_stale_goggles().await;
+    });
+
+    let active_ids: std::collections::HashSet<u64> = cookie_jar
+        .get("active_goggles")
+        .map(|c| {
+            c.value()
+                .split(',')
+                .filter_map(|p| p.trim().parse().ok())
+                .collect()
+        })
+        .unwrap_or_default();
+
     let goggles_list: Vec<GoggleView> = list_public()
         .into_iter()
         .map(|g| GoggleView {
+            checked: active_ids.contains(&g.id),
+            id: g.id,
             name: g.name,
             author: g.author,
             description: g.description,
-            source_url: g.source_url,
+            source_url: g.url,
+            avatar: g.avatar.trim_start_matches('#').to_string(),
         })
         .collect();
 
     let mut context: HashMap<String, RocketValue> = HashMap::from([
         (String::from("css_version"), json!(CSS_VERSION)),
         (String::from("js_version"), json!(JS_VERSION)),
-        (String::from("title_query"), json!("Thank You! | ")),
+        (String::from("title_query"), json!("Goggles | ")),
         (String::from("goggles"), json!(goggles_list)),
     ]);
+
     settings::run(&mut context, &None, cookie_jar, host);
+
     Template::render("search/goggles", context)
 }
+
 #[get("/goggles/load?<url>")]
 pub async fn load_goggle(url: String, cookie_jar: &CookieJar<'_>) -> Redirect {
-    match fetch_and_store(url).await {
-        Ok(goggle) => {
-            cookie_jar.add(Cookie::new("active_goggle", goggle.id.to_string()));
+    let goggle = fetch_and_store(url).await;
+
+    if goggle.id != 0 {
+        let mut ids: Vec<u64> = cookie_jar
+            .get("active_goggles")
+            .map(|c| {
+                c.value()
+                    .split(',')
+                    .filter_map(|p| p.trim().parse().ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        if !ids.contains(&goggle.id) {
+            ids.push(goggle.id);
         }
-        Err(e) => {
-            println!("Failed to load goggle: {:?}", e);
-        }
+        let joined = ids
+            .iter()
+            .map(|i| i.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        cookie_jar.add(Cookie::new("active_goggles", joined));
+    }
+
+    Redirect::to("/goggles")
+}
+#[get("/goggles/apply?<ids>")]
+pub fn apply_goggles(ids: Vec<u64>, cookie_jar: &CookieJar<'_>) -> Redirect {
+    if ids.is_empty() {
+        cookie_jar.remove(Cookie::from("active_goggles"));
+    } else {
+        let joined = ids
+            .iter()
+            .map(|i| i.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        cookie_jar.add(Cookie::new("active_goggles", joined));
     }
     Redirect::to("/goggles")
+}
+
+#[get("/static/css/goggles_tint.css.hbs?<tint>&<target>")]
+pub fn goggles_tint(tint: Option<&str>, target: Option<&str>) -> (ContentType, String) {
+    let hex = validate_hex(tint.unwrap_or("14141E")).unwrap_or_else(|| String::from("14141E"));
+    let target = target.unwrap_or_default();
+
+    let css = format!(".{target} {{ background-color: #{hex}66; }}");
+
+    (ContentType::CSS, css)
+}
+
+fn validate_hex(hex: &str) -> Option<String> {
+    let hex = hex.trim_start_matches('#');
+    if hex.len() == 6 && hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        Some(hex.to_string())
+    } else {
+        None
+    }
 }
 
 /*

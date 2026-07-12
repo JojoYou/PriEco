@@ -32,17 +32,41 @@ h2 {
     color: #ffffff;
 }
 
+.goggle-add input {
+    background-color: rgba(20, 30, 35, 0.4);
+    border: solid 1px #ffffff24;
+    border-radius: 20px 0 0 20px;
+    padding: 1rem;
+    color: white;
+    margin-top: 1rem;
+}
+.goggle-add button {
+    background-color: rgba(20, 30, 35, 0.4);
+    border: solid 1px #ffffff24;
+    border-radius: 0 20px 20px 0;
+    padding: 1rem;
+    margin-top: 1rem;
+    margin-left: -5px;
+    color: white;
+    cursor: pointer;
+}
+
+.goggles-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    width: calc(100% - 9vw);
+    max-width: 1400px;
+    margin: 20px auto;
+}
+
 .center-wrapper {
     display: flex;
-    justify-content: space-between;
-    flex-wrap: wrap;
+    flex-direction: column;
     background-color: rgba(20, 30, 35, 0.4);
     border: solid 1px #ffffff24;
     border-radius: 20px;
     padding: 2rem;
-    width: calc(100% - 9vw);
-    max-width: 36cm;
-    margin: 20px auto 0 auto;
     box-shadow:
         inset 0 1px 1px 0 #ffffff24,
         0 8px 32px 0 #fff0;
@@ -51,53 +75,14 @@ h2 {
 
 .center-wrapper p {
     margin-top: 5px;
-    max-width: 600px;
 }
 
-.center-wrapper img {
-    max-height: 200px;
-    max-width: max(200px, calc(100% - 600px));
-    border-radius: 20px;
+@media (max-width: 890px) {
+    .goggles-grid {
+        grid-template-columns: 1fr;
+    }
 }
-
-.vote-buttons {
-    width: 100%;
-    margin-top: 30px;
-    margin-right: 10px;
-}
-.vote-buttons button {
-    background: none;
-    border: none;
-    cursor: pointer;
-}
-.vote-buttons svg {
-    fill: gray;
-}
-
-.response {
-    text-align: center;
-    margin: 50px;
-}
-.response form {
-    display: flex;
-    flex-direction: column;
-}
-.response textarea {
-    border-radius: 20px 20px 0 0;
-    padding: 10px;
-    background-color: rgba(20, 30, 35, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    color: white;
-    font-size: 14px;
-}
-.response button {
-    background-color: rgba(20, 30, 35, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    color: #3edce2;
-    border-radius: 0 0 20px 20px;
-    padding: 5px;
-    cursor: pointer;
-}
-.response button:hover {
-    background-color: rgba(20, 30, 35, 1);
+.checkbox_cute {
+    margin-top: 10px;
+    float: right;
 }
