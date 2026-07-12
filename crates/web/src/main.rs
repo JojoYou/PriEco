@@ -104,7 +104,7 @@ impl Fairing for GlobalHeaders {
             "default-src 'self'; \
              script-src 'self'; \
              style-src 'self'; \
-             img-src 'self' data:; \
+             img-src 'self' data: https://proxy.prieco.net; \
              connect-src 'self'; \
              frame-src 'self' https://cartes.app; \
              frame-ancestors 'self'; \

@@ -37,6 +37,15 @@
         </button>
       </form>
 
+      <form action="search">
+        <input type="hidden" name="t" value="img">
+        <input type="hidden" name="q" value="{{query}}">
+        <button class="{{img_active}}">
+          <img src="static/img/icon/image.svg" alt="image search button">
+          <p>Images</p>
+        </button>
+      </form>
+
       <form action="search" method="{{#if check_post}}POST{{else}}GET{{/if}}">
         <input type="hidden" name="t" value="map">
         <input type="hidden" name="q" value="{{query}}">

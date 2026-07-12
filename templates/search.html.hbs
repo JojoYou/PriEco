@@ -32,6 +32,18 @@
   {{/if}}
 {{/if}}
 
+{{#if img_active}}
+  <div id="js_load_results" class="div_images">
+      {{#each placeholder_number}}
+      <div class="placeholder_img output">
+        <div></div>
+        <br>
+        <div></div>
+      </div>
+    {{/each}}
+  </div>
+{{/if}}
+
 {{#if map_active}}
     <iframe src="https://cartes.app/?q={{query_enc}}" class="map"></iframe>
 {{/if}}
