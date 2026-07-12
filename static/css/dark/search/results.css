@@ -10,7 +10,8 @@
 }
 
 .output_text h3,
-.spell_check a {
+.spell_check a,
+.qt_menu a {
     color: #8ab4f8;
 }
 
@@ -39,16 +40,18 @@
     color: #fff;
 }
 
-[data-sxpr-top-bar] .sx-search-suggestions p {
-    color: #bdc2ca;
-}
-
 [data-sxpr-top-bar] .sx-search-suggestions a {
     background: #181a1b;
     color: #fff;
     border-radius: 10px;
 }
 
-.sx-ta-places div {
+.sx-ta-places div,
+.qt_menu p,
+[data-sxpr-top-bar] .sx-search-suggestions p,
+.qt-btn {
     color: #bdc2ca;
+}
+.qt_menu {
+    background-color: #202124;
 }

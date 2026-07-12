@@ -148,23 +148,22 @@ pub fn osd(host: &Host) -> RawXml<String> {
   Input: JS template name, Optional type, Optional language, Optional location, Optional query
   Output:
 */
-#[get("/static/js/hbs/<script_name>?<t>&<lang>&<loc>&<q>")]
+#[get("/static/js/hbs/<script_name>?<t>&<lang>&<loc>&<goggles>&<q>&<qt>")]
 pub fn script(
     script_name: &str,
     t: Option<&str>,
     lang: Option<&str>,
     loc: Option<&str>,
     q: Option<&str>,
+    goggles: Option<&str>,
+    qt: Option<&str>,
 ) -> RawJavaScript<String> {
-    // Create handlebars engine
     let mut hbs = Handlebars::new();
 
-    // Read the template file
     let template_path = format!("static/js/hbs/{}", script_name);
     let template_content = std::fs::read_to_string(&template_path)
         .unwrap_or_else(|_| format!("console.error('Template {} not found');", template_path));
 
-    // Register the template
     if let Err(e) = hbs.register_template_string("js_template", &template_content) {
         return RawJavaScript(format!(
             "console.error('Failed to register template: {}');",
@@ -180,6 +179,8 @@ pub fn script(
                 "t": t.unwrap_or_default(),
                 "lang": lang.unwrap_or_default(),
                 "loc": loc.unwrap_or_default(),
+                "goggles": goggles.unwrap_or_default(),
+                "qt": qt.unwrap_or_default()
             }),
         )
         .unwrap_or_else(|_| format!("console.error('Failed to render {}');", script_name)),

@@ -25,8 +25,11 @@
             <button type="submit">Add Goggle</button>
         </form>
     </div>
+
     <form action="/goggles/apply" method="get" id="goggles-form">
-        <button type="submit" class="apply-goggles-btn">Apply changes</button>
+     {{#if no_js}}
+                <button type="submit" class="submit">Apply Goggles</button>
+        {{/if}}
         <div class="goggles-grid">
         {{#each goggles}}
             <link rel="stylesheet" href="/static/css/goggles_tint.css.hbs?tint={{this.avatar}}&target=g{{@index}}">
@@ -35,7 +38,7 @@
                 <i>{{this.author}}</i>
                 <br>
                 <p>{{this.description}}</p>
-                <a href="{{this.source_url}}" target="_blank">Source</a>
+                <a href="{{this.source_url}}" target="_blank" class="link">Source</a>
                 <div class="checkbox_cute">
                     <div class="check">
                         <input id="check_goggle_{{@index}}" name="ids" value="{{this.id}}" type="checkbox"
@@ -48,6 +51,7 @@
         </div>
     </form>
   </div>
+
   {{#unless no_js}}
     <script src="/static/js/goggles.js"></script>
   {{/unless}}

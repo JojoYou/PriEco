@@ -7,7 +7,8 @@
 }
 
 .output_text h3,
-.spell_check a {
+.spell_check a,
+.qt_menu a {
     color: #1a0dab;
 }
 
@@ -18,11 +19,19 @@
 }
 
 .yadore_title,
-.yadore_price {
+.yadore_price,
+.qt_domain {
     color: #1f1f1f;
 }
 
 [data-sxpr-top-bar] .sx-search-suggestions,
 .sx-ta-places {
     background-color: #eaeaf2;
+}
+
+.qt_menu {
+    background-color: #f2f4f7;
+}
+.qt_menu p {
+    color: #353333;
 }

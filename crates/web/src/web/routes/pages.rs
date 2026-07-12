@@ -38,7 +38,7 @@ use rocket::{
     uri,
 };
 use rocket_dyn_templates::Template;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{Value, json};
 use urlencoding::encode;
 
@@ -50,7 +50,7 @@ use crate::web::{
         ranking::goggles::{
             fetch_and_store, get_goggle_ids, list_public, load_goggles, refresh_stale_goggles,
         },
-        search_endpoint,
+        search_endpoint::{self, UserQtPrefs},
     },
     modules::settings,
 };
@@ -188,6 +188,11 @@ pub async fn search(
     uri: &Origin<'_>,
     embedding_service: &State<EmbeddingService>,
 ) -> Template {
+    let raw_qt_cookie = cookie_jar
+        .get("prieco_qt_prefs")
+        .map(|c| c.value())
+        .unwrap_or("{}");
+
     let mut context: HashMap<String, Value> = HashMap::from([
         // File versions
         (String::from("css_version"), json!(CSS_VERSION)),
@@ -216,6 +221,10 @@ pub async fn search(
             String::from("placeholder_number"),
             json!(vec![json!(()); 10]),
         ),
+        (
+            String::from("qt_prefs_enc"),
+            json!(encode(raw_qt_cookie).into_owned()),
+        ),
     ]);
 
     // Search type
@@ -243,9 +252,20 @@ pub async fn search(
         let loc = cookie_jar.get("loc").map_or("all", |c| c.value());
         let active_goggles = load_goggles(&get_goggle_ids(None, Some(cookie_jar)));
 
+        let user_qt_prefs: UserQtPrefs = serde_json::from_str(raw_qt_cookie).unwrap_or_default();
+
         // Results
-        let results_ctx =
-            search_endpoint::run(t, q, lang, loc, embedding_service, active_goggles).await;
+        let results_ctx = search_endpoint::run(
+            t,
+            q,
+            lang,
+            loc,
+            embedding_service,
+            active_goggles,
+            &user_qt_prefs,
+        )
+        .await;
+
         context.insert(String::from("search_results"), json!(results_ctx));
         ANALYTICS.record_query();
 
@@ -279,25 +299,37 @@ pub async fn search(
   Input: Search type, Search query, Location, Language
   Output: Results html
 */
-#[get("/results_html?<t>&<q>&<loc>&<lang>&<goggles>")]
+#[get("/results_html?<t>&<q>&<loc>&<lang>&<goggles>&<qt>")]
 pub async fn results_htmls(
     t: &str,
     q: &str,
     lang: &str,
     loc: &str,
     goggles: Option<&str>,
-
+    qt: Option<&str>,
     embedding_service: &State<EmbeddingService>,
     cookie_jar: &CookieJar<'_>,
 ) -> Template {
     ANALYTICS.record_query();
 
-    // Goggles
     let active_goggles = load_goggles(&get_goggle_ids(goggles, Some(cookie_jar)));
+
+    let user_qt_prefs: UserQtPrefs = qt
+        .and_then(|s| serde_json::from_str(s).ok())
+        .unwrap_or_default();
 
     Template::render(
         "search/results",
-        search_endpoint::run(t, q, lang, loc, embedding_service, active_goggles).await,
+        search_endpoint::run(
+            t,
+            q,
+            lang,
+            loc,
+            embedding_service,
+            active_goggles,
+            &user_qt_prefs,
+        )
+        .await,
     )
 }
 
@@ -780,52 +812,19 @@ pub async fn submit_roadmap_vote(vote: Json<RoadmapVote>) -> Status {
   Input:
   Output: Goggle store html
 */
-#[derive(Serialize)]
-struct GoggleView {
-    id: u64,
-    name: String,
-    author: String,
-    description: String,
-    source_url: String,
-    avatar: String,
-    checked: bool,
-}
-
 #[get("/goggles")]
 pub fn goggles(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     tokio::spawn(async {
         refresh_stale_goggles().await;
     });
 
-    let active_ids: std::collections::HashSet<u64> = cookie_jar
-        .get("active_goggles")
-        .map(|c| {
-            c.value()
-                .split(',')
-                .filter_map(|p| p.trim().parse().ok())
-                .collect()
-        })
-        .unwrap_or_default();
-
-    let goggles_list: Vec<GoggleView> = list_public()
-        .into_iter()
-        .map(|g| GoggleView {
-            checked: active_ids.contains(&g.id),
-            id: g.id,
-            name: g.name,
-            author: g.author,
-            description: g.description,
-            source_url: g.url,
-            avatar: g.avatar.trim_start_matches('#').to_string(),
-        })
-        .collect();
-
     let mut context: HashMap<String, RocketValue> = HashMap::from([
         (String::from("css_version"), json!(CSS_VERSION)),
         (String::from("js_version"), json!(JS_VERSION)),
         (String::from("title_query"), json!("Goggles | ")),
-        (String::from("goggles"), json!(goggles_list)),
     ]);
+
+    context.insert(String::from("no_js"), json!(cookie_jar.get("js").is_some()));
 
     settings::run(&mut context, &None, cookie_jar, host);
 
@@ -846,31 +845,45 @@ pub async fn load_goggle(url: String, cookie_jar: &CookieJar<'_>) -> Redirect {
                     .collect()
             })
             .unwrap_or_default();
+
         if !ids.contains(&goggle.id) {
             ids.push(goggle.id);
         }
+
         let joined = ids
             .iter()
             .map(|i| i.to_string())
             .collect::<Vec<_>>()
             .join(",");
-        cookie_jar.add(Cookie::new("active_goggles", joined));
+
+        let mut cookie = Cookie::new("active_goggles", joined);
+        cookie.set_path("/");
+        cookie_jar.add(cookie);
     }
 
     Redirect::to("/goggles")
 }
+
 #[get("/goggles/apply?<ids>")]
-pub fn apply_goggles(ids: Vec<u64>, cookie_jar: &CookieJar<'_>) -> Redirect {
+pub fn apply_goggles(ids: Option<Vec<u64>>, cookie_jar: &CookieJar<'_>) -> Redirect {
+    let ids = ids.unwrap_or_default();
+
     if ids.is_empty() {
-        cookie_jar.remove(Cookie::from("active_goggles"));
+        let mut cookie = Cookie::from("active_goggles");
+        cookie.set_path("/");
+        cookie_jar.remove(cookie);
     } else {
         let joined = ids
             .iter()
             .map(|i| i.to_string())
             .collect::<Vec<_>>()
             .join(",");
-        cookie_jar.add(Cookie::new("active_goggles", joined));
+
+        let mut cookie = Cookie::new("active_goggles", joined);
+        cookie.set_path("/");
+        cookie_jar.add(cookie);
     }
+
     Redirect::to("/goggles")
 }
 
@@ -891,6 +904,47 @@ fn validate_hex(hex: &str) -> Option<String> {
     } else {
         None
     }
+}
+
+#[derive(FromForm)]
+pub struct QtUpdateForm {
+    return_url: String,
+    prefs: HashMap<String, String>, // Maps domain -> "boost", "downrank", "discard", or "none"
+}
+
+#[post("/quick_tune_update", data = "<form>")]
+pub fn update_qt(form: Form<QtUpdateForm>, cookie_jar: &CookieJar<'_>) -> Redirect {
+    // 1. Fetch current preferences
+    let mut user_prefs = cookie_jar
+        .get("prieco_qt_prefs")
+        .and_then(|c| serde_json::from_str::<UserQtPrefs>(c.value()).ok())
+        .unwrap_or_default();
+
+    // 2. Iterate through the form and update arrays
+    for (domain, action) in form.prefs.iter() {
+        // Always remove the domain from all lists first to reset its state
+        user_prefs.boost.retain(|d| d != domain);
+        user_prefs.downrank.retain(|d| d != domain);
+        user_prefs.discard.retain(|d| d != domain);
+
+        // Add it to the correct list if they selected an action
+        match action.as_str() {
+            "boost" => user_prefs.boost.push(domain.clone()),
+            "downrank" => user_prefs.downrank.push(domain.clone()),
+            "discard" => user_prefs.discard.push(domain.clone()),
+            _ => {} // "none" leaves it removed
+        }
+    }
+
+    // 3. Save back to Cookie (expires in ~1 year)
+    let cookie_str = serde_json::to_string(&user_prefs).unwrap();
+    let mut cookie = Cookie::new("prieco_qt_prefs", cookie_str);
+    cookie.set_path("/");
+    cookie.set_max_age(rocket::time::Duration::days(365));
+    cookie_jar.add(cookie);
+
+    // 4. Redirect the user back to the search page they were just on
+    Redirect::to(form.return_url.clone())
 }
 
 /*

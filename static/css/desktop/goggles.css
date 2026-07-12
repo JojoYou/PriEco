@@ -32,6 +32,17 @@ h2 {
     color: #ffffff;
 }
 
+.submit {
+    background-color: #3edce266;
+    border: none;
+    color: white;
+    padding: 10px;
+    border-radius: 20px;
+    font-size: 20px;
+    cursor: pointer;
+    margin-top: 20px;
+}
+
 .goggle-add input {
     background-color: rgba(20, 30, 35, 0.4);
     border: solid 1px #ffffff24;
@@ -39,6 +50,8 @@ h2 {
     padding: 1rem;
     color: white;
     margin-top: 1rem;
+    width: 60%;
+    max-width: 600px;
 }
 .goggle-add button {
     background-color: rgba(20, 30, 35, 0.4);
@@ -84,5 +97,5 @@ h2 {
 }
 .checkbox_cute {
     margin-top: 10px;
-    float: right;
+    margin-left: auto;
 }

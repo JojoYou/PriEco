@@ -16,7 +16,7 @@
   Import system libraries
 */
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     net::{IpAddr, Ipv4Addr},
 };
 
@@ -24,13 +24,25 @@ use std::{
   Import external libraries
 */
 use rocket::http::{CookieJar, uri::Host};
+use serde::Serialize;
 use serde_json::json;
 
 /*
   Import own libraries
 */
-use crate::web::functions::general::set_cookie;
+use crate::web::functions::{general::set_cookie, ranking::goggles::list_public};
 use prieco_core::globals::{COUNTRY_TO_LANG, IP_TO_LOC};
+
+#[derive(Serialize)]
+struct GoggleView {
+    id: u64,
+    name: String,
+    author: String,
+    description: String,
+    source_url: String,
+    avatar: String,
+    checked: bool,
+}
 
 /*
   Description: Integrates settings to the page
@@ -173,4 +185,40 @@ pub fn run(
     if cookie_jar.get("post").is_some() {
         context.insert(String::from("check_post"), json!(1));
     }
+
+    // Goggles
+    let active_ids: HashSet<u64> = cookie_jar
+        .get("active_goggles")
+        .map(|c| {
+            c.value()
+                .split(',')
+                .filter_map(|p| p.trim().parse().ok())
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let goggles_list: Vec<GoggleView> = list_public()
+        .into_iter()
+        .map(|g| GoggleView {
+            checked: active_ids.contains(&g.id),
+            id: g.id,
+            name: g.name,
+            author: g.author,
+            description: g.description,
+            source_url: g.url,
+            avatar: g.avatar.trim_start_matches('#').to_string(),
+        })
+        .collect();
+
+    context.insert(String::from("goggles"), json!(goggles_list));
+    context.insert(
+        String::from("goggles_ids"),
+        json!(
+            active_ids
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
+    );
 }

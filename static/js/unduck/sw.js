@@ -188,8 +188,24 @@ self.addEventListener("fetch", (event) => {
   const locMatch = swCookie.match(/(?:^|;\s*)loc=([^;]*)/);
   const loc = locMatch ? locMatch[1] : "default";
 
+  const gogglesMatch = swCookie.match(/(?:^|;\s*)active_goggles=([^;]*)/);
+  const goggles = gogglesMatch ? gogglesMatch[1] : "none";
+
+  const qtMatch = swCookie.match(/(?:^|;\s*)prieco_qt_prefs=([^;]*)/);
+  const qtPrefs = qtMatch ? qtMatch[1] : "none";
+
   const cacheKey =
-    url.href + "__sw=" + screenWidth + "__lang=" + lang + "__loc=" + loc;
+    url.href +
+    "__sw=" +
+    screenWidth +
+    "__lang=" +
+    lang +
+    "__loc=" +
+    loc +
+    "__goggles=" +
+    goggles +
+    "__qt=" +
+    qtPrefs;
 
   event.respondWith(
     caches.match(cacheKey).then(async (cached) => {

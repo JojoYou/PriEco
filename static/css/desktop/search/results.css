@@ -221,3 +221,178 @@
 .spell_check {
     margin: 10px 0 20px 0;
 }
+
+.quick_tune {
+    position: fixed;
+    top: 15px;
+    right: 150px;
+    z-index: 82;
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+
+.quick_tune img {
+    width: 22px;
+    height: 22px;
+}
+
+.qt_menu {
+    display: none;
+
+    position: fixed;
+    top: 55px;
+    right: 70px;
+
+    width: 560px;
+    max-height: 80vh;
+
+    padding: 18px;
+    overflow-y: auto;
+
+    border-radius: 20px;
+    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35);
+
+    z-index: 82;
+}
+
+.quick_tune:focus ~ .qt_menu,
+.qt_menu:hover {
+    display: block;
+}
+
+.qt_menu p,
+.qt_menu a {
+    padding-left: 10px;
+    margin-bottom: 10px;
+}
+
+.qt_grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 22px;
+}
+
+.qt_item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    padding: 8px 10px;
+    border-radius: 12px;
+
+    transition: background 0.15s;
+}
+
+.qt_item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.qt_icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.qt_content {
+    position: relative;
+    flex: 1;
+    height: 28px;
+    overflow: hidden;
+}
+
+.qt_domain,
+.qt_actions {
+    position: absolute;
+    inset: 0;
+
+    display: flex;
+    align-items: center;
+
+    transition: opacity 0.15s;
+}
+
+.qt_domain {
+    color: #ddd;
+    font-size: 14px;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    opacity: 1;
+}
+
+.qt_actions {
+    gap: 6px;
+
+    opacity: 0;
+    pointer-events: none;
+}
+
+.qt_content:hover .qt_domain {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.qt_content:hover .qt_actions {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.qt-btn {
+    width: 34px;
+    height: 28px;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+    background: none;
+}
+
+.qt-btn:hover {
+    background: #4b4c4f;
+}
+
+.qt-btn.active {
+    background: #4659d9;
+}
+
+.qt_actions_nojs {
+    display: flex;
+    gap: 8px;
+    background: #1a1a1c;
+    border-radius: 6px;
+    padding: 4px;
+}
+
+.qt_actions_nojs label {
+    font-size: 12px;
+    cursor: pointer;
+    color: #bbb;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.qt_actions_nojs input[type="radio"] {
+    accent-color: #3edce2; /* Style the radio circle */
+    cursor: pointer;
+}
+
+.qt_submit_btn {
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px;
+    background: #3edce2;
+    color: #1e1e20;
+    font-weight: bold;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.qt_submit_btn:hover {
+    background: #03d781;
+}

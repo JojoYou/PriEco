@@ -20,7 +20,7 @@ pub struct Goggle {
     pub content_hash: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct GoggleRules {
     pub path: Vec<(String, f64)>,
 

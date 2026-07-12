@@ -29,8 +29,8 @@ function loadSection(containerId, url, scriptPath) {
 }
 
 Promise.all([
-  loadSection("js_load_results", "/results_html?t={{t}}&lang={{lang}}&loc={{loc}}&goggles={{goggles_param}}&q={{q}}", ""),
-  loadSection("js_load_settings", "/settings_html", "static/js/settings.js"),
+loadSection("js_load_results", "/results_html?t={{t}}&lang={{lang}}&loc={{loc}}&goggles={{goggles}}&q={{q}}&qt={{qt}}", ""),
+loadSection("js_load_settings", "/settings_html", "static/js/settings.js"),
 ]).then(() => {
   // High Res Images script
   const highResScript = document.createElement("script");
