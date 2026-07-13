@@ -128,22 +128,22 @@ impl UserQtPrefs {
         for d in &self.boost {
             rules
                 .boost
-                .insert(url_to_domain_id(&format!("https://{}/", d)), 5.0);
+                .insert(url_to_domain_id(&format!("https://{}/", d)), 3.0);
             if !d.starts_with("www.") {
                 rules
                     .boost
-                    .insert(url_to_domain_id(&format!("https://www.{}/", d)), 5.0);
+                    .insert(url_to_domain_id(&format!("https://www.{}/", d)), 3.0);
             }
         }
 
         for d in &self.downrank {
             rules
                 .downrank
-                .insert(url_to_domain_id(&format!("https://{}/", d)), 5.0);
+                .insert(url_to_domain_id(&format!("https://{}/", d)), 3.0);
             if !d.starts_with("www.") {
                 rules
                     .downrank
-                    .insert(url_to_domain_id(&format!("https://www.{}/", d)), 5.0);
+                    .insert(url_to_domain_id(&format!("https://www.{}/", d)), 3.0);
             }
         }
 
