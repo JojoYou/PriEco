@@ -235,9 +235,6 @@
     margin-bottom: 10px;
     margin-right: 20px;
 }
-.qt_menu a {
-    margin-left: -20px;
-}
 
 .qt_grid {
     display: grid;
