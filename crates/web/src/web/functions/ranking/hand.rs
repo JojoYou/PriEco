@@ -194,23 +194,23 @@ pub fn run(
 
             if let Some(g) = important_goggle {
                 if let Some(b) = g.boost.get(&domain_id) {
-                    boost = 1.0 + (b.min(5.0) * 0.15);
+                    boost = 1.0 + (b.min(3.0) * 0.15);
                 } else if let Some(d) = g.downrank.get(&domain_id) {
-                    boost = 1.0 / (1.0 + d.min(5.0));
+                    boost = 1.0 / (1.0 + d.min(3.0));
                 }
             } else {
                 for g in goggles {
                     if let Some(b) = g.boost.get(&domain_id) {
-                        boost *= 1.0 + (b.min(5.0) * 0.15);
+                        boost *= 1.0 + (b.min(3.0) * 0.15);
                     }
                     if let Some(d) = g.downrank.get(&domain_id) {
-                        boost *= 1.0 / (1.0 + d.min(5.0));
+                        boost *= 1.0 / (1.0 + d.min(3.0));
                     }
                 }
             }
             for (pattern, b) in goggles.iter().flat_map(|g| &g.path) {
                 if path_matches(clean_url, pattern) {
-                    boost *= 1.0 + (b.min(5.0) * 0.15);
+                    boost *= 1.0 + (b.min(3.0) * 0.15);
                 }
             }
         }

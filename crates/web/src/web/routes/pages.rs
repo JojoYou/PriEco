@@ -970,15 +970,15 @@ pub fn export_quick_tune(cookie_jar: &CookieJar<'_>) -> QuickTuneExport {
     let user_qt_prefs = get_user_qt_prefs(cookie_jar);
 
     let mut out = String::new();
-    out.push_str("! name: My PriEco Quick Tune\n");
-    out.push_str("! description: Exported preferences from Quick Tune UI\n");
+    out.push_str("! name: My PriEco Goggle\n");
+    out.push_str("! description: Exported Goggle\n");
     out.push_str("! public: false\n\n");
 
     for domain in &user_qt_prefs.boost {
-        out.push_str(&format!("$boost=5,site={}\n", domain));
+        out.push_str(&format!("$boost=3,site={}\n", domain));
     }
     for domain in &user_qt_prefs.downrank {
-        out.push_str(&format!("$downrank=5,site={}\n", domain));
+        out.push_str(&format!("$downrank=3,site={}\n", domain));
     }
     for domain in &user_qt_prefs.discard {
         out.push_str(&format!("$discard,site={}\n", domain));
