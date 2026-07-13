@@ -233,6 +233,7 @@ async fn rocket() -> _ {
                 apply_goggles,
                 goggles_tint,
                 update_qt,
+                export_quick_tune,
                 // Thanks page
                 thanks
             ],

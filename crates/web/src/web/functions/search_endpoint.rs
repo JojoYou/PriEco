@@ -23,6 +23,7 @@ use std::{collections::HashMap, sync::Arc};
 use rocket::{State, http::CookieJar};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use urlencoding::decode;
 
 /*
   Import own libraries
@@ -124,16 +125,37 @@ impl UserQtPrefs {
     pub fn into_goggle_rules(&self) -> GoggleRules {
         let mut rules = GoggleRules::default();
 
-        let to_id = |d: &str| url_to_domain_id(&format!("https://{}/", d));
-
         for d in &self.boost {
-            rules.boost.insert(to_id(d), 5.0);
+            rules
+                .boost
+                .insert(url_to_domain_id(&format!("https://{}/", d)), 5.0);
+            if !d.starts_with("www.") {
+                rules
+                    .boost
+                    .insert(url_to_domain_id(&format!("https://www.{}/", d)), 5.0);
+            }
         }
+
         for d in &self.downrank {
-            rules.downrank.insert(to_id(d), 5.0);
+            rules
+                .downrank
+                .insert(url_to_domain_id(&format!("https://{}/", d)), 5.0);
+            if !d.starts_with("www.") {
+                rules
+                    .downrank
+                    .insert(url_to_domain_id(&format!("https://www.{}/", d)), 5.0);
+            }
         }
+
         for d in &self.discard {
-            rules.discard.insert(to_id(d));
+            rules
+                .discard
+                .insert(url_to_domain_id(&format!("https://{}/", d)));
+            if !d.starts_with("www.") {
+                rules
+                    .discard
+                    .insert(url_to_domain_id(&format!("https://www.{}/", d)));
+            }
         }
 
         rules.discard_by_default = false;
@@ -145,7 +167,10 @@ impl UserQtPrefs {
 pub fn get_user_qt_prefs(cookie_jar: &CookieJar<'_>) -> UserQtPrefs {
     cookie_jar
         .get("prieco_qt_prefs")
-        .and_then(|c| serde_json::from_str(c.value()).ok())
+        .and_then(|c| {
+            let decoded = decode(c.value()).ok()?;
+            serde_json::from_str(&decoded).ok()
+        })
         .unwrap_or_default()
 }
 
@@ -164,7 +189,6 @@ async fn all_search(
     }
 
     context.insert(String::from("all_results"), json!(true)); // Set btn search type
-    context.insert(String::from("active_goggle_count"), json!(&goggles.len()));
 
     let mut results_vec: Vec<SearchResult> = Vec::with_capacity(100);
 
@@ -190,8 +214,33 @@ async fn all_search(
         }
     }
 
+    let mut saved_qt_domains: Vec<QtDomainDisplay> = Vec::new();
+
+    let mut add_saved = |domain: &String, is_boost: bool, is_downrank: bool, is_discard: bool| {
+        if !unique_domains.contains(domain) {
+            saved_qt_domains.push(QtDomainDisplay {
+                domain: domain.clone(),
+                is_boost,
+                is_downrank,
+                is_discard,
+            });
+            unique_domains.insert(domain.clone());
+        }
+    };
+
+    for d in &user_qt_prefs.boost {
+        add_saved(d, true, false, false);
+    }
+    for d in &user_qt_prefs.downrank {
+        add_saved(d, false, true, false);
+    }
+    for d in &user_qt_prefs.discard {
+        add_saved(d, false, false, true);
+    }
+
     context.insert(String::from("qt_domains_count"), json!(qt_domains.len()));
     context.insert(String::from("qt_domains"), json!(qt_domains));
+    context.insert(String::from("saved_qt_domains"), json!(saved_qt_domains));
 
     // If PriEco confidence is too low, use other indexes too
     /*if !cookie_jar.get("index").is_some() && index_confidence < 0.95 {

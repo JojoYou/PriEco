@@ -161,63 +161,101 @@
   </div>
 {{/if}}
 
-{{!--
 <button class="quick_tune">
     <img src="static/img/icon/tuning.svg" alt="Quick Tune">
 </button>
 
 <div class="qt_menu">
-<p>YOU decide how PriEco ranks results just for you</p>
-<a href="/goggles" target="_blank">You have {{active_goggle_count}} active Goggles</a>
+    <p>YOU decide how PriEco ranks results just for you</p>
+    <a href="/quick_tune/export" download="my_prieco.goggle" class="qt_download_btn"><img src="static/img/icon/download.svg" alt="Export Tune"></a>
+    <a href="/goggles" target="_blank">You have {{@root.active_goggle_count}} active Goggles</a>
 
-    {{#if @root.no_js}}
-    <form action="/quick_tune_update" method="POST">
-        <input type="hidden" name="return_url" value="/search?q={{query_enc}}&t={{type}}&lang={{lang}}&loc={{loc}}">
-
-        <div class="qt_grid">
-            {{#each qt_domains}}
-            <div class="qt_item">
-                <img class="qt_icon" src="/proxy?u=https://www.google.com/s2/favicons?domain={{this.domain}}&sz=32">
-                <div class="qt_content">
-                    <span class="qt_domain">{{this.domain}}</span>
-
-                    <div class="qt_actions_nojs">
-                        <label title="None">
-                            <input type="radio" name="prefs[{{this.domain}}]" value="none"
-                            {{#unless this.is_boost}}{{#unless this.is_downrank}}{{#unless this.is_discard}}checked{{/unless}}{{/unless}}{{/unless}}> ➖
-                        </label>
-                        <label title="Boost">
-                            <input type="radio" name="prefs[{{this.domain}}]" value="boost" {{#if this.is_boost}}checked{{/if}}> 👍
-                        </label>
-                        <label title="Downrank">
-                            <input type="radio" name="prefs[{{this.domain}}]" value="downrank" {{#if this.is_downrank}}checked{{/if}}> 👎
-                        </label>
-                        <label title="Discard">
-                            <input type="radio" name="prefs[{{this.domain}}]" value="discard" {{#if this.is_discard}}checked{{/if}}> 🚫
-                        </label>
-                    </div>
-                </div>
-            </div>
-            {{/each}}
-        </div>
-        <button type="submit" class="qt_submit_btn">Apply Tuning</button>
-    </form>
-    {{else}}
+   <form action="/quick_tune_update" method="POST">
+    <input type="hidden" name="return_url" value="/search?q={{@root.query_enc}}&t={{@root.type}}&lang={{@root.lang}}&loc={{@root.loc}}">
+  {{#if @root.no_js}}
+        <button type="submit" class="qt_submit_btn" style="margin-top: 15px;">Apply</button>
+    {{/if}}
     <div class="qt_grid">
         {{#each qt_domains}}
         <div class="qt_item" data-domain="{{this.domain}}">
             <img class="qt_icon" src="/proxy?u=https://www.google.com/s2/favicons?domain={{this.domain}}&sz=32">
             <div class="qt_content">
                 <span class="qt_domain">{{this.domain}}</span>
-                <div class="qt_actions">
-                    <button class="qt-btn {{#if this.is_boost}}active boost{{/if}}" data-action="boost">👍</button>
-                    <button class="qt-btn {{#if this.is_downrank}}active downrank{{/if}}" data-action="downrank">👎</button>
-                    <button class="qt-btn {{#if this.is_discard}}active discard{{/if}}" data-action="discard">🚫</button>
-                </div>
+
+                {{#if @root.no_js}}
+                    <div class="qt_actions">
+                        <label class="qt_radio_label" title="None">
+                            <input type="radio" name="prefs[{{this.domain}}]" value="none" {{#unless this.is_boost}}{{#unless this.is_downrank}}{{#unless this.is_discard}}checked{{/unless}}{{/unless}}{{/unless}}>
+                            <span class="qt-btn">➖</span>
+                        </label>
+                        <label class="qt_radio_label" title="Boost">
+                            <input type="radio" name="prefs[{{this.domain}}]" value="boost" {{#if this.is_boost}}checked{{/if}}>
+                            <span class="qt-btn boost">👍</span>
+                        </label>
+                        <label class="qt_radio_label" title="Downrank">
+                            <input type="radio" name="prefs[{{this.domain}}]" value="downrank" {{#if this.is_downrank}}checked{{/if}}>
+                            <span class="qt-btn downrank">👎</span>
+                        </label>
+                        <label class="qt_radio_label" title="Discard">
+                            <input type="radio" name="prefs[{{this.domain}}]" value="discard" {{#if this.is_discard}}checked{{/if}}>
+                            <span class="qt-btn discard">🚫</span>
+                        </label>
+                    </div>
+                {{else}}
+                    <div class="qt_actions">
+    <button type="button" class="qt-btn {{#unless this.is_boost}}{{#unless this.is_downrank}}{{#unless this.is_discard}}active none{{/unless}}{{/unless}}{{/unless}}" data-action="none">❌</button>
+    <button type="button" class="qt-btn {{#if this.is_boost}}active boost{{/if}}" data-action="boost">👍</button>
+    <button type="button" class="qt-btn {{#if this.is_downrank}}active downrank{{/if}}" data-action="downrank">👎</button>
+    <button type="button" class="qt-btn {{#if this.is_discard}}active discard{{/if}}" data-action="discard">🚫</button>
+</div>
+                {{/if}}
             </div>
         </div>
         {{/each}}
     </div>
-    {{/if}}
+
+    {{#if saved_qt_domains}}
+    <details>
+        <summary class="other_tuned" style="margin-top: 15px; cursor: pointer;"><b>Other Tuned Domains</b></summary>
+        <div class="qt_grid" style="margin-top: 10px;">
+            {{#each saved_qt_domains}}
+            <div class="qt_item" data-domain="{{this.domain}}">
+                <img class="qt_icon" src="/proxy?u=https://www.google.com/s2/favicons?domain={{this.domain}}&sz=32">
+                <div class="qt_content">
+                    <span class="qt_domain">{{this.domain}}</span>
+
+                    {{#if @root.no_js}}
+                        <div class="qt_actions">
+                            <label class="qt_radio_label" title="None">
+                                <input type="radio" name="prefs[{{this.domain}}]" value="none" {{#unless this.is_boost}}{{#unless this.is_downrank}}{{#unless this.is_discard}}checked{{/unless}}{{/unless}}{{/unless}}>
+                                <span class="qt-btn">➖</span>
+                            </label>
+                            <label class="qt_radio_label" title="Boost">
+                                <input type="radio" name="prefs[{{this.domain}}]" value="boost" {{#if this.is_boost}}checked{{/if}}>
+                                <span class="qt-btn boost">👍</span>
+                            </label>
+                            <label class="qt_radio_label" title="Downrank">
+                                <input type="radio" name="prefs[{{this.domain}}]" value="downrank" {{#if this.is_downrank}}checked{{/if}}>
+                                <span class="qt-btn downrank">👎</span>
+                            </label>
+                            <label class="qt_radio_label" title="Discard">
+                                <input type="radio" name="prefs[{{this.domain}}]" value="discard" {{#if this.is_discard}}checked{{/if}}>
+                                <span class="qt-btn discard">🚫</span>
+                            </label>
+                        </div>
+                    {{else}}
+                        <div class="qt_actions">
+    <button type="button" class="qt-btn {{#unless this.is_boost}}{{#unless this.is_downrank}}{{#unless this.is_discard}}active none{{/unless}}{{/unless}}{{/unless}}" data-action="none">❌</button>
+    <button type="button" class="qt-btn {{#if this.is_boost}}active boost{{/if}}" data-action="boost">👍</button>
+    <button type="button" class="qt-btn {{#if this.is_downrank}}active downrank{{/if}}" data-action="downrank">👎</button>
+    <button type="button" class="qt-btn {{#if this.is_discard}}active discard{{/if}}" data-action="discard">🚫</button>
 </div>
---}}
+                    {{/if}}
+                </div>
+            </div>
+            {{/each}}
+        </div>
+    </details>
+    {{/if}}
+</form>
+</div>

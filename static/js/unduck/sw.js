@@ -171,7 +171,10 @@ self.addEventListener("fetch", (event) => {
     url.pathname == "/stats" ||
     url.pathname === "/pv" ||
     url.pathname === "/goggles" ||
-    url.pathname === "/goggles/load"
+    url.pathname === "/goggles/load" ||
+    url.pathname === "/search" ||
+    url.pathname === "/results_html" ||
+    url.pathname === "/quick_tune_update"
   )
     return;
   if (event.request.method !== "GET" || url.origin !== self.location.origin)

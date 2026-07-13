@@ -15,7 +15,7 @@
 /*
   Import system libraries
 */
-use std::{collections::HashMap, net::IpAddr};
+use std::{collections::HashMap, io::Cursor, net::IpAddr};
 
 /*
   Import external libraries
@@ -23,16 +23,16 @@ use std::{collections::HashMap, net::IpAddr};
 use chrono::Utc;
 use dotenv_codegen::dotenv;
 use rocket::{
-    Request, State,
+    Request, Response, State,
     form::{Form, FromForm},
     get, head,
     http::{
-        ContentType, Cookie, CookieJar, SameSite, Status,
+        ContentType, Cookie, CookieJar, Header, SameSite, Status,
         uri::{Host, Origin},
     },
     post,
     request::{FromRequest, Outcome},
-    response::Redirect,
+    response::{Redirect, Responder, Result as RocketResult},
     serde::json::{Json, Value as RocketValue},
     time::Duration,
     uri,
@@ -47,10 +47,8 @@ use urlencoding::encode;
 */
 use crate::web::{
     functions::{
-        ranking::goggles::{
-            fetch_and_store, get_goggle_ids, list_public, load_goggles, refresh_stale_goggles,
-        },
-        search_endpoint::{self, UserQtPrefs},
+        ranking::goggles::{fetch_and_store, get_goggle_ids, load_goggles, refresh_stale_goggles},
+        search_endpoint::{self, UserQtPrefs, get_user_qt_prefs},
     },
     modules::settings,
 };
@@ -193,6 +191,8 @@ pub async fn search(
         .map(|c| c.value())
         .unwrap_or("{}");
 
+    let active_goggle_ids = get_goggle_ids(None, Some(cookie_jar));
+
     let mut context: HashMap<String, Value> = HashMap::from([
         // File versions
         (String::from("css_version"), json!(CSS_VERSION)),
@@ -224,6 +224,10 @@ pub async fn search(
         (
             String::from("qt_prefs_enc"),
             json!(encode(raw_qt_cookie).into_owned()),
+        ),
+        (
+            String::from("active_goggle_count"),
+            json!(active_goggle_ids.len()),
         ),
     ]);
 
@@ -299,38 +303,43 @@ pub async fn search(
   Input: Search type, Search query, Location, Language
   Output: Results html
 */
-#[get("/results_html?<t>&<q>&<loc>&<lang>&<goggles>&<qt>")]
+#[get("/results_html?<t>&<q>&<loc>&<lang>")]
 pub async fn results_htmls(
     t: &str,
     q: &str,
     lang: &str,
     loc: &str,
-    goggles: Option<&str>,
-    qt: Option<&str>,
     embedding_service: &State<EmbeddingService>,
     cookie_jar: &CookieJar<'_>,
 ) -> Template {
     ANALYTICS.record_query();
 
-    let active_goggles = load_goggles(&get_goggle_ids(goggles, Some(cookie_jar)));
+    let active_goggles = load_goggles(&get_goggle_ids(None, Some(cookie_jar)));
+    let user_qt_prefs = get_user_qt_prefs(cookie_jar);
 
-    let user_qt_prefs: UserQtPrefs = qt
-        .and_then(|s| serde_json::from_str(s).ok())
-        .unwrap_or_default();
-
-    Template::render(
-        "search/results",
-        search_endpoint::run(
-            t,
-            q,
-            lang,
-            loc,
-            embedding_service,
-            active_goggles,
-            &user_qt_prefs,
-        )
-        .await,
+    let mut ctx = search_endpoint::run(
+        t,
+        q,
+        lang,
+        loc,
+        embedding_service,
+        active_goggles,
+        &user_qt_prefs,
     )
+    .await;
+
+    let goggle_count = get_goggle_ids(None, Some(cookie_jar)).len();
+    ctx.insert(String::from("active_goggle_count"), json!(goggle_count));
+    ctx.insert(
+        String::from("query_enc"),
+        json!(urlencoding::encode(q).into_owned()),
+    );
+    ctx.insert(String::from("type"), json!(t));
+    ctx.insert(String::from("lang"), json!(lang));
+    ctx.insert(String::from("loc"), json!(loc));
+    ctx.insert(String::from("no_js"), json!(false));
+
+    Template::render("search/results", ctx)
 }
 
 /*
@@ -909,42 +918,73 @@ fn validate_hex(hex: &str) -> Option<String> {
 #[derive(FromForm)]
 pub struct QtUpdateForm {
     return_url: String,
-    prefs: HashMap<String, String>, // Maps domain -> "boost", "downrank", "discard", or "none"
+    prefs: HashMap<String, String>,
 }
 
 #[post("/quick_tune_update", data = "<form>")]
 pub fn update_qt(form: Form<QtUpdateForm>, cookie_jar: &CookieJar<'_>) -> Redirect {
-    // 1. Fetch current preferences
     let mut user_prefs = cookie_jar
         .get("prieco_qt_prefs")
         .and_then(|c| serde_json::from_str::<UserQtPrefs>(c.value()).ok())
         .unwrap_or_default();
 
-    // 2. Iterate through the form and update arrays
     for (domain, action) in form.prefs.iter() {
-        // Always remove the domain from all lists first to reset its state
         user_prefs.boost.retain(|d| d != domain);
         user_prefs.downrank.retain(|d| d != domain);
         user_prefs.discard.retain(|d| d != domain);
 
-        // Add it to the correct list if they selected an action
         match action.as_str() {
             "boost" => user_prefs.boost.push(domain.clone()),
             "downrank" => user_prefs.downrank.push(domain.clone()),
             "discard" => user_prefs.discard.push(domain.clone()),
-            _ => {} // "none" leaves it removed
+            _ => {}
         }
     }
 
-    // 3. Save back to Cookie (expires in ~1 year)
     let cookie_str = serde_json::to_string(&user_prefs).unwrap();
     let mut cookie = Cookie::new("prieco_qt_prefs", cookie_str);
     cookie.set_path("/");
     cookie.set_max_age(rocket::time::Duration::days(365));
     cookie_jar.add(cookie);
 
-    // 4. Redirect the user back to the search page they were just on
     Redirect::to(form.return_url.clone())
+}
+
+pub struct QuickTuneExport(String);
+
+impl<'r, 'o: 'r> Responder<'r, 'o> for QuickTuneExport {
+    fn respond_to(self, _: &'r Request<'_>) -> RocketResult<'o> {
+        Response::build()
+            .header(ContentType::Plain)
+            .header(Header::new(
+                "Content-Disposition",
+                "attachment; filename=\"my_prieco.goggle\"",
+            ))
+            .sized_body(self.0.len(), Cursor::new(self.0))
+            .ok()
+    }
+}
+
+#[get("/quick_tune/export")]
+pub fn export_quick_tune(cookie_jar: &CookieJar<'_>) -> QuickTuneExport {
+    let user_qt_prefs = get_user_qt_prefs(cookie_jar);
+
+    let mut out = String::new();
+    out.push_str("! name: My PriEco Quick Tune\n");
+    out.push_str("! description: Exported preferences from Quick Tune UI\n");
+    out.push_str("! public: false\n\n");
+
+    for domain in &user_qt_prefs.boost {
+        out.push_str(&format!("$boost=5,site={}\n", domain));
+    }
+    for domain in &user_qt_prefs.downrank {
+        out.push_str(&format!("$downrank=5,site={}\n", domain));
+    }
+    for domain in &user_qt_prefs.discard {
+        out.push_str(&format!("$discard,site={}\n", domain));
+    }
+
+    QuickTuneExport(out)
 }
 
 /*

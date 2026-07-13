@@ -32,7 +32,9 @@
     color: #fff !important;
 }
 
-.products img {
+.products img,
+.quick_tune img,
+.qt_download_btn img {
     filter: brightness(0) invert(1);
 }
 
@@ -49,6 +51,7 @@
 .sx-ta-places div,
 .qt_menu p,
 [data-sxpr-top-bar] .sx-search-suggestions p,
+.other_tuned,
 .qt-btn {
     color: #bdc2ca;
 }

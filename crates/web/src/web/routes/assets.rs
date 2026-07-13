@@ -148,15 +148,13 @@ pub fn osd(host: &Host) -> RawXml<String> {
   Input: JS template name, Optional type, Optional language, Optional location, Optional query
   Output:
 */
-#[get("/static/js/hbs/<script_name>?<t>&<lang>&<loc>&<goggles>&<q>&<qt>")]
+#[get("/static/js/hbs/<script_name>?<t>&<lang>&<loc>&<q>")]
 pub fn script(
     script_name: &str,
     t: Option<&str>,
     lang: Option<&str>,
     loc: Option<&str>,
     q: Option<&str>,
-    goggles: Option<&str>,
-    qt: Option<&str>,
 ) -> RawJavaScript<String> {
     let mut hbs = Handlebars::new();
 
@@ -179,8 +177,6 @@ pub fn script(
                 "t": t.unwrap_or_default(),
                 "lang": lang.unwrap_or_default(),
                 "loc": loc.unwrap_or_default(),
-                "goggles": goggles.unwrap_or_default(),
-                "qt": qt.unwrap_or_default()
             }),
         )
         .unwrap_or_else(|_| format!("console.error('Failed to render {}');", script_name)),

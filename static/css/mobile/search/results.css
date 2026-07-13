@@ -196,12 +196,11 @@
 
 .quick_tune {
     position: fixed;
-    top: 15px;
-    right: 150px;
-    z-index: 82;
+    top: 10px;
+    right: 80px;
+    z-index: 10000;
     border: 0;
     background: none;
-    cursor: pointer;
 }
 
 .quick_tune img {
@@ -211,48 +210,47 @@
 
 .qt_menu {
     display: none;
-
     position: fixed;
     top: 55px;
-    right: 70px;
-
-    width: 560px;
+    right: 0px;
+    width: calc(100% - 20px);
     max-height: 80vh;
-
     padding: 18px;
     overflow-y: auto;
-
     border-radius: 20px;
     box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35);
-
-    z-index: 82;
+    z-index: 10000;
+    margin: 10px;
+    box-sizing: border-box;
 }
 
 .quick_tune:focus ~ .qt_menu,
-.qt_menu:hover {
+.qt_menu:hover,
+.qt_menu.active {
     display: block;
 }
 
 .qt_menu p,
 .qt_menu a {
-    padding-left: 10px;
     margin-bottom: 10px;
+    margin-right: 20px;
+}
+.qt_menu a {
+    margin-left: -20px;
 }
 
 .qt_grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px 22px;
+    grid-template-columns: 1fr;
+    gap: 12px;
 }
 
 .qt_item {
     display: flex;
     align-items: center;
     gap: 10px;
-
     padding: 8px 10px;
     border-radius: 12px;
-
     transition: background 0.15s;
 }
 
@@ -267,49 +265,31 @@
 }
 
 .qt_content {
-    position: relative;
-    flex: 1;
-    height: 28px;
-    overflow: hidden;
-}
-
-.qt_domain,
-.qt_actions {
-    position: absolute;
-    inset: 0;
-
     display: flex;
     align-items: center;
-
-    transition: opacity 0.15s;
+    justify-content: space-between;
+    flex: 1;
+    width: 100%;
+    gap: 10px;
 }
 
 .qt_domain {
     color: #ddd;
     font-size: 14px;
-
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-
     opacity: 1;
+    flex: 1;
 }
 
 .qt_actions {
+    display: flex;
+    align-items: center;
     gap: 6px;
-
-    opacity: 0;
-    pointer-events: none;
-}
-
-.qt_content:hover .qt_domain {
-    opacity: 0;
-    pointer-events: none;
-}
-
-.qt_content:hover .qt_actions {
     opacity: 1;
     pointer-events: auto;
+    flex-shrink: 0;
 }
 
 .qt-btn {
@@ -320,6 +300,11 @@
     cursor: pointer;
     transition: background 0.15s;
     background: none;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
 }
 
 .qt-btn:hover {
@@ -330,26 +315,19 @@
     background: #4659d9;
 }
 
-.qt_actions_nojs {
-    display: flex;
-    gap: 8px;
-    background: #1a1a1c;
-    border-radius: 6px;
-    padding: 4px;
+.qt_radio_label input[type="radio"] {
+    display: none;
 }
 
-.qt_actions_nojs label {
-    font-size: 12px;
+.qt_radio_label {
     cursor: pointer;
-    color: #bbb;
-    display: flex;
-    align-items: center;
-    gap: 2px;
+    margin: 0;
+    padding: 0;
+    display: inline-flex;
 }
 
-.qt_actions_nojs input[type="radio"] {
-    accent-color: #3edce2; /* Style the radio circle */
-    cursor: pointer;
+.qt_radio_label input[type="radio"]:checked + .qt-btn {
+    background: #4659d9;
 }
 
 .qt_submit_btn {
@@ -367,4 +345,14 @@
 
 .qt_submit_btn:hover {
     background: #03d781;
+}
+
+.qt_download_btn {
+    background: none;
+}
+.qt_download_btn img {
+    position: absolute;
+    right: 20px;
+    width: 20px;
+    top: 10px;
 }

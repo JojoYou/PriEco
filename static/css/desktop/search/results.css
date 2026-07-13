@@ -263,7 +263,6 @@
 
 .qt_menu p,
 .qt_menu a {
-    padding-left: 10px;
     margin-bottom: 10px;
 }
 
@@ -339,7 +338,6 @@
     opacity: 1;
     pointer-events: auto;
 }
-
 .qt-btn {
     width: 34px;
     height: 28px;
@@ -348,6 +346,11 @@
     cursor: pointer;
     transition: background 0.15s;
     background: none;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
 }
 
 .qt-btn:hover {
@@ -358,26 +361,19 @@
     background: #4659d9;
 }
 
-.qt_actions_nojs {
-    display: flex;
-    gap: 8px;
-    background: #1a1a1c;
-    border-radius: 6px;
-    padding: 4px;
+.qt_radio_label input[type="radio"] {
+    display: none;
 }
 
-.qt_actions_nojs label {
-    font-size: 12px;
+.qt_radio_label {
     cursor: pointer;
-    color: #bbb;
-    display: flex;
-    align-items: center;
-    gap: 2px;
+    margin: 0;
+    padding: 0;
+    display: inline-flex;
 }
 
-.qt_actions_nojs input[type="radio"] {
-    accent-color: #3edce2; /* Style the radio circle */
-    cursor: pointer;
+.qt_radio_label input[type="radio"]:checked + .qt-btn {
+    background: #4659d9;
 }
 
 .qt_submit_btn {
@@ -395,4 +391,13 @@
 
 .qt_submit_btn:hover {
     background: #03d781;
+}
+.qt_download_btn {
+    background: none;
+}
+.qt_download_btn img {
+    position: absolute;
+    right: 20px;
+    width: 20px;
+    top: 10px;
 }
