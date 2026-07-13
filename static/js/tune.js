@@ -22,6 +22,9 @@ function savePrefs(prefs) {
   const expiry = new Date(Date.now() + 31536000000).toUTCString();
   const encodedData = encodeURIComponent(JSON.stringify(prefs));
   document.cookie = `${COOKIE_NAME}=${encodedData}; expires=${expiry}; path=/; SameSite=Lax`;
+  if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ action: "clearCache" });
+  }
 }
 
 document.addEventListener("click", function (e) {

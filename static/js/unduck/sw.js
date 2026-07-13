@@ -72,7 +72,6 @@ async function trackAndEvict(url) {
   await saveMetadata(metadata);
 }
 
-// Cache wipe + rebuild
 async function rebuildCache() {
   await caches.delete(CACHE_NAME);
   swLog("Cache wiped, rebuilding static assets...");
@@ -89,7 +88,6 @@ async function rebuildCache() {
   );
 }
 
-// Version check
 async function checkVersion() {
   try {
     const res = await fetch(CACHE_VER_URL);
@@ -122,7 +120,6 @@ async function checkVersion() {
   }
 }
 
-// Lifecycle
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
 });
@@ -132,7 +129,6 @@ self.addEventListener("activate", (event) => {
     (async () => {
       await self.clients.claim();
 
-      // Wipe ALL old caches
       const allCaches = await caches.keys();
       await Promise.all(
         allCaches.map((name) => {
@@ -143,7 +139,6 @@ self.addEventListener("activate", (event) => {
         }),
       );
 
-      // Pre-cache static assets on first install
       const cache = await caches.open(CACHE_NAME);
       await Promise.all(
         STATIC_ASSETS.map(async (url) => {
@@ -167,48 +162,21 @@ self.addEventListener("fetch", (event) => {
   if (
     url.pathname === "/sw.js" ||
     url.pathname === CACHE_VER_URL ||
-    url.pathname == "/settings_html" ||
-    url.pathname == "/stats" ||
+    url.pathname === "/settings_html" ||
+    url.pathname === "/stats" ||
     url.pathname === "/pv" ||
     url.pathname === "/goggles" ||
     url.pathname === "/goggles/load" ||
-    url.pathname === "/search" ||
-    url.pathname === "/results_html" ||
     url.pathname === "/quick_tune_update"
-  )
+  ) {
     return;
-  if (event.request.method !== "GET" || url.origin !== self.location.origin)
+  }
+
+  if (event.request.method !== "GET" || url.origin !== self.location.origin) {
     return;
+  }
 
-  const swCookie = event.request.headers.get("cookie") ?? "";
-
-  const swMatch = swCookie.match(/(?:^|;\s*)screen_width=([^;]*)/);
-  const screenWidth = swMatch ? swMatch[1] : "default";
-
-  const langMatch = swCookie.match(/(?:^|;\s*)lang=([^;]*)/);
-  const lang = langMatch ? langMatch[1] : "default";
-
-  const locMatch = swCookie.match(/(?:^|;\s*)loc=([^;]*)/);
-  const loc = locMatch ? locMatch[1] : "default";
-
-  const gogglesMatch = swCookie.match(/(?:^|;\s*)active_goggles=([^;]*)/);
-  const goggles = gogglesMatch ? gogglesMatch[1] : "none";
-
-  const qtMatch = swCookie.match(/(?:^|;\s*)prieco_qt_prefs=([^;]*)/);
-  const qtPrefs = qtMatch ? qtMatch[1] : "none";
-
-  const cacheKey =
-    url.href +
-    "__sw=" +
-    screenWidth +
-    "__lang=" +
-    lang +
-    "__loc=" +
-    loc +
-    "__goggles=" +
-    goggles +
-    "__qt=" +
-    qtPrefs;
+  const cacheKey = url.href;
 
   event.respondWith(
     caches.match(cacheKey).then(async (cached) => {
@@ -229,7 +197,6 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Messages from main thread
 self.addEventListener("message", (event) => {
   if (!event.data?.action) return;
 

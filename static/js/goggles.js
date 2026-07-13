@@ -12,6 +12,10 @@ if (form) {
       const joined = ids.join(",");
       document.cookie = `active_goggles=${joined}; path=/; max-age=31536000`;
     }
+
+    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ action: "clearCache" });
+    }
   }
 
   form.querySelectorAll('input[name="ids"]').forEach((checkbox) => {
