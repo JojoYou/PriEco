@@ -159,24 +159,29 @@ pub struct WebScrollResult {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WebDocument {
     pub url: String,
+
     pub title: String,
     pub description: String,
     pub content: String,
     pub favicon: String,
     pub image: String,
     pub keywords: String,
+
     pub safe_s: bool,
-    pub html: String,
     pub lang: String,
     pub loc: String,
+
+    pub html: String, // Html blob id
+
     pub impressions: u32,
     pub clicks: u32,
-    pub confidence: f32,
-    pub effort: f32,
-    pub qna: f32,
+    pub confidence: f32, // Flesch Reading Ease and Text Image Ratio
+    pub effort: f32,     // Text effort
+    pub qna: f32,        // Quality score
     pub sts: f32,
-    pub load: f64,
-    pub date: i64,
+
+    pub load: f64, // Loading time
+    pub date: i64, // Date of crawling
 
     #[serde(default)]
     pub search_score: f32,

@@ -184,8 +184,59 @@ pub fn run(
             boost *= weights.path_depth_penalty.powi(extra_slashes);
         }
 
-        boost *= 1.0 + sigmoid(doc.confidence as f64 / 200.0) * weights.confidence_multi;
-        boost *= 1.0 + sigmoid(doc.effort as f64 / 200.0) * weights.effort_multi;
+        // Query in title
+        if doc.title.to_lowercase().contains(&query.to_lowercase()) {
+            boost *= 1.3;
+        }
+
+        // Quality score
+        boost *= 1.0 + (doc.qna as f64 / 2400.0).clamp(-0.20, 0.25);
+
+        // Relevance
+        match intent {
+            QueryIntent::Informational => {
+                // Query complexity (Avg word len)
+                let words: Vec<&str> = query.split_whitespace().collect();
+                let avg_word_len = if !words.is_empty() {
+                    words.iter().map(|w| w.len()).sum::<usize>() as f64 / words.len() as f64
+                } else {
+                    5.0
+                };
+
+                let normalized_readability = (doc.confidence as f64 / 100.0).clamp(0.0, 1.0);
+
+                if avg_word_len > 7.0 {
+                    // Complex query: prioritize low readability
+                    let technical_boost = 1.0 - normalized_readability;
+                    boost *= 1.0 + (technical_boost * weights.confidence_multi * 15.0);
+                } else {
+                    // Simple query: prioritize high readability
+                    boost *= 1.0 + (normalized_readability * weights.confidence_multi * 20.0);
+                }
+            }
+            QueryIntent::CommercialInvestigation | QueryIntent::Transactional => {
+                // Quality
+                if doc.qna > 0.0 {
+                    boost *= 1.0 + (doc.qna as f64 / 1200.0).clamp(0.0, 0.20);
+                }
+
+                // Penalize too long unstructured pages
+                if doc.effort > 500.0 {
+                    boost *= 0.85;
+                }
+            }
+            QueryIntent::Navigational => {}
+            _ => {
+                if doc.confidence > 0.0 {
+                    boost *= 1.0
+                        + (doc.confidence as f64 / 100.0).clamp(0.0, 1.0)
+                            * weights.confidence_multi
+                            * 10.0;
+                }
+
+                boost *= 1.0 + (doc.effort as f64 / 1000.0).clamp(0.0, 0.5) * weights.effort_multi;
+            }
+        }
 
         // Goggles
         if !goggles.is_empty() {
