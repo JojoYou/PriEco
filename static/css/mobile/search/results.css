@@ -201,6 +201,7 @@
     z-index: 10000;
     border: 0;
     background: none;
+    cursor: pointer;
 }
 
 .quick_tune img {
@@ -209,37 +210,90 @@
 }
 
 .qt_menu {
-    display: none;
+    visibility: hidden;
+    opacity: 0;
+    bottom: -50px;
     position: fixed;
-    top: 55px;
-    right: 0px;
-    width: calc(100% - 20px);
-    max-height: 80vh;
-    padding: 18px;
-    overflow-y: auto;
-    border-radius: 20px;
-    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35);
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-height: 60vh;
+    background-color: #202124;
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.5);
     z-index: 10000;
-    margin: 10px;
     box-sizing: border-box;
+    transition:
+        opacity 0.35s ease,
+        bottom 0.35s ease,
+        visibility 0.35s;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+    padding-top: 24px;
+}
+
+.qt_menu::before {
+    content: "";
+    position: fixed;
+    bottom: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100vw;
+    height: 150vh;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    z-index: -1;
+    cursor: pointer;
+}
+
+.qt_menu::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 2px 0;
+    padding: 2px 2px 0 2px;
+    border-radius: 24px 24px 0 0;
+    background: linear-gradient(#3edce2, #03d781);
+    -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+}
+
+.qt_menu form {
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 20px;
+    padding-bottom: env(safe-area-inset-bottom, 24px);
+    flex-shrink: 1;
 }
 
 .quick_tune:focus ~ .qt_menu,
-.qt_menu:hover,
-.qt_menu.active {
-    display: block;
+.qt_menu:focus-within {
+    visibility: visible;
+    opacity: 1;
+    bottom: 0;
 }
 
 .qt_menu p,
 .qt_menu a {
-    margin-bottom: 10px;
-    margin-right: 20px;
+    margin-bottom: 12px;
+    padding-right: 50px;
+    margin-left: 20px;
+    color: #e8eaed;
+    display: inline-block;
+    position: relative;
+    z-index: 2;
 }
 
 .qt_grid {
     display: grid;
     grid-template-columns: 1fr;
     gap: 12px;
+    width: 100%;
 }
 
 .qt_item {
@@ -249,10 +303,12 @@
     padding: 8px 10px;
     border-radius: 12px;
     transition: background 0.15s;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .qt_item:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .qt_icon {
@@ -266,38 +322,38 @@
     align-items: center;
     justify-content: space-between;
     flex: 1;
-    width: 100%;
     gap: 10px;
 }
 
 .qt_domain {
-    color: #ddd;
+    color: #e8eaed;
     font-size: 14px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    opacity: 1;
     flex: 1;
+    max-width: 30vw;
 }
 
 .qt_actions {
     display: flex;
     align-items: center;
     gap: 6px;
-    opacity: 1;
     pointer-events: auto;
     flex-shrink: 0;
 }
 
 .qt-btn {
     width: 34px;
-    height: 28px;
+    height: 30px;
     border: 0;
     border-radius: 8px;
     cursor: pointer;
-    transition: background 0.15s;
-    background: none;
-
+    transition:
+        background 0.15s,
+        transform 0.1s;
+    background: transparent;
+    color: white;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -308,8 +364,8 @@
     background: #4b4c4f;
 }
 
-.qt-btn.active {
-    background: #4659d9;
+.qt-btn:active {
+    transform: scale(0.95);
 }
 
 .qt_radio_label input[type="radio"] {
@@ -329,13 +385,15 @@
 
 .qt_submit_btn {
     width: 100%;
-    margin-top: 12px;
-    padding: 10px;
+    margin-top: 16px;
+    margin-bottom: 12px;
+    padding: 14px;
     background: #3edce2;
     color: #1e1e20;
-    font-weight: bold;
+    font-weight: 600;
+    font-size: 15px;
     border: none;
-    border-radius: 6px;
+    border-radius: 10px;
     cursor: pointer;
     transition: background 0.2s;
 }
@@ -346,10 +404,18 @@
 
 .qt_download_btn {
     background: none;
+    position: absolute !important;
+    width: 100%;
 }
 .qt_download_btn img {
     position: absolute;
-    right: 20px;
+    right: 40px;
     width: 20px;
-    top: 10px;
+}
+
+details summary.other_tuned {
+    color: #e8eaed;
+    outline: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
