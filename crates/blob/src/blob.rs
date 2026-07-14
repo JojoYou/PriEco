@@ -18,9 +18,9 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
-    fs::{self, File, create_dir_all, read_dir, remove_file},
+    fs::{self, File, OpenOptions, create_dir_all, read_dir, remove_file},
     hash::{BuildHasher, Hash, Hasher},
-    io::{Cursor, Read},
+    io::{BufWriter, Cursor, Read, Write},
     os::unix::fs::FileExt,
     path::{Path, PathBuf},
     thread,
@@ -32,6 +32,7 @@ use std::{
 */
 use fjall::PersistMode;
 use flate2::read::GzDecoder;
+use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tar::Archive;
 
@@ -42,6 +43,20 @@ use prieco_core::{
     BLOB_IMPORT_DIR, BLOB_STORAGE, META_DICTIONARY, PRIECO_FJALL,
     globals::{colors, icons},
 };
+use rocksdb::{DB, DBCompressionType, Options};
+use std::sync::Arc;
+pub static ORPHAN_STORAGE: Lazy<Arc<DB>> = Lazy::new(|| {
+    Arc::new({
+        let mut options = Options::default();
+        options.create_if_missing(true);
+        options.set_compression_type(DBCompressionType::Lz4);
+
+        options.set_max_background_jobs(2);
+        options.set_write_buffer_size(64 * 1024 * 1024);
+
+        DB::open(&options, Path::new("/mnt/hdd/orphan_blobs_triage")).unwrap()
+    })
+});
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct OrphanPayload {
@@ -51,12 +66,8 @@ pub struct OrphanPayload {
 }
 
 pub fn run() {
-    // Load the known-blob-id index ONCE and share it between the migration
-    // and the tar-import passes, since both need the same (correctly parsed)
-    // set of AHash blob IDs that meta already knows about.
-    //let mut known_blobs = get_known_blob_ids();
-    //dry(&mut known_blobs);
-    // migrate_blob_to_fjall(&mut known_blobs);
+    let mut known_blobs = get_known_blob_ids();
+    migrate_blob_to_fjall(&mut known_blobs);
 
     /*let directories = find_all_directories();
 
@@ -289,12 +300,6 @@ fn find_all_directories() -> Vec<PathBuf> {
 struct HtmlOnly {
     html: String,
 }
-fn hash_string(s: &str) -> u64 {
-    let build_hasher = ahash::RandomState::with_seeds(SEARCHED_K1, SEARCHED_K2, 0, 0);
-    let mut hasher = build_hasher.build_hasher();
-    s.hash(&mut hasher);
-    hasher.finish()
-}
 
 fn get_known_blob_ids() -> Vec<u64> {
     if Path::new(META_INDEX_CACHE_FILE).exists() {
@@ -304,7 +309,6 @@ fn get_known_blob_ids() -> Vec<u64> {
             colors::RESET
         );
 
-        // Read the file and parse lines into u64
         let contents =
             std::fs::read_to_string(META_INDEX_CACHE_FILE).expect("Failed to read cache");
         let known_ids: Vec<u64> = contents
@@ -315,25 +319,31 @@ fn get_known_blob_ids() -> Vec<u64> {
         return known_ids;
     }
 
-    let mut known_ids: Vec<u64> = Vec::with_capacity(350_000_000); // Now only requires ~2.8 GB
+    let mut known_ids: Vec<u64> = Vec::with_capacity(420_000_000);
     let mut j = 0;
     let mut x = 0;
 
     let mut decompressor = zstd::bulk::Decompressor::with_dictionary(&META_DICTIONARY)
         .expect("Failed to initialize zstd decompressor");
-
     for item in PRIECO_FJALL.meta_ks.iter() {
         j += 1;
         if let Ok(val) = item.value() {
             x += 1;
             if x % 100_000 == 0 {
-                println!("Foud: {} of {}", x, j);
+                println!("Found: {} of {}", x, j);
             }
 
             if let Ok(decompressed_vec) = decompressor.decompress(&val, 10_000_000) {
                 if let Ok(doc) = serde_json::from_slice::<HtmlOnly>(&decompressed_vec) {
-                    // Hash the string immediately and throw the string away
-                    known_ids.push(hash_string(&doc.html));
+                    let path = std::path::Path::new(&doc.html);
+
+                    if let Some(stem) = path.file_stem() {
+                        if let Some(stem_str) = stem.to_str() {
+                            if let Ok(blob_id) = stem_str.parse::<u64>() {
+                                known_ids.push(blob_id);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -347,7 +357,6 @@ fn get_known_blob_ids() -> Vec<u64> {
     known_ids
 }
 
-// Write integers to the cache instead of strings
 fn write_known_blob_cache(known_ids: &[u64]) {
     use std::io::{BufWriter, Write};
     let file = std::fs::File::create(META_INDEX_CACHE_FILE).expect("Failed to create cache");
@@ -358,10 +367,7 @@ fn write_known_blob_cache(known_ids: &[u64]) {
     }
     writer.flush().expect("Failed to flush");
 }
-// Notice the signature change: &mut Vec<u64> instead of [u8; 8]
-pub fn migrate_blob_to_fjall(known_blobs: &mut Vec<u64>) {
-    fs::create_dir_all(ORPHAN_RAM_DIR).expect("Failed to create RAM dir");
-
+pub fn migrate_blob_to_fjall(known_blobs: &[u64]) {
     let last_migrated_key: Option<[u8; 8]> = std::fs::read(BLOB_V2_PROGRESS_FILE)
         .ok()
         .and_then(|buf| buf.try_into().ok());
@@ -372,95 +378,61 @@ pub fn migrate_blob_to_fjall(known_blobs: &mut Vec<u64>) {
     };
 
     println!(
-        "{}Starting RocksDB -> Fjall (Blob) migration with RAM Disk offloading!{}",
+        "{}Starting Triage Migration: Known -> Fjall (SSD) | Unknown -> RocksDB (HDD){}",
         colors::BLUE,
         colors::RESET
     );
 
     let mut count: u64 = 0;
-    let mut orphaned_count: u64 = 0;
+    let mut known_count: u64 = 0;
+    let mut orphan_count: u64 = 0;
     let mut last_key: Option<[u8; 8]> = None;
     let mut skip_first = last_migrated_key.is_some();
 
+    let mut start_time = std::time::Instant::now();
+
     for item in BLOB_STORAGE.iterator(iter_mode) {
         let (key, value) = item.unwrap();
-        count += 1;
 
         if skip_first {
             skip_first = false;
             continue;
         }
 
+        count += 1;
         let key_arr: [u8; 8] = key.as_ref().try_into().unwrap();
-
-        // 1. Convert the byte array into a u64 integer immediately
         let blob_id = u64::from_le_bytes(key_arr);
 
-        // 2. Perform the binary search directly using the u64 ID
         if known_blobs.binary_search(&blob_id).is_ok() {
             PRIECO_FJALL.blobs_ks.insert(key_arr, &*value).unwrap();
+            known_count += 1;
         } else {
-            let tag_data = decode_blob_to_tag_data(&value);
-
-            if let Some(recovered_url) = attempt_url_recovery(blob_id, &tag_data) {
-                orphaned_count += 1;
-
-                let payload = OrphanPayload {
-                    html_id: blob_id.to_string(), // Or blob_id directly if OrphanPayload expects u64
-                    recovered_url,
-                    tag_data,
-                };
-
-                let config = bincode_next::config::standard();
-                let encoded = bincode_next::serde::encode_to_vec(&payload, config).unwrap();
-
-                let file_path = format!("{}/{}.bin", ORPHAN_RAM_DIR, blob_id);
-                std::fs::write(&file_path, encoded).unwrap();
-
-                PRIECO_FJALL.blobs_ks.insert(key_arr, &*value).unwrap();
-
-                // 3. Insert the u64 ID into known_blobs to keep it sorted
-                match known_blobs.binary_search(&blob_id) {
-                    Ok(_) => {}
-                    Err(pos) => {
-                        known_blobs.insert(pos, blob_id);
-                        append_to_cache(blob_id); // Append ONLY the new ID to disk instantly
-                    }
-                }
-                if orphaned_count % CHECK_INTERVAL == 0 {
-                    loop {
-                        let current_files = fs::read_dir(ORPHAN_RAM_DIR).unwrap().count();
-                        if current_files >= MAX_RAM_FILES {
-                            println!(
-                                "{}RAM disk full. Pausing to let crawler catch up...{}",
-                                colors::YELLOW,
-                                colors::RESET
-                            );
-                            thread::sleep(Duration::from_secs(10));
-                        } else {
-                            break;
-                        }
-                    }
-                }
-            } else {
-                // FAILURE! We could not recover the URL. Do NOT insert. Dead data.
-            }
+            ORPHAN_STORAGE.put(key, &*value).unwrap();
+            orphan_count += 1;
         }
 
         last_key = Some(key_arr);
 
-        if count % 10_000 == 0 {
+        if count % 5_000 == 0 {
             if let Some(k) = last_key {
                 std::fs::write(BLOB_V2_PROGRESS_FILE, k).unwrap();
             }
 
+            let elapsed = start_time.elapsed();
+            let items_per_sec = 5_000.0 / elapsed.as_secs_f64();
+
             println!(
-                "{}Written!{} {} (Orphans Offloaded: {})",
+                "{}Progress:{} {} scanned in {:.2?} ({:.0} ops/sec) | {} Saved to Fjall | {} Deferred to HDD",
                 colors::BLUE,
                 colors::RESET,
                 count,
-                orphaned_count
+                elapsed,
+                items_per_sec,
+                known_count,
+                orphan_count
             );
+
+            start_time = std::time::Instant::now();
         }
     }
 
@@ -473,15 +445,21 @@ pub fn migrate_blob_to_fjall(known_blobs: &mut Vec<u64>) {
         .persist(fjall::PersistMode::SyncAll)
         .unwrap();
 
+    let mut flush_opts = rocksdb::FlushOptions::default();
+    flush_opts.set_wait(true);
+    ORPHAN_STORAGE.flush_opt(&flush_opts).unwrap();
+
     println!(
-        "{}: {}Migration complete: {} entries migrated ({} orphans offloaded){}",
+        "{}: {}Triage Migration Complete!{}\nTotal Scanned: {}\nMigrated to Fjall: {}\nDeferred to HDD: {}",
         icons::BLOB,
         colors::GREEN,
+        colors::RESET,
         count,
-        orphaned_count,
-        colors::RESET
+        known_count,
+        orphan_count
     );
 }
+
 fn append_to_cache(new_id: u64) {
     use std::fs::OpenOptions;
     use std::io::Write;
@@ -554,126 +532,6 @@ pub fn decode_blob_to_text(raw_db_value: &[u8]) -> String {
     reconstructed_text
 }
 
-// Notice the signature change: &mut Vec<u64> instead of [u8; 8]
-pub fn dry(known_blobs: &mut Vec<u64>) {
-    // DRY RUN: We don't need the RAM dir if we aren't writing to it
-    // fs::create_dir_all(ORPHAN_RAM_DIR).expect("Failed to create RAM dir");
-
-    let last_migrated_key: Option<[u8; 8]> = std::fs::read(BLOB_V2_PROGRESS_FILE)
-        .ok()
-        .and_then(|buf| buf.try_into().ok());
-
-    let iter_mode = match &last_migrated_key {
-        Some(key) => rocksdb::IteratorMode::From(key, rocksdb::Direction::Forward),
-        None => rocksdb::IteratorMode::Start,
-    };
-
-    println!(
-        "{}Starting DRY RUN: RocksDB -> Fjall (Blob) migration! No data will be written.{}",
-        colors::BLUE,
-        colors::RESET
-    );
-
-    let mut count: u64 = 0;
-    let mut orphaned_count: u64 = 0;
-    let mut skip_first = last_migrated_key.is_some();
-
-    for item in BLOB_STORAGE.iterator(iter_mode) {
-        let (key, value) = item.unwrap();
-        count += 1;
-
-        if skip_first {
-            skip_first = false;
-            continue;
-        }
-
-        let key_arr: [u8; 8] = key.as_ref().try_into().unwrap();
-        let blob_id = u64::from_le_bytes(key_arr);
-
-        if known_blobs.binary_search(&blob_id).is_ok() {
-            // DRY RUN: Do not insert into Fjall
-            // PRIECO_FJALL.blobs_ks.insert(key_arr, &*value).unwrap();
-        } else {
-            let tag_data = decode_blob_to_tag_data(&value);
-
-            if let Some(recovered_url) = attempt_url_recovery(blob_id, &tag_data) {
-                orphaned_count += 1;
-
-                // DRY RUN: Do not serialize or write payload to RAM disk
-                /*
-                let payload = OrphanPayload {
-                    html_id: blob_id.to_string(),
-                    recovered_url,
-                    tag_data,
-                };
-                let config = bincode_next::config::standard();
-                let encoded = bincode_next::serde::encode_to_vec(&payload, config).unwrap();
-                let file_path = format!("{}/{}.bin", ORPHAN_RAM_DIR, blob_id);
-                std::fs::write(&file_path, encoded).unwrap();
-
-                PRIECO_FJALL.blobs_ks.insert(key_arr, &*value).unwrap();
-                */
-
-                // IMPORTANT: We DO keep the in-memory insert so the dry-run
-                // accurately reflects state if it encounters the same ID again.
-                match known_blobs.binary_search(&blob_id) {
-                    Ok(_) => {}
-                    Err(pos) => {
-                        known_blobs.insert(pos, blob_id);
-
-                        // DRY RUN: Do not append to the disk cache
-                        // append_to_cache(blob_id);
-                    }
-                }
-
-                // DRY RUN: No RAM disk pause needed since we aren't writing files
-            } else {
-                // FAILURE! Dead data.
-            }
-        }
-
-        if count % 10_000 == 0 {
-            // DRY RUN: Do not write the progress file
-            /*
-            if let Some(k) = last_key {
-                std::fs::write(BLOB_V2_PROGRESS_FILE, k).unwrap();
-            }
-            */
-
-            println!(
-                "{}DRY RUN Progress:{} {} scanned ({} orphans would be recovered)",
-                colors::BLUE,
-                colors::RESET,
-                count,
-                orphaned_count
-            );
-        }
-    }
-
-    // DRY RUN: Do not write final progress or persist Fjall
-    /*
-    if let Some(k) = last_key {
-        std::fs::write(BLOB_V2_PROGRESS_FILE, k).unwrap();
-    }
-    PRIECO_FJALL.blob_db.persist(fjall::PersistMode::SyncAll).unwrap();
-    */
-
-    println!(
-        "{}: {}DRY RUN Complete: {} entries scanned ({} orphans would be recovered){}",
-        icons::BLOB,
-        colors::GREEN,
-        count,
-        orphaned_count,
-        colors::RESET
-    );
-}
-
-// NOTE: this function was called from migrate_blob_to_fjall in the original
-// file but wasn't defined anywhere. Rebuilt here by reusing the identical
-// tag/word parsing state machine from decode_blob_to_text, collecting into
-// a HashMap<tag_name, words> instead of one flat string. If you already have
-// a real implementation elsewhere (especially the ambiguity check inside
-// resolve_token), use that one instead — this is a best-effort reconstruction.
 pub fn decode_blob_to_tag_data(raw_db_value: &[u8]) -> HashMap<String, Vec<String>> {
     let mut tag_data: HashMap<String, Vec<String>> = HashMap::new();
 
@@ -726,8 +584,6 @@ pub fn decode_blob_to_tag_data(raw_db_value: &[u8]) -> HashMap<String, Vec<Strin
             let slice = &decompressed[i..i + len];
             let word = resolve_token(slice);
 
-            // Meta/href/img entries are naturally one "word" per whole value
-            // (e.g. a full URL); other tags accumulate space-joined text.
             match tag_name.as_str() {
                 "meta" | "a_href" | "img_src" => {
                     tag_data.entry(tag_name.clone()).or_default().push(word);
@@ -811,7 +667,6 @@ pub fn search_word_by_id(id: usize) -> String {
     DICT_FILE.with(|file_cell| {
         let mut borrow = file_cell.borrow_mut();
 
-        // Open the file only if this thread hasn't opened it yet
         if borrow.is_none() {
             match File::open(db_path) {
                 Ok(f) => *borrow = Some(f),
@@ -827,13 +682,12 @@ pub fn search_word_by_id(id: usize) -> String {
         let mut current_offset = start_offset;
         let mut byte = [0u8; 1];
 
-        // Stateless positional reading via pread
         loop {
             match file.read_at(&mut byte, current_offset) {
-                Ok(0) => break, // Reached EOF
+                Ok(0) => break,
                 Ok(_) => {
                     if byte[0] == 0 {
-                        break; // Null-terminator found
+                        break;
                     }
                     buffer.push(byte[0]);
                     current_offset += 1;
@@ -908,6 +762,5 @@ pub fn attempt_url_recovery(
     None
 }
 thread_local! {
-    // Caches the open file descriptor per thread so it opens exactly once
     static DICT_FILE: RefCell<Option<File>> = RefCell::new(None);
 }

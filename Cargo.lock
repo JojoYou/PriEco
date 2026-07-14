@@ -3778,6 +3778,7 @@ dependencies = [
  "bincode-next",
  "fjall",
  "flate2",
+ "once_cell",
  "prieco_core",
  "rocksdb",
  "serde",

@@ -552,6 +552,7 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
         .expect("Failed to open Blob Fjall DB");
 
     let blob_opts = KeyspaceCreateOptions::default()
+        .max_memtable_size(2048 * 1024 * 1024)
         .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
         .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
         .with_kv_separation(Some(KvSeparationOptions {
