@@ -208,10 +208,10 @@ pub fn run(
                 if avg_word_len > 7.0 {
                     // Complex query: prioritize low readability
                     let technical_boost = 1.0 - normalized_readability;
-                    boost *= 1.0 + (technical_boost * weights.confidence_multi * 15.0);
+                    boost *= 1.0 + (technical_boost * weights.confidence_multi * 1.4);
                 } else {
                     // Simple query: prioritize high readability
-                    boost *= 1.0 + (normalized_readability * weights.confidence_multi * 20.0);
+                    boost *= 1.0 + (normalized_readability * weights.confidence_multi * 1.4);
                 }
             }
             QueryIntent::CommercialInvestigation | QueryIntent::Transactional => {
