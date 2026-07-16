@@ -70,7 +70,7 @@ pub struct OrphanPayload {
 }
 
 pub fn run() {
-    feed_blobs_for_reembedding();
+    //feed_blobs_for_reembedding();
     /*let directories = find_all_directories();
 
     if directories.is_empty() {
