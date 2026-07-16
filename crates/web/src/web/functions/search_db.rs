@@ -34,7 +34,7 @@ use serde_json::Value as Json_Value;
 use tantivy::{
     Term,
     collector::TopDocs,
-    query::{BooleanQuery, BoostQuery, Occur, Query, QueryParser, TermQuery, TermSetQuery},
+    query::{BooleanQuery, Occur, Query, QueryParser, TermQuery, TermSetQuery},
     schema::{IndexRecordOption, Value},
 };
 use zstd::bulk::Decompressor;
@@ -526,12 +526,11 @@ fn search_tantivy(
 
     let mut clauses: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Must, parsed_query)];
 
-    if lang != "all" && !lang.is_empty() {
+    if intent != &QueryIntent::Navigational && lang != "all" && !lang.is_empty() {
         let lang_term = Term::from_field_text(lang_field, lang);
-        let lang_query = Box::new(TermQuery::new(lang_term, IndexRecordOption::Basic));
         clauses.push((
-            Occur::Should,
-            Box::new(BoostQuery::new(lang_query, 3.0_f32)),
+            Occur::Must,
+            Box::new(TermQuery::new(lang_term, IndexRecordOption::Basic)),
         ));
     }
 
