@@ -352,86 +352,6 @@ pub fn write_to_random_file(dir: &str, content: &str) {
         file_path.pop();
     }
 }
-pub fn test_blob_relevance_data_extraction() {
-    println!("Starting Direct Blob Storage Extraction Test...");
-
-    // Iterate DIRECTLY over the blob keyspace
-    let mut iter = PRIECO_FJALL.blobs_ks.iter();
-
-    let mut blobs_checked = 0;
-    let mut found_og_type = 0;
-    let mut found_pub_date = 0;
-
-    // Test the first 10,000 blobs
-    while blobs_checked < 100_000 {
-        let Some(item) = iter.next() else {
-            break;
-        };
-
-        // 2. Extract key and value. Continue to the next item if this specific read fails.
-        let Ok((_key, val)) = item.into_inner() else {
-            continue;
-        };
-
-        if val.is_empty() {
-            continue;
-        }
-
-        // Pass the raw Fjall bytes directly into your decoder
-        let embed_text = decode_blob_to_embed_text(val.as_ref());
-        if embed_text.trim().is_empty() {
-            continue;
-        }
-
-        blobs_checked += 1;
-        let mut has_og = false;
-        let mut has_date = false;
-
-        // Hunt for the properties
-        // Note: converting to lowercase just in case decode_blob_to_embed_text doesn't normalize
-        for token in embed_text.split_whitespace() {
-            let lower_token = token.to_lowercase();
-
-            if lower_token.starts_with("og:type=") {
-                has_og = true;
-                println!("Found OG: {}", token); // Uncomment to debug actual values
-            }
-
-            if lower_token.starts_with("article:published_time=")
-                || lower_token.starts_with("date=")
-                || lower_token.starts_with("pubdate=")
-            {
-                has_date = true;
-                println!("Found Date: {}", token); // Uncomment to debug actual values
-            }
-        }
-
-        if has_og {
-            found_og_type += 1;
-        }
-        if has_date {
-            found_pub_date += 1;
-        }
-    }
-
-    println!("--------------------------------------------------");
-    println!("✅ Blob Extraction Test Results");
-    println!("Blobs Checked: {}", blobs_checked);
-    if blobs_checked > 0 {
-        println!(
-            "Contains OpenGraph (og:type): {} ({:.2}%)",
-            found_og_type,
-            (found_og_type as f64 / blobs_checked as f64) * 100.0
-        );
-        println!(
-            "Contains Publish Date: {} ({:.2}%)",
-            found_pub_date,
-            (found_pub_date as f64 / blobs_checked as f64) * 100.0
-        );
-    }
-    println!("--------------------------------------------------");
-}
-
 const RESUME_FILE: &str = "/mnt/ssd/feed_resume.txt";
 const BATCH_SIZE: usize = 5000;
 pub fn feed_blobs_for_reembedding() {
@@ -543,7 +463,10 @@ pub fn feed_blobs_for_reembedding() {
                         l_times[2] += t.elapsed().as_micros();
 
                         let t = Instant::now();
-                        let embed_text = decode_blob_to_embed_text(&raw_blob);
+
+                        let (embed_text, links_text, has_500_words) =
+                            decode_blob_to_embed_text(&raw_blob);
+
                         if embed_text.trim().is_empty() {
                             l_skips[5] += 1;
                             continue;
@@ -551,8 +474,9 @@ pub fn feed_blobs_for_reembedding() {
                         l_times[3] += t.elapsed().as_micros();
 
                         let t = Instant::now();
+
                         let result_str = format!(
-                            "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{:?}\n{}\n{}\n{}",
+                            "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{:?}\n{}\n{}\n{}\n{}\n{}",
                             doc.url,
                             doc.title,
                             doc.description,
@@ -567,7 +491,9 @@ pub fn feed_blobs_for_reembedding() {
                             vec![doc.confidence, doc.effort, doc.qna, doc.sts],
                             doc.load,
                             doc.date,
-                            embed_text
+                            embed_text,
+                            links_text,
+                            has_500_words
                         );
                         write_to_random_file("/mnt/vec/", &result_str);
                         l_times[4] += t.elapsed().as_micros();
@@ -1038,28 +964,37 @@ pub fn decode_blob_to_tag_data(raw_db_value: &[u8]) -> HashMap<String, Vec<Strin
 
     tag_data
 }
-pub fn decode_blob_to_embed_text(raw_db_value: &[u8]) -> String {
+
+pub fn decode_blob_to_embed_text(raw_db_value: &[u8]) -> (String, String, u8) {
     if raw_db_value.is_empty() {
-        return String::new();
+        return (String::new(), String::new(), 0);
     }
+
     let is_compressed = raw_db_value[0] == 1;
     let payload = &raw_db_value[1..];
     let decompressed_data = if is_compressed {
-        match zstd::stream::decode_all(Cursor::new(payload)) {
+        match zstd::stream::decode_all(std::io::Cursor::new(payload)) {
             Ok(data) => data,
-            Err(_) => return String::new(),
+            Err(_) => return (String::new(), String::new(), 0),
         }
     } else {
         payload.to_vec()
     };
+
     let decompressed = &decompressed_data;
     let mut embed_text = String::with_capacity(decompressed.len() * 3);
+    let mut links_text = String::with_capacity(decompressed.len());
+    let mut p_word_count = 0;
+
     let mut i = 0;
     while i < decompressed.len() {
         let tag_byte = decompressed[i];
         i += 1;
         let tag_name = tag_byte_to_name(tag_byte);
-        let skip_tag = matches!(tag_name, "meta" | "a_href" | "img_src");
+
+        let skip_tag = matches!(tag_name, "meta" | "img_src");
+        let is_link = tag_name == "a_href";
+        let is_p = tag_name == "p";
 
         while i < decompressed.len() {
             if i + 3 < decompressed.len()
@@ -1069,8 +1004,12 @@ pub fn decode_blob_to_embed_text(raw_db_value: &[u8]) -> String {
                 && decompressed[i + 3] == 255
             {
                 i += 4;
+                if is_link {
+                    links_text.push(' ');
+                }
                 break;
             }
+
             let len = decompressed[i] as usize;
             i += 1;
             if len == 0 {
@@ -1079,17 +1018,29 @@ pub fn decode_blob_to_embed_text(raw_db_value: &[u8]) -> String {
             if i + len > decompressed.len() {
                 break;
             }
+
             let slice = &decompressed[i..i + len];
             if !skip_tag {
                 let word = resolve_token(slice);
-                embed_text.push_str(&word);
-                embed_text.push(' ');
+
+                if is_link {
+                    links_text.push_str(&word);
+                } else {
+                    embed_text.push_str(&word);
+                    embed_text.push(' ');
+                    if is_p {
+                        p_word_count += 1;
+                    }
+                }
             }
             i += len;
         }
     }
-    embed_text
+
+    let has_500_words = if p_word_count >= 500 { 1 } else { 0 };
+    (embed_text, links_text, has_500_words)
 }
+
 fn tag_byte_to_name(tag_byte: u8) -> &'static str {
     match tag_byte {
         b'1' => "h1",
