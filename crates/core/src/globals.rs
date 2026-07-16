@@ -246,7 +246,8 @@ pub static CLIENT: Lazy<Client> = Lazy::new(|| {
  Vector embeder
 */
 pub static VECTOR_EMBEDDING_TOKENIZER: &[u8] = include_bytes!("../../../data/tokenizer.json");
-pub static VECTOR_EMBEDDING_MODEL: &[u8] = include_bytes!("../../../data/model_int8.onnx");
+pub static VECTOR_EMBEDDING_MODEL: &[u8] =
+    include_bytes!("../../../data/paraphrase-multilingual-MiniLM-L12-v2_O3.onnx");
 #[derive(Clone)]
 pub struct EmbeddingService {
     pub tokenizer: Arc<tokio::sync::Mutex<Tokenizer>>,
@@ -261,17 +262,14 @@ impl EmbeddingService {
         let tokenizer = self.tokenizer.clone();
         let model = self.model.clone();
 
-        // Move the actual embedding work to a blocking task
         let embeddings = task::spawn_blocking(
             move || -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
-                // Tokenize the query (single item, not batch)
                 let tokenizer_guard = tokio::runtime::Handle::current().block_on(tokenizer.lock());
 
                 let encoding = tokenizer_guard
                     .encode(query, true)
                     .map_err(|e| format!("Tokenization failed: {}", e))?;
 
-                // Get token data (similar to your batch logic but for single query)
                 let token_ids: Vec<i64> = encoding.get_ids().iter().map(|&id| id as i64).collect();
                 let attention_mask: Vec<i64> = encoding
                     .get_attention_mask()
@@ -279,18 +277,24 @@ impl EmbeddingService {
                     .map(|&v| v as i64)
                     .collect();
 
-                // Create arrays with shape [1, sequence_length] for single query
+                let type_ids: Vec<i64> =
+                    encoding.get_type_ids().iter().map(|&v| v as i64).collect();
+
                 let shape = [1, token_ids.len()];
                 let cow_input_ids = CowArray::from(
                     Array::from_shape_vec(IxDyn(&shape), token_ids)
                         .map_err(|e| format!("Failed to create input_ids array: {}", e))?,
                 );
                 let cow_attention_masks = CowArray::from(
-                    Array::from_shape_vec(IxDyn(&shape), attention_mask)
+                    Array::from_shape_vec(IxDyn(&shape), attention_mask.clone())
                         .map_err(|e| format!("Failed to create attention_mask array: {}", e))?,
                 );
 
-                // Get model lock and create input tensors (matching your working code)
+                let cow_type_ids = CowArray::from(
+                    Array::from_shape_vec(IxDyn(&shape), type_ids)
+                        .map_err(|e| format!("Failed to create type_ids array: {}", e))?,
+                );
+
                 let embedder = tokio::runtime::Handle::current().block_on(model.lock());
 
                 let input_tensor_ids = ort::Value::from_array(embedder.allocator(), &cow_input_ids)
@@ -299,27 +303,48 @@ impl EmbeddingService {
                     ort::Value::from_array(embedder.allocator(), &cow_attention_masks)
                         .map_err(|e| format!("Failed to create attention mask tensor: {}", e))?;
 
-                // Run inference (exactly like your batch code)
+                let input_tensor_type_ids =
+                    ort::Value::from_array(embedder.allocator(), &cow_type_ids)
+                        .map_err(|e| format!("Failed to create type_ids tensor: {}", e))?;
+
                 let outputs: Vec<ort::Value<'static>> = embedder
-                    .run(vec![input_tensor_ids, input_tensor_attention_mask])
+                    .run(vec![
+                        input_tensor_ids,
+                        input_tensor_attention_mask,
+                        input_tensor_type_ids,
+                    ])
                     .map_err(|e| format!("Model inference failed: {}", e))?;
 
-                // Extract embeddings (adapted from your batch logic)
                 let tensor: OrtOwnedTensor<f32, _> = outputs[0]
                     .try_extract()
                     .map_err(|e| format!("Failed to extract output tensor: {}", e))?;
 
-                // Since we have only one query, take the first (and only) row
-                // and limit to 384 dimensions like your batch code
-                let binding = tensor.view();
-                let embed_row = binding
-                    .outer_iter()
-                    .next()
-                    .ok_or("No embedding row found")?;
-                let full_embed: Vec<f32> = embed_row.iter().copied().collect();
-                let embedding = full_embed[..384.min(full_embed.len())].to_vec();
+                let view = tensor.view();
+                let shape = view.shape();
+                let hidden_size = shape[2];
 
-                Ok(embedding)
+                let batch_row = view.outer_iter().next().ok_or("No embedding row found")?;
+
+                let mut sum_vec = vec![0.0f32; hidden_size];
+                let mut token_count = 0.0f32;
+
+                for (j, token_vec) in batch_row.outer_iter().enumerate() {
+                    if attention_mask[j] == 1 {
+                        for k in 0..hidden_size {
+                            sum_vec[k] += token_vec[k];
+                        }
+                        token_count += 1.0;
+                    }
+                }
+
+                // Average
+                if token_count > 0.0 {
+                    for k in 0..hidden_size {
+                        sum_vec[k] /= token_count;
+                    }
+                }
+
+                Ok(sum_vec)
             },
         )
         .await?;

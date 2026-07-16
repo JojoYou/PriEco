@@ -27,6 +27,7 @@ use std::{
 */
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
+use prieco_blob::blob::decode_blob_to_text;
 use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 use rocket::{State, serde::json::Json};
 use serde_json::Value as Json_Value;
@@ -450,7 +451,20 @@ pub async fn run_json(
     }
 
     // Trim results
-    let shown_results: Vec<_> = results.iter().take(20).cloned().collect();
+    let shown_results: Vec<WebDocument> = results.iter().take(20).cloned().collect();
+    /*let html_ids: Vec<u64> = shown_results
+    .iter()
+    .filter_map(|doc| {
+        doc.html
+            .split('/')
+            .nth(1)?
+            .trim_end_matches(".zst")
+            .trim_end_matches(".txt")
+            .parse::<u64>()
+            .ok()
+    })
+    .collect();*/
+
     let serialized_sites: Vec<_> = shown_results
         .into_iter()
         .filter_map(|s| match serde_json::to_value(s) {
@@ -466,6 +480,8 @@ pub async fn run_json(
             }
         })
         .collect();
+
+    /*benchmark_concurrent_fetch(html_ids).await;*/
 
     serialized_sites
 }
@@ -683,4 +699,93 @@ pub fn path_matches(url: &str, pattern: &str) -> bool {
         return url.ends_with(core); // Anchored end
     }
     url.contains(pattern)
+}
+
+pub async fn benchmark_concurrent_fetch(mut top_30_ids: Vec<u64>) {
+    println!(
+        "{}Starting Sorted I/O + Parallel CPU Benchmark...{}",
+        colors::BLUE,
+        colors::RESET
+    );
+
+    let total_start = Instant::now();
+
+    top_30_ids.sort_unstable();
+
+    let target_set: HashSet<u64> = top_30_ids.iter().copied().collect();
+    let total_targets = target_set.len();
+
+    let mut tasks = Vec::new();
+    let mut found_count = 0;
+
+    let io_start = Instant::now();
+
+    if let Some(&first_id) = top_30_ids.first() {
+        let start_key = first_id.to_le_bytes();
+
+        let iter = PRIECO_FJALL.blobs_ks.range(start_key..);
+
+        for guard in iter {
+            if found_count >= total_targets {
+                break;
+            }
+
+            let check_result = guard.into_inner_if(|k| {
+                let key_arr: [u8; 8] = k.as_ref().try_into().unwrap_or([0; 8]);
+                let current_id = u64::from_le_bytes(key_arr);
+                target_set.contains(&current_id)
+            });
+
+            if let Ok((key_bytes, Some(raw_blob))) = check_result {
+                let key_arr: [u8; 8] = key_bytes.as_ref().try_into().unwrap_or([0; 8]);
+                let current_id = u64::from_le_bytes(key_arr);
+
+                found_count += 1;
+
+                let blob_owned = raw_blob.to_vec();
+
+                let task = tokio::task::spawn_blocking(move || {
+                    let decode_start = Instant::now();
+                    let html_text = decode_blob_to_text(&blob_owned);
+                    let decode_ms = decode_start.elapsed().as_millis();
+
+                    (current_id, decode_ms, html_text.len())
+                });
+
+                tasks.push(task);
+            }
+        }
+    }
+
+    let io_elapsed = io_start.elapsed().as_millis();
+    println!(
+        "{}HDD Sequential Scan Completed in {}ms{}",
+        colors::YELLOW,
+        io_elapsed,
+        colors::RESET
+    );
+
+    let mut total_bytes = 0;
+    for task in tasks {
+        match task.await {
+            Ok((id, decode_ms, size)) => {
+                total_bytes += size;
+                println!(
+                    "Blob {} | CPU Decode: {:>3}ms | Output Size: {}",
+                    id, decode_ms, size
+                );
+            }
+            Err(e) => println!("Task panicked: {}", e),
+        }
+    }
+
+    let elapsed = total_start.elapsed();
+    println!(
+        "{}Benchmark Complete!{} Fetched & Decoded {} blobs in {:.2?} (Total HTML size: {} bytes)",
+        colors::GREEN,
+        colors::RESET,
+        found_count,
+        elapsed,
+        total_bytes
+    );
 }
