@@ -29,10 +29,10 @@ pub struct RankingWeights {
 impl Default for RankingWeights {
     fn default() -> Self {
         Self {
-            domain_match_boost: 2.164824041987222,
+            domain_match_boost: 4.164824041987222,
             homepage_boost: 1.6227153067582822,
             lang_boost: 1.2422396900328991,
-            loc_boost: 0.9794162380413227,
+            loc_boost: 1.2422396900328991,
             tld_loc_boost: 1.2,
             wiki_boost: 1.3977276102163492,
             https_boost: 1.2874976244929701,
@@ -147,7 +147,17 @@ pub fn run(
 
         // Wikipedia authority signal
         if clean_url.contains(".wikipedia.org/wiki/") {
-            boost *= weights.wiki_boost;
+            let wiki_lang = clean_url
+                .split("://")
+                .nth(1)
+                .and_then(|s| s.split('.').next())
+                .unwrap_or("");
+
+            if wiki_lang == lang {
+                boost *= weights.wiki_boost;
+            } else {
+                boost *= 0.1;
+            }
         }
 
         // SSL
@@ -164,11 +174,20 @@ pub fn run(
 
         // Load speed
         boost *= match doc.load {
-            l if l < 0.3 => 1.08,
-            l if l < 0.5 => 1.05,
-            l if l < 2.0 => 1.02,
-            l if l < 3.0 => 1.01,
-            _ => 1.0,
+            // Fast Boosts
+            l if l < 0.2 => 1.08,
+            l if l < 0.3 => 1.05,
+            l if l < 0.5 => 1.02,
+
+            // Baseline
+            l if l < 1.2 => 1.00,
+
+            // Penalties
+            l if l < 2.0 => 0.90,
+            l if l < 3.5 => 0.70,
+            l if l < 5.0 => 0.40,
+
+            _ => 0.10, // > 5s
         };
 
         // Bad URL patterns

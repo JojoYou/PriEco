@@ -167,13 +167,23 @@ pub async fn run_json(
     let q_clone4 = q_clone.to_string();
 
     // Clasify query intent
-    let (intent, coords) = ranking::meaning::call::process_query(&mut fts_query, lang);
+    let (intent, coords) = ranking::meaning::call::process_query(&mut fts_query, lang, loc);
 
     let mut results = if let Some(cached) = cached_data {
         cached
     } else {
+        // Context
+        // Local query, add loc to embed for better locality
+        let contextual_query = if intent == QueryIntent::Local
+            || (query.split_whitespace().count() <= 2 && !loc.is_empty())
+        {
+            format!("{} {}", query, loc)
+        } else {
+            query.to_string()
+        };
+
         // Query to embed (vector)
-        let embed: Vec<f32> = match embedding_service.embed_query(&query).await {
+        let embed: Vec<f32> = match embedding_service.embed_query(&contextual_query).await {
             Ok(embed) => embed,
             Err(e) => {
                 println!(

@@ -4,7 +4,11 @@ use crate::web::functions::ranking::meaning::{
     entities::scan_entities, intent::intent, optimize::synynyms_and_optimize,
 };
 
-pub fn process_query(query: &mut String, lang: &str) -> (QueryIntent, Option<(f32, f32)>) {
+pub fn process_query(
+    query: &mut String,
+    lang: &str,
+    loc: &str,
+) -> (QueryIntent, Option<(f32, f32)>) {
     // Clasifies intent of the query
     // It's also used to decide if we want to show map, products...
     let possible_intent = intent(&query, lang);
@@ -12,7 +16,7 @@ pub fn process_query(query: &mut String, lang: &str) -> (QueryIntent, Option<(f3
     // Entities scan
     // Clarifies intent
     // If query contains a place extract its coords
-    let (intent, coords, tags) = scan_entities(query, possible_intent);
+    let (intent, coords, tags) = scan_entities(query, possible_intent, loc);
 
     // Adds synonyms to the query for better coverage
     // Optimizes query for faster FTS performance

@@ -506,33 +506,6 @@ pub static COUNTRY_TO_LANG: Lazy<Arc<AHashMap<&'static str, &'static str>>> = La
 });
 
 /*
-  Blob storage Depricated, please remove after migration
-  Description: RocksDB for html blobs storage. Designed for high capacity HDD, usage of SSD is beneficial too
-*/
-pub const BLOB_IMPORT_DIR: &str = "/mnt/usb/archives/imp";
-pub static BLOB_STORAGE: Lazy<Arc<DB>> = Lazy::new(|| {
-    Arc::new({
-        let mut options = Options::default();
-        options.create_if_missing(true);
-        options.set_compression_type(DBCompressionType::None);
-
-        options.set_max_background_jobs(4);
-
-        options.set_bytes_per_sync(1048576);
-
-        options.set_ratelimiter(50 * 1024 * 1024, 100 * 1000, 10);
-
-        options.set_write_buffer_size(64 * 1024 * 1024);
-        options.set_max_write_buffer_number(3);
-        options.set_min_write_buffer_number_to_merge(1);
-
-        options.set_target_file_size_base(64 * 1024 * 1024);
-
-        DB::open(&options, Path::new("/mnt/ssd/blobs")).unwrap()
-    })
-});
-
-/*
   PriEco Storage
   Description: FJALL key-value storage. Stores results meta data and html blobs
 */
@@ -575,7 +548,7 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
     let goggles_ks = meta_db.keyspace("goggles", || goggles_opts).unwrap();
 
     // Blob storage
-    let blob_db = FJALL_DATABASE::builder(Path::new("/mnt/hdd/blobs"))
+    let blob_db = FJALL_DATABASE::builder(Path::new("/mnt/ssd/blobs"))
         .worker_threads(2)
         .cache_size(512 * 1024 * 1024)
         .open()

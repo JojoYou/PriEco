@@ -3,10 +3,10 @@ use prieco_core::{EntityType, QU_PIPELINE, QueryIntent, TaggedEntity};
 pub fn scan_entities(
     query: &mut String,
     mut final_intent: QueryIntent,
+    loc: &str,
 ) -> (QueryIntent, Option<(f32, f32)>, Vec<TaggedEntity>) {
     let tags = QU_PIPELINE.get_tags(query);
     let mut spatial_coords = None;
-    let new_query = query.clone();
 
     for tag in tags.iter() {
         match tag.entity_type {
@@ -17,7 +17,13 @@ pub fn scan_entities(
                     .places
                     .get(tag.matched_text.as_str())
                 {
-                    spatial_coords = Some((coords[0].lat, coords[0].lon));
+                    // Find place in user location
+                    let local_match = coords.iter().find(|c| c.country.eq_ignore_ascii_case(loc));
+                    if let Some(local_coord) = local_match {
+                        spatial_coords = Some((local_coord.lat, local_coord.lon));
+                    } else if !coords.is_empty() {
+                        spatial_coords = Some((coords[0].lat, coords[0].lon)); // Fallback to idx 0
+                    }
                 }
 
                 // Upgrade Unknown or Navigational to Local
@@ -40,9 +46,6 @@ pub fn scan_entities(
             }
         }
     }
-
-    // Apply
-    *query = new_query;
 
     (final_intent, spatial_coords, tags)
 }

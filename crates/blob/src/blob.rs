@@ -43,7 +43,7 @@ use tar::Archive;
   Import own libraries
 */
 use prieco_core::{
-    BLOB_IMPORT_DIR, BLOB_STORAGE, META_DICTIONARY, PRIECO_FJALL, WebDocument,
+    META_DICTIONARY, PRIECO_FJALL, WebDocument,
     globals::{colors, icons},
     url_to_id,
 };
@@ -280,7 +280,7 @@ fn process_directory(
 }
 
 /* Helper functions */
-fn find_all_directories() -> Vec<PathBuf> {
+/*fn find_all_directories() -> Vec<PathBuf> {
     let watch_path = Path::new(BLOB_IMPORT_DIR);
     if !watch_path.exists() {
         let _ = create_dir_all(watch_path);
@@ -297,7 +297,7 @@ fn find_all_directories() -> Vec<PathBuf> {
         })
         .unwrap_or_else(|_| Vec::new())
 }
-
+*/
 #[derive(Deserialize)]
 struct HtmlOnly {
     html: String,
@@ -464,7 +464,7 @@ pub fn feed_blobs_for_reembedding() {
 
                         let t = Instant::now();
 
-                        let (embed_text, links_text, has_500_words) =
+                        let (embed_text, links_text, has_500_words, is_mobile) =
                             decode_blob_to_embed_text(&raw_blob);
 
                         if embed_text.trim().is_empty() {
@@ -476,7 +476,7 @@ pub fn feed_blobs_for_reembedding() {
                         let t = Instant::now();
 
                         let result_str = format!(
-                            "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{:?}\n{}\n{}\n{}\n{}\n{}",
+                            "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{:?}\n{}\n{}\n{}\n{}\n{}\n{}", // Added one more \n{}
                             doc.url,
                             doc.title,
                             doc.description,
@@ -493,7 +493,8 @@ pub fn feed_blobs_for_reembedding() {
                             doc.date,
                             embed_text,
                             links_text,
-                            has_500_words
+                            has_500_words,
+                            is_mobile
                         );
                         write_to_random_file("/mnt/vec/", &result_str);
                         l_times[4] += t.elapsed().as_micros();
@@ -721,6 +722,8 @@ fn write_known_blob_cache(known_ids: &[u64]) {
     }
     writer.flush().expect("Failed to flush");
 }
+
+/*
 pub fn migrate_blob_to_fjall(known_blobs: &[u64]) {
     let last_migrated_key: Option<[u8; 8]> = std::fs::read(BLOB_V2_PROGRESS_FILE)
         .ok()
@@ -813,7 +816,7 @@ pub fn migrate_blob_to_fjall(known_blobs: &[u64]) {
         orphan_count
     );
 }
-
+*/
 fn append_to_cache(new_id: u64) {
     use std::fs::OpenOptions;
     use std::io::Write;
@@ -964,10 +967,9 @@ pub fn decode_blob_to_tag_data(raw_db_value: &[u8]) -> HashMap<String, Vec<Strin
 
     tag_data
 }
-
-pub fn decode_blob_to_embed_text(raw_db_value: &[u8]) -> (String, String, u8) {
+pub fn decode_blob_to_embed_text(raw_db_value: &[u8]) -> (String, String, u8, u8) {
     if raw_db_value.is_empty() {
-        return (String::new(), String::new(), 0);
+        return (String::new(), String::new(), 0, 0);
     }
 
     let is_compressed = raw_db_value[0] == 1;
@@ -975,7 +977,7 @@ pub fn decode_blob_to_embed_text(raw_db_value: &[u8]) -> (String, String, u8) {
     let decompressed_data = if is_compressed {
         match zstd::stream::decode_all(std::io::Cursor::new(payload)) {
             Ok(data) => data,
-            Err(_) => return (String::new(), String::new(), 0),
+            Err(_) => return (String::new(), String::new(), 0, 0),
         }
     } else {
         payload.to_vec()
@@ -985,6 +987,7 @@ pub fn decode_blob_to_embed_text(raw_db_value: &[u8]) -> (String, String, u8) {
     let mut embed_text = String::with_capacity(decompressed.len() * 3);
     let mut links_text = String::with_capacity(decompressed.len());
     let mut p_word_count = 0;
+    let mut is_mobile = 0;
 
     let mut i = 0;
     while i < decompressed.len() {
@@ -995,6 +998,9 @@ pub fn decode_blob_to_embed_text(raw_db_value: &[u8]) -> (String, String, u8) {
         let skip_tag = matches!(tag_name, "meta" | "img_src");
         let is_link = tag_name == "a_href";
         let is_p = tag_name == "p";
+        let is_meta = tag_name == "meta";
+
+        let mut current_meta_content = String::new();
 
         while i < decompressed.len() {
             if i + 3 < decompressed.len()
@@ -1006,6 +1012,14 @@ pub fn decode_blob_to_embed_text(raw_db_value: &[u8]) -> (String, String, u8) {
                 i += 4;
                 if is_link {
                     links_text.push(' ');
+                }
+                if is_meta {
+                    if current_meta_content
+                        .to_lowercase()
+                        .contains("width=device-width")
+                    {
+                        is_mobile = 1;
+                    }
                 }
                 break;
             }
@@ -1020,9 +1034,14 @@ pub fn decode_blob_to_embed_text(raw_db_value: &[u8]) -> (String, String, u8) {
             }
 
             let slice = &decompressed[i..i + len];
-            if !skip_tag {
-                let word = resolve_token(slice);
+            let word = resolve_token(slice);
 
+            if is_meta {
+                current_meta_content.push_str(&word);
+                current_meta_content.push(' ');
+            }
+
+            if !skip_tag {
                 if is_link {
                     links_text.push_str(&word);
                 } else {
@@ -1038,9 +1057,8 @@ pub fn decode_blob_to_embed_text(raw_db_value: &[u8]) -> (String, String, u8) {
     }
 
     let has_500_words = if p_word_count >= 500 { 1 } else { 0 };
-    (embed_text, links_text, has_500_words)
+    (embed_text, links_text, has_500_words, is_mobile)
 }
-
 fn tag_byte_to_name(tag_byte: u8) -> &'static str {
     match tag_byte {
         b'1' => "h1",
