@@ -112,3 +112,7 @@ image = "0.25.8" # Image manipulation
 # ARM build command
 # RUSTFLAGS="-C target-cpu=cortex-a72" JEMALLOC_SYS_WITH_LG_PAGE=16 CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ cargo build --target aarch64-unknown-linux-gnu --release
 # This is just a specific command
+
+# Temp
+moka = { version = "0.12.15", features = ["sync"] }
+io-uring = "0.7.13"
