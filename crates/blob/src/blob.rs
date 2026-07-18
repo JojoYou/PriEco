@@ -440,21 +440,11 @@ pub fn feed_blobs_for_reembedding() {
 
                     let t = Instant::now();
                     let result_str = format!(
-                        "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{:?}\n{}\n{}\n{}\n{}\n{}\n{}",
+                        "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
                         doc.url,
                         doc.title,
-                        doc.description,
-                        doc.content,
-                        doc.favicon,
-                        doc.image,
-                        doc.keywords,
-                        doc.safe_s,
                         meta_id,
                         doc.lang,
-                        doc.loc,
-                        vec![doc.confidence, doc.effort, doc.qna, doc.sts],
-                        doc.load,
-                        doc.date,
                         embed_text,
                         links_text,
                         has_500_words,
