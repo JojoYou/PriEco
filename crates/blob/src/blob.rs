@@ -18,28 +18,24 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
-    fs::{self, File, OpenOptions, create_dir_all, read_dir, remove_file},
-    hash::{BuildHasher, DefaultHasher, Hash, Hasher},
-    io::{BufWriter, Cursor, Read, Write},
+    fs::{self, File, read_dir, remove_file},
+    io::{Cursor, Read, Write},
     os::{fd::AsRawFd, unix::fs::FileExt},
     path::{Path, PathBuf},
-    sync::atomic::{AtomicUsize, Ordering},
     thread,
     time::{Duration, Instant},
 };
 
-use ahash::AHashMap;
 /*
   Import external libraries
 */
-use fjall::{Guard, PersistMode};
+use fjall::PersistMode;
 use flate2::read::GzDecoder;
 use io_uring::{IoUring, opcode, types};
 use moka::sync::Cache;
 use once_cell::sync::Lazy;
 use rand::{Rng, rng};
 use rayon::prelude::*;
-use serde::Deserialize;
 use tar::Archive;
 
 /*
@@ -48,7 +44,6 @@ use tar::Archive;
 use prieco_core::{
     META_DICTIONARY, PRIECO_FJALL, WebDocument,
     globals::{colors, icons},
-    url_to_id,
 };
 use rocksdb::{DB, DBCompressionType, Options};
 use std::sync::Arc;
@@ -73,7 +68,7 @@ pub struct OrphanPayload {
 }
 
 pub fn run() {
-    //feed_blobs_for_reembedding();
+    feed_blobs_for_reembedding();
     /*let directories = find_all_directories();
 
     if directories.is_empty() {
@@ -301,60 +296,7 @@ fn process_directory(
         .unwrap_or_else(|_| Vec::new())
 }
 */
-#[derive(Deserialize)]
-struct HtmlOnly {
-    html: String,
-}
 
-/*
-  Description: Feeds old blob+meta data back through the embedder pipeline.
-  Reconstructs embed-input text from blob storage, writes it in the legacy
-  VECTORS pipe-format so the existing embedder run() picks it up unchanged.
-  The meta_ks key (doc id) is stashed in the `html` field so it survives
-  through to results.txt for the collector step later.
-*/
-pub fn vector_dir_bytes() -> u64 {
-    read_dir("/mnt/vec/")
-        .map(|entries| {
-            entries
-                .filter_map(|e| e.ok())
-                .filter_map(|e| e.metadata().ok())
-                .map(|m| m.len())
-                .sum()
-        })
-        .unwrap_or(0)
-}
-pub const VECTOR_DIR_MAX: u64 = 1_717_986_918;
-
-pub fn write_to_random_file(dir: &str, content: &str) {
-    let mut rng = rng();
-    let mut file_path = PathBuf::from(dir);
-
-    loop {
-        let file_name = format!("{}.txt", rng.random_range(0..10_000_000_000_000_i64));
-        file_path.push(&file_name);
-
-        if !file_path.exists() {
-            let mut file = match File::create(&file_path) {
-                Ok(f) => f,
-                Err(e) => {
-                    println!(
-                        "{}Write to random file function{}: Failed to create file {} Because of: {}",
-                        colors::RED,
-                        colors::RESET,
-                        file_path.to_str().unwrap_or(""),
-                        e
-                    );
-                    return;
-                }
-            };
-            let _ = file.write_all(content.as_bytes());
-            return;
-        }
-
-        file_path.pop();
-    }
-}
 const RESUME_FILE: &str = "/mnt/ssd/feed_resume.txt";
 const BATCH_SIZE: usize = 5000;
 pub fn feed_blobs_for_reembedding() {
@@ -373,24 +315,22 @@ pub fn feed_blobs_for_reembedding() {
         PRIECO_FJALL.meta_ks.iter()
     };
 
-    let mut batch = Vec::with_capacity(BATCH_SIZE);
+    let mut batch = Vec::with_capacity(BATCH_SIZE + 100);
     let mut last_meta_id = 0u64;
 
     loop {
         let mut paused_for_space = false;
 
-        while is_tmpfs_full("/mnt/vec/") {
+        while full_dir("/mnt/vec/") {
             if !paused_for_space {
-                println!(
-                    "⏸️ Paused: /mnt/vec/ is over 75% full. Waiting for ingestor to clear space..."
-                );
+                println!("Paused: /mnt/vec/");
                 paused_for_space = true;
             }
             thread::sleep(Duration::from_secs(2));
         }
 
         if paused_for_space {
-            println!("▶️ Resuming: Space freed up in /mnt/vec/.");
+            println!("Resuming: Space freed up in /mnt/vec/");
         }
 
         for _ in 0..BATCH_SIZE {
@@ -411,7 +351,7 @@ pub fn feed_blobs_for_reembedding() {
 
         let chunk_size = (batch.len() / 8).max(1);
 
-        let chunk_results: Vec<_> = batch
+        let chunk_results: Vec<(u64, [u64; 6], [u128; 7], [u64; 2])> = batch
             .par_chunks(chunk_size)
             .map(|chunk| {
                 let mut decompressor = zstd::bulk::Decompressor::with_dictionary(&META_DICTIONARY)
@@ -434,13 +374,14 @@ pub fn feed_blobs_for_reembedding() {
                     l_times[0] += t.elapsed().as_micros();
 
                     let t = Instant::now();
-                    let doc = match serde_json::from_slice::<WebDocument>(&decompressed) {
-                        Ok(d) => d,
-                        Err(_) => {
-                            l_skips[1] += 1;
-                            continue;
-                        }
-                    };
+                    let doc: WebDocument =
+                        match serde_json::from_slice::<WebDocument>(&decompressed) {
+                            Ok(d) => d,
+                            Err(_) => {
+                                l_skips[1] += 1;
+                                continue;
+                            }
+                        };
                     l_times[1] += t.elapsed().as_micros();
 
                     let Ok(id_bytes): Result<[u8; 8], _> = key.as_ref().try_into() else {
@@ -458,6 +399,7 @@ pub fn feed_blobs_for_reembedding() {
                         continue;
                     };
 
+                    // Get blob
                     let t = Instant::now();
                     let raw_blob = match PRIECO_FJALL.blobs_ks.get(&blob_id.to_le_bytes()) {
                         Ok(Some(b)) => b,
@@ -589,364 +531,6 @@ pub fn feed_blobs_for_reembedding() {
         );
     }
 }
-fn is_tmpfs_full(path: &str) -> bool {
-    unsafe {
-        let mut stat: libc::statvfs = std::mem::zeroed();
-        let c_path = std::ffi::CString::new(path).unwrap();
-
-        if libc::statvfs(c_path.as_ptr(), &mut stat) == 0 {
-            let total_blocks = stat.f_blocks as f64;
-            let available_blocks = stat.f_bavail as f64;
-
-            let used_blocks = total_blocks - available_blocks;
-            let percent_used = used_blocks / total_blocks;
-
-            percent_used >= 0.75
-        } else {
-            false
-        }
-    }
-}
-fn get_blob_filename(url: &str) -> String {
-    let mut hasher = DefaultHasher::new();
-    url.hash(&mut hasher);
-    format!("{:x}.txt", hasher.finish())
-}
-
-pub fn feed_blob_to_crawler(
-    vectors_dir: &str,
-    url: &str,
-    tag_data: &AHashMap<String, Vec<String>>,
-) -> std::io::Result<()> {
-    let mut tags = String::with_capacity(2048);
-    for (key, value) in tag_data.iter() {
-        if key == "a_href" || key == "img_src" || key == "meta" {
-            continue;
-        }
-        if !tags.is_empty() {
-            tags.push_str(" ");
-        }
-        tags.push_str(&value.join(" "));
-    }
-
-    let payload = format!("{}\n{}", url, tags);
-
-    let filename = get_blob_filename(url);
-    let file_path = Path::new(vectors_dir).join(filename);
-
-    fs::write(file_path, payload)?;
-    Ok(())
-}
-
-fn get_known_blob_ids() -> Vec<u64> {
-    if Path::new(META_INDEX_CACHE_FILE).exists() {
-        println!(
-            "{}Found meta index cache on disk! Loading...{}",
-            colors::GREEN,
-            colors::RESET
-        );
-
-        let contents =
-            std::fs::read_to_string(META_INDEX_CACHE_FILE).expect("Failed to read cache");
-        let known_ids: Vec<u64> = contents
-            .lines()
-            .filter_map(|line| line.parse::<u64>().ok())
-            .collect();
-
-        return known_ids;
-    }
-
-    let mut known_ids: Vec<u64> = Vec::with_capacity(420_000_000);
-    let mut j = 0;
-    let mut x = 0;
-
-    let mut decompressor = zstd::bulk::Decompressor::with_dictionary(&META_DICTIONARY)
-        .expect("Failed to initialize zstd decompressor");
-    for item in PRIECO_FJALL.meta_ks.iter() {
-        j += 1;
-        if let Ok(val) = item.value() {
-            x += 1;
-            if x % 100_000 == 0 {
-                println!("Found: {} of {}", x, j);
-            }
-
-            if let Ok(decompressed_vec) = decompressor.decompress(&val, 10_000_000) {
-                if let Ok(doc) = serde_json::from_slice::<HtmlOnly>(&decompressed_vec) {
-                    let path = std::path::Path::new(&doc.html);
-
-                    if let Some(stem) = path.file_stem() {
-                        if let Some(stem_str) = stem.to_str() {
-                            if let Ok(blob_id) = stem_str.parse::<u64>() {
-                                known_ids.push(blob_id);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    known_ids.sort_unstable();
-    known_ids.dedup();
-
-    write_known_blob_cache(&known_ids);
-
-    known_ids
-}
-pub fn diagnostic_self_referential_recovery() {
-    println!(
-        "{}--- STARTING SELF-REFERENTIAL URL RECOVERY ---{}",
-        colors::BLUE,
-        colors::RESET
-    );
-
-    let mut recovered_count = 0;
-    let mut total_scanned = 0;
-
-    for item in ORPHAN_STORAGE.iterator(rocksdb::IteratorMode::Start) {
-        if let Ok((key_bytes, raw_blob)) = item {
-            let key_arr: [u8; 8] = match key_bytes.as_ref().try_into() {
-                Ok(arr) => arr,
-                Err(_) => continue,
-            };
-
-            let target_blob_id = u64::from_le_bytes(key_arr);
-            if target_blob_id == 0 {
-                continue;
-            }
-
-            total_scanned += 1;
-
-            let html_text = decode_blob_to_text(&raw_blob);
-
-            let potential_urls = extract_all_urls_from_text(&html_text);
-
-            for url in potential_urls {
-                let clean = url.trim();
-
-                let variations = vec![clean.to_string(), format!("{}/", clean)];
-
-                let mut found = false;
-                for var in variations {
-                    if url_to_id(&var) == target_blob_id {
-                        println!(
-                            "{}SUCCESS:{} Match found for ID {}! \n  Recovered URL via self-link: {}",
-                            colors::GREEN,
-                            colors::RESET,
-                            target_blob_id,
-                            var
-                        );
-                        recovered_count += 1;
-                        found = true;
-                        break;
-                    }
-                }
-                if found {
-                    break;
-                }
-            }
-
-            if total_scanned % 5000 == 0 {
-                println!(
-                    "Scanned: {} | Recovered: {}",
-                    total_scanned, recovered_count
-                );
-            }
-
-            if total_scanned >= 20000 {
-                break;
-            }
-        }
-    }
-
-    println!(
-        "\n{}Diagnostic Complete!{} Scanned: {} | Recovered: {}",
-        colors::GREEN,
-        colors::RESET,
-        total_scanned,
-        recovered_count
-    );
-}
-fn write_known_blob_cache(known_ids: &[u64]) {
-    use std::io::{BufWriter, Write};
-    let file = std::fs::File::create(META_INDEX_CACHE_FILE).expect("Failed to create cache");
-    let mut writer = BufWriter::new(file);
-
-    for id in known_ids {
-        writeln!(writer, "{id}").expect("Failed to write cache");
-    }
-    writer.flush().expect("Failed to flush");
-}
-
-/*
-pub fn migrate_blob_to_fjall(known_blobs: &[u64]) {
-    let last_migrated_key: Option<[u8; 8]> = std::fs::read(BLOB_V2_PROGRESS_FILE)
-        .ok()
-        .and_then(|buf| buf.try_into().ok());
-
-    let iter_mode = match &last_migrated_key {
-        Some(key) => rocksdb::IteratorMode::From(key, rocksdb::Direction::Forward),
-        None => rocksdb::IteratorMode::Start,
-    };
-
-    println!(
-        "{}Starting Triage Migration: Known -> Fjall (SSD) | Unknown -> RocksDB (HDD){}",
-        colors::BLUE,
-        colors::RESET
-    );
-
-    let mut count: u64 = 0;
-    let mut known_count: u64 = 0;
-    let mut orphan_count: u64 = 0;
-    let mut last_key: Option<[u8; 8]> = None;
-    let mut skip_first = last_migrated_key.is_some();
-
-    let mut start_time = std::time::Instant::now();
-
-    for item in BLOB_STORAGE.iterator(iter_mode) {
-        let (key, value) = item.unwrap();
-
-        if skip_first {
-            skip_first = false;
-            continue;
-        }
-
-        count += 1;
-        let key_arr: [u8; 8] = key.as_ref().try_into().unwrap();
-        let blob_id = u64::from_le_bytes(key_arr);
-
-        if known_blobs.binary_search(&blob_id).is_ok() {
-            PRIECO_FJALL.blobs_ks.insert(key_arr, &*value).unwrap();
-            known_count += 1;
-        } else {
-            ORPHAN_STORAGE.put(key, &*value).unwrap();
-            orphan_count += 1;
-        }
-
-        last_key = Some(key_arr);
-
-        if count % 5_000 == 0 {
-            if let Some(k) = last_key {
-                std::fs::write(BLOB_V2_PROGRESS_FILE, k).unwrap();
-            }
-
-            let elapsed = start_time.elapsed();
-            let items_per_sec = 5_000.0 / elapsed.as_secs_f64();
-
-            println!(
-                "{}Progress:{} {} scanned in {:.2?} ({:.0} ops/sec) | {} Saved to Fjall | {} Deferred to HDD",
-                colors::BLUE,
-                colors::RESET,
-                count,
-                elapsed,
-                items_per_sec,
-                known_count,
-                orphan_count
-            );
-
-            start_time = std::time::Instant::now();
-        }
-    }
-
-    if let Some(k) = last_key {
-        std::fs::write(BLOB_V2_PROGRESS_FILE, k).unwrap();
-    }
-
-    PRIECO_FJALL
-        .blob_db
-        .persist(fjall::PersistMode::SyncAll)
-        .unwrap();
-
-    let mut flush_opts = rocksdb::FlushOptions::default();
-    flush_opts.set_wait(true);
-    ORPHAN_STORAGE.flush_opt(&flush_opts).unwrap();
-
-    println!(
-        "{}: {}Triage Migration Complete!{}\nTotal Scanned: {}\nMigrated to Fjall: {}\nDeferred to HDD: {}",
-        icons::BLOB,
-        colors::GREEN,
-        colors::RESET,
-        count,
-        known_count,
-        orphan_count
-    );
-}
-*/
-fn append_to_cache(new_id: u64) {
-    use std::fs::OpenOptions;
-    use std::io::Write;
-
-    if let Ok(mut file) = OpenOptions::new().append(true).open(META_INDEX_CACHE_FILE) {
-        let _ = writeln!(file, "{new_id}");
-    }
-}
-
-pub fn decode_blob_to_text(raw_db_value: &[u8]) -> String {
-    if raw_db_value.is_empty() {
-        return String::new();
-    }
-
-    let is_compressed = raw_db_value[0] == 1;
-    let payload = &raw_db_value[1..];
-
-    let decompressed_data = if is_compressed {
-        match zstd::stream::decode_all(Cursor::new(payload)) {
-            Ok(data) => data,
-            Err(_) => return String::new(),
-        }
-    } else {
-        payload.to_vec()
-    };
-
-    let decompressed = &decompressed_data;
-    let mut reconstructed_text = String::with_capacity(decompressed.len() * 3);
-    let mut i = 0;
-
-    while i < decompressed.len() {
-        let tag_byte = decompressed[i];
-        i += 1;
-
-        let tag_name = tag_byte_to_name(tag_byte);
-
-        reconstructed_text.push('<');
-        reconstructed_text.push_str(tag_name);
-        reconstructed_text.push('>');
-
-        while i < decompressed.len() {
-            if i + 3 < decompressed.len()
-                && decompressed[i] == 255
-                && decompressed[i + 1] == 255
-                && decompressed[i + 2] == 255
-                && decompressed[i + 3] == 255
-            {
-                i += 4;
-                break;
-            }
-
-            let len = decompressed[i] as usize;
-            i += 1;
-
-            if len == 0 {
-                continue;
-            }
-            if i + len > decompressed.len() {
-                break;
-            }
-
-            let slice = &decompressed[i..i + len];
-            let (word, hit_cache) = resolve_token(slice);
-            reconstructed_text.push_str(&word);
-            reconstructed_text.push(' ');
-            i += len;
-        }
-
-        reconstructed_text.push_str("</");
-        reconstructed_text.push_str(tag_name);
-        reconstructed_text.push_str(">\n");
-    }
-
-    reconstructed_text
-}
 
 pub fn decode_blob_to_embed_text(
     raw_db_value: &[u8],
@@ -1076,6 +660,73 @@ pub fn decode_blob_to_embed_text(
         cache_hits,
         cache_misses,
     )
+}
+
+pub fn decode_blob_to_text(raw_db_value: &[u8]) -> String {
+    if raw_db_value.is_empty() {
+        return String::new();
+    }
+
+    let is_compressed = raw_db_value[0] == 1;
+    let payload = &raw_db_value[1..];
+
+    let decompressed_data = if is_compressed {
+        match zstd::stream::decode_all(Cursor::new(payload)) {
+            Ok(data) => data,
+            Err(_) => return String::new(),
+        }
+    } else {
+        payload.to_vec()
+    };
+
+    let decompressed = &decompressed_data;
+    let mut reconstructed_text = String::with_capacity(decompressed.len() * 3);
+    let mut i = 0;
+
+    while i < decompressed.len() {
+        let tag_byte = decompressed[i];
+        i += 1;
+
+        let tag_name = tag_byte_to_name(tag_byte);
+
+        reconstructed_text.push('<');
+        reconstructed_text.push_str(tag_name);
+        reconstructed_text.push('>');
+
+        while i < decompressed.len() {
+            if i + 3 < decompressed.len()
+                && decompressed[i] == 255
+                && decompressed[i + 1] == 255
+                && decompressed[i + 2] == 255
+                && decompressed[i + 3] == 255
+            {
+                i += 4;
+                break;
+            }
+
+            let len = decompressed[i] as usize;
+            i += 1;
+
+            if len == 0 {
+                continue;
+            }
+            if i + len > decompressed.len() {
+                break;
+            }
+
+            let slice = &decompressed[i..i + len];
+            let (word, hit_cache) = resolve_token(slice);
+            reconstructed_text.push_str(&word);
+            reconstructed_text.push(' ');
+            i += len;
+        }
+
+        reconstructed_text.push_str("</");
+        reconstructed_text.push_str(tag_name);
+        reconstructed_text.push_str(">\n");
+    }
+
+    reconstructed_text
 }
 
 fn tag_byte_to_name(tag_byte: u8) -> &'static str {
@@ -1296,283 +947,56 @@ pub fn search_word_by_id(id: usize) -> (String, bool) {
     (word, false)
 }
 
-fn extract_all_urls_from_text(text: &str) -> Vec<String> {
-    let mut urls = Vec::new();
-    let mut current_idx = 0;
+/* Helper functions */
+fn full_dir(path: &str) -> bool {
+    unsafe {
+        let mut stat: libc::statvfs = std::mem::zeroed();
+        let c_path = std::ffi::CString::new(path).unwrap();
+        if libc::statvfs(c_path.as_ptr(), &mut stat) == 0 {
+            let total_blocks = stat.f_blocks as f64;
+            let available_blocks = stat.f_bavail as f64;
+            let used_blocks = total_blocks - available_blocks;
+            let percent_used = used_blocks / total_blocks;
 
-    while let Some(start_offset) = text[current_idx..].find("http") {
-        let start = current_idx + start_offset;
-        let mut raw_url = String::new();
-        let mut end = start;
-
-        for c in text[start..].chars() {
-            if c == '"' || c == '\'' || c == '<' || c == '>' || c == '\n' || c == ']' {
-                break;
+            if percent_used >= 0.75 {
+                true
+            } else if percent_used >= 0.5 {
+                rand::rng().random_bool(0.5)
+            } else {
+                false
             }
-            if !c.is_whitespace() {
-                raw_url.push(c);
-            }
-            end += c.len_utf8();
-        }
-
-        if raw_url.starts_with("http://") || raw_url.starts_with("https://") {
-            urls.push(raw_url);
-        }
-
-        current_idx = end;
-        if current_idx >= text.len() {
-            break;
-        }
-    }
-
-    urls
-}
-pub async fn attempt_url_recovery_parallel_dry_run() {
-    println!(
-        "{}Starting Parallel URL Recovery (DRY RUN)...{}",
-        colors::BLUE,
-        colors::RESET
-    );
-    let start_time = Instant::now();
-
-    let mut tasks = Vec::new();
-    let mut read_count = 0;
-
-    for item in ORPHAN_STORAGE.iterator(rocksdb::IteratorMode::Start) {
-        if let Ok((key_bytes, raw_blob)) = item {
-            let key_arr: [u8; 8] = match key_bytes.as_ref().try_into() {
-                Ok(arr) => arr,
-                Err(_) => continue,
-            };
-
-            let blob_id = u64::from_le_bytes(key_arr);
-            let blob_owned = raw_blob.to_vec();
-
-            let task = tokio::task::spawn_blocking(move || {
-                let html_text = decode_blob_to_text(&blob_owned);
-                let potential_urls = extract_all_urls_from_text(&html_text);
-
-                for url in potential_urls {
-                    let clean = url.trim();
-
-                    let variations = vec![
-                        clean.to_string(),
-                        format!("{}/", clean),
-                        clean.trim_end_matches('/').to_string(),
-                    ];
-
-                    for var in variations {
-                        if url_to_id(&var) == blob_id {
-                            return Some((blob_id, var));
-                        }
-                    }
-                }
-                None
-            });
-
-            tasks.push(task);
-            read_count += 1;
-
-            if read_count >= 1000 {
-                break;
-            }
-        }
-    }
-
-    let mut recovered_count = 0;
-
-    for task in tasks {
-        if let Ok(Some((id, found_url))) = task.await {
-            recovered_count += 1;
-
-            if recovered_count <= 5 {
-                println!(
-                    "{}SUCCESS:{} Match found for ID {}! \n  Recovered URL: {}",
-                    colors::GREEN,
-                    colors::RESET,
-                    id,
-                    found_url
-                );
-            }
-        }
-    }
-
-    println!(
-        "\n{}Dry Run Complete in {:.2?}!{}\nTotal Scanned: {}\nSuccessfully Recovered: {}",
-        colors::GREEN,
-        start_time.elapsed(),
-        colors::RESET,
-        read_count,
-        recovered_count
-    );
-}
-pub fn diagnostic_url_hash_mismatch() {
-    println!(
-        "{}--- STARTING MULTI-BLOB FORENSIC DIAGNOSTIC ---{}",
-        colors::BLUE,
-        colors::RESET
-    );
-
-    let mut tested_count = 0;
-
-    for item in ORPHAN_STORAGE.iterator(rocksdb::IteratorMode::Start) {
-        if let Ok((key_bytes, raw_blob)) = item {
-            let key_arr: [u8; 8] = match key_bytes.as_ref().try_into() {
-                Ok(arr) => arr,
-                Err(_) => continue,
-            };
-
-            let target_blob_id = u64::from_le_bytes(key_arr);
-
-            if target_blob_id == 0 {
-                continue;
-            }
-
-            println!(
-                "\n{}=================================================={}",
-                colors::YELLOW,
-                colors::RESET
-            );
-            println!(
-                "{}TARGET BLOB ID TO MATCH: {}{}",
-                colors::YELLOW,
-                target_blob_id,
-                colors::RESET
-            );
-
-            let html_text = decode_blob_to_text(&raw_blob);
-            let potential_urls = extract_all_urls_from_text(&html_text);
-
-            println!(
-                "Extracted {} potential HTTP strings from this blob.",
-                potential_urls.len()
-            );
-
-            if potential_urls.is_empty() {
-                println!("No URLs found in this blob, skipping to the next one...");
-                continue;
-            }
-
-            for (i, url) in potential_urls.iter().take(5).enumerate() {
-                let clean = url.trim();
-                println!(
-                    "\n{}--- Testing Extracted String #{} ---{}",
-                    colors::BLUE,
-                    i,
-                    colors::RESET
-                );
-                println!("Raw String: '{}'", clean);
-
-                let variations = vec![
-                    clean.to_string(),
-                    format!("{}/", clean),
-                    clean.trim_end_matches('/').to_string(),
-                    clean.replace("https://", "http://"),
-                    clean.replace("http://", "https://"),
-                    clean
-                        .replace("%20", " ")
-                        .replace("%3A", ":")
-                        .replace("%2F", "/"),
-                ];
-
-                let mut matched = false;
-                for (v_idx, var) in variations.iter().enumerate() {
-                    let generated_hash = url_to_id(var);
-
-                    println!("  Variation {}: '{}'", v_idx, var);
-                    println!("    Generated Hash: {:>20}", generated_hash);
-                    println!("    Target Hash:    {:>20}", target_blob_id);
-
-                    if generated_hash == target_blob_id {
-                        println!(
-                            "    {}*** PERFECT MATCH FOUND! ***{}",
-                            colors::GREEN,
-                            colors::RESET
-                        );
-                        matched = true;
-                        break;
-                    }
-                }
-
-                if matched {
-                    break;
-                }
-            }
-
-            tested_count += 1;
-            if tested_count >= 5 {
-                break;
-            }
-        }
-    }
-
-    println!(
-        "\n{}--- FORENSIC DIAGNOSTIC COMPLETE ---{}",
-        colors::BLUE,
-        colors::RESET
-    );
-}
-pub fn diagnostic_raw_decode() {
-    println!(
-        "{}--- STARTING RAW DECODE VERIFIER ---{}",
-        colors::BLUE,
-        colors::RESET
-    );
-
-    let mut iterator = ORPHAN_STORAGE.iterator(rocksdb::IteratorMode::Start);
-
-    while let Some(Ok((key_bytes, raw_blob))) = iterator.next() {
-        let key_arr: [u8; 8] = match key_bytes.as_ref().try_into() {
-            Ok(arr) => arr,
-            Err(_) => continue,
-        };
-        let target_blob_id = u64::from_le_bytes(key_arr);
-
-        if target_blob_id == 0 {
-            continue;
-        }
-
-        println!(
-            "\n{}--- TESTING BLOB ID: {} ---{}",
-            colors::YELLOW,
-            target_blob_id,
-            colors::RESET
-        );
-
-        println!("Raw payload size from RocksDB: {} bytes", raw_blob.len());
-        if raw_blob.len() < 10 {
-            println!("Payload is suspiciously small. Here are the raw bytes:");
-            println!("{:?}", raw_blob.as_ref());
-        }
-
-        let html_text = decode_blob_to_text(&raw_blob);
-
-        println!("Decoded string length: {} characters", html_text.len());
-
-        if html_text.is_empty() {
-            println!(
-                "{}FATAL: decode_blob_to_text returned an empty string!{}",
-                colors::RED,
-                colors::RESET
-            );
         } else {
-            let preview_len = html_text.len().min(500);
-            println!(
-                "\n{}--- PREVIEW OF DECODED TEXT (First {} chars) ---{}",
-                colors::BLUE,
-                preview_len,
-                colors::RESET
-            );
-            println!("{}", &html_text[..preview_len]);
-            println!(
-                "{}--------------------------------------------------{}",
-                colors::BLUE,
-                colors::RESET
-            );
+            false
         }
-
-        break;
     }
 }
-const SEARCHED_K1: u64 = 0xC70F6907A1C9566B;
-const SEARCHED_K2: u64 = 0x85E4C66FC71D33EF;
+
+pub fn write_to_random_file(dir: &str, content: &str) {
+    let mut rng = rng();
+    let mut file_path = PathBuf::from(dir);
+
+    loop {
+        let file_name = format!("{}.txt", rng.random_range(0..10_000_000_000_000_i64));
+        file_path.push(&file_name);
+
+        if !file_path.exists() {
+            let mut file = match File::create(&file_path) {
+                Ok(f) => f,
+                Err(e) => {
+                    println!(
+                        "{}Write to random file function{}: Failed to create file {} Because of: {}",
+                        colors::RED,
+                        colors::RESET,
+                        file_path.to_str().unwrap_or(""),
+                        e
+                    );
+                    return;
+                }
+            };
+            let _ = file.write_all(content.as_bytes());
+            return;
+        }
+
+        file_path.pop();
+    }
+}

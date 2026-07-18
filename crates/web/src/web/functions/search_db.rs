@@ -183,7 +183,7 @@ pub async fn run_json(
         };
 
         // Query to embed (vector)
-        let embed: Vec<f32> = match embedding_service.embed_query(&contextual_query).await {
+        /*let embed: Vec<f32> = match embedding_service.embed_query(&contextual_query).await {
             Ok(embed) => embed,
             Err(e) => {
                 println!(
@@ -194,7 +194,8 @@ pub async fn run_json(
                 );
                 return Vec::new();
             }
-        };
+        };*/
+        let embed: Vec<f32> = Vec::new();
 
         let total_start = Instant::now();
 
@@ -282,6 +283,7 @@ pub async fn run_json(
         });
 
         let vector_task = tokio::task::spawn_blocking(move || {
+            return Vec::new();
             if q_clone3.contains('"')
                 || q_clone3.contains("site:")
                 || q_clone3.contains("filetype:")
@@ -413,7 +415,7 @@ pub async fn run_json(
 
     // Stage: 3
     // Reranker + PageRank
-    let mut pagerank_time_total: f32 = 0.0;
+    /*let mut pagerank_time_total: f32 = 0.0;
     let mut rerank_time_total: f32 = 0.0;
     let candidates = results.len().min(RERANK_CUTOFF);
     if candidates > 0 {
@@ -442,7 +444,7 @@ pub async fn run_json(
     println!(
         "PageRank: {}s\nRerank: {}s",
         pagerank_time_total, rerank_time_total
-    );
+    );*/
 
     // Stage: 4
     // Cap result count from a single domain
