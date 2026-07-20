@@ -25,6 +25,7 @@ use std::{
     net::{Ipv4Addr, Ipv6Addr},
     ops::Range,
     path::Path,
+    process::exit,
     str::FromStr,
     sync::Arc,
     time::Duration as stdDuration,
@@ -66,7 +67,7 @@ use rocket::{
     Request,
     request::{FromRequest, Outcome},
 };
-use rocksdb::{DB, DBCompressionType, Options, WriteBatch};
+use rocksdb::{DB, Options, WriteBatch};
 use serde::{Deserialize, Serialize};
 use symspell::{SymSpell, UnicodeStringStrategy};
 use tantivy::{
@@ -550,7 +551,7 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
     // Blob storage
     let blob_db = FJALL_DATABASE::builder(Path::new("/mnt/ssd/blobs"))
         .worker_threads(2)
-        .cache_size(512 * 1024 * 1024)
+        .cache_size(6 * 1024 * 1024 * 1024)
         .open()
         .expect("Failed to open Blob Fjall DB");
 
