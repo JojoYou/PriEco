@@ -646,7 +646,7 @@ fn bulk_prefetch_missing_words(mut missing_ids: Vec<usize>) {
         RING.with(|ring_cell| {
             let mut ring = ring_cell.borrow_mut();
 
-            for chunk in missing_ids.chunks(256) {
+            for chunk in missing_ids.chunks(1024) {
                 let mut buffers = vec![[0u8; MAX_WORD_LEN as usize]; chunk.len()];
 
                 {
@@ -703,7 +703,6 @@ pub fn decode_decompressed_to_embed_text(
     }
 
     let mut embed_text = String::with_capacity(1024);
-    let mut links_text = String::with_capacity(decompressed.len() / 4);
     let mut p_word_count = 0;
     let mut is_mobile = 0;
 
@@ -713,13 +712,12 @@ pub fn decode_decompressed_to_embed_text(
     let t_loop = std::time::Instant::now();
     let mut i = 0;
 
-    while i < decompressed.len() {
+    'outer: while i < decompressed.len() {
         let tag_byte = decompressed[i];
         i += 1;
         let tag_name = tag_byte_to_name(tag_byte);
 
-        let skip_tag = matches!(tag_name, "meta" | "img_src");
-        let is_link = tag_name == "a_href";
+        let skip_tag = matches!(tag_name, "meta" | "img_src" | "a_href");
         let is_p = tag_name == "p";
         let is_meta = tag_name == "meta";
 
@@ -733,15 +731,18 @@ pub fn decode_decompressed_to_embed_text(
                 && decompressed[i + 3] == 255
             {
                 i += 4;
-                if is_link {
-                    links_text.push(' ');
-                }
-                if is_meta
-                    && current_meta_content
+                if is_meta {
+                    let clean_meta = current_meta_content
                         .to_lowercase()
-                        .contains("width=device-width")
-                {
-                    is_mobile = 1;
+                        .replace(' ', "")
+                        .replace('"', "")
+                        .replace('\'', "");
+
+                    if clean_meta.contains("width=device-width")
+                        || clean_meta.contains("device-width")
+                    {
+                        is_mobile = 1;
+                    }
                 }
                 break;
             }
@@ -762,7 +763,11 @@ pub fn decode_decompressed_to_embed_text(
                 p_word_count += 1;
             }
 
-            if !is_link && !is_meta && embed_text.len() >= 1000 {
+            if embed_text.len() >= 600 && p_word_count >= 500 {
+                break 'outer;
+            }
+
+            if !is_meta && embed_text.len() >= 600 {
                 i += len;
                 continue;
             }
@@ -787,13 +792,8 @@ pub fn decode_decompressed_to_embed_text(
             }
 
             if !skip_tag {
-                if is_link {
-                    links_text.push_str(&word);
-                    links_text.push(' ');
-                } else {
-                    embed_text.push_str(&word);
-                    embed_text.push(' ');
-                }
+                embed_text.push_str(&word);
+                embed_text.push(' ');
             }
 
             i += len;
@@ -805,7 +805,7 @@ pub fn decode_decompressed_to_embed_text(
 
     (
         embed_text,
-        links_text,
+        String::new(),
         has_500_words,
         is_mobile,
         string_time_us,
@@ -935,7 +935,7 @@ static DICT_CACHE: Lazy<Cache<usize, String>> =
 
 thread_local! {
     static DICT_FILE: RefCell<Option<File>> = RefCell::new(None);
-    static RING: RefCell<IoUring> = RefCell::new(IoUring::new(256).expect("Failed to init io_uring"));
+    static RING: RefCell<IoUring> = RefCell::new(IoUring::new(1024).expect("Failed to init io_uring"));
 }
 
 pub fn search_word_by_id(id: usize) -> (String, bool) {
