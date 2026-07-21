@@ -318,6 +318,11 @@ pub fn feed_blobs_for_reembedding() {
     let mut batch = Vec::with_capacity(BATCH_SIZE + 100);
     let mut last_meta_id = 0u64;
 
+    let io_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(128)
+        .build()
+        .expect("Failed to build custom thread pool");
+
     loop {
         let mut paused_for_space = false;
         while full_dir("/mnt/vec/") {
@@ -348,143 +353,150 @@ pub fn feed_blobs_for_reembedding() {
             break;
         }
 
-        let chunk_size = 200;
+        let chunk_size = 50;
 
-        let chunk_results: Vec<(u64, [u64; 6], [u128; 7], [u64; 2])> = batch
-            .par_chunks(chunk_size)
-            .map_init(
-                || {
-                    zstd::bulk::Decompressor::with_dictionary(&META_DICTIONARY)
-                        .expect("Failed to init zstd")
-                },
-                |decompressor, chunk| {
-                    let mut l_fed = 0;
-                    let mut l_skips = [0u64; 6];
-                    let mut l_times = [0u128; 7];
-                    let mut l_cache_hits = 0u64;
-                    let mut l_cache_misses = 0u64;
+        let chunk_results: Vec<(u64, [u64; 6], [u128; 9], [u64; 2])> = io_pool.install(|| {
+            batch
+                .par_chunks(chunk_size)
+                .map_init(
+                    || {
+                        zstd::bulk::Decompressor::with_dictionary(&META_DICTIONARY)
+                            .expect("Failed to init zstd")
+                    },
+                    |decompressor, chunk| {
+                        let mut l_fed = 0;
+                        let mut l_skips = [0u64; 6];
+                        let mut l_times = [0u128; 9];
+                        let mut l_cache_hits = 0u64;
+                        let mut l_cache_misses = 0u64;
 
-                    struct BlobPayload {
-                        meta_id: u64,
-                        doc: WebDocument,
-                        decompressed_blob: Vec<u8>,
-                    }
-
-                    let mut blob_payloads: Vec<BlobPayload> = Vec::with_capacity(chunk.len());
-                    let mut chunk_missing_dict_ids: Vec<usize> = Vec::new();
-
-                    for (key, val) in chunk {
-                        let t = Instant::now();
-                        let decompressed = match decompressor.decompress(val.as_ref(), 10_000_000) {
-                            Ok(d) => d,
-                            Err(_) => {
-                                l_skips[0] += 1;
-                                continue;
-                            }
-                        };
-                        l_times[0] += t.elapsed().as_micros();
-
-                        let t = Instant::now();
-                        let doc: WebDocument = match serde_json::from_slice(&decompressed) {
-                            Ok(d) => d,
-                            Err(_) => {
-                                l_skips[1] += 1;
-                                continue;
-                            }
-                        };
-                        l_times[1] += t.elapsed().as_micros();
-
-                        let Ok(id_bytes): Result<[u8; 8], _> = key.as_ref().try_into() else {
-                            l_skips[2] += 1;
-                            continue;
-                        };
-                        let meta_id = u64::from_be_bytes(id_bytes);
-
-                        let stem = doc.html.rsplit('/').next().and_then(|f| {
-                            f.strip_suffix(".zst").or_else(|| f.strip_suffix(".txt"))
-                        });
-                        let Some(blob_id) = stem.and_then(|s| s.parse::<u64>().ok()) else {
-                            l_skips[2] += 1;
-                            continue;
-                        };
-
-                        let t_ssd = Instant::now();
-                        let raw_blob = match PRIECO_FJALL.blobs_ks.get(&blob_id.to_le_bytes()) {
-                            Ok(Some(b)) => b,
-                            _ => {
-                                l_skips[3] += 1;
-                                continue;
-                            }
-                        };
-                        if raw_blob.is_empty() {
-                            l_skips[4] += 1;
-                            continue;
+                        struct BlobPayload {
+                            meta_id: u64,
+                            doc: WebDocument,
+                            decompressed_blob: Vec<u8>,
                         }
-                        l_times[2] += t_ssd.elapsed().as_micros();
 
-                        let is_compressed = raw_blob[0] == 1;
-                        let payload = &raw_blob[1..];
-                        let t_zstd = Instant::now();
-                        let decompressed_blob = if is_compressed {
-                            match zstd::stream::decode_all(std::io::Cursor::new(payload)) {
-                                Ok(data) => data,
-                                Err(_) => continue,
+                        let mut blob_payloads: Vec<BlobPayload> = Vec::with_capacity(chunk.len());
+                        let mut chunk_missing_dict_ids: Vec<usize> = Vec::new();
+
+                        for (key, val) in chunk {
+                            let t = Instant::now();
+                            let decompressed =
+                                match decompressor.decompress(val.as_ref(), 10_000_000) {
+                                    Ok(d) => d,
+                                    Err(_) => {
+                                        l_skips[0] += 1;
+                                        continue;
+                                    }
+                                };
+                            l_times[0] += t.elapsed().as_micros();
+
+                            let t = Instant::now();
+                            let doc: WebDocument = match serde_json::from_slice(&decompressed) {
+                                Ok(d) => d,
+                                Err(_) => {
+                                    l_skips[1] += 1;
+                                    continue;
+                                }
+                            };
+                            l_times[1] += t.elapsed().as_micros();
+
+                            let Ok(id_bytes): Result<[u8; 8], _> = key.as_ref().try_into() else {
+                                l_skips[2] += 1;
+                                continue;
+                            };
+                            let meta_id = u64::from_be_bytes(id_bytes);
+
+                            let stem = doc.html.rsplit('/').next().and_then(|f| {
+                                f.strip_suffix(".zst").or_else(|| f.strip_suffix(".txt"))
+                            });
+                            let Some(blob_id) = stem.and_then(|s| s.parse::<u64>().ok()) else {
+                                l_skips[2] += 1;
+                                continue;
+                            };
+
+                            let t_ssd = Instant::now();
+                            let raw_blob = match PRIECO_FJALL.blobs_ks.get(&blob_id.to_le_bytes()) {
+                                Ok(Some(b)) => b,
+                                _ => {
+                                    l_skips[3] += 1;
+                                    continue;
+                                }
+                            };
+                            if raw_blob.is_empty() {
+                                l_skips[4] += 1;
+                                continue;
                             }
-                        } else {
-                            payload.to_vec()
-                        };
-                        l_times[3] += t_zstd.elapsed().as_micros();
+                            l_times[2] += t_ssd.elapsed().as_micros();
 
-                        collect_missing_ids(
-                            &decompressed_blob,
-                            &mut chunk_missing_dict_ids,
-                            &mut l_cache_hits,
-                            &mut l_cache_misses,
-                        );
+                            let is_compressed = raw_blob[0] == 1;
+                            let payload = &raw_blob[1..];
+                            let t_zstd = Instant::now();
+                            let decompressed_blob = if is_compressed {
+                                match zstd::stream::decode_all(std::io::Cursor::new(payload)) {
+                                    Ok(data) => data,
+                                    Err(_) => continue,
+                                }
+                            } else {
+                                payload.to_vec()
+                            };
+                            l_times[3] += t_zstd.elapsed().as_micros();
 
-                        blob_payloads.push(BlobPayload {
-                            meta_id,
-                            doc,
-                            decompressed_blob,
-                        });
-                    }
+                            let t_collect = Instant::now();
+                            collect_missing_ids(
+                                &decompressed_blob,
+                                &mut chunk_missing_dict_ids,
+                                &mut l_cache_hits,
+                                &mut l_cache_misses,
+                            );
+                            l_times[4] += t_collect.elapsed().as_micros();
 
-                    let t_dict = Instant::now();
-                    bulk_prefetch_missing_words(chunk_missing_dict_ids);
-                    l_times[4] += t_dict.elapsed().as_micros();
+                            blob_payloads.push(BlobPayload {
+                                meta_id,
+                                doc,
+                                decompressed_blob,
+                            });
+                        }
 
-                    for payload in blob_payloads {
-                        let (embed_text, links_text, has_500_words, is_mobile, b_str, _, _) =
-                            decode_decompressed_to_embed_text(&payload.decompressed_blob);
+                        let t_dict = Instant::now();
+                        bulk_prefetch_missing_words(chunk_missing_dict_ids);
+                        l_times[5] += t_dict.elapsed().as_micros();
 
-                        l_times[5] += b_str;
+                        for payload in blob_payloads {
+                            let (embed_text, links_text, has_500_words, is_mobile, b_str, _, _) =
+                                decode_decompressed_to_embed_text(&payload.decompressed_blob);
+                            l_times[6] += b_str;
 
-                        let t_write = Instant::now();
-                        let result_str = format!(
-                            "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
-                            payload.doc.url,
-                            payload.doc.title,
-                            payload.meta_id,
-                            payload.doc.lang,
-                            embed_text,
-                            links_text,
-                            has_500_words,
-                            is_mobile
-                        );
-                        write_to_random_file("/mnt/vec/", &result_str);
-                        l_times[6] += t_write.elapsed().as_micros();
+                            let t_format = Instant::now();
+                            let result_str = format!(
+                                "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
+                                payload.doc.url,
+                                payload.doc.title,
+                                payload.meta_id,
+                                payload.doc.lang,
+                                embed_text,
+                                links_text,
+                                has_500_words,
+                                is_mobile
+                            );
+                            l_times[7] += t_format.elapsed().as_micros();
 
-                        l_fed += 1;
-                    }
+                            let t_write = Instant::now();
+                            write_to_random_file("/mnt/vec/", &result_str);
+                            l_times[8] += t_write.elapsed().as_micros();
 
-                    (l_fed, l_skips, l_times, [l_cache_hits, l_cache_misses])
-                },
-            )
-            .collect();
+                            l_fed += 1;
+                        }
+
+                        (l_fed, l_skips, l_times, [l_cache_hits, l_cache_misses])
+                    },
+                )
+                .collect()
+        });
 
         let mut batch_fed = 0;
         let mut skips = [0u64; 6];
-        let mut times = [0u128; 7];
+        let mut times = [0u128; 9];
         let mut cache_stats = [0u64; 2];
 
         for (f, sk, tm, cs) in chunk_results {
@@ -492,7 +504,7 @@ pub fn feed_blobs_for_reembedding() {
             for i in 0..6 {
                 skips[i] += sk[i];
             }
-            for i in 0..7 {
+            for i in 0..9 {
                 times[i] += tm[i];
             }
             cache_stats[0] += cs[0];
@@ -525,15 +537,21 @@ pub fn feed_blobs_for_reembedding() {
             "⚠️ Skips -> Meta:{} JSON:{} BadID:{} DBMiss:{} Empty:{}",
             skips[0], skips[1], skips[2], skips[3], skips[4]
         );
+
         println!(
-            "⏱️ Time(ms) -> MetaZstd: {:.0} | JSON: {:.0} | SSD: {:.0} | BlobZstd: {:.0} | Dict: {:.0} | StrParse: {:.0} | Write: {:.0}",
+            "⏱️ CPU(ms) -> MetaZstd: {:.0} | JSON: {:.0} | BlobZstd: {:.0} | CollectIDs: {:.0} | DecodeText: {:.0} | FormatStr: {:.0}",
             times[0] as f64 / 1000.0,
             times[1] as f64 / 1000.0,
-            times[2] as f64 / 1000.0,
             times[3] as f64 / 1000.0,
             times[4] as f64 / 1000.0,
+            times[6] as f64 / 1000.0,
+            times[7] as f64 / 1000.0
+        );
+        println!(
+            "⏱️ I/O(ms) -> FjallFetch: {:.0} | DictFetch: {:.0} | Write: {:.0}",
+            times[2] as f64 / 1000.0,
             times[5] as f64 / 1000.0,
-            times[6] as f64 / 1000.0
+            times[8] as f64 / 1000.0
         );
         println!(
             "🧠 Cache -> Hits: {} | Misses: {} | Hit Rate: {:.2}%",
@@ -549,14 +567,19 @@ fn collect_missing_ids(
 ) {
     let mut i = 0;
     let mut simulated_embed_len = 0;
+    let mut p_word_count = 0;
 
-    while i < decompressed.len() {
+    'outer: while i < decompressed.len() {
+        if i > 30_000 {
+            break 'outer;
+        }
+
         let tag_byte = decompressed[i];
         i += 1;
         let tag_name = tag_byte_to_name(tag_byte);
 
-        let skip_tag = matches!(tag_name, "meta" | "img_src");
-        let is_link = tag_name == "a_href";
+        let skip_tag = matches!(tag_name, "meta" | "img_src" | "a_href");
+        let is_p = tag_name == "p";
         let is_meta = tag_name == "meta";
 
         while i < decompressed.len() {
@@ -582,7 +605,20 @@ fn collect_missing_ids(
 
             let slice = &decompressed[i..i + len];
 
-            if !is_link && !is_meta && simulated_embed_len >= 1000 {
+            if is_p {
+                p_word_count += 1;
+            }
+
+            if simulated_embed_len >= 600 && p_word_count >= 500 {
+                break 'outer;
+            }
+
+            if tag_name == "img_src" || tag_name == "a_href" {
+                i += len;
+                continue;
+            }
+
+            if !is_meta && simulated_embed_len >= 600 {
                 i += len;
                 continue;
             }
@@ -614,7 +650,7 @@ fn collect_missing_ids(
                 }
             }
 
-            if !skip_tag && !is_link {
+            if !skip_tag {
                 simulated_embed_len += len + 1;
             }
 
@@ -623,7 +659,7 @@ fn collect_missing_ids(
     }
 }
 
-const MAX_WORD_LEN: u32 = 512;
+const MAX_WORD_LEN: u32 = 256;
 
 fn bulk_prefetch_missing_words(mut missing_ids: Vec<usize>) {
     if missing_ids.is_empty() {
@@ -637,16 +673,23 @@ fn bulk_prefetch_missing_words(mut missing_ids: Vec<usize>) {
 
     DICT_FILE.with(|file_cell| {
         let mut borrow = file_cell.borrow_mut();
+
         if borrow.is_none() {
-            *borrow = File::open(db_path).ok();
+            if let Ok(file) = File::open(db_path) {
+                unsafe {
+                    libc::posix_fadvise(file.as_raw_fd(), 0, 0, libc::POSIX_FADV_RANDOM);
+                }
+                *borrow = Some(file);
+            }
         }
+
         let file = borrow.as_ref().unwrap();
         let fd = types::Fd(file.as_raw_fd());
 
         RING.with(|ring_cell| {
             let mut ring = ring_cell.borrow_mut();
 
-            for chunk in missing_ids.chunks(1024) {
+            for chunk in missing_ids.chunks(256) {
                 let mut buffers = vec![[0u8; MAX_WORD_LEN as usize]; chunk.len()];
 
                 {
@@ -713,6 +756,10 @@ pub fn decode_decompressed_to_embed_text(
     let mut i = 0;
 
     'outer: while i < decompressed.len() {
+        if i > 30_000 {
+            break 'outer;
+        }
+
         let tag_byte = decompressed[i];
         i += 1;
         let tag_name = tag_byte_to_name(tag_byte);
@@ -765,6 +812,16 @@ pub fn decode_decompressed_to_embed_text(
 
             if embed_text.len() >= 600 && p_word_count >= 500 {
                 break 'outer;
+            }
+
+            if tag_name == "img_src" || tag_name == "a_href" {
+                i += len;
+                continue;
+            }
+
+            if is_meta && is_mobile == 1 {
+                i += len;
+                continue;
             }
 
             if !is_meta && embed_text.len() >= 600 {
@@ -935,7 +992,7 @@ static DICT_CACHE: Lazy<Cache<usize, String>> =
 
 thread_local! {
     static DICT_FILE: RefCell<Option<File>> = RefCell::new(None);
-    static RING: RefCell<IoUring> = RefCell::new(IoUring::new(1024).expect("Failed to init io_uring"));
+    static RING: RefCell<IoUring> = RefCell::new(IoUring::new(256).expect("Failed to init io_uring"));
 }
 
 pub fn search_word_by_id(id: usize) -> (String, bool) {
