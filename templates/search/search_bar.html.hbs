@@ -8,23 +8,24 @@
 
   <div class="div_search_type">
     <!-- Search bar -->
-    <form action="search" method="{{#if check_post}}POST{{else}}GET{{/if}}" class="search_bar">
-      <button class="search_button">
-        <img
-          src="static/img/icon/search.webp"
-          alt="Search button icon"
-          width="13px"
-        />
-      </button>
-      <input type="hidden" name="t" value="{{ type }}">
-      <input name="q" placeholder="PriEco" value="{{ query }}" class="search_box" data-sxpr-input>
-      {{#unless no_js}}
-        <button type="button" aria-label="Clear query button" class="btn_del_query">
-          <img src="static/img/icon/cross.svg" alt="Delete query button">
-        </button>
-      {{/unless}}
+<form action="search" method="{{#if check_post}}POST{{else}}GET{{/if}}" class="search_bar">
+  <button class="search_button">
+    <img src="static/img/icon/search.webp" alt="Search button icon" width="13px" />
+  </button>
+  <input type="hidden" name="t" value="{{ type }}">
 
-    </form>
+  <div class="search_input_wrapper">
+    <div class="ghost_box search_box"></div>
+    <input name="q" placeholder="PriEco" value="{{ query }}" class="search_box" id="search_box" data-sxpr-input autocomplete="off">
+    <div class="suggestions_container" style="display: none;"></div>
+  </div>
+
+  {{#unless no_js}}
+    <button type="button" aria-label="Clear query button" class="btn_del_query">
+      <img src="static/img/icon/cross.svg" alt="Delete query button">
+    </button>
+  {{/unless}}
+</form>
 
     <!-- Type bar -->
     <div class="type_btns">
@@ -122,5 +123,6 @@
 {{#unless no_js}}
 <script src="static/js/donate.js?v={{ js_version }}"></script>
 <script src="/static/js/tune.js?v={{ js_version }}"></script>
+<script src="static/js/suggestions.js?v={{ js_version }}"></script>
 {{/unless}}
 </div>

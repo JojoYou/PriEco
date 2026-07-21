@@ -86,6 +86,7 @@
     cursor: pointer;
     padding: 5px;
     margin-right: 15px;
+    z-index: 2;
 }
 
 .btn_del_query img {
@@ -293,4 +294,50 @@
     border-radius: 8px;
     cursor: pointer;
     font: 600 16px inherit;
+}
+
+.suggestions_container {
+    display: none;
+    border-radius: 0 0 20px 20px;
+    position: absolute;
+    height: auto;
+    cursor: pointer;
+    z-index: 1;
+    margin-left: -40px;
+    width: 592px;
+    max-width: clamp(1px, 715px, 90vw);
+}
+.suggestion_item {
+    padding: 5px 5px 5px 10px;
+    border-radius: 5px;
+}
+
+form.suggestions-active .search_box {
+    border-radius: 0 30px 0px 0 !important;
+}
+
+form.suggestions-active .search_button {
+    border-radius: 30px 0 0 0 !important;
+}
+form.suggestions-active .search_button::before {
+    border-radius: 30px 0 0 0 !important;
+}
+
+#search_box {
+    position: relative;
+    z-index: 1;
+}
+
+.ghost_box {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+    box-sizing: border-box;
+    border: none;
+    background-color: transparent !important;
+    opacity: 0.5;
+    white-space: pre;
+    overflow: hidden;
+    align-items: center;
+    display: flex;
 }

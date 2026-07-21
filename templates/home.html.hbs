@@ -15,29 +15,37 @@
    <img src="static/img/icon/gear.svg" alt="open settings" width="13px">
 </label>
 
-<!-- Search bar -->
 <div class="bg_search_bar">
   <div class="div_search_bar">
     <img src="static/img/prieco.webp" class="logo" alt="PriEco logo">
     <span class="title">PriEco</span>
+
     <form action="search" method="{{#if check_post}}POST{{else}}GET{{/if}}" class="search_bar">
       <input type="hidden" name="t" value="all">
+
       <button aria-label="search button" class="search_button">
         <img src="static/img/icon/search.webp" alt="Search button icon" width="13px">
       </button>
-      <input name="q" placeholder="Search" class="search_box" required>
-            {{#unless no_js}}
+
+      <div class="search_input_wrapper">
+        <div class="ghost_box search_box"></div>
+        <input name="q" placeholder="Search" class="search_box" id="search_box" autocomplete="off" required>
+        <div class="suggestions_container" style="display: none;"></div>
+      </div>
+
+      {{#unless no_js}}
         <button type="button" aria-label="Clear query button" class="btn_del_query">
           <img src="static/img/icon/cross.svg" alt="Delete query button">
         </button>
       {{/unless}}
     </form>
-    <div class="autocom-box"></div>
+
   </div>
 </div>
 
 {{#unless no_js}}
   <script src="static/js/del_query.js?v={{ js_version }}"></script>
+  <script src="static/js/suggestions.js?v={{ js_version }}"></script>
 {{/unless}}
 
 {{> footer }}

@@ -1,13 +1,14 @@
 .div_search_bar,
-.footer-content-left a {
+.footer-content-left a,
+.suggestion_item.active,
+.suggestion_item:hover {
     background: #202124;
 }
 .search_button,
-.search_box {
+.search_box,
+.suggestions_container {
     background: #181a1b;
     color: #fff;
-    border: solid 1px #111;
-    box-shadow: 0 1px 3px rgba(23, 23, 23, 0.24);
 }
 .type_btns button p {
     color: #fff;

@@ -48,7 +48,6 @@
     left: 0;
     width: 100%;
     height: 100%;
-    box-shadow: 1px 1px 3px rgba(23, 23, 23, 0.24);
     border-radius: 30px 0 0 30px;
     -webkit-clip-path: inset(-5px 10px -5px -5px);
     clip-path: inset(-5px 0 -5px -5px);
@@ -62,21 +61,7 @@
     height: 50%;
     border-right: 1.2px solid #25dab9;
 }
-.search_box {
-    height: 52px;
-    width: calc(92% - 30px);
-    min-width: 200px;
-    max-width: clamp(1px, 675px, 90vw);
-    border: none;
-    border-radius: 0 30px 30px 0;
-    border-left: unset !important;
-    padding-left: 20px;
-    padding-right: 53px;
-    margin-left: 9.5px;
-    font-size: 16px;
-    outline: none;
-    box-shadow: 0 1px 3px rgba(23, 23, 23, 0.24);
-}
+
 .btn_del_query {
     width: 20px;
     height: auto;
@@ -92,4 +77,93 @@
     width: 100%;
     height: 100%;
     filter: opacity(0.7);
+}
+
+.search_input_wrapper {
+    position: relative;
+    width: calc(92% - 30px);
+    min-width: 200px;
+    max-width: clamp(1px, 675px, 90vw);
+    margin-left: 9.5px;
+    display: flex;
+}
+
+.search_box {
+    height: 52px;
+    width: 100%;
+    border: none;
+    border-radius: 0 30px 30px 0;
+    border-left: unset !important;
+    padding-left: 20px;
+    padding-right: 53px;
+    font-size: 16px;
+    outline: none;
+    position: relative;
+    z-index: 1;
+    background-color: var(--bg-color, #ffffff);
+}
+
+.ghost_box {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+    box-sizing: border-box;
+    border: none;
+    background-color: transparent !important;
+    opacity: 0.5;
+    white-space: pre;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    color: var(--text-color, #333);
+
+    padding-left: 20px;
+    padding-right: 53px;
+    font-size: 16px;
+}
+
+.btn_del_query {
+    width: 20px;
+    height: auto;
+    padding: 5px;
+    margin-left: -43px;
+    margin-right: 15px;
+    background: none;
+    border: none;
+    z-index: 3;
+    cursor: pointer;
+}
+
+.suggestions_container {
+    display: none;
+    position: absolute;
+    left: -52px;
+    width: calc(100% + 52px);
+    width: calc(100% + 48px);
+    background-color: var(--bg-color, #ffffff);
+    border-radius: 0 0 20px 20px;
+    z-index: 10;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.suggestion_item {
+    padding: 10px 15px;
+    text-align: left;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+form.suggestions-active .search_box,
+form.suggestions-active .ghost_box {
+    border-radius: 0 30px 0px 0 !important;
+}
+
+form.suggestions-active .search_button,
+form.suggestions-active .search_button::before {
+    border-radius: 30px 0 0 0 !important;
 }

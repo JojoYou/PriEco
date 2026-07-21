@@ -1,13 +1,19 @@
 .bg_search_bar {
-  background: radial-gradient(circle, #1a3531 0%, transparent 70%);
+    background: radial-gradient(circle, #1a3531 0%, transparent 70%);
 }
 .search_button,
-.search_box {
-  background: #181a1b;
-  color: #fff;
+.search_box,
+.suggestions_container {
+    background: #181a1b;
+    color: #fff;
 }
 .search_button img,
 .btn_del_query img,
 .open-settings-btn img {
-  filter: brightness(0) invert(1);
+    filter: brightness(0) invert(1);
+}
+
+.suggestion_item.active,
+.suggestion_item:hover {
+    background: #202124;
 }

@@ -1,91 +1,156 @@
 .bg_search_bar {
-  width: 100%;
-  height: 100vh;
-  background: radial-gradient(circle, #d5f2ee 0%, transparent 70%);
+    width: 100%;
+    height: 100vh;
+    background: radial-gradient(circle, #d5f2ee 0%, transparent 70%);
 }
 .div_search_bar {
-  position: absolute;
-  top: 35%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: clamp(0px, 659px, 100%);
-  text-align: center;
+    position: absolute;
+    top: 35%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: clamp(0px, 659px, 100%);
+    text-align: center;
 }
 .logo {
-  height: 56px;
+    height: 56px;
 }
 .title {
-  font-size: 56px;
-  font-weight: bold;
-  width: 40%;
-  background: -webkit-linear-gradient(#03d781, #3edce2);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+    font-size: 56px;
+    font-weight: bold;
+    width: 40%;
+    background: -webkit-linear-gradient(#03d781, #3edce2);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 .search_bar {
-  display: flex;
-  margin-top: 10px;
+    display: flex;
+    margin-top: 10px;
 }
+
 .search_button {
-  width: 48px;
-  height: 45px;
-  right: -10px;
-  left: unset;
-  border: none;
-  border-radius: 30px 0 0 30px;
-  position: relative;
-  cursor: pointer;
+    width: 48px;
+    height: 45px;
+    left: 0;
+    border: none;
+    border-radius: 30px 0 0 30px;
+    position: relative;
+    cursor: pointer;
+    z-index: 2;
 }
+
 .search_button::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  box-shadow: 1px 1px 3px rgba(23, 23, 23, 0.24);
-  border-radius: 30px 0 0 30px;
-  -webkit-clip-path: inset(-5px 10px -5px -5px);
-  clip-path: inset(-5px 0 -5px -5px);
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    box-shadow: none;
+    border-radius: 30px 0 0 30px;
+    -webkit-clip-path: inset(-5px 10px -5px -5px);
+    clip-path: inset(-5px 0 -5px -5px);
 }
 .search_button::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  top: 25%;
-  left: unset;
-  height: 50%;
-  border-right: 1.2px solid #25dab9;
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 25%;
+    left: unset;
+    height: 50%;
+    border-right: 1.2px solid #25dab9;
 }
+
+.search_input_wrapper {
+    position: relative;
+    width: calc(92% - 20px);
+    min-width: 200px;
+    max-width: clamp(1px, 675px, 90vw);
+    margin-left: 0;
+    display: flex;
+}
+
 .search_box {
-  height: 45px;
-  width: calc(92% - 30px);
-  min-width: 200px;
-  max-width: clamp(1px, 675px, 90vw);
-  border: none;
-  border-radius: 0 30px 30px 0;
-  border-left: unset !important;
-  padding-left: 20px;
-  padding-right: 53px;
-  margin-left: 9.5px;
-  font-size: 16px;
-  outline: none;
-  box-shadow: 0 1px 3px rgba(23, 23, 23, 0.24);
+    height: 45px;
+    width: 100%;
+    border: none;
+    border-radius: 0 30px 30px 0;
+    border-left: unset !important;
+    padding-left: 20px;
+    padding-right: 53px;
+    font-size: 16px;
+    outline: none;
+    box-shadow: none;
+    position: relative;
+    z-index: 1;
 }
+
+.ghost_box {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+    box-sizing: border-box;
+    border: none;
+    background-color: transparent !important;
+    opacity: 0.5;
+    white-space: pre;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    color: var(--text-color, #333);
+
+    padding-left: 20px;
+    padding-right: 53px;
+    font-size: 16px;
+}
+
 .btn_del_query {
-  width: 20px;
-  height: auto;
-  padding: 5px;
-  margin-left: -43px;
-  margin-right: 15px;
-  background: none;
-  border: none;
-  z-index: 1;
-  cursor: pointer;
+    width: 20px;
+    height: auto;
+    padding: 5px;
+    margin-left: -43px;
+    margin-right: 15px;
+    background: none;
+    border: none;
+    z-index: 3;
+    cursor: pointer;
 }
 .btn_del_query img {
-  width: 100%;
-  height: 100%;
-  filter: opacity(0.7);
+    width: 100%;
+    height: 100%;
+    filter: opacity(0.7);
+}
+
+.suggestions_container {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: -48px;
+    width: calc(100% + 48px);
+    border-radius: 0 0 20px 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.suggestion_item {
+    padding: 10px 15px;
+    text-align: left;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+form.suggestions-active .search_box,
+form.suggestions-active .ghost_box {
+    border-radius: 0 30px 0px 0 !important;
+}
+
+form.suggestions-active .search_button,
+form.suggestions-active .search_button::before {
+    border-radius: 30px 0 0 0 !important;
 }
