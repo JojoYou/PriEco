@@ -95,6 +95,15 @@ pub async fn run(
                 .and_then(|v| v.as_str())
                 .unwrap_or_default()
                 .to_string();
+            let url_enc = urlencoding::encode(&url).into_owned();
+
+            let html_id = item
+                .get("html")
+                .and_then(|v| v.as_str())
+                .and_then(|html_str| html_str.rsplit('/').next())
+                .and_then(|f| f.strip_suffix(".zst").or_else(|| f.strip_suffix(".txt")))
+                .map(|id| id.to_string());
+
             results.push(SearchResult {
                 url: url.clone(),
                 display_url: url
@@ -136,6 +145,8 @@ pub async fn run(
                             get_domain(&url, false)
                         )
                     }),
+                html_id,
+                url_enc,
             });
         }
     }

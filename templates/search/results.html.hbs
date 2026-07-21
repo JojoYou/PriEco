@@ -23,6 +23,17 @@
                 <b>{{ domain }}</b>
                 <p>{{ display_url }}</p>
                 </a>
+<button class="res_opt">
+  <img src="static/img/icon/dots.svg" class="res_opt_icon" alt="Options">
+</button>
+
+<div class="res_opt_menu">
+  <a href="#" target="_blank"><img src="static/img/icon/shield.svg" alt="Shield"></a>
+    {{#if html_id}}
+      <a href="/archive/{{html_id}}" target="_blank"><img src="static/img/icon/cache.svg" alt="Cache"></a>
+  {{/if}}
+  <a href="https://web.archive.org/web/*/{{url_enc}}" target="_blank"><img src="static/img/icon/archive.svg" alt="Archive"></a>
+</div>
               </div>
               <a href='{{ url }}' rel='noopener noreferrer' {{{ @root.newtab }}} class="link" data-sxpr-link>
                 <h3>{{ title }}</h3>

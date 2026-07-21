@@ -3820,6 +3820,7 @@ dependencies = [
  "tantivy",
  "tar",
  "tokio",
+ "urlencoding",
  "zstd",
 ]
 

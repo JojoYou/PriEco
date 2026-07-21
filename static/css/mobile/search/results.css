@@ -419,3 +419,42 @@ details summary.other_tuned {
     user-select: none;
     -webkit-tap-highlight-color: transparent;
 }
+
+.res_opt {
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    padding: 4px;
+}
+.res_opt img {
+    height: 12px;
+}
+
+.res_opt_menu {
+    position: relative;
+    top: 80%;
+    left: -85px;
+    width: 150px;
+    background: #ffffff;
+    border: 1px solid #eaeaea;
+    border-radius: 8px;
+    padding: 10px 5px 10px 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 1;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-10px) scale(0.97);
+    transition: 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    display: flex;
+}
+.res_opt_menu img :hover {
+    transform: scale(1.1);
+}
+.res_opt:focus ~ .res_opt_menu,
+.res_opt_menu:hover {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+}

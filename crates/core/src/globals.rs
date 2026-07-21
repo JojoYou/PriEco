@@ -135,6 +135,9 @@ pub struct SearchResult {
 
     pub image: String,
     pub favicon: String,
+
+    pub html_id: Option<String>,
+    pub url_enc: String,
 }
 #[derive(Serialize, Clone)]
 pub struct ImgResult {
@@ -551,7 +554,7 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
     // Blob storage
     let blob_db = FJALL_DATABASE::builder(Path::new("/mnt/ssd/blobs"))
         .worker_threads(2)
-        .cache_size(6 * 1024 * 1024 * 1024)
+        .cache_size(2 * 1024 * 1024 * 1024)
         .open()
         .expect("Failed to open Blob Fjall DB");
 

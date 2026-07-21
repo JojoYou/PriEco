@@ -235,7 +235,9 @@ async fn rocket() -> _ {
                 update_qt,
                 export_quick_tune,
                 // Thanks page
-                thanks
+                thanks,
+                // Blob storage
+                view_blob
             ],
         )
         .mount("/static", FileServer::from("./static"))

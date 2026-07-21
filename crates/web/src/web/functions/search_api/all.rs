@@ -443,6 +443,8 @@ fn format_google(json: Value) -> Vec<SearchResult> {
                 .get("link")
                 .and_then(|v| v.as_str())
                 .unwrap_or_default();
+            let url_enc = urlencoding::encode(&url).into_owned();
+
             remote_results.push(SearchResult {
                 url: url.to_string(),
                 display_url: url
@@ -481,6 +483,8 @@ fn format_google(json: Value) -> Vec<SearchResult> {
                     "/proxy?u=https://www.google.com/s2/favicons?domain={}&sz=512",
                     urlencoding::encode(&get_domain(url, false))
                 ),
+                html_id: None,
+                url_enc,
             });
         }
     }
@@ -500,6 +504,8 @@ fn format_bing(json: Value) -> Vec<SearchResult> {
             if let Some(items) = block.get("items").and_then(|v| v.as_array()) {
                 for item in items {
                     let url = item.get("url").and_then(|v| v.as_str()).unwrap_or_default();
+                    let url_enc = urlencoding::encode(&url).into_owned();
+
                     remote_results.push(SearchResult {
                         url: url.to_string(),
                         display_url: url
@@ -540,6 +546,8 @@ fn format_bing(json: Value) -> Vec<SearchResult> {
                                     urlencoding::encode(&get_domain(url, false))
                                 )
                             }),
+                        html_id: None,
+                        url_enc,
                     });
                 }
             }
@@ -558,6 +566,7 @@ fn format_brave(json: Value) -> Vec<SearchResult> {
     {
         for item in results {
             let url = item.get("url").and_then(|v| v.as_str()).unwrap_or_default();
+            let url_enc = urlencoding::encode(&url).into_owned();
 
             let favicon = item
                 .get("meta_url")
@@ -600,6 +609,8 @@ fn format_brave(json: Value) -> Vec<SearchResult> {
                     .to_string(),
                 image,
                 favicon,
+                html_id: None,
+                url_enc,
             });
         }
     }
@@ -617,6 +628,7 @@ fn format_brave2(json: Value) -> Vec<SearchResult> {
                 // Skip if result isn't web result
                 continue;
             };
+            let url_enc = urlencoding::encode(&url).into_owned();
 
             remote_results.push(SearchResult {
                 url: url.to_string(),
@@ -649,6 +661,8 @@ fn format_brave2(json: Value) -> Vec<SearchResult> {
                             get_domain(url, false)
                         )
                     }),
+                html_id: None,
+                url_enc,
             });
         }
     }

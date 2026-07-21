@@ -22,6 +22,7 @@ use std::{collections::HashMap, io::Cursor, net::IpAddr};
 */
 use chrono::Utc;
 use dotenv_codegen::dotenv;
+use prieco_blob::blob::decode_blob_to_html_rendered;
 use rocket::{
     Request, Response, State,
     form::{Form, FromForm},
@@ -32,7 +33,7 @@ use rocket::{
     },
     post,
     request::{FromRequest, Outcome},
-    response::{Redirect, Responder, Result as RocketResult},
+    response::{Redirect, Responder, Result as RocketResult, content::RawHtml},
     serde::json::{Json, Value as RocketValue},
     time::Duration,
     uri,
@@ -53,7 +54,7 @@ use crate::web::{
     modules::settings,
 };
 use prieco_core::{
-    CLIENT, TANTIVY_INDEX,
+    CLIENT, PRIECO_FJALL, TANTIVY_INDEX,
     globals::{ANALYTICS, CSS_VERSION, EmbeddingService, JS_VERSION, UserAgent},
 };
 
@@ -340,6 +341,34 @@ pub async fn results_htmls(
     ctx.insert(String::from("no_js"), json!(false));
 
     Template::render("search/results", ctx)
+}
+
+#[get("/archive/<id>")]
+pub async fn view_blob(id: u64) -> Option<RawHtml<String>> {
+    let raw_blob = match PRIECO_FJALL.blobs_ks.get(&id.to_le_bytes()) {
+        Ok(Some(blob)) => blob,
+        _ => return None,
+    };
+
+    let proxy_prefix = "/proxy?u=";
+    let body_html = decode_blob_to_html_rendered(&raw_blob, proxy_prefix);
+
+    let full_page = format!(
+        r#"<!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>PriEco Document: {}</title>
+        </head>
+        <body>
+            {}
+        </body>
+        </html>"#,
+        id, body_html
+    );
+
+    Some(RawHtml(full_page))
 }
 
 /*

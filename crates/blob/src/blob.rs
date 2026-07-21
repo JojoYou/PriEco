@@ -42,7 +42,7 @@ use tar::Archive;
   Import own libraries
 */
 use prieco_core::{
-    META_DICTIONARY, PRIECO_FJALL, WebDocument,
+    META_DECODER, PRIECO_FJALL, WebDocument,
     globals::{colors, icons},
 };
 use rocksdb::{DB, DBCompressionType, Options};
@@ -319,7 +319,7 @@ pub fn feed_blobs_for_reembedding() {
     let mut last_meta_id = 0u64;
 
     let io_pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(128)
+        .num_threads(32)
         .build()
         .expect("Failed to build custom thread pool");
 
@@ -360,7 +360,7 @@ pub fn feed_blobs_for_reembedding() {
                 .par_chunks(chunk_size)
                 .map_init(
                     || {
-                        zstd::bulk::Decompressor::with_dictionary(&META_DICTIONARY)
+                        zstd::bulk::Decompressor::with_prepared_dictionary(&META_DECODER)
                             .expect("Failed to init zstd")
                     },
                     |decompressor, chunk| {
@@ -1100,4 +1100,105 @@ pub fn write_to_random_file(dir: &str, content: &str) {
 
         file_path.pop();
     }
+}
+
+pub fn decode_blob_to_html_rendered(raw_db_value: &[u8], proxy_prefix: &str) -> String {
+    if raw_db_value.is_empty() {
+        return String::new();
+    }
+
+    let is_compressed = raw_db_value[0] == 1;
+    let payload = &raw_db_value[1..];
+
+    let decompressed_data = if is_compressed {
+        match zstd::stream::decode_all(std::io::Cursor::new(payload)) {
+            Ok(data) => data,
+            Err(_) => return String::new(),
+        }
+    } else {
+        payload.to_vec()
+    };
+
+    let decompressed = &decompressed_data;
+    let mut html = String::with_capacity(decompressed.len() * 5);
+    let mut i = 0;
+
+    while i < decompressed.len() {
+        let tag_byte = decompressed[i];
+        i += 1;
+
+        let mut inner_content = String::new();
+        let is_url = tag_byte == b'i' || tag_byte == b'h';
+
+        while i < decompressed.len() {
+            if i + 3 < decompressed.len()
+                && decompressed[i] == 255
+                && decompressed[i + 1] == 255
+                && decompressed[i + 2] == 255
+                && decompressed[i + 3] == 255
+            {
+                i += 4;
+                break;
+            }
+
+            let len = decompressed[i] as usize;
+            i += 1;
+
+            if len == 0 {
+                continue;
+            }
+            if i + len > decompressed.len() {
+                break;
+            }
+
+            let slice = &decompressed[i..i + len];
+            let (word, _) = resolve_token(slice);
+            inner_content.push_str(&word);
+
+            if !is_url && i + len < decompressed.len() && decompressed[i + len] != 255 {
+                inner_content.push(' ');
+            }
+
+            i += len;
+        }
+
+        let inner_content = inner_content.trim();
+        if inner_content.is_empty() {
+            continue;
+        }
+
+        let tag_name = tag_byte_to_name(tag_byte);
+
+        let tag_label = format!("<strong>[{}]</strong>", tag_name);
+
+        match tag_byte {
+            b'i' => {
+                let encoded_url = urlencoding::encode(inner_content);
+                html.push_str(&format!(
+                    "<div>{}<br><img src=\"{}{}\" /></div>\n",
+                    tag_label, proxy_prefix, encoded_url
+                ));
+            }
+            b'h' => {
+                html.push_str(&format!(
+                    "<div>{}<a href=\"{}\" target=\"_blank\">{}</a></div>\n",
+                    tag_label, inner_content, inner_content
+                ));
+            }
+            b'm' => {
+                html.push_str(&format!(
+                    "<div>{} <i>{}</i></div>\n",
+                    tag_label, inner_content
+                ));
+            }
+            _ => {
+                html.push_str(&format!(
+                    "<div>{}<br><span>{}</span></div>\n",
+                    tag_label, inner_content
+                ));
+            }
+        }
+    }
+
+    html
 }
