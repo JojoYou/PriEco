@@ -137,7 +137,11 @@ pub struct SearchResult {
     pub favicon: String,
 
     pub html_id: Option<String>,
-    pub url_enc: String,
+
+    pub content: String,
+    pub reading_level: String,
+    pub formatted_load: String,
+    pub source_engine: String,
 }
 #[derive(Serialize, Clone)]
 pub struct ImgResult {
@@ -189,6 +193,9 @@ pub struct WebDocument {
 
     #[serde(default)]
     pub search_score: f32,
+
+    #[serde(default)]
+    pub source: String,
 }
 
 pub struct FileLocks {

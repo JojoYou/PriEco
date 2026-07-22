@@ -1,6 +1,5 @@
 {{#if all_results}}
   <div class="div_output">
-    {{!-- Search expander widgets --}}
     <div data-sxpr-top-bar></div>
     <div class="results">
      {{#if did_you_mean}}
@@ -24,16 +23,47 @@
                 <p>{{ display_url }}</p>
                 </a>
 <button class="res_opt">
-  <img src="static/img/icon/dots.svg" class="res_opt_icon" alt="Options">
+  <img src="static/img/icon/dots.svg" alt="Options">
 </button>
 
 <div class="res_opt_menu">
-  <a href="#" target="_blank"><img src="static/img/icon/shield.svg" alt="Shield"></a>
+  <div class="res_opt_header">
+    <div class="res_opt_site_info">
+      <img loading="lazy" src="{{ favicon }}" alt="Favicon" class="res_opt_fav">
+      <span class="res_opt_domain"><b>{{ domain }}</b></span>
+    </div>
+    <h4 class="res_opt_title">{{ title }}</h4>
+  </div>
+
+<b>Actions</b>
+  <div class="res_opt_actions">
+    <a href="#" target="_blank" title="Privacy Shield">
+      <img src="static/img/icon/shield.svg" alt="Shield">
+      <p>Privacy</p>
+    </a>
     {{#if html_id}}
-      <a href="/archive/{{html_id}}" target="_blank"><img src="static/img/icon/cache.svg" alt="Cache"></a>
-  {{/if}}
-  <a href="https://web.archive.org/web/*/{{url_enc}}" target="_blank"><img src="static/img/icon/archive.svg" alt="Archive"></a>
+      <a href="/archive/{{html_id}}" target="_blank" title="Cached View">
+        <img src="static/img/icon/cache.svg" alt="Cache">
+        <p>How PriEco sees result</p>
+      </a>
+    {{/if}}
+    <a href="https://web.archive.org/web/*/{{url}}" target="_blank" title="Wayback Machine">
+      <img src="static/img/icon/archive.svg" alt="Archive">
+      <p>Internet Archive</p>
+    </a>
+  </div>
+
+<b>Metrics</b>
+  <div class="res_opt_insights">
+    <span title="Load Speed">{{ formatted_load }}</span>
+    <span title="Reading Complexity">{{ reading_level }}</span>
+    <span title="Discovery Engine">{{ source_engine }}</span>
+  </div>
+
+<b>Content</b>
+<p class="res_opt_context">{{{ content }}}</p>
 </div>
+<div class="menu_backdrop res_opt_backdrop"></div>
               </div>
               <a href='{{ url }}' rel='noopener noreferrer' {{{ @root.newtab }}} class="link" data-sxpr-link>
                 <h3>{{ title }}</h3>
@@ -46,15 +76,12 @@
             {{/if}}
         </div>
 
-        {{!-- Insert the knowledge panel after the first result --}}
         {{#if @first}}
           <div class="knowledge_panel" data-sxpr-knowledge-panel>
-            <!-- Knowledge panel will render here -->
           </div>
           <div data-sxpr-instant-answers></div>
         {{/if}}
 
-        {{!-- Insert Yadore products --}}
         {{#if (and (eq @index 2) ../yadore)}}
           <div class="products">
             <p>👕 Products</p>
@@ -270,3 +297,4 @@
     {{/if}}
 </form>
 </div>
+<div class="menu_backdrop qt_backdrop"></div>

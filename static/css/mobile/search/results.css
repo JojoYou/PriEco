@@ -194,6 +194,98 @@
     margin: 10px 0 20px 0;
 }
 
+.res_opt {
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    padding: 4px;
+}
+
+.res_opt img {
+    height: 12px;
+}
+
+.res_opt_menu {
+    visibility: hidden;
+    opacity: 0;
+    bottom: -50px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-height: 60vh;
+    border-radius: 24px 24px 0 0;
+    padding: 24px 5px 24px 10px;
+    box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.5);
+    z-index: 10002;
+    box-sizing: border-box;
+    transition:
+        opacity 0.35s ease,
+        bottom 0.35s ease,
+        visibility 0s linear 0.35s;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    transform: none !important;
+}
+
+.res_opt:focus ~ .res_opt_menu,
+.res_opt_menu:focus-within {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    bottom: 0;
+    transition:
+        opacity 0.35s ease,
+        bottom 0.35s ease,
+        visibility 0s;
+}
+
+.res_opt_site_info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.res_opt_actions,
+.res_opt_insights {
+    display: flex;
+    justify-content: space-evenly;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.res_opt_actions a {
+    padding: 5px;
+    margin: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.res_opt_actions img {
+    margin: 5px;
+}
+
+.res_opt_context {
+    white-space: unset !important;
+    line-height: 15px;
+    padding: 0 10px;
+    font-size: 13px;
+    font-style: italic;
+}
+
+.res_opt_title {
+    text-align: center;
+}
+
+.res_opt_actions p {
+    width: unset;
+}
+
 .quick_tune {
     position: fixed;
     top: 10px;
@@ -218,34 +310,18 @@
     right: 0;
     width: 100%;
     max-height: 60vh;
-    background-color: #202124;
     border-radius: 24px 24px 0 0;
     box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.5);
-    z-index: 10000;
+    z-index: 10002;
     box-sizing: border-box;
     transition:
         opacity 0.35s ease,
         bottom 0.35s ease,
-        visibility 0.35s;
+        visibility 0s linear 0.35s;
     display: flex;
     flex-direction: column;
     overflow: visible;
     padding-top: 24px;
-}
-
-.qt_menu::before {
-    content: "";
-    position: fixed;
-    bottom: -100px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100vw;
-    height: 150vh;
-    background: rgba(0, 0, 0, 0.65);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    z-index: -1;
-    cursor: pointer;
 }
 
 .qt_menu::after {
@@ -276,6 +352,10 @@
     visibility: visible;
     opacity: 1;
     bottom: 0;
+    transition:
+        opacity 0.35s ease,
+        bottom 0.35s ease,
+        visibility 0s;
 }
 
 .qt_menu p,
@@ -407,6 +487,7 @@
     position: absolute !important;
     width: 100%;
 }
+
 .qt_download_btn img {
     position: absolute;
     right: 40px;
@@ -420,41 +501,39 @@ details summary.other_tuned {
     -webkit-tap-highlight-color: transparent;
 }
 
-.res_opt {
-    cursor: pointer;
-    background: transparent;
-    border: none;
-    padding: 4px;
-}
-.res_opt img {
-    height: 12px;
+.menu_backdrop {
+    visibility: hidden;
+    opacity: 0;
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    z-index: 10001;
+    transition:
+        opacity 0.35s ease,
+        visibility 0s linear 0.35s;
+    pointer-events: none;
 }
 
-.res_opt_menu {
-    position: relative;
-    top: 80%;
-    left: -85px;
-    width: 150px;
-    background: #ffffff;
-    border: 1px solid #eaeaea;
-    border-radius: 8px;
-    padding: 10px 5px 10px 10px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    z-index: 1;
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    transform: translateY(-10px) scale(0.97);
-    transition: 0.25s cubic-bezier(0.22, 1, 0.36, 1);
-    display: flex;
-}
-.res_opt_menu img :hover {
-    transform: scale(1.1);
-}
-.res_opt:focus ~ .res_opt_menu,
-.res_opt_menu:hover {
+.quick_tune:focus ~ .qt_backdrop,
+.qt_menu:focus-within ~ .qt_backdrop {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    transform: none;
+    transition:
+        opacity 0.35s ease,
+        visibility 0s;
+}
+
+.res_opt:focus ~ .res_opt_backdrop,
+.res_opt_menu:focus-within ~ .res_opt_backdrop {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition:
+        opacity 0.35s ease,
+        visibility 0s;
 }

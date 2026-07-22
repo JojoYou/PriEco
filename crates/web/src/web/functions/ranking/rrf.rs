@@ -23,19 +23,29 @@ pub fn run(
     );
 
     let sources = [
-        (dir_results, DIR_WEIGHT),
-        (fts_results, fts_weight),
-        (ivf_results, ivf_weight),
-        (dis_results, DIS_WEIGHT),
+        (dir_results, DIR_WEIGHT, "DIR"),
+        (fts_results, fts_weight, "FTS"),
+        (ivf_results, ivf_weight, "IVF"),
+        (dis_results, DIS_WEIGHT, "DIS"),
     ];
 
-    for (results, weight) in sources {
-        for (rank, doc) in results.into_iter().enumerate() {
+    for (results, weight, source_name) in sources {
+        for (rank, mut doc) in results.into_iter().enumerate() {
             let rrf_score = weight * (1.0 / (k + rank as f32 + 1.0));
+
             scores
                 .entry(doc.url.clone())
-                .and_modify(|(score, _)| *score += rrf_score)
-                .or_insert((rrf_score, doc));
+                .and_modify(|(score, existing_doc)| {
+                    *score += rrf_score;
+
+                    if !existing_doc.source.contains(source_name) {
+                        existing_doc.source = format!("{} + {}", existing_doc.source, source_name);
+                    }
+                })
+                .or_insert_with(|| {
+                    doc.source = source_name.to_string();
+                    (rrf_score, doc)
+                });
         }
     }
 

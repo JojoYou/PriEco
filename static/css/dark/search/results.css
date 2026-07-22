@@ -34,7 +34,9 @@
 
 .products img,
 .quick_tune img,
-.qt_download_btn img {
+.qt_download_btn img,
+.res_opt img,
+.res_opt_actions img {
     filter: brightness(0) invert(1);
 }
 
@@ -55,6 +57,12 @@
 .qt-btn {
     color: #bdc2ca;
 }
+
 .qt_menu {
     background-color: #202124;
+}
+
+.res_opt_menu {
+    background: #202124;
+    border: 1px solid #181a1b;
 }

@@ -178,6 +178,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     load: parts[12].parse().unwrap_or_default(),
                     date: parts[13].parse().unwrap_or(0),
                     search_score: 0.0,
+                    source: String::new(),
                 };
 
                 /* FJALL */

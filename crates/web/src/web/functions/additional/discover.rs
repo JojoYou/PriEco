@@ -148,6 +148,7 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
                         .unwrap_or_default()
                         .as_secs() as i64,
                     search_score: 0.0,
+                    source: String::from(""),
                 };
                 discovery_results.push(mock_doc);
             }

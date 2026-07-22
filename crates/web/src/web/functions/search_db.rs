@@ -95,7 +95,6 @@ pub async fn run(
                 .and_then(|v| v.as_str())
                 .unwrap_or_default()
                 .to_string();
-            let url_enc = urlencoding::encode(&url).into_owned();
 
             let html_id = item
                 .get("html")
@@ -103,6 +102,44 @@ pub async fn run(
                 .and_then(|html_str| html_str.rsplit('/').next())
                 .and_then(|f| f.strip_suffix(".zst").or_else(|| f.strip_suffix(".txt")))
                 .map(|id| id.to_string());
+
+            let confidence = item
+                .get("confidence")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let reading_level = match confidence {
+                c if c >= 70.0 => "📖 Easy Read",
+                c if c >= 40.0 => "🎓 Intermediate Read",
+                c if c > 0.0 => "🔬 Dense / Academic Read",
+                _ => "📄 Unknown Read",
+            }
+            .to_string();
+
+            let load_time = item.get("load").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let formatted_load = if load_time <= 0.0 {
+                "❓ Unknown speed"
+            } else if load_time < 1.0 {
+                "⚡⚡⚡"
+            } else if load_time < 2.5 {
+                "⚡⚡"
+            } else {
+                "⚡"
+            };
+
+            let raw_source = item.get("source").and_then(|v| v.as_str()).unwrap_or("");
+
+            let mut source_engine = raw_source.to_string();
+
+            if source_engine.is_empty() {
+                source_engine = "🔍 PriEco Index".to_string();
+            } else {
+                source_engine = source_engine.replace("FTS", "🔍 Keyword");
+                source_engine = source_engine.replace("IVF", "🤖 Semantic");
+                source_engine = source_engine.replace("DIR", "🗂️ Directory");
+                source_engine = source_engine.replace("DIS", "🌐 Discovered");
+            }
+
+            let content = item.get("content").and_then(|v| v.as_str()).unwrap_or("");
 
             results.push(SearchResult {
                 url: url.clone(),
@@ -146,7 +183,11 @@ pub async fn run(
                         )
                     }),
                 html_id,
-                url_enc,
+
+                reading_level,
+                formatted_load: formatted_load.to_string(),
+                source_engine,
+                content: content.to_string(),
             });
         }
     }

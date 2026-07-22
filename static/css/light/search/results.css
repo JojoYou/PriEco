@@ -35,3 +35,7 @@
 .qt_menu p {
     color: #353333;
 }
+.res_opt_menu {
+    background: #ffffff;
+    border: 1px solid #eaeaea;
+}

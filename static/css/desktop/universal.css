@@ -76,7 +76,6 @@ Import font
     padding: 0;
     box-sizing: border-box;
     font-family: "Montserrat", arial, sans-serif;
-    transition: all 0.3s ease-in-out;
 }
 
 html,
