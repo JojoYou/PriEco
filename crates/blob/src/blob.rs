@@ -319,7 +319,7 @@ pub fn feed_blobs_for_reembedding() {
     let mut last_meta_id = 0u64;
 
     let io_pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(32)
+        .num_threads(16)
         .build()
         .expect("Failed to build custom thread pool");
 
@@ -988,7 +988,7 @@ fn resolve_token(slice: &[u8]) -> (String, bool) {
 }
 
 static DICT_CACHE: Lazy<Cache<usize, String>> =
-    Lazy::new(|| Cache::builder().max_capacity(50_000_000).build());
+    Lazy::new(|| Cache::builder().max_capacity(20_000_000).build());
 
 thread_local! {
     static DICT_FILE: RefCell<Option<File>> = RefCell::new(None);

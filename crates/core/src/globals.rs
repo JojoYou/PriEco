@@ -535,7 +535,7 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
     // Meta storage
     let meta_db = FJALL_DATABASE::builder(Path::new(&PRIECO_CONFIG.meta_path))
         .worker_threads(4)
-        .cache_size(4 * 1024 * 1024 * 1024)
+        .cache_size(2 * 1024 * 1024 * 1024)
         .open()
         .expect("Failed to open Meta Fjall DB");
 
@@ -554,7 +554,7 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
     // Blob storage
     let blob_db = FJALL_DATABASE::builder(Path::new("/mnt/ssd/blobs"))
         .worker_threads(2)
-        .cache_size(2 * 1024 * 1024 * 1024)
+        .cache_size(1 * 1024 * 1024 * 1024)
         .open()
         .expect("Failed to open Blob Fjall DB");
 
