@@ -89,6 +89,18 @@ pub fn synynyms_and_optimize(
     }
 
     if !groups.is_empty() {
-        *query = groups.join(" ");
+        if groups.len() > 1 {
+            let strict_and = groups
+                .iter()
+                .map(|g| format!("+({})", g))
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            let broad_or = groups.join(" ");
+
+            *query = format!("({})^3.0 OR ({})", strict_and, broad_or);
+        } else {
+            *query = groups.join(" ");
+        }
     }
 }

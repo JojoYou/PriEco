@@ -38,8 +38,8 @@ impl Default for RankingWeights {
             https_boost: 1.2874976244929701,
             dev_com_boost: 1.04,
             org_net_boost: 1.02,
-            bad_url_penalty: 1.1601573817712056,
-            path_depth_penalty: 1.096907068787565,
+            bad_url_penalty: 0.8,
+            path_depth_penalty: 0.9,
             confidence_multi: 0.01,
             effort_multi: 0.08,
         }
@@ -155,7 +155,7 @@ pub fn run(
 
             if wiki_lang == lang {
                 boost *= weights.wiki_boost;
-            } else {
+            } else if lang != "all" {
                 boost *= 0.1;
             }
         }
