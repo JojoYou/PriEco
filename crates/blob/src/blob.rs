@@ -729,7 +729,7 @@ fn bulk_prefetch_missing_words(mut missing_ids: Vec<usize>) {
                             } else {
                                 String::from_utf8_lossy(&buffer[..bytes_read]).into_owned()
                             };
-                            DICT_CACHE.insert(id, word);
+                            DICT_CACHE.insert(id, Arc::new(word));
                         }
                     }
                 }
@@ -745,7 +745,7 @@ pub fn decode_decompressed_to_embed_text(
         return (String::new(), String::new(), 0, 0, 0, 0, 0);
     }
 
-    let mut embed_text = String::with_capacity(1024);
+    let mut embed_text = String::with_capacity(4096);
     let mut p_word_count = 0;
     let mut is_mobile = 0;
 
@@ -779,11 +779,11 @@ pub fn decode_decompressed_to_embed_text(
             {
                 i += 4;
                 if is_meta {
-                    let clean_meta = current_meta_content
-                        .to_lowercase()
-                        .replace(' ', "")
-                        .replace('"', "")
-                        .replace('\'', "");
+                    let clean_meta: String = current_meta_content
+                        .chars()
+                        .filter(|&c| !c.is_whitespace() && c != '"' && c != '\'')
+                        .map(|c| c.to_ascii_lowercase())
+                        .collect();
 
                     if clean_meta.contains("width=device-width")
                         || clean_meta.contains("device-width")
@@ -957,7 +957,7 @@ fn tag_byte_to_name(tag_byte: u8) -> &'static str {
         _ => "div",
     }
 }
-fn resolve_token(slice: &[u8]) -> (String, bool) {
+fn resolve_token(slice: &[u8]) -> (Arc<String>, bool) {
     if slice.len() > 3 {
         let mut id = 0u64;
         for (j, b) in slice.iter().enumerate() {
@@ -977,7 +977,10 @@ fn resolve_token(slice: &[u8]) -> (String, bool) {
     }) && std::str::from_utf8(slice).is_ok();
 
     if is_normal_short_word {
-        (std::str::from_utf8(slice).unwrap().to_string(), true)
+        (
+            Arc::new(std::str::from_utf8(slice).unwrap().to_string()),
+            true,
+        )
     } else {
         let mut id = 0u64;
         for (j, b) in slice.iter().enumerate() {
@@ -987,7 +990,7 @@ fn resolve_token(slice: &[u8]) -> (String, bool) {
     }
 }
 
-static DICT_CACHE: Lazy<Cache<usize, String>> =
+static DICT_CACHE: Lazy<Cache<usize, Arc<String>>> =
     Lazy::new(|| Cache::builder().max_capacity(20_000_000).build());
 
 thread_local! {
@@ -995,9 +998,9 @@ thread_local! {
     static RING: RefCell<IoUring> = RefCell::new(IoUring::new(256).expect("Failed to init io_uring"));
 }
 
-pub fn search_word_by_id(id: usize) -> (String, bool) {
+pub fn search_word_by_id(id: usize) -> (Arc<String>, bool) {
     if id < 256 {
-        return (String::new(), true);
+        return (Arc::new(String::new()), true);
     }
 
     if let Some(cached_word) = DICT_CACHE.get(&id) {
@@ -1043,9 +1046,10 @@ pub fn search_word_by_id(id: usize) -> (String, bool) {
         String::from_utf8_lossy(&result_bytes).into_owned()
     });
 
-    DICT_CACHE.insert(id, word.clone());
+    let arc_word = Arc::new(word);
+    DICT_CACHE.insert(id, arc_word.clone());
 
-    (word, false)
+    (arc_word, false)
 }
 
 /* Helper functions */

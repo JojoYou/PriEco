@@ -37,14 +37,14 @@
 
 <b>Actions</b>
   <div class="res_opt_actions">
-    <a href="#" target="_blank" title="Privacy Shield">
+    <a href="#" target="_blank" title="Privacy Analysis">
       <img src="static/img/icon/shield.svg" alt="Shield">
       <p>Privacy</p>
     </a>
     {{#if html_id}}
       <a href="/archive/{{html_id}}" target="_blank" title="Cached View">
         <img src="static/img/icon/cache.svg" alt="Cache">
-        <p>How PriEco sees result</p>
+        <p>Cache</p>
       </a>
     {{/if}}
     <a href="https://web.archive.org/web/*/{{url}}" target="_blank" title="Wayback Machine">
@@ -57,7 +57,7 @@
   <div class="res_opt_insights">
     <span title="Load Speed">{{ formatted_load }}</span>
     <span title="Reading Complexity">{{ reading_level }}</span>
-    <span title="Discovery Engine">{{ source_engine }}</span>
+    <span title="Served from index">{{ source_engine }}</span>
   </div>
 
 <b>Content</b>
