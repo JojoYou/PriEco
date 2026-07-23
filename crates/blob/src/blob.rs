@@ -858,16 +858,6 @@ pub fn decode_decompressed_to_embed_text(
                 embed_text.push(' ');
             }
 
-            if is_meta {
-                current_meta_content.push_str(word_str);
-                current_meta_content.push(' ');
-            }
-
-            if !skip_tag {
-                embed_text.push_str(word_str);
-                embed_text.push(' ');
-            }
-
             i += len;
         }
     }
