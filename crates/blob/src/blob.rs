@@ -298,7 +298,7 @@ fn process_directory(
 */
 
 const RESUME_FILE: &str = "/mnt/ssd/feed_resume.txt";
-const BATCH_SIZE: usize = 5000;
+const BATCH_SIZE: usize = 1000;
 pub fn feed_blobs_for_reembedding() {
     let start_key = fs::read_to_string(RESUME_FILE)
         .ok()
@@ -991,7 +991,7 @@ fn resolve_token(slice: &[u8]) -> (Arc<String>, bool) {
 }
 
 static DICT_CACHE: Lazy<Cache<usize, Arc<String>>> = Lazy::new(|| {
-    let max_memory_bytes = 3 * 1024 * 1024 * 1024;
+    let max_memory_bytes = 1 * 1024 * 1024 * 1024;
 
     Cache::builder()
         .max_capacity(max_memory_bytes)

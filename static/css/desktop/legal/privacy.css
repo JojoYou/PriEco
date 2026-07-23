@@ -1,64 +1,64 @@
 .privacy_header {
-  width: 100vw;
-  height: 50vh;
-  min-height: 500px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
+    width: 100vw;
+    height: 50vh;
+    min-height: 500px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
 }
 .privacy_header::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  background: linear-gradient(
-    135deg,
-    rgb(134, 228, 235),
-    #34a8ac,
-    rgb(0, 246, 86)
-  );
-  -webkit-mask-image: linear-gradient(rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
-  z-index: -1;
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: linear-gradient(
+        135deg,
+        rgb(134, 228, 235),
+        #34a8ac,
+        rgb(0, 246, 86)
+    );
+    -webkit-mask-image: linear-gradient(rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
+    z-index: -1;
 }
 
 .privacy_header_logo {
-  width: 32px;
-  height: 40px;
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: flex;
-  align-items: center;
-  flex-direction: row;
-  margin-top: 20px;
-  margin-left: 20px;
+    width: 32px;
+    height: 40px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    margin-top: 20px;
+    margin-left: 20px;
 }
 .privacy_header_logo img {
-  height: 100%;
+    height: 100%;
 }
 .privacy_header_logo p {
-  font-size: 32px;
-  margin-left: 10px;
+    font-size: 32px;
+    margin-left: 10px;
 }
 .privacy_header h1 {
-  font-size: 55px;
+    font-size: 75px;
 }
 .privacy_policy {
-  display: flex;
-  justify-content: center;
+    display: flex;
+    justify-content: center;
 }
 .privacy_policy_text {
-  width: 80ch;
-  font-size: 20px;
+    width: 80ch;
+    font-size: 20px;
 }
 .privacy_policy p {
-  padding: 10px 0 10px 0;
+    padding: 10px 0 10px 0;
 }
 .privacy_policy_update {
-  font-size: 16px;
+    font-size: 16px;
 }
