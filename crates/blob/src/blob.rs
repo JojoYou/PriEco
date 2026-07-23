@@ -319,7 +319,7 @@ pub fn feed_blobs_for_reembedding() {
     let mut last_meta_id = 0u64;
 
     let io_pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(16)
+        .num_threads(8)
         .build()
         .expect("Failed to build custom thread pool");
 
@@ -745,7 +745,7 @@ pub fn decode_decompressed_to_embed_text(
         return (String::new(), String::new(), 0, 0, 0, 0, 0);
     }
 
-    let mut embed_text = String::with_capacity(4096);
+    let mut embed_text = String::with_capacity(40960);
     let mut p_word_count = 0;
     let mut is_mobile = 0;
 
@@ -990,8 +990,19 @@ fn resolve_token(slice: &[u8]) -> (Arc<String>, bool) {
     }
 }
 
-static DICT_CACHE: Lazy<Cache<usize, Arc<String>>> =
-    Lazy::new(|| Cache::builder().max_capacity(20_000_000).build());
+static DICT_CACHE: Lazy<Cache<usize, Arc<String>>> = Lazy::new(|| {
+    let max_memory_bytes = 3 * 1024 * 1024 * 1024;
+
+    Cache::builder()
+        .max_capacity(max_memory_bytes)
+        .weigher(|_key: &usize, value: &Arc<String>| {
+            let struct_overhead = 40;
+            let string_data_size = value.capacity();
+
+            (string_data_size + struct_overhead) as u32
+        })
+        .build()
+});
 
 thread_local! {
     static DICT_FILE: RefCell<Option<File>> = RefCell::new(None);
