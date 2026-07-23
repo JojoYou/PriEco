@@ -833,7 +833,7 @@ pub fn decode_decompressed_to_embed_text(
 
             if hit_cache {
                 cache_hits += 1;
-            } else {
+            } else if let ResolvedToken::Cached(_) = word {
                 let mut id = 0u64;
                 for (j, b) in slice.iter().enumerate() {
                     id |= (*b as u64) << (8 * j);
@@ -843,13 +843,28 @@ pub fn decode_decompressed_to_embed_text(
                 }
             }
 
+            let word_str: &str = match &word {
+                ResolvedToken::Raw(s) => s,
+                ResolvedToken::Cached(arc) => arc.as_str(),
+            };
+
             if is_meta {
-                current_meta_content.push_str(&word);
+                current_meta_content.push_str(word_str);
                 current_meta_content.push(' ');
             }
 
             if !skip_tag {
-                embed_text.push_str(&word);
+                embed_text.push_str(word_str);
+                embed_text.push(' ');
+            }
+
+            if is_meta {
+                current_meta_content.push_str(word_str);
+                current_meta_content.push(' ');
+            }
+
+            if !skip_tag {
+                embed_text.push_str(word_str);
                 embed_text.push(' ');
             }
 
@@ -924,8 +939,12 @@ pub fn decode_blob_to_text(raw_db_value: &[u8]) -> String {
             }
 
             let slice = &decompressed[i..i + len];
-            let (word, hit_cache) = resolve_token(slice);
-            reconstructed_text.push_str(&word);
+            let (resolved_word, _) = resolve_token(slice);
+            let word_str: &str = match &resolved_word {
+                ResolvedToken::Raw(s) => s,
+                ResolvedToken::Cached(arc) => arc.as_str(),
+            };
+            reconstructed_text.push_str(word_str);
             reconstructed_text.push(' ');
             i += len;
         }
@@ -957,13 +976,19 @@ fn tag_byte_to_name(tag_byte: u8) -> &'static str {
         _ => "div",
     }
 }
-fn resolve_token(slice: &[u8]) -> (Arc<String>, bool) {
+pub enum ResolvedToken<'a> {
+    Raw(&'a str),
+    Cached(Arc<String>),
+}
+
+fn resolve_token<'a>(slice: &'a [u8]) -> (ResolvedToken<'a>, bool) {
     if slice.len() > 3 {
         let mut id = 0u64;
         for (j, b) in slice.iter().enumerate() {
             id |= (*b as u64) << (8 * j);
         }
-        return search_word_by_id(id as usize);
+        let (word, hit) = search_word_by_id(id as usize);
+        return (ResolvedToken::Cached(word), hit);
     }
 
     let is_normal_short_word = slice.iter().all(|&b| {
@@ -978,7 +1003,7 @@ fn resolve_token(slice: &[u8]) -> (Arc<String>, bool) {
 
     if is_normal_short_word {
         (
-            Arc::new(std::str::from_utf8(slice).unwrap().to_string()),
+            ResolvedToken::Raw(std::str::from_utf8(slice).unwrap()),
             true,
         )
     } else {
@@ -986,7 +1011,8 @@ fn resolve_token(slice: &[u8]) -> (Arc<String>, bool) {
         for (j, b) in slice.iter().enumerate() {
             id |= (*b as u64) << (8 * j);
         }
-        search_word_by_id(id as usize)
+        let (word, hit) = search_word_by_id(id as usize);
+        (ResolvedToken::Cached(word), hit)
     }
 }
 
@@ -1168,7 +1194,13 @@ pub fn decode_blob_to_html_rendered(raw_db_value: &[u8], proxy_prefix: &str) -> 
 
             let slice = &decompressed[i..i + len];
             let (word, _) = resolve_token(slice);
-            inner_content.push_str(&word);
+
+            let word_str: &str = match &word {
+                ResolvedToken::Raw(s) => s,
+                ResolvedToken::Cached(arc) => arc.as_str(),
+            };
+
+            inner_content.push_str(word_str);
 
             if !is_url && i + len < decompressed.len() && decompressed[i + len] != 255 {
                 inner_content.push(' ');
