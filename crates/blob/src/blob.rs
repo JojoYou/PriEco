@@ -22,17 +22,18 @@ use std::{
     io::{Cursor, Read, Write},
     os::{fd::AsRawFd, unix::fs::FileExt},
     path::{Path, PathBuf},
+    sync::atomic::{AtomicUsize, Ordering},
     thread,
     time::{Duration, Instant},
 };
 
+use dashmap::DashMap;
 /*
   Import external libraries
 */
 use fjall::PersistMode;
 use flate2::read::GzDecoder;
 use io_uring::{IoUring, opcode, types};
-use moka::sync::Cache;
 use once_cell::sync::Lazy;
 use rand::{Rng, rng};
 use rayon::prelude::*;
@@ -554,8 +555,12 @@ pub fn feed_blobs_for_reembedding() {
             times[8] as f64 / 1000.0
         );
         println!(
-            "🧠 Cache -> Hits: {} | Misses: {} | Hit Rate: {:.2}%",
-            cache_stats[0], cache_stats[1], hit_rate
+            "🧠 Cache -> Hits: {} | Misses: {} | Hit Rate: {:.2}% | Cache size {}/{}",
+            cache_stats[0],
+            cache_stats[1],
+            hit_rate,
+            CACHE_ITEM_COUNT.load(Ordering::Relaxed),
+            MAX_CACHE_ITEMS
         );
     }
 }
@@ -730,6 +735,13 @@ fn bulk_prefetch_missing_words(mut missing_ids: Vec<usize>) {
                                 String::from_utf8_lossy(&buffer[..bytes_read]).into_owned()
                             };
                             DICT_CACHE.insert(id, Arc::new(word));
+
+                            let current_size = CACHE_ITEM_COUNT.fetch_add(1, Ordering::Relaxed);
+                            if current_size >= MAX_CACHE_ITEMS {
+                                println!("🗑️ Cache full! Nuking DashMap to prevent CPU stall...");
+                                DICT_CACHE.clear();
+                                CACHE_ITEM_COUNT.store(0, Ordering::Relaxed);
+                            }
                         }
                     }
                 }
@@ -754,8 +766,10 @@ pub fn decode_decompressed_to_embed_text(
 
     let t_loop = std::time::Instant::now();
     let mut i = 0;
+    let mut current_meta_content = String::new();
 
     'outer: while i < decompressed.len() {
+        current_meta_content.clear();
         if i > 30_000 {
             break 'outer;
         }
@@ -767,8 +781,6 @@ pub fn decode_decompressed_to_embed_text(
         let skip_tag = matches!(tag_name, "meta" | "img_src" | "a_href");
         let is_p = tag_name == "p";
         let is_meta = tag_name == "meta";
-
-        let mut current_meta_content = String::new();
 
         while i < decompressed.len() {
             if i + 3 < decompressed.len()
@@ -1006,19 +1018,10 @@ fn resolve_token<'a>(slice: &'a [u8]) -> (ResolvedToken<'a>, bool) {
     }
 }
 
-static DICT_CACHE: Lazy<Cache<usize, Arc<String>>> = Lazy::new(|| {
-    let max_memory_bytes = 1 * 1024 * 1024 * 1024;
-
-    Cache::builder()
-        .max_capacity(max_memory_bytes)
-        .weigher(|_key: &usize, value: &Arc<String>| {
-            let struct_overhead = 40;
-            let string_data_size = value.capacity();
-
-            (string_data_size + struct_overhead) as u32
-        })
-        .build()
-});
+static DICT_CACHE: Lazy<DashMap<usize, Arc<String>>> =
+    Lazy::new(|| DashMap::with_capacity(MAX_CACHE_ITEMS + 1_000));
+pub static CACHE_ITEM_COUNT: AtomicUsize = AtomicUsize::new(0);
+const MAX_CACHE_ITEMS: usize = 50_000_000;
 
 thread_local! {
     static DICT_FILE: RefCell<Option<File>> = RefCell::new(None);
@@ -1031,52 +1034,10 @@ pub fn search_word_by_id(id: usize) -> (Arc<String>, bool) {
     }
 
     if let Some(cached_word) = DICT_CACHE.get(&id) {
-        return (cached_word, true);
+        return (cached_word.value().clone(), true);
     }
 
-    let mut current_offset = (id - 256) as u64;
-    let db_path = "/root/crawler/prieco_crawler/dictionary/offset.db";
-
-    let word = DICT_FILE.with(|file_cell| {
-        let mut borrow = file_cell.borrow_mut();
-
-        if borrow.is_none() {
-            match File::open(db_path) {
-                Ok(f) => *borrow = Some(f),
-                Err(_) => return String::new(),
-            }
-        }
-
-        let file = borrow.as_ref().unwrap();
-        let mut result_bytes = Vec::new();
-        let mut buffer = [0u8; 4096];
-
-        loop {
-            if result_bytes.len() > 8192 {
-                break;
-            }
-
-            match file.read_at(&mut buffer, current_offset) {
-                Ok(0) => break,
-                Ok(bytes_read) => {
-                    if let Some(null_pos) = buffer[..bytes_read].iter().position(|&b| b == 0) {
-                        result_bytes.extend_from_slice(&buffer[..null_pos]);
-                        break;
-                    } else {
-                        result_bytes.extend_from_slice(&buffer[..bytes_read]);
-                        current_offset += bytes_read as u64;
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-        String::from_utf8_lossy(&result_bytes).into_owned()
-    });
-
-    let arc_word = Arc::new(word);
-    DICT_CACHE.insert(id, arc_word.clone());
-
-    (arc_word, false)
+    (Arc::new(String::new()), false)
 }
 
 /* Helper functions */

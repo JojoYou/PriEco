@@ -114,5 +114,4 @@ image = "0.25.8" # Image manipulation
 # This is just a specific command
 
 # Temp
-moka = { version = "0.12.15", features = ["sync"] }
 io-uring = "0.7.13"
