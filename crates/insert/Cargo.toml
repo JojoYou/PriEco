@@ -23,6 +23,9 @@ serde_json = { workspace = true }
 bytemuck = { workspace = true }
 tokio = {workspace =true}
 fjall = { workspace = true }
+half = { workspace = true }
+
+memmap2 = { workspace = true }
 
 [features]
 default = []

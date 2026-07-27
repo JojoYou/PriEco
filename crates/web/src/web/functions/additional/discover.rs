@@ -147,6 +147,11 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()
                         .as_secs() as i64,
+
+                    has_500_words: false,
+                    intent: 0,
+                    is_mobile: false,
+
                     search_score: 0.0,
                     source: String::from(""),
                 };

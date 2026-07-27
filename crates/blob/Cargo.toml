@@ -30,6 +30,8 @@ libc = { workspace = true }
 io-uring  = { workspace = true }
 urlencoding = { workspace = true }
 dashmap = { workspace = true }
+prieco_insert = { workspace = true }
+half = { workspace = true }
 
 flate2 = "1.1.9"
 tar = "0.4.44"

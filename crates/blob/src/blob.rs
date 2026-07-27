@@ -18,6 +18,7 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
+    error::Error,
     fs::{self, File, read_dir, remove_file},
     io::{Cursor, Read, Write},
     os::{fd::AsRawFd, unix::fs::FileExt},
@@ -31,23 +32,29 @@ use dashmap::DashMap;
 /*
   Import external libraries
 */
-use fjall::PersistMode;
+use fjall::{CompressionType, KeyspaceCreateOptions, PersistMode, config::CompressionPolicy};
 use flate2::read::GzDecoder;
+use half::f16;
 use io_uring::{IoUring, opcode, types};
+use memmap2::MmapOptions;
 use once_cell::sync::Lazy;
+use prieco_insert::db_insert::{MAX_VECTORS_IN_VRAM, merge_bucket, merge_tantivy, vector_process};
 use rand::{Rng, rng};
 use rayon::prelude::*;
+use tantivy::{Document, tokenizer::TextAnalyzer};
 use tar::Archive;
 
 /*
   Import own libraries
 */
 use prieco_core::{
-    META_DECODER, PRIECO_FJALL, WebDocument,
+    META_DECODER, PRIECO_CONFIG, PRIECO_FJALL, WebDocument,
     globals::{colors, icons},
+    url_to_domain_id,
 };
 use rocksdb::{DB, DBCompressionType, Options};
 use std::sync::Arc;
+use zstd::bulk::{Compressor, Decompressor};
 pub static ORPHAN_STORAGE: Lazy<Arc<DB>> = Lazy::new(|| {
     Arc::new({
         let mut options = Options::default();
@@ -69,7 +76,17 @@ pub struct OrphanPayload {
 }
 
 pub fn run() {
-    feed_blobs_for_reembedding();
+    println!("Inserting IVF");
+    if let Err(e) = import_binary_vectors_mmap() {
+        println!(
+            "{}Error: Buckets failed!{} {}",
+            colors::RED,
+            colors::RESET,
+            e
+        );
+    };
+
+    //migrate_meta_and_blobs();
     /*let directories = find_all_directories();
 
     if directories.is_empty() {
@@ -1199,4 +1216,412 @@ pub fn decode_blob_to_html_rendered(raw_db_value: &[u8], proxy_prefix: &str) -> 
     }
 
     html
+}
+
+/* Update */
+// Zero-allocation line iterator for mmap'd files
+struct MmapLines<'a> {
+    data: &'a [u8],
+    pos: usize,
+}
+
+impl<'a> MmapLines<'a> {
+    fn new(data: &'a [u8]) -> Self {
+        Self { data, pos: 0 }
+    }
+}
+
+impl<'a> Iterator for MmapLines<'a> {
+    type Item = &'a [u8];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos >= self.data.len() {
+            return None;
+        }
+        let start = self.pos;
+        while self.pos < self.data.len() && self.data[self.pos] != b'\n' {
+            self.pos += 1;
+        }
+        let res = &self.data[start..self.pos];
+        self.pos += 1; // Skip the newline character
+        Some(res)
+    }
+}
+
+// Helper to quickly parse ASCII bytes to u64/u8
+fn parse_bytes_to_u64(bytes: &[u8]) -> u64 {
+    let mut res = 0;
+    for &b in bytes {
+        if b >= b'0' && b <= b'9' {
+            res = res * 10 + (b - b'0') as u64;
+        }
+    }
+    res
+}
+pub fn migrate_meta_and_blobs() {
+    println!("Mapping text files to memory...");
+
+    // 2. Memory map all files
+    let file_ids = File::open("/root/centropoids/recovery/ids_sorted.txt").unwrap();
+    let mmap_ids = unsafe { MmapOptions::new().map(&file_ids).unwrap() };
+
+    let file_del = File::open("/root/centropoids/recovery/deletes_sorted.txt").unwrap();
+    let mmap_del = unsafe { MmapOptions::new().map(&file_del).unwrap() };
+
+    let file_dates = File::open("/root/centropoids/recovery/dates_sorted.txt").unwrap();
+    let mmap_dates = unsafe { MmapOptions::new().map(&file_dates).unwrap() };
+
+    let file_intents = File::open("/root/centropoids/recovery/intents_sorted.txt").unwrap();
+    let mmap_intents = unsafe { MmapOptions::new().map(&file_intents).unwrap() };
+
+    let file_mobile = File::open("/root/centropoids/recovery/mobile_sorted.txt").unwrap();
+    let mmap_mobile = unsafe { MmapOptions::new().map(&file_mobile).unwrap() };
+
+    let file_words = File::open("/root/centropoids/recovery/words_sorted.txt").unwrap();
+    let mmap_words = unsafe { MmapOptions::new().map(&file_words).unwrap() };
+
+    // Create zero-allocation iterators
+    let mut iter_ids = MmapLines::new(&mmap_ids);
+    let mut iter_del = MmapLines::new(&mmap_del);
+    let mut iter_dates = MmapLines::new(&mmap_dates);
+    let mut iter_intents = MmapLines::new(&mmap_intents);
+    let mut iter_mobile = MmapLines::new(&mmap_mobile);
+    let mut iter_words = MmapLines::new(&mmap_words);
+
+    let mut advance_text = || -> Option<(u64, bool, i64, u8, bool, bool)> {
+        let id_bytes = iter_ids.next()?;
+        let target_id = parse_bytes_to_u64(id_bytes);
+
+        let delete = iter_del.next()?.first() == Some(&b'1');
+
+        let date_bytes = iter_dates.next()?;
+        let date = if date_bytes.is_empty() {
+            0
+        } else {
+            std::str::from_utf8(date_bytes)
+                .unwrap_or("0")
+                .parse::<i64>()
+                .unwrap_or(0)
+        };
+
+        let intent_bytes = iter_intents.next()?;
+        let intent = if intent_bytes.is_empty() {
+            0
+        } else {
+            (intent_bytes[0].saturating_sub(b'0')) as u8
+        };
+
+        let mobile = iter_mobile.next()?.first() == Some(&b'1');
+        let words = iter_words.next()?.first() == Some(&b'1');
+
+        Some((target_id, delete, date, intent, mobile, words))
+    };
+
+    println!("Initializing ZSTD contexts...");
+    // 3. Setup ZSTD contexts for the loop
+    let mut decompressor = Decompressor::with_prepared_dictionary(&prieco_core::META_DECODER)
+        .expect("Failed to init ZSTD decompressor");
+
+    // Need an encoder dictionary to compress the modified JSON
+    let encoder_dict = zstd::dict::EncoderDictionary::copy(&prieco_core::META_DICTIONARY, 3); // Adjust compression level (1-22) as needed
+    let mut compressor = Compressor::with_prepared_dictionary(&encoder_dict)
+        .expect("Failed to init ZSTD compressor");
+
+    println!("Starting lockstep migration...");
+    let mut current_txt_state = advance_text();
+
+    let mut batch = prieco_core::PRIECO_FJALL.meta_db.batch();
+
+    // --- Rich Logging Counters ---
+    let mut processed_count = 0;
+    let mut updated_count = 0;
+    let mut deleted_count = 0;
+    let mut skipped_orphan_count = 0;
+    let mut error_fallback_count = 0;
+    let start_time = Instant::now();
+
+    // Iterate the OLD global DB
+    for item in prieco_core::PRIECO_FJALL.meta_ks.iter() {
+        if let Ok((key_bytes, val_bytes_compressed)) = item.into_inner() {
+            let db_id = u64::from_be_bytes(key_bytes.as_ref().try_into().unwrap());
+
+            // Catch up text files if DB is ahead
+            while let Some(txt) = current_txt_state {
+                if txt.0 < db_id {
+                    current_txt_state = advance_text();
+                } else {
+                    break;
+                }
+            }
+
+            match current_txt_state {
+                Some(txt) if txt.0 == db_id => {
+                    let is_delete = txt.1;
+                    let mut needs_fallback = false;
+
+                    if let Ok(decompressed_json) =
+                        decompressor.decompress(val_bytes_compressed.as_ref(), 10_000_000)
+                    {
+                        if is_delete {
+                            // --- DELETE LOGIC ---
+                            if let Ok(doc) =
+                                serde_json::from_slice::<WebDocument>(&decompressed_json)
+                            {
+                                let stem = doc.html.rsplit('/').next().and_then(|f| {
+                                    f.strip_suffix(".zst").or_else(|| f.strip_suffix(".txt"))
+                                });
+
+                                if let Some(blob_id) = stem.and_then(|s| s.parse::<u64>().ok()) {
+                                    let _ = prieco_core::PRIECO_FJALL
+                                        .blobs_ks
+                                        .remove(&blob_id.to_le_bytes());
+                                }
+                            }
+                            deleted_count += 1;
+                        } else {
+                            // --- UPDATE LOGIC ---
+                            if let Ok(mut doc) =
+                                serde_json::from_slice::<WebDocument>(&decompressed_json)
+                            {
+                                if txt.2 != 0 {
+                                    doc.date = txt.2;
+                                }
+                                doc.intent = txt.3;
+                                doc.is_mobile = txt.4;
+                                doc.has_500_words = txt.5;
+
+                                let new_json = serde_json::to_vec(&doc).unwrap();
+                                if let Ok(new_compressed_val) = compressor.compress(&new_json) {
+                                    batch.insert(
+                                        &prieco_core::PRIECO_FJALL.meta_ks,
+                                        key_bytes.as_ref(),
+                                        new_compressed_val,
+                                    );
+                                    updated_count += 1;
+                                } else {
+                                    needs_fallback = true; // Compression failed
+                                }
+                            } else {
+                                needs_fallback = true; // JSON Parse failed
+                            }
+                        }
+                    } else {
+                        // Decompression failed
+                        if !is_delete {
+                            needs_fallback = true;
+                        }
+                    }
+
+                    // --- SAFETY FALLBACK ---
+                    // If we meant to keep it, but decompression/parsing failed, copy it raw so we don't lose data.
+                    if needs_fallback {
+                        batch.insert(
+                            &prieco_core::PRIECO_FJALL.meta_ks,
+                            key_bytes.as_ref(),
+                            val_bytes_compressed.as_ref(),
+                        );
+                        error_fallback_count += 1;
+                    }
+
+                    current_txt_state = advance_text();
+                }
+                _ => {
+                    // --- ORPHAN LOGIC ---
+                    batch.insert(
+                        &prieco_core::PRIECO_FJALL.meta_ks,
+                        key_bytes.as_ref(),
+                        val_bytes_compressed.as_ref(),
+                    );
+                    skipped_orphan_count += 1;
+                }
+            }
+
+            processed_count += 1;
+            if processed_count % 100_000 == 0 {
+                let elapsed = start_time.elapsed().as_secs_f64();
+                let rate = (processed_count as f64) / elapsed;
+
+                println!(
+                    "[{:.1}s] Processed: {} | Rate: {:.0} rec/s | Updates: {} | Deletes: {} | Orphans: {} | Errors: {}",
+                    elapsed,
+                    processed_count,
+                    rate,
+                    updated_count,
+                    deleted_count,
+                    skipped_orphan_count,
+                    error_fallback_count
+                );
+
+                batch.commit().unwrap();
+                batch = prieco_core::PRIECO_FJALL.meta_db.batch();
+            }
+        }
+    }
+
+    batch.commit().unwrap();
+    let _ = prieco_core::PRIECO_FJALL
+        .meta_db
+        .persist(fjall::PersistMode::SyncAll);
+
+    let total_time = start_time.elapsed().as_secs_f64();
+    println!("========================================");
+    println!("🚀 MIGRATION COMPLETE in {:.1} seconds", total_time);
+    println!("📊 Final Stats:");
+    println!("   Total Processed : {}", processed_count);
+    println!("   Successfully Updated : {}", updated_count);
+    println!("   Blobs Deleted        : {}", deleted_count);
+    println!("   Orphans Ported Raw   : {}", skipped_orphan_count);
+    println!("   Fallback Parse Errors: {}", error_fallback_count);
+    println!("========================================");
+}
+pub fn import_binary_vectors_mmap() -> Result<(), Box<dyn Error + Send + Sync>> {
+    println!(
+        "{}: Starting Zero-Copy Mmap Binary Vector ingestion...",
+        icons::DB_INSERT
+    );
+
+    // 1. Open files
+    let ids_file = File::open("/mnt/ssd/recovery_ids.txt")?;
+    let bin_file = File::open("/mnt/ssd/recovery_embeds.bin")?;
+
+    // 2. Memory map both files
+    println!("{}: Mapping files to virtual memory...", icons::DB_INSERT);
+    let ids_mmap = unsafe { MmapOptions::new().map(&ids_file)? };
+    let bin_mmap = unsafe { MmapOptions::new().map(&bin_file)? };
+
+    // 3. Advise the Linux kernel that we are reading strictly sequentially
+    // This triggers aggressive NVMe read-ahead and drops pages behind us so we don't eat all our RAM.
+    #[cfg(unix)]
+    {
+        ids_mmap.advise(memmap2::Advice::Sequential)?;
+        bin_mmap.advise(memmap2::Advice::Sequential)?;
+    }
+
+    let mut vector_idx_buffer: HashMap<u64, Vec<f32>> = HashMap::with_capacity(MAX_VECTORS_IN_VRAM);
+    let mut total_inserted = 0;
+    let mut total_skipped_zeros = 0;
+
+    println!("{}: Streaming from disk via mmap...", icons::DB_INSERT);
+
+    // 4. Create zero-copy iterators
+    // This splits the text file by newline, and chunks the binary file into exact 768-byte slices
+    let id_lines = ids_mmap.split(|&b| b == b'\n');
+    let bin_chunks = bin_mmap.chunks_exact(768);
+
+    // 5. Iterate lockstep!
+    for (id_bytes, bin_chunk) in id_lines.zip(bin_chunks) {
+        if id_bytes.is_empty() {
+            continue;
+        }
+
+        // Fast zero-copy parse (we know IDs are ASCII numbers)
+        let id_str = unsafe { std::str::from_utf8_unchecked(id_bytes) };
+        let id = match id_str.parse::<u64>() {
+            Ok(parsed) => parsed,
+            Err(_) => continue,
+        };
+
+        // Convert f16 bytes to f32 vector
+        let mut vector_f32 = Vec::with_capacity(384);
+        let mut sum_sq = 0.0;
+        let mut is_garbage = true;
+
+        for i in 0..384 {
+            let bytes = [bin_chunk[i * 2], bin_chunk[i * 2 + 1]];
+            let val_f16 = f16::from_le_bytes(bytes);
+            let val_f32 = val_f16.to_f32();
+
+            if val_f32 != 0.0 {
+                is_garbage = false;
+            }
+
+            sum_sq += val_f32 * val_f32;
+            vector_f32.push(val_f32);
+        }
+
+        // Drop perfectly 0 vectors (garbage pages)
+        if is_garbage || sum_sq == 0.0 {
+            total_skipped_zeros += 1;
+            continue;
+        }
+
+        // --- PRE-NORMALIZATION (L2) ---
+        let norm = sum_sq.sqrt();
+        for v in vector_f32.iter_mut() {
+            *v /= norm;
+        }
+
+        vector_idx_buffer.insert(id, vector_f32);
+        total_inserted += 1;
+
+        if total_inserted % 1_000_000 == 0 {
+            println!(
+                "{}: Buffered {} million vectors (Skipped Garbage: {})",
+                icons::DB_INSERT,
+                total_inserted / 1_000_000,
+                total_skipped_zeros
+            );
+        }
+
+        // Trigger GPU Assignment when RAM is full
+        if vector_idx_buffer.len() >= MAX_VECTORS_IN_VRAM {
+            println!(
+                "{}: VRAM limit reached. Committing {} vectors to GPU...",
+                icons::DB_INSERT,
+                vector_idx_buffer.len()
+            );
+            vector_process(&mut vector_idx_buffer)?;
+            println!("{}: GPU batch complete.", icons::DB_INSERT);
+        }
+    }
+
+    // Flush any remaining vectors in the buffer
+    if !vector_idx_buffer.is_empty() {
+        println!(
+            "{}: Flushing final {} vectors to GPU...",
+            icons::DB_INSERT,
+            vector_idx_buffer.len()
+        );
+        vector_process(&mut vector_idx_buffer)?;
+    }
+
+    println!(
+        "{}: Binary import complete! Total Valid Vectors: {} | Total Skipped Garbage: {}",
+        icons::DB_INSERT,
+        total_inserted,
+        total_skipped_zeros
+    );
+
+    println!(
+        "{}: Merging staging files into buckets...",
+        icons::DB_INSERT
+    );
+
+    let staging_files: Vec<usize> = read_dir(&PRIECO_CONFIG.vector_path)?
+        .filter_map(|e| e.ok())
+        .filter_map(|e| {
+            let name = e.file_name();
+            let s = name.to_string_lossy();
+            s.strip_prefix("staging_")
+                .and_then(|r| r.strip_suffix(".bin"))
+                .and_then(|id_str| id_str.parse::<usize>().ok())
+        })
+        .collect();
+
+    let total_buckets = staging_files.len();
+    let mut merged_count = 0;
+    for bucket_id in &staging_files {
+        merge_bucket(*bucket_id)?;
+        merged_count += 1;
+        if merged_count % 100 == 0 || merged_count == total_buckets {
+            println!(
+                "{}: Merge progress: {}/{} ({:.1}%)",
+                icons::DB_INSERT,
+                merged_count,
+                total_buckets,
+                merged_count as f64 / total_buckets as f64 * 100.0
+            );
+        }
+    }
+    Ok(())
 }

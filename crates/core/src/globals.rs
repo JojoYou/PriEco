@@ -141,6 +141,7 @@ pub struct SearchResult {
     pub content: String,
     pub reading_level: String,
     pub formatted_load: String,
+    pub intent: String,
     pub source_engine: String,
 }
 #[derive(Serialize, Clone)]
@@ -164,6 +165,9 @@ pub struct WebScrollResult {
     pub price: String,
 }
 // Index documents
+fn default_unknown_intent() -> u8 {
+    5
+}
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WebDocument {
     pub url: String,
@@ -191,9 +195,17 @@ pub struct WebDocument {
     pub load: f64, // Loading time
     pub date: i64, // Date of crawling
 
+    #[serde(default = "default_unknown_intent")]
+    pub intent: u8,
+
+    #[serde(default)]
+    pub is_mobile: bool,
+    #[serde(default)]
+    pub has_500_words: bool,
+
+    // Dynamic data
     #[serde(default)]
     pub search_score: f32,
-
     #[serde(default)]
     pub source: String,
 }
@@ -550,7 +562,7 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
         .data_block_compression_policy(CompressionPolicy::disabled())
         .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
 
-    let meta_ks = meta_db.keyspace("meta", || meta_opts).unwrap();
+    let meta_ks = meta_db.keyspace("meta", || meta_opts.clone()).unwrap();
 
     // Goggles storage
     let goggles_opts = KeyspaceCreateOptions::default()
@@ -582,7 +594,9 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
     Arc::new(PriecoStorage {
         meta_db,
         meta_ks,
+
         goggles_ks,
+
         blob_db,
         blobs_ks,
     })
@@ -613,6 +627,8 @@ pub static TANTIVY_INDEX: Lazy<Arc<Index>> = Lazy::new(|| {
     builder.add_text_field("loc", STRING | FAST);
     builder.add_i64_field("date", INDEXED | FAST);
     builder.add_bool_field("safe_s", INDEXED | FAST);
+
+    builder.add_u64_field("intent", INDEXED | FAST);
 
     let schema = builder.build();
 
@@ -1018,8 +1034,8 @@ extern "C" __global__ void topk_argmax(
                         .zip(query_norm.iter())
                         .map(|(v, q)| v * q)
                         .sum();
-                    let vnorm: f32 = slice.iter().map(|v| v * v).sum::<f32>().sqrt().max(1e-10);
-                    results.push((id, dot / vnorm));
+
+                    results.push((id, dot));
                 }
 
                 Some(results)

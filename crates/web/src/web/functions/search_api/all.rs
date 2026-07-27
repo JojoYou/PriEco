@@ -488,6 +488,7 @@ fn format_google(json: Value) -> Vec<SearchResult> {
                 formatted_load: String::new(),
                 source_engine: String::new(),
                 content: String::new(),
+                intent: String::new(),
             });
         }
     }
@@ -554,6 +555,7 @@ fn format_bing(json: Value) -> Vec<SearchResult> {
                         formatted_load: String::new(),
                         source_engine: String::new(),
                         content: String::new(),
+                        intent: String::new(),
                     });
                 }
             }
@@ -620,6 +622,7 @@ fn format_brave(json: Value) -> Vec<SearchResult> {
                 formatted_load: String::new(),
                 source_engine: String::new(),
                 content: String::new(),
+                intent: String::new(),
             });
         }
     }
@@ -675,6 +678,7 @@ fn format_brave2(json: Value) -> Vec<SearchResult> {
                 formatted_load: String::new(),
                 source_engine: String::new(),
                 content: String::new(),
+                intent: String::new(),
             });
         }
     }

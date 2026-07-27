@@ -34,7 +34,7 @@ use serde_json::Value as Json_Value;
 use tantivy::{
     Term,
     collector::TopDocs,
-    query::{BooleanQuery, Occur, Query, QueryParser, TermQuery, TermSetQuery},
+    query::{BooleanQuery, BoostQuery, Occur, Query, QueryParser, TermQuery, TermSetQuery},
     schema::{IndexRecordOption, Value},
 };
 use zstd::bulk::Decompressor;
@@ -126,10 +126,19 @@ pub async fn run(
                 "⚡"
             };
 
+            let raw_intent = item.get("intent").and_then(|v| v.as_u64()).unwrap_or(5);
+            let intent = match raw_intent {
+                0 => "🧠 Informational",
+                1 => "💳 Transactional",
+                2 => "🛍️ Commercial Investigation",
+                3 => "🧭 Navigational",
+                4 => "📍 Local",
+                _ => "🎯 Unknown Intent",
+            }
+            .to_string();
+
             let raw_source = item.get("source").and_then(|v| v.as_str()).unwrap_or("");
-
             let mut source_engine = raw_source.to_string();
-
             if source_engine.is_empty() {
                 source_engine = "🔍 PriEco Index".to_string();
             } else {
@@ -188,6 +197,7 @@ pub async fn run(
                 formatted_load: formatted_load.to_string(),
                 source_engine,
                 content: content.to_string(),
+                intent,
             });
         }
     }
@@ -414,7 +424,7 @@ pub async fn run_json(
         );
 
         // Temp remove blocked terms
-        let blocked_terms: &[&str] = &["porn", "sex"];
+        let blocked_terms: &[&str] = &["porn", "sex", "dick", "fap"];
         results.retain(|doc| {
             let haystack = format!(
                 "{} {} {} {} {}",
@@ -571,6 +581,8 @@ fn search_tantivy(
     let lang_field = schema.get_field("lang").ok()?;
     let loc_field = schema.get_field("loc").ok()?;
 
+    let intent_field = schema.get_field("intent").ok()?;
+
     let mut query_parser = QueryParser::for_index(
         &TANTIVY_INDEX,
         vec![
@@ -589,6 +601,23 @@ fn search_tantivy(
     let parsed_query = query_parser.parse_query(query_text).ok()?;
 
     let mut clauses: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Must, parsed_query)];
+
+    let intent_val: u64 = match intent {
+        QueryIntent::Informational => 0,
+        QueryIntent::Transactional => 1,
+        QueryIntent::CommercialInvestigation => 2,
+        QueryIntent::Navigational => 3,
+        QueryIntent::Local => 4,
+        QueryIntent::Unknown => 5,
+    };
+    if intent != &QueryIntent::Unknown {
+        let intent_term = Term::from_field_u64(intent_field, intent_val);
+        let intent_term_query = Box::new(TermQuery::new(intent_term, IndexRecordOption::Basic));
+
+        let boosted_intent_query = Box::new(BoostQuery::new(intent_term_query, 2.0));
+
+        clauses.push((Occur::Should, boosted_intent_query));
+    }
 
     if intent != &QueryIntent::Navigational && lang != "all" && !lang.is_empty() {
         let lang_term = Term::from_field_text(lang_field, lang);

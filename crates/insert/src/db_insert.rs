@@ -13,6 +13,8 @@ use std::{
   Import external libraries
 */
 use fjall::PersistMode;
+use half::f16;
+use memmap2::MmapOptions;
 use zip::ZipArchive;
 use zstd::stream::{Encoder as ZstdEncoder, decode_all};
 
@@ -29,7 +31,7 @@ use prieco_core::{
   Constants
 */
 const SKIP_MERGE_FILE: &str = "dont_merge.txt";
-const MAX_VECTORS_IN_VRAM: usize = 1_500_000;
+pub const MAX_VECTORS_IN_VRAM: usize = 1_500_000;
 const BATCH_SIZE_FOR_GPU: usize = 1_500;
 const ZSTD_LEVEL: i32 = 3;
 
@@ -177,6 +179,11 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     sts: points[3],
                     load: parts[12].parse().unwrap_or_default(),
                     date: parts[13].parse().unwrap_or(0),
+
+                    has_500_words: false,
+                    intent: 0,
+                    is_mobile: false,
+
                     search_score: 0.0,
                     source: String::new(),
                 };
@@ -287,7 +294,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     Ok(())
 }
 
-fn vector_process(
+pub fn vector_process(
     chunk_buffer: &mut HashMap<u64, Vec<f32>>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let ids: Vec<u64> = chunk_buffer.keys().copied().collect();
@@ -383,7 +390,7 @@ pub fn merge_tantivy() {
     }
 }
 
-fn merge_bucket(bucket_id: usize) -> Result<(), Box<dyn Error + Send + Sync>> {
+pub fn merge_bucket(bucket_id: usize) -> Result<(), Box<dyn Error + Send + Sync>> {
     let staging_path = format!(
         "{}/staging_{:06}.bin",
         &PRIECO_CONFIG.vector_path, bucket_id

@@ -86,6 +86,7 @@ tokenizers = "0.21.1" # Ort model tokenizer
 cudarc = { version = "0.19.2" } # Nvidia GPU, used for comparing cosine distance between vectors
 ndarray = "0.15.1"
 bytemuck = "1.25.0"
+half = "2.7.1" # F16 embeds
 
 # Mini crawler
 bincode-next = { version = "2.1.0", features = ["serde"] }
