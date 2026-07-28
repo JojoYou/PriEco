@@ -412,14 +412,18 @@ pub fn merge_bucket(bucket_id: usize) -> Result<(), Box<dyn Error + Send + Sync>
     }
 
     // Collect staging IDs
-    let mut staging_ids: HashMap<u64, ()> = HashMap::new();
+    let mut staging: HashMap<u64, u64> = HashMap::new();
     {
         let mut f = BufReader::with_capacity(1 << 20, File::open(&staging_path)?);
         let mut id_buf = [0u8; ID_SIZE];
         let mut skip = vec![0u8; VECTOR_DIM * 4];
+        let mut current_offset = 0u64;
+
         while f.read_exact(&mut id_buf).is_ok() {
-            staging_ids.insert(u64::from_le_bytes(id_buf), ());
+            let id = u64::from_le_bytes(id_buf);
+            staging.insert(id, current_offset);
             f.read_exact(&mut skip)?;
+            current_offset += RECORD_SIZE as u64;
         }
     }
 
@@ -451,7 +455,7 @@ pub fn merge_bucket(bucket_id: usize) -> Result<(), Box<dyn Error + Send + Sync>
         for i in 0..count {
             let base = i * RECORD_SIZE;
             let id = u64::from_le_bytes(data[base..base + ID_SIZE].try_into().unwrap());
-            if !staging_ids.contains_key(&id) {
+            if !staging.contains_key(&id) {
                 encoder.write_all(&data[base..base + RECORD_SIZE])?;
             }
         }
@@ -461,8 +465,17 @@ pub fn merge_bucket(bucket_id: usize) -> Result<(), Box<dyn Error + Send + Sync>
     {
         let mut f = BufReader::with_capacity(1 << 20, File::open(&staging_path)?);
         let mut buf = vec![0u8; RECORD_SIZE];
+        let mut current_offset = 0u64;
+
         while f.read_exact(&mut buf).is_ok() {
-            encoder.write_all(&buf)?;
+            let id = u64::from_le_bytes(buf[0..ID_SIZE].try_into().unwrap());
+
+            // Write last embed
+            if staging.get(&id) == Some(&current_offset) {
+                encoder.write_all(&buf)?;
+            }
+
+            current_offset += RECORD_SIZE as u64;
         }
     }
 

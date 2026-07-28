@@ -141,7 +141,9 @@
     position: absolute;
     top: 10px;
     left: 20px;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 5px 8px;
     border-radius: 30px;
     cursor: pointer;
@@ -150,6 +152,7 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     border: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .donate::before {

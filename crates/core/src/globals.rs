@@ -1014,8 +1014,16 @@ extern "C" __global__ void topk_argmax(
             .par_iter()
             .filter_map(|&cid| {
                 let zst_path = format!("{}/bucket_{:06}.bin.zst", &PRIECO_CONFIG.vector_path, cid);
-                if !Path::new(&zst_path).exists() || cid == 080159 {
+                if !Path::new(&zst_path).exists() {
                     return None;
+                }
+
+                if let Ok(meta) = std::fs::metadata(&zst_path) {
+                    if meta.len() > 1_073_741_824 {
+                        return None;
+                    }
+                } else {
+                    return None; // Skip if we can't read file metadata
                 }
 
                 let compressed = std::fs::read(&zst_path).ok()?;

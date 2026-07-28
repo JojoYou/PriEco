@@ -76,7 +76,7 @@ pub struct OrphanPayload {
 }
 
 pub fn run() {
-    println!("Inserting IVF");
+    /*println!("Inserting IVF");
     if let Err(e) = import_binary_vectors_mmap() {
         println!(
             "{}Error: Buckets failed!{} {}",
@@ -84,7 +84,47 @@ pub fn run() {
             colors::RESET,
             e
         );
-    };
+    };*/
+
+    /*println!(
+        "{}: Merging staging files into buckets...",
+        icons::DB_INSERT
+    );
+    let staging_files: Vec<usize> = read_dir(&PRIECO_CONFIG.vector_path)?
+        .filter_map(|e| e.ok())
+        .filter_map(|e| {
+            let name = e.file_name();
+            let s = name.to_string_lossy();
+            s.strip_prefix("staging_")
+                .and_then(|r| r.strip_suffix(".bin"))
+                .and_then(|id_str| id_str.parse::<usize>().ok())
+        })
+        .collect();
+
+    let total_buckets = staging_files.len();
+    let mut merged_count = 0;
+    for bucket_id in &staging_files {
+        if let Err(e) = merge_bucket(*bucket_id) {
+            println!(
+                "{}Failed to merge bucket!{} {}",
+                colors::RED,
+                colors::RESET,
+                e
+            );
+            return;
+        };
+        merged_count += 1;
+        if merged_count % 100 == 0 || merged_count == total_buckets {
+            println!(
+                "{}: Merge progress: {}/{} ({:.1}%)",
+                icons::DB_INSERT,
+                merged_count,
+                total_buckets,
+                merged_count as f64 / total_buckets as f64 * 100.0
+            );
+        }
+    }
+    println!("{}: Merge complete", icons::DB_INSERT);*/
 
     //migrate_meta_and_blobs();
     /*let directories = find_all_directories();
@@ -1480,9 +1520,17 @@ pub fn import_binary_vectors_mmap() -> Result<(), Box<dyn Error + Send + Sync>> 
         icons::DB_INSERT
     );
 
+    // --- RESUME CONFIGURATION ---
+    // Set these to the values from your chosen log line.
+    // Log: 💾: Buffered 358 million vectors (Skipped Garbage: 23138953)
+    let resume_inserted = 358_000_000;
+    let resume_skipped = 23_138_953;
+    let items_to_skip = resume_inserted + resume_skipped;
+    // ----------------------------
+
     // 1. Open files
     let ids_file = File::open("/mnt/ssd/recovery_ids.txt")?;
-    let bin_file = File::open("/mnt/ssd/recovery_embeds.bin")?;
+    let bin_file = File::open("/mnt/hdd/recovery_embeds.bin")?;
 
     // 2. Memory map both files
     println!("{}: Mapping files to virtual memory...", icons::DB_INSERT);
@@ -1490,7 +1538,6 @@ pub fn import_binary_vectors_mmap() -> Result<(), Box<dyn Error + Send + Sync>> 
     let bin_mmap = unsafe { MmapOptions::new().map(&bin_file)? };
 
     // 3. Advise the Linux kernel that we are reading strictly sequentially
-    // This triggers aggressive NVMe read-ahead and drops pages behind us so we don't eat all our RAM.
     #[cfg(unix)]
     {
         ids_mmap.advise(memmap2::Advice::Sequential)?;
@@ -1498,23 +1545,30 @@ pub fn import_binary_vectors_mmap() -> Result<(), Box<dyn Error + Send + Sync>> 
     }
 
     let mut vector_idx_buffer: HashMap<u64, Vec<f32>> = HashMap::with_capacity(MAX_VECTORS_IN_VRAM);
-    let mut total_inserted = 0;
-    let mut total_skipped_zeros = 0;
 
-    println!("{}: Streaming from disk via mmap...", icons::DB_INSERT);
+    // Start counters from our resume points so logs remain accurate
+    let mut total_inserted = resume_inserted;
+    let mut total_skipped_zeros = resume_skipped;
+
+    println!(
+        "{}: Streaming from disk via mmap (Skipping first {} items)...",
+        icons::DB_INSERT,
+        items_to_skip
+    );
 
     // 4. Create zero-copy iterators
-    // This splits the text file by newline, and chunks the binary file into exact 768-byte slices
     let id_lines = ids_mmap.split(|&b| b == b'\n');
     let bin_chunks = bin_mmap.chunks_exact(768);
 
-    // 5. Iterate lockstep!
-    for (id_bytes, bin_chunk) in id_lines.zip(bin_chunks) {
+    // 5. Iterate lockstep, fast-forwarding to where we left off!
+    let zipped_iter = id_lines.zip(bin_chunks).skip(items_to_skip);
+
+    for (id_bytes, bin_chunk) in zipped_iter {
         if id_bytes.is_empty() {
             continue;
         }
 
-        // Fast zero-copy parse (we know IDs are ASCII numbers)
+        // Fast zero-copy parse
         let id_str = unsafe { std::str::from_utf8_unchecked(id_bytes) };
         let id = match id_str.parse::<u64>() {
             Ok(parsed) => parsed,

@@ -84,6 +84,7 @@
     backdrop-filter: blur(20px);
     border-radius: 20px;
     box-shadow: 0 0 10px 10px #0002;
+    overflow: hidden;
 }
 
 .div_full_img img {

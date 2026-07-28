@@ -593,11 +593,6 @@ fn search_tantivy(
         ],
     );
 
-    query_parser.set_field_boost(title_field, 3.0);
-    query_parser.set_field_boost(keywords_field, 2.0);
-    query_parser.set_field_boost(description_field, 1.5);
-    query_parser.set_field_boost(content_field, 1.0);
-
     let parsed_query = query_parser.parse_query(query_text).ok()?;
 
     let mut clauses: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Must, parsed_query)];

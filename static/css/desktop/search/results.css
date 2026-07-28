@@ -230,6 +230,10 @@
     border: 0;
     background: none;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .quick_tune img {
@@ -407,6 +411,10 @@
     background: transparent;
     border: none;
     padding: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
 }
 .res_opt img {
     height: 12px;
