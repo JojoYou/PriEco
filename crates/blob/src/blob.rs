@@ -16,118 +16,31 @@
   Import system libraries
 */
 use std::{
-    cell::RefCell,
-    collections::HashMap,
-    error::Error,
-    fs::{self, File, read_dir, remove_file},
-    io::{Cursor, Read, Write},
-    os::{fd::AsRawFd, unix::fs::FileExt},
+    fs::{File, create_dir_all, read_dir, remove_dir_all, remove_file},
+    io::Read,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicUsize, Ordering},
-    thread,
-    time::{Duration, Instant},
 };
 
-use dashmap::DashMap;
 /*
   Import external libraries
 */
-use fjall::{CompressionType, KeyspaceCreateOptions, PersistMode, config::CompressionPolicy};
+use dashmap::DashMap;
+use fjall::PersistMode;
 use flate2::read::GzDecoder;
-use half::f16;
-use io_uring::{IoUring, opcode, types};
-use memmap2::MmapOptions;
 use once_cell::sync::Lazy;
-use prieco_insert::db_insert::{MAX_VECTORS_IN_VRAM, merge_bucket, merge_tantivy, vector_process};
-use rand::{Rng, rng};
-use rayon::prelude::*;
-use tantivy::{Document, tokenizer::TextAnalyzer};
+use std::sync::Arc;
 use tar::Archive;
 
 /*
   Import own libraries
 */
 use prieco_core::{
-    META_DECODER, PRIECO_CONFIG, PRIECO_FJALL, WebDocument,
+    BLOB_IMPORT_DIR, PRIECO_FJALL,
     globals::{colors, icons},
-    url_to_domain_id,
 };
-use rocksdb::{DB, DBCompressionType, Options};
-use std::sync::Arc;
-use zstd::bulk::{Compressor, Decompressor};
-pub static ORPHAN_STORAGE: Lazy<Arc<DB>> = Lazy::new(|| {
-    Arc::new({
-        let mut options = Options::default();
-        options.create_if_missing(true);
-        options.set_compression_type(DBCompressionType::Lz4);
-
-        options.set_max_background_jobs(2);
-        options.set_write_buffer_size(64 * 1024 * 1024);
-
-        DB::open(&options, Path::new("/mnt/hdd/orphan_blobs_triage")).unwrap()
-    })
-});
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct OrphanPayload {
-    pub html_id: String,
-    pub recovered_url: String,
-    pub tag_data: HashMap<String, Vec<String>>,
-}
 
 pub fn run() {
-    /*println!("Inserting IVF");
-    if let Err(e) = import_binary_vectors_mmap() {
-        println!(
-            "{}Error: Buckets failed!{} {}",
-            colors::RED,
-            colors::RESET,
-            e
-        );
-    };*/
-
-    /*println!(
-        "{}: Merging staging files into buckets...",
-        icons::DB_INSERT
-    );
-    let staging_files: Vec<usize> = read_dir(&PRIECO_CONFIG.vector_path)?
-        .filter_map(|e| e.ok())
-        .filter_map(|e| {
-            let name = e.file_name();
-            let s = name.to_string_lossy();
-            s.strip_prefix("staging_")
-                .and_then(|r| r.strip_suffix(".bin"))
-                .and_then(|id_str| id_str.parse::<usize>().ok())
-        })
-        .collect();
-
-    let total_buckets = staging_files.len();
-    let mut merged_count = 0;
-    for bucket_id in &staging_files {
-        if let Err(e) = merge_bucket(*bucket_id) {
-            println!(
-                "{}Failed to merge bucket!{} {}",
-                colors::RED,
-                colors::RESET,
-                e
-            );
-            return;
-        };
-        merged_count += 1;
-        if merged_count % 100 == 0 || merged_count == total_buckets {
-            println!(
-                "{}: Merge progress: {}/{} ({:.1}%)",
-                icons::DB_INSERT,
-                merged_count,
-                total_buckets,
-                merged_count as f64 / total_buckets as f64 * 100.0
-            );
-        }
-    }
-    println!("{}: Merge complete", icons::DB_INSERT);*/
-
-    //migrate_meta_and_blobs();
-    /*let directories = find_all_directories();
+    let directories = find_all_directories();
 
     if directories.is_empty() {
         return;
@@ -142,7 +55,7 @@ pub fn run() {
             colors::RESET,
         );
 
-        if let Err(e) = process_directory(&dir_path, &known_blobs) {
+        if let Err(e) = process_directory(&dir_path) {
             println!(
                 "{}{}: Processing directory: {:?} Error: {}{}",
                 icons::BLOB,
@@ -173,18 +86,10 @@ pub fn run() {
                 );
             }
         }
-    }*/
+    }
 }
-const BLOB_V2_PROGRESS_FILE: &str = "blob_v2_migration_progress.bin";
-const META_INDEX_CACHE_FILE: &str = "meta_known_blobs_cache.bin";
-const ORPHAN_RAM_DIR: &str = "/mnt/ramdisk/prieco_orphans";
 
-const MAX_RAM_FILES: usize = 100_000;
-const CHECK_INTERVAL: u64 = 5_000;
-fn process_directory(
-    dir_path: &Path,
-    known_blobs: &[[u8; 8]],
-) -> Result<(), Box<dyn std::error::Error>> {
+fn process_directory(dir_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let entries = read_dir(dir_path)?;
     let tar_files: Vec<PathBuf> = entries
         .filter_map(|e| e.ok())
@@ -266,7 +171,14 @@ fn process_directory(
             files_inserted += 1;
 
             if files_inserted % 1000 == 0 {
-                let _ = batch.commit();
+                if let Err(e) = batch.commit() {
+                    println!(
+                        "{}Failed to commit blob batch!{} {}",
+                        colors::RED,
+                        colors::RESET,
+                        e
+                    );
+                };
                 batch = PRIECO_FJALL.blob_db.batch();
 
                 println!(
@@ -280,8 +192,12 @@ fn process_directory(
                     ))
                 );
 
-                let key_arr = name.to_le_bytes();
-                if known_blobs.binary_search(&key_arr).is_err() {
+                if PRIECO_FJALL
+                    .meta_ks
+                    .get(&name.to_le_bytes())
+                    .unwrap()
+                    .is_none()
+                {
                     println!(
                         "{}: {}INTEGRITY CHECK FAILED for key {}!{}",
                         icons::BLOB,
@@ -310,8 +226,23 @@ fn process_directory(
         );
 
         println!("{}: Flushing!", icons::BLOB);
-        let _ = batch.commit();
-        let _ = PRIECO_FJALL.blob_db.persist(PersistMode::SyncAll);
+        if let Err(e) = batch.commit() {
+            println!(
+                "{}Failed to commit blob batch!{} {}",
+                colors::RED,
+                colors::RESET,
+                e
+            );
+        };
+
+        if let Err(e) = PRIECO_FJALL.blob_db.persist(PersistMode::SyncAll) {
+            println!(
+                "{}Failed to make blobdb persistant!{} {}",
+                colors::RED,
+                colors::RESET,
+                e
+            );
+        };
 
         println!(
             "{}: {}Flushed!{}",
@@ -335,617 +266,23 @@ fn process_directory(
     Ok(())
 }
 
-/* Helper functions */
-/*fn find_all_directories() -> Vec<PathBuf> {
-    let watch_path = Path::new(BLOB_IMPORT_DIR);
-    if !watch_path.exists() {
-        let _ = create_dir_all(watch_path);
-        return Vec::new();
-    }
-
-    read_dir(watch_path)
-        .map(|entries| {
-            entries
-                .filter_map(|e| e.ok())
-                .filter(|e| e.path().is_dir())
-                .map(|e| e.path())
-                .collect()
-        })
-        .unwrap_or_else(|_| Vec::new())
-}
+/*
+  Decode blob
 */
-
-const RESUME_FILE: &str = "/mnt/ssd/feed_resume.txt";
-const BATCH_SIZE: usize = 1000;
-pub fn feed_blobs_for_reembedding() {
-    let start_key = fs::read_to_string(RESUME_FILE)
-        .ok()
-        .and_then(|s| s.trim().parse::<u64>().ok());
-
-    let mut fed = 0u64;
-    let mut total_skipped = 0u64;
-
-    let mut iter = if let Some(k) = start_key {
-        println!("Resuming from meta_id: {}", k);
-        PRIECO_FJALL.meta_ks.range(k.to_be_bytes()..)
-    } else {
-        println!("Starting from the beginning...");
-        PRIECO_FJALL.meta_ks.iter()
-    };
-
-    let mut batch = Vec::with_capacity(BATCH_SIZE + 100);
-    let mut last_meta_id = 0u64;
-
-    let io_pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(8)
-        .build()
-        .expect("Failed to build custom thread pool");
-
-    loop {
-        let mut paused_for_space = false;
-        while full_dir("/mnt/vec/") {
-            if !paused_for_space {
-                println!("Paused: /mnt/vec/");
-                paused_for_space = true;
-            }
-            thread::sleep(Duration::from_secs(2));
-        }
-
-        if paused_for_space {
-            println!("Resuming: Space freed up in /mnt/vec/");
-        }
-
-        for _ in 0..BATCH_SIZE {
-            if let Some(item) = iter.next() {
-                if let Ok((key, val)) = item.into_inner() {
-                    batch.push((key, val));
-                } else {
-                    total_skipped += 1;
-                }
-            } else {
-                break;
-            }
-        }
-
-        if batch.is_empty() {
-            break;
-        }
-
-        let chunk_size = 50;
-
-        let chunk_results: Vec<(u64, [u64; 6], [u128; 9], [u64; 2])> = io_pool.install(|| {
-            batch
-                .par_chunks(chunk_size)
-                .map_init(
-                    || {
-                        zstd::bulk::Decompressor::with_prepared_dictionary(&META_DECODER)
-                            .expect("Failed to init zstd")
-                    },
-                    |decompressor, chunk| {
-                        let mut l_fed = 0;
-                        let mut l_skips = [0u64; 6];
-                        let mut l_times = [0u128; 9];
-                        let mut l_cache_hits = 0u64;
-                        let mut l_cache_misses = 0u64;
-
-                        struct BlobPayload {
-                            meta_id: u64,
-                            doc: WebDocument,
-                            decompressed_blob: Vec<u8>,
-                        }
-
-                        let mut blob_payloads: Vec<BlobPayload> = Vec::with_capacity(chunk.len());
-                        let mut chunk_missing_dict_ids: Vec<usize> = Vec::new();
-
-                        for (key, val) in chunk {
-                            let t = Instant::now();
-                            let decompressed =
-                                match decompressor.decompress(val.as_ref(), 10_000_000) {
-                                    Ok(d) => d,
-                                    Err(_) => {
-                                        l_skips[0] += 1;
-                                        continue;
-                                    }
-                                };
-                            l_times[0] += t.elapsed().as_micros();
-
-                            let t = Instant::now();
-                            let doc: WebDocument = match serde_json::from_slice(&decompressed) {
-                                Ok(d) => d,
-                                Err(_) => {
-                                    l_skips[1] += 1;
-                                    continue;
-                                }
-                            };
-                            l_times[1] += t.elapsed().as_micros();
-
-                            let Ok(id_bytes): Result<[u8; 8], _> = key.as_ref().try_into() else {
-                                l_skips[2] += 1;
-                                continue;
-                            };
-                            let meta_id = u64::from_be_bytes(id_bytes);
-
-                            let stem = doc.html.rsplit('/').next().and_then(|f| {
-                                f.strip_suffix(".zst").or_else(|| f.strip_suffix(".txt"))
-                            });
-                            let Some(blob_id) = stem.and_then(|s| s.parse::<u64>().ok()) else {
-                                l_skips[2] += 1;
-                                continue;
-                            };
-
-                            let t_ssd = Instant::now();
-                            let raw_blob = match PRIECO_FJALL.blobs_ks.get(&blob_id.to_le_bytes()) {
-                                Ok(Some(b)) => b,
-                                _ => {
-                                    l_skips[3] += 1;
-                                    continue;
-                                }
-                            };
-                            if raw_blob.is_empty() {
-                                l_skips[4] += 1;
-                                continue;
-                            }
-                            l_times[2] += t_ssd.elapsed().as_micros();
-
-                            let is_compressed = raw_blob[0] == 1;
-                            let payload = &raw_blob[1..];
-                            let t_zstd = Instant::now();
-                            let decompressed_blob = if is_compressed {
-                                match zstd::stream::decode_all(std::io::Cursor::new(payload)) {
-                                    Ok(data) => data,
-                                    Err(_) => continue,
-                                }
-                            } else {
-                                payload.to_vec()
-                            };
-                            l_times[3] += t_zstd.elapsed().as_micros();
-
-                            let t_collect = Instant::now();
-                            collect_missing_ids(
-                                &decompressed_blob,
-                                &mut chunk_missing_dict_ids,
-                                &mut l_cache_hits,
-                                &mut l_cache_misses,
-                            );
-                            l_times[4] += t_collect.elapsed().as_micros();
-
-                            blob_payloads.push(BlobPayload {
-                                meta_id,
-                                doc,
-                                decompressed_blob,
-                            });
-                        }
-
-                        let t_dict = Instant::now();
-                        bulk_prefetch_missing_words(chunk_missing_dict_ids);
-                        l_times[5] += t_dict.elapsed().as_micros();
-
-                        for payload in blob_payloads {
-                            let (embed_text, links_text, has_500_words, is_mobile, b_str, _, _) =
-                                decode_decompressed_to_embed_text(&payload.decompressed_blob);
-                            l_times[6] += b_str;
-
-                            let t_format = Instant::now();
-                            let result_str = format!(
-                                "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
-                                payload.doc.url,
-                                payload.doc.title,
-                                payload.meta_id,
-                                payload.doc.lang,
-                                embed_text,
-                                links_text,
-                                has_500_words,
-                                is_mobile
-                            );
-                            l_times[7] += t_format.elapsed().as_micros();
-
-                            let t_write = Instant::now();
-                            write_to_random_file("/mnt/vec/", &result_str);
-                            l_times[8] += t_write.elapsed().as_micros();
-
-                            l_fed += 1;
-                        }
-
-                        (l_fed, l_skips, l_times, [l_cache_hits, l_cache_misses])
-                    },
-                )
-                .collect()
-        });
-
-        let mut batch_fed = 0;
-        let mut skips = [0u64; 6];
-        let mut times = [0u128; 9];
-        let mut cache_stats = [0u64; 2];
-
-        for (f, sk, tm, cs) in chunk_results {
-            batch_fed += f;
-            for i in 0..6 {
-                skips[i] += sk[i];
-            }
-            for i in 0..9 {
-                times[i] += tm[i];
-            }
-            cache_stats[0] += cs[0];
-            cache_stats[1] += cs[1];
-        }
-
-        fed += batch_fed;
-        total_skipped += skips.iter().sum::<u64>();
-
-        if let Some((last_key, _)) = batch.last() {
-            if let Ok(id_bytes) = <[u8; 8]>::try_from(last_key.as_ref()) {
-                last_meta_id = u64::from_be_bytes(id_bytes);
-                let _ = fs::write(RESUME_FILE, last_meta_id.to_string());
-            }
-        }
-
-        let total_lookups = cache_stats[0] + cache_stats[1];
-        let hit_rate = if total_lookups > 0 {
-            (cache_stats[0] as f64 / total_lookups as f64) * 100.0
-        } else {
-            0.0
-        };
-
-        batch.clear();
-        println!(
-            "✅ Fed: {} | ❌ Skipped: {} | Last ID: {}",
-            fed, total_skipped, last_meta_id
-        );
-        println!(
-            "⚠️ Skips -> Meta:{} JSON:{} BadID:{} DBMiss:{} Empty:{}",
-            skips[0], skips[1], skips[2], skips[3], skips[4]
-        );
-
-        println!(
-            "⏱️ CPU(ms) -> MetaZstd: {:.0} | JSON: {:.0} | BlobZstd: {:.0} | CollectIDs: {:.0} | DecodeText: {:.0} | FormatStr: {:.0}",
-            times[0] as f64 / 1000.0,
-            times[1] as f64 / 1000.0,
-            times[3] as f64 / 1000.0,
-            times[4] as f64 / 1000.0,
-            times[6] as f64 / 1000.0,
-            times[7] as f64 / 1000.0
-        );
-        println!(
-            "⏱️ I/O(ms) -> FjallFetch: {:.0} | DictFetch: {:.0} | Write: {:.0}",
-            times[2] as f64 / 1000.0,
-            times[5] as f64 / 1000.0,
-            times[8] as f64 / 1000.0
-        );
-        println!(
-            "🧠 Cache -> Hits: {} | Misses: {} | Hit Rate: {:.2}% | Cache size {}/{}",
-            cache_stats[0],
-            cache_stats[1],
-            hit_rate,
-            CACHE_ITEM_COUNT.load(Ordering::Relaxed),
-            MAX_CACHE_ITEMS
-        );
-    }
-}
-fn collect_missing_ids(
-    decompressed: &[u8],
-    missing_ids: &mut Vec<usize>,
-    cache_hits: &mut u64,
-    cache_misses: &mut u64,
-) {
-    let mut i = 0;
-    let mut simulated_embed_len = 0;
-    let mut p_word_count = 0;
-
-    'outer: while i < decompressed.len() {
-        if i > 30_000 {
-            break 'outer;
-        }
-
-        let tag_byte = decompressed[i];
-        i += 1;
-        let tag_name = tag_byte_to_name(tag_byte);
-
-        let skip_tag = matches!(tag_name, "meta" | "img_src" | "a_href");
-        let is_p = tag_name == "p";
-        let is_meta = tag_name == "meta";
-
-        while i < decompressed.len() {
-            if i + 3 < decompressed.len()
-                && decompressed[i] == 255
-                && decompressed[i + 1] == 255
-                && decompressed[i + 2] == 255
-                && decompressed[i + 3] == 255
-            {
-                i += 4;
-                break;
-            }
-
-            let len = decompressed[i] as usize;
-            i += 1;
-
-            if len == 0 {
-                continue;
-            }
-            if i + len > decompressed.len() {
-                break;
-            }
-
-            let slice = &decompressed[i..i + len];
-
-            if is_p {
-                p_word_count += 1;
-            }
-
-            if simulated_embed_len >= 600 && p_word_count >= 500 {
-                break 'outer;
-            }
-
-            if tag_name == "img_src" || tag_name == "a_href" {
-                i += len;
-                continue;
-            }
-
-            if !is_meta && simulated_embed_len >= 600 {
-                i += len;
-                continue;
-            }
-
-            if slice.len() > 3
-                || !slice.iter().all(|&b| {
-                    b.is_ascii_alphanumeric()
-                        || b == b'.'
-                        || b == b','
-                        || b == b'-'
-                        || b == b'!'
-                        || b == b'?'
-                        || b == b'\''
-                })
-            {
-                let mut id = 0u64;
-                for (j, b) in slice.iter().enumerate() {
-                    id |= (*b as u64) << (8 * j);
-                }
-                let id_usize = id as usize;
-
-                if id_usize >= 256 {
-                    if DICT_CACHE.contains_key(&id_usize) {
-                        *cache_hits += 1;
-                    } else {
-                        *cache_misses += 1;
-                        missing_ids.push(id_usize);
-                    }
-                }
-            }
-
-            if !skip_tag {
-                simulated_embed_len += len + 1;
-            }
-
-            i += len;
-        }
-    }
-}
-
-const MAX_WORD_LEN: u32 = 256;
-
-fn bulk_prefetch_missing_words(mut missing_ids: Vec<usize>) {
-    if missing_ids.is_empty() {
-        return;
-    }
-
-    missing_ids.sort_unstable();
-    missing_ids.dedup();
-
-    let db_path = "/root/crawler/prieco_crawler/dictionary/offset.db";
-
-    DICT_FILE.with(|file_cell| {
-        let mut borrow = file_cell.borrow_mut();
-
-        if borrow.is_none() {
-            if let Ok(file) = File::open(db_path) {
-                unsafe {
-                    libc::posix_fadvise(file.as_raw_fd(), 0, 0, libc::POSIX_FADV_RANDOM);
-                }
-                *borrow = Some(file);
-            }
-        }
-
-        let file = borrow.as_ref().unwrap();
-        let fd = types::Fd(file.as_raw_fd());
-
-        RING.with(|ring_cell| {
-            let mut ring = ring_cell.borrow_mut();
-
-            for chunk in missing_ids.chunks(256) {
-                let mut buffers = vec![[0u8; MAX_WORD_LEN as usize]; chunk.len()];
-
-                {
-                    let mut sq = ring.submission();
-                    for (idx, &id) in chunk.iter().enumerate() {
-                        let offset = (id - 256) as u64;
-                        let buf_ptr = buffers[idx].as_mut_ptr();
-
-                        let read_e = opcode::Read::new(fd, buf_ptr, MAX_WORD_LEN)
-                            .offset(offset)
-                            .build()
-                            .user_data(idx as u64);
-
-                        unsafe {
-                            sq.push(&read_e).unwrap();
-                        }
-                    }
-                    sq.sync();
-                }
-
-                ring.submit_and_wait(chunk.len()).unwrap();
-
-                {
-                    let cq = ring.completion();
-                    for cqe in cq {
-                        let idx = cqe.user_data() as usize;
-                        let id = chunk[idx];
-                        let buffer = &buffers[idx];
-                        let bytes_read = cqe.result();
-
-                        if bytes_read > 0 {
-                            let bytes_read = bytes_read as usize;
-                            let word = if let Some(null_pos) =
-                                buffer[..bytes_read].iter().position(|&b| b == 0)
-                            {
-                                String::from_utf8_lossy(&buffer[..null_pos]).into_owned()
-                            } else {
-                                String::from_utf8_lossy(&buffer[..bytes_read]).into_owned()
-                            };
-                            DICT_CACHE.insert(id, Arc::new(word));
-
-                            let current_size = CACHE_ITEM_COUNT.fetch_add(1, Ordering::Relaxed);
-                            if current_size >= MAX_CACHE_ITEMS {
-                                println!("🗑️ Cache full! Nuking DashMap to prevent CPU stall...");
-                                DICT_CACHE.clear();
-                                CACHE_ITEM_COUNT.store(0, Ordering::Relaxed);
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    });
-}
-
-pub fn decode_decompressed_to_embed_text(
-    decompressed: &[u8],
-) -> (String, String, u8, u8, u128, u64, u64) {
-    if decompressed.is_empty() {
-        return (String::new(), String::new(), 0, 0, 0, 0, 0);
-    }
-
-    let mut embed_text = String::with_capacity(40960);
-    let mut p_word_count = 0;
-    let mut is_mobile = 0;
-
-    let mut cache_hits = 0u64;
-    let mut cache_misses = 0u64;
-
-    let t_loop = std::time::Instant::now();
-    let mut i = 0;
-    let mut current_meta_content = String::new();
-
-    'outer: while i < decompressed.len() {
-        current_meta_content.clear();
-        if i > 30_000 {
-            break 'outer;
-        }
-
-        let tag_byte = decompressed[i];
-        i += 1;
-        let tag_name = tag_byte_to_name(tag_byte);
-
-        let skip_tag = matches!(tag_name, "meta" | "img_src" | "a_href");
-        let is_p = tag_name == "p";
-        let is_meta = tag_name == "meta";
-
-        while i < decompressed.len() {
-            if i + 3 < decompressed.len()
-                && decompressed[i] == 255
-                && decompressed[i + 1] == 255
-                && decompressed[i + 2] == 255
-                && decompressed[i + 3] == 255
-            {
-                i += 4;
-                if is_meta {
-                    let clean_meta: String = current_meta_content
-                        .chars()
-                        .filter(|&c| !c.is_whitespace() && c != '"' && c != '\'')
-                        .map(|c| c.to_ascii_lowercase())
-                        .collect();
-
-                    if clean_meta.contains("width=device-width")
-                        || clean_meta.contains("device-width")
-                    {
-                        is_mobile = 1;
-                    }
-                }
-                break;
-            }
-
-            let len = decompressed[i] as usize;
-            i += 1;
-
-            if len == 0 {
-                continue;
-            }
-            if i + len > decompressed.len() {
-                break;
-            }
-
-            let slice = &decompressed[i..i + len];
-
-            if is_p {
-                p_word_count += 1;
-            }
-
-            if embed_text.len() >= 600 && p_word_count >= 500 {
-                break 'outer;
-            }
-
-            if tag_name == "img_src" || tag_name == "a_href" {
-                i += len;
-                continue;
-            }
-
-            if is_meta && is_mobile == 1 {
-                i += len;
-                continue;
-            }
-
-            if !is_meta && embed_text.len() >= 600 {
-                i += len;
-                continue;
-            }
-
-            let (word, hit_cache) = resolve_token(slice);
-
-            if hit_cache {
-                cache_hits += 1;
-            } else if let ResolvedToken::Cached(_) = word {
-                let mut id = 0u64;
-                for (j, b) in slice.iter().enumerate() {
-                    id |= (*b as u64) << (8 * j);
-                }
-                if id >= 256 {
-                    cache_misses += 1;
-                }
-            }
-
-            let word_str: &str = match &word {
-                ResolvedToken::Raw(s) => s,
-                ResolvedToken::Cached(arc) => arc.as_str(),
-            };
-
-            if is_meta {
-                current_meta_content.push_str(word_str);
-                current_meta_content.push(' ');
-            }
-
-            if !skip_tag {
-                embed_text.push_str(word_str);
-                embed_text.push(' ');
-            }
-
-            i += len;
-        }
-    }
-
-    let string_time_us = t_loop.elapsed().as_micros();
-    let has_500_words = if p_word_count >= 500 { 1 } else { 0 };
-
-    (
-        embed_text,
-        String::new(),
-        has_500_words,
-        is_mobile,
-        string_time_us,
-        cache_hits,
-        cache_misses,
-    )
+pub enum DecodeMode<'a> {
+    Text,
+    Html { proxy_prefix: &'a str },
 }
 
 pub fn decode_blob_to_text(raw_db_value: &[u8]) -> String {
+    decode_blob(raw_db_value, DecodeMode::Text)
+}
+
+pub fn decode_blob_to_html_rendered(raw_db_value: &[u8], proxy_prefix: &str) -> String {
+    decode_blob(raw_db_value, DecodeMode::Html { proxy_prefix })
+}
+
+fn decode_blob(raw_db_value: &[u8], mode: DecodeMode) -> String {
     if raw_db_value.is_empty() {
         return String::new();
     }
@@ -953,17 +290,17 @@ pub fn decode_blob_to_text(raw_db_value: &[u8]) -> String {
     let is_compressed = raw_db_value[0] == 1;
     let payload = &raw_db_value[1..];
 
-    let decompressed_data = if is_compressed {
-        match zstd::stream::decode_all(Cursor::new(payload)) {
-            Ok(data) => data,
-            Err(_) => return String::new(),
-        }
+    let decompressed = if is_compressed {
+        zstd::stream::decode_all(std::io::Cursor::new(payload)).unwrap_or_default()
     } else {
         payload.to_vec()
     };
 
-    let decompressed = &decompressed_data;
-    let mut reconstructed_text = String::with_capacity(decompressed.len() * 3);
+    if decompressed.is_empty() {
+        return String::new();
+    }
+
+    let mut output = String::with_capacity(decompressed.len() * 4);
     let mut i = 0;
 
     while i < decompressed.len() {
@@ -971,18 +308,11 @@ pub fn decode_blob_to_text(raw_db_value: &[u8]) -> String {
         i += 1;
 
         let tag_name = tag_byte_to_name(tag_byte);
-
-        reconstructed_text.push('<');
-        reconstructed_text.push_str(tag_name);
-        reconstructed_text.push('>');
+        let is_url = tag_byte == b'i' || tag_byte == b'h';
+        let mut inner_content = String::new();
 
         while i < decompressed.len() {
-            if i + 3 < decompressed.len()
-                && decompressed[i] == 255
-                && decompressed[i + 1] == 255
-                && decompressed[i + 2] == 255
-                && decompressed[i + 3] == 255
-            {
+            if i + 3 < decompressed.len() && decompressed[i..i + 4] == [255, 255, 255, 255] {
                 i += 4;
                 break;
             }
@@ -999,42 +329,98 @@ pub fn decode_blob_to_text(raw_db_value: &[u8]) -> String {
 
             let slice = &decompressed[i..i + len];
             let (resolved_word, _) = resolve_token(slice);
+
             let word_str: &str = match &resolved_word {
                 ResolvedToken::Raw(s) => s,
                 ResolvedToken::Cached(arc) => arc.as_str(),
             };
-            reconstructed_text.push_str(word_str);
-            reconstructed_text.push(' ');
+
+            inner_content.push_str(word_str);
+
+            match mode {
+                DecodeMode::Text => {
+                    inner_content.push(' ');
+                }
+                DecodeMode::Html { .. } => {
+                    if !is_url && i + len < decompressed.len() && decompressed[i + len] != 255 {
+                        inner_content.push(' ');
+                    }
+                }
+            }
+
             i += len;
         }
 
-        reconstructed_text.push_str("</");
-        reconstructed_text.push_str(tag_name);
-        reconstructed_text.push_str(">\n");
+        match mode {
+            DecodeMode::Text => {
+                output.push('<');
+                output.push_str(tag_name);
+                output.push('>');
+                output.push_str(&inner_content);
+                output.push_str("</");
+                output.push_str(tag_name);
+                output.push_str(">\n");
+            }
+            DecodeMode::Html { proxy_prefix } => {
+                let inner = inner_content.trim();
+                if inner.is_empty() {
+                    continue;
+                }
+
+                let tag_label = format!("<strong>[{}]</strong>", tag_name);
+
+                match tag_byte {
+                    b'i' => {
+                        let encoded_url = urlencoding::encode(inner);
+                        output.push_str(&format!(
+                            "<div>{}<br><img src=\"{}{}\" /></div>\n",
+                            tag_label, proxy_prefix, encoded_url
+                        ));
+                    }
+                    b'h' => {
+                        output.push_str(&format!(
+                            "<div>{}<a href=\"{}\" target=\"_blank\">{}</a></div>\n",
+                            tag_label, inner, inner
+                        ));
+                    }
+                    b'm' => {
+                        output.push_str(&format!("<div>{} <i>{}</i></div>\n", tag_label, inner));
+                    }
+                    _ => {
+                        output.push_str(&format!(
+                            "<div>{}<br><span>{}</span></div>\n",
+                            tag_label, inner
+                        ));
+                    }
+                }
+            }
+        }
     }
 
-    reconstructed_text
+    output
 }
 
-fn tag_byte_to_name(tag_byte: u8) -> &'static str {
-    match tag_byte {
-        b'1' => "h1",
-        b'2' => "h2",
-        b'3' => "h3",
-        b'4' => "h4",
-        b'5' => "h5",
-        b'6' => "h6",
-        b's' => "span",
-        b'p' => "p",
-        b'a' => "a",
-        b'l' => "li",
-        b'b' => "label",
-        b'm' => "meta",
-        b'i' => "img_src",
-        b'h' => "a_href",
-        _ => "div",
+/* Helper functions */
+/* Importer */
+fn find_all_directories() -> Vec<PathBuf> {
+    let watch_path = Path::new(BLOB_IMPORT_DIR);
+    if !watch_path.exists() {
+        let _ = create_dir_all(watch_path);
+        return Vec::new();
     }
+
+    read_dir(watch_path)
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().is_dir())
+                .map(|e| e.path())
+                .collect()
+        })
+        .unwrap_or_else(|_| Vec::new())
 }
+
+/* Decoder */
 pub enum ResolvedToken<'a> {
     Raw(&'a str),
     Cached(Arc<String>),
@@ -1075,15 +461,29 @@ fn resolve_token<'a>(slice: &'a [u8]) -> (ResolvedToken<'a>, bool) {
     }
 }
 
+fn tag_byte_to_name(tag_byte: u8) -> &'static str {
+    match tag_byte {
+        b'1' => "h1",
+        b'2' => "h2",
+        b'3' => "h3",
+        b'4' => "h4",
+        b'5' => "h5",
+        b'6' => "h6",
+        b's' => "span",
+        b'p' => "p",
+        b'a' => "a",
+        b'l' => "li",
+        b'b' => "label",
+        b'm' => "meta",
+        b'i' => "img_src",
+        b'h' => "a_href",
+        _ => "div",
+    }
+}
+
 static DICT_CACHE: Lazy<DashMap<usize, Arc<String>>> =
     Lazy::new(|| DashMap::with_capacity(MAX_CACHE_ITEMS + 1_000));
-pub static CACHE_ITEM_COUNT: AtomicUsize = AtomicUsize::new(0);
-const MAX_CACHE_ITEMS: usize = 50_000_000;
-
-thread_local! {
-    static DICT_FILE: RefCell<Option<File>> = RefCell::new(None);
-    static RING: RefCell<IoUring> = RefCell::new(IoUring::new(256).expect("Failed to init io_uring"));
-}
+const MAX_CACHE_ITEMS: usize = 1_000_000;
 
 pub fn search_word_by_id(id: usize) -> (Arc<String>, bool) {
     if id < 256 {
@@ -1095,587 +495,4 @@ pub fn search_word_by_id(id: usize) -> (Arc<String>, bool) {
     }
 
     (Arc::new(String::new()), false)
-}
-
-/* Helper functions */
-fn full_dir(path: &str) -> bool {
-    unsafe {
-        let mut stat: libc::statvfs = std::mem::zeroed();
-        let c_path = std::ffi::CString::new(path).unwrap();
-        if libc::statvfs(c_path.as_ptr(), &mut stat) == 0 {
-            let total_blocks = stat.f_blocks as f64;
-            let available_blocks = stat.f_bavail as f64;
-            let used_blocks = total_blocks - available_blocks;
-            let percent_used = used_blocks / total_blocks;
-
-            if percent_used >= 0.95 {
-                true
-            } else if percent_used >= 0.9 {
-                rand::rng().random_bool(0.1)
-            } else {
-                false
-            }
-        } else {
-            false
-        }
-    }
-}
-
-pub fn write_to_random_file(dir: &str, content: &str) {
-    let mut rng = rng();
-    let mut file_path = PathBuf::from(dir);
-
-    loop {
-        let file_name = format!("{}.txt", rng.random_range(0..10_000_000_000_000_i64));
-        file_path.push(&file_name);
-
-        if !file_path.exists() {
-            let mut file = match File::create(&file_path) {
-                Ok(f) => f,
-                Err(e) => {
-                    println!(
-                        "{}Write to random file function{}: Failed to create file {} Because of: {}",
-                        colors::RED,
-                        colors::RESET,
-                        file_path.to_str().unwrap_or(""),
-                        e
-                    );
-                    return;
-                }
-            };
-            let _ = file.write_all(content.as_bytes());
-            return;
-        }
-
-        file_path.pop();
-    }
-}
-
-pub fn decode_blob_to_html_rendered(raw_db_value: &[u8], proxy_prefix: &str) -> String {
-    if raw_db_value.is_empty() {
-        return String::new();
-    }
-
-    let is_compressed = raw_db_value[0] == 1;
-    let payload = &raw_db_value[1..];
-
-    let decompressed_data = if is_compressed {
-        match zstd::stream::decode_all(std::io::Cursor::new(payload)) {
-            Ok(data) => data,
-            Err(_) => return String::new(),
-        }
-    } else {
-        payload.to_vec()
-    };
-
-    let decompressed = &decompressed_data;
-    let mut html = String::with_capacity(decompressed.len() * 5);
-    let mut i = 0;
-
-    while i < decompressed.len() {
-        let tag_byte = decompressed[i];
-        i += 1;
-
-        let mut inner_content = String::new();
-        let is_url = tag_byte == b'i' || tag_byte == b'h';
-
-        while i < decompressed.len() {
-            if i + 3 < decompressed.len()
-                && decompressed[i] == 255
-                && decompressed[i + 1] == 255
-                && decompressed[i + 2] == 255
-                && decompressed[i + 3] == 255
-            {
-                i += 4;
-                break;
-            }
-
-            let len = decompressed[i] as usize;
-            i += 1;
-
-            if len == 0 {
-                continue;
-            }
-            if i + len > decompressed.len() {
-                break;
-            }
-
-            let slice = &decompressed[i..i + len];
-            let (word, _) = resolve_token(slice);
-
-            let word_str: &str = match &word {
-                ResolvedToken::Raw(s) => s,
-                ResolvedToken::Cached(arc) => arc.as_str(),
-            };
-
-            inner_content.push_str(word_str);
-
-            if !is_url && i + len < decompressed.len() && decompressed[i + len] != 255 {
-                inner_content.push(' ');
-            }
-
-            i += len;
-        }
-
-        let inner_content = inner_content.trim();
-        if inner_content.is_empty() {
-            continue;
-        }
-
-        let tag_name = tag_byte_to_name(tag_byte);
-
-        let tag_label = format!("<strong>[{}]</strong>", tag_name);
-
-        match tag_byte {
-            b'i' => {
-                let encoded_url = urlencoding::encode(inner_content);
-                html.push_str(&format!(
-                    "<div>{}<br><img src=\"{}{}\" /></div>\n",
-                    tag_label, proxy_prefix, encoded_url
-                ));
-            }
-            b'h' => {
-                html.push_str(&format!(
-                    "<div>{}<a href=\"{}\" target=\"_blank\">{}</a></div>\n",
-                    tag_label, inner_content, inner_content
-                ));
-            }
-            b'm' => {
-                html.push_str(&format!(
-                    "<div>{} <i>{}</i></div>\n",
-                    tag_label, inner_content
-                ));
-            }
-            _ => {
-                html.push_str(&format!(
-                    "<div>{}<br><span>{}</span></div>\n",
-                    tag_label, inner_content
-                ));
-            }
-        }
-    }
-
-    html
-}
-
-/* Update */
-// Zero-allocation line iterator for mmap'd files
-struct MmapLines<'a> {
-    data: &'a [u8],
-    pos: usize,
-}
-
-impl<'a> MmapLines<'a> {
-    fn new(data: &'a [u8]) -> Self {
-        Self { data, pos: 0 }
-    }
-}
-
-impl<'a> Iterator for MmapLines<'a> {
-    type Item = &'a [u8];
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.pos >= self.data.len() {
-            return None;
-        }
-        let start = self.pos;
-        while self.pos < self.data.len() && self.data[self.pos] != b'\n' {
-            self.pos += 1;
-        }
-        let res = &self.data[start..self.pos];
-        self.pos += 1; // Skip the newline character
-        Some(res)
-    }
-}
-
-// Helper to quickly parse ASCII bytes to u64/u8
-fn parse_bytes_to_u64(bytes: &[u8]) -> u64 {
-    let mut res = 0;
-    for &b in bytes {
-        if b >= b'0' && b <= b'9' {
-            res = res * 10 + (b - b'0') as u64;
-        }
-    }
-    res
-}
-pub fn migrate_meta_and_blobs() {
-    println!("Mapping text files to memory...");
-
-    // 2. Memory map all files
-    let file_ids = File::open("/root/centropoids/recovery/ids_sorted.txt").unwrap();
-    let mmap_ids = unsafe { MmapOptions::new().map(&file_ids).unwrap() };
-
-    let file_del = File::open("/root/centropoids/recovery/deletes_sorted.txt").unwrap();
-    let mmap_del = unsafe { MmapOptions::new().map(&file_del).unwrap() };
-
-    let file_dates = File::open("/root/centropoids/recovery/dates_sorted.txt").unwrap();
-    let mmap_dates = unsafe { MmapOptions::new().map(&file_dates).unwrap() };
-
-    let file_intents = File::open("/root/centropoids/recovery/intents_sorted.txt").unwrap();
-    let mmap_intents = unsafe { MmapOptions::new().map(&file_intents).unwrap() };
-
-    let file_mobile = File::open("/root/centropoids/recovery/mobile_sorted.txt").unwrap();
-    let mmap_mobile = unsafe { MmapOptions::new().map(&file_mobile).unwrap() };
-
-    let file_words = File::open("/root/centropoids/recovery/words_sorted.txt").unwrap();
-    let mmap_words = unsafe { MmapOptions::new().map(&file_words).unwrap() };
-
-    // Create zero-allocation iterators
-    let mut iter_ids = MmapLines::new(&mmap_ids);
-    let mut iter_del = MmapLines::new(&mmap_del);
-    let mut iter_dates = MmapLines::new(&mmap_dates);
-    let mut iter_intents = MmapLines::new(&mmap_intents);
-    let mut iter_mobile = MmapLines::new(&mmap_mobile);
-    let mut iter_words = MmapLines::new(&mmap_words);
-
-    let mut advance_text = || -> Option<(u64, bool, i64, u8, bool, bool)> {
-        let id_bytes = iter_ids.next()?;
-        let target_id = parse_bytes_to_u64(id_bytes);
-
-        let delete = iter_del.next()?.first() == Some(&b'1');
-
-        let date_bytes = iter_dates.next()?;
-        let date = if date_bytes.is_empty() {
-            0
-        } else {
-            std::str::from_utf8(date_bytes)
-                .unwrap_or("0")
-                .parse::<i64>()
-                .unwrap_or(0)
-        };
-
-        let intent_bytes = iter_intents.next()?;
-        let intent = if intent_bytes.is_empty() {
-            0
-        } else {
-            (intent_bytes[0].saturating_sub(b'0')) as u8
-        };
-
-        let mobile = iter_mobile.next()?.first() == Some(&b'1');
-        let words = iter_words.next()?.first() == Some(&b'1');
-
-        Some((target_id, delete, date, intent, mobile, words))
-    };
-
-    println!("Initializing ZSTD contexts...");
-    // 3. Setup ZSTD contexts for the loop
-    let mut decompressor = Decompressor::with_prepared_dictionary(&prieco_core::META_DECODER)
-        .expect("Failed to init ZSTD decompressor");
-
-    // Need an encoder dictionary to compress the modified JSON
-    let encoder_dict = zstd::dict::EncoderDictionary::copy(&prieco_core::META_DICTIONARY, 3); // Adjust compression level (1-22) as needed
-    let mut compressor = Compressor::with_prepared_dictionary(&encoder_dict)
-        .expect("Failed to init ZSTD compressor");
-
-    println!("Starting lockstep migration...");
-    let mut current_txt_state = advance_text();
-
-    let mut batch = prieco_core::PRIECO_FJALL.meta_db.batch();
-
-    // --- Rich Logging Counters ---
-    let mut processed_count = 0;
-    let mut updated_count = 0;
-    let mut deleted_count = 0;
-    let mut skipped_orphan_count = 0;
-    let mut error_fallback_count = 0;
-    let start_time = Instant::now();
-
-    // Iterate the OLD global DB
-    for item in prieco_core::PRIECO_FJALL.meta_ks.iter() {
-        if let Ok((key_bytes, val_bytes_compressed)) = item.into_inner() {
-            let db_id = u64::from_be_bytes(key_bytes.as_ref().try_into().unwrap());
-
-            // Catch up text files if DB is ahead
-            while let Some(txt) = current_txt_state {
-                if txt.0 < db_id {
-                    current_txt_state = advance_text();
-                } else {
-                    break;
-                }
-            }
-
-            match current_txt_state {
-                Some(txt) if txt.0 == db_id => {
-                    let is_delete = txt.1;
-                    let mut needs_fallback = false;
-
-                    if let Ok(decompressed_json) =
-                        decompressor.decompress(val_bytes_compressed.as_ref(), 10_000_000)
-                    {
-                        if is_delete {
-                            // --- DELETE LOGIC ---
-                            if let Ok(doc) =
-                                serde_json::from_slice::<WebDocument>(&decompressed_json)
-                            {
-                                let stem = doc.html.rsplit('/').next().and_then(|f| {
-                                    f.strip_suffix(".zst").or_else(|| f.strip_suffix(".txt"))
-                                });
-
-                                if let Some(blob_id) = stem.and_then(|s| s.parse::<u64>().ok()) {
-                                    let _ = prieco_core::PRIECO_FJALL
-                                        .blobs_ks
-                                        .remove(&blob_id.to_le_bytes());
-                                }
-                            }
-                            deleted_count += 1;
-                        } else {
-                            // --- UPDATE LOGIC ---
-                            if let Ok(mut doc) =
-                                serde_json::from_slice::<WebDocument>(&decompressed_json)
-                            {
-                                if txt.2 != 0 {
-                                    doc.date = txt.2;
-                                }
-                                doc.intent = txt.3;
-                                doc.is_mobile = txt.4;
-                                doc.has_500_words = txt.5;
-
-                                let new_json = serde_json::to_vec(&doc).unwrap();
-                                if let Ok(new_compressed_val) = compressor.compress(&new_json) {
-                                    batch.insert(
-                                        &prieco_core::PRIECO_FJALL.meta_ks,
-                                        key_bytes.as_ref(),
-                                        new_compressed_val,
-                                    );
-                                    updated_count += 1;
-                                } else {
-                                    needs_fallback = true; // Compression failed
-                                }
-                            } else {
-                                needs_fallback = true; // JSON Parse failed
-                            }
-                        }
-                    } else {
-                        // Decompression failed
-                        if !is_delete {
-                            needs_fallback = true;
-                        }
-                    }
-
-                    // --- SAFETY FALLBACK ---
-                    // If we meant to keep it, but decompression/parsing failed, copy it raw so we don't lose data.
-                    if needs_fallback {
-                        batch.insert(
-                            &prieco_core::PRIECO_FJALL.meta_ks,
-                            key_bytes.as_ref(),
-                            val_bytes_compressed.as_ref(),
-                        );
-                        error_fallback_count += 1;
-                    }
-
-                    current_txt_state = advance_text();
-                }
-                _ => {
-                    // --- ORPHAN LOGIC ---
-                    batch.insert(
-                        &prieco_core::PRIECO_FJALL.meta_ks,
-                        key_bytes.as_ref(),
-                        val_bytes_compressed.as_ref(),
-                    );
-                    skipped_orphan_count += 1;
-                }
-            }
-
-            processed_count += 1;
-            if processed_count % 100_000 == 0 {
-                let elapsed = start_time.elapsed().as_secs_f64();
-                let rate = (processed_count as f64) / elapsed;
-
-                println!(
-                    "[{:.1}s] Processed: {} | Rate: {:.0} rec/s | Updates: {} | Deletes: {} | Orphans: {} | Errors: {}",
-                    elapsed,
-                    processed_count,
-                    rate,
-                    updated_count,
-                    deleted_count,
-                    skipped_orphan_count,
-                    error_fallback_count
-                );
-
-                batch.commit().unwrap();
-                batch = prieco_core::PRIECO_FJALL.meta_db.batch();
-            }
-        }
-    }
-
-    batch.commit().unwrap();
-    let _ = prieco_core::PRIECO_FJALL
-        .meta_db
-        .persist(fjall::PersistMode::SyncAll);
-
-    let total_time = start_time.elapsed().as_secs_f64();
-    println!("========================================");
-    println!("🚀 MIGRATION COMPLETE in {:.1} seconds", total_time);
-    println!("📊 Final Stats:");
-    println!("   Total Processed : {}", processed_count);
-    println!("   Successfully Updated : {}", updated_count);
-    println!("   Blobs Deleted        : {}", deleted_count);
-    println!("   Orphans Ported Raw   : {}", skipped_orphan_count);
-    println!("   Fallback Parse Errors: {}", error_fallback_count);
-    println!("========================================");
-}
-pub fn import_binary_vectors_mmap() -> Result<(), Box<dyn Error + Send + Sync>> {
-    println!(
-        "{}: Starting Zero-Copy Mmap Binary Vector ingestion...",
-        icons::DB_INSERT
-    );
-
-    // --- RESUME CONFIGURATION ---
-    // Set these to the values from your chosen log line.
-    // Log: 💾: Buffered 358 million vectors (Skipped Garbage: 23138953)
-    let resume_inserted = 358_000_000;
-    let resume_skipped = 23_138_953;
-    let items_to_skip = resume_inserted + resume_skipped;
-    // ----------------------------
-
-    // 1. Open files
-    let ids_file = File::open("/mnt/ssd/recovery_ids.txt")?;
-    let bin_file = File::open("/mnt/hdd/recovery_embeds.bin")?;
-
-    // 2. Memory map both files
-    println!("{}: Mapping files to virtual memory...", icons::DB_INSERT);
-    let ids_mmap = unsafe { MmapOptions::new().map(&ids_file)? };
-    let bin_mmap = unsafe { MmapOptions::new().map(&bin_file)? };
-
-    // 3. Advise the Linux kernel that we are reading strictly sequentially
-    #[cfg(unix)]
-    {
-        ids_mmap.advise(memmap2::Advice::Sequential)?;
-        bin_mmap.advise(memmap2::Advice::Sequential)?;
-    }
-
-    let mut vector_idx_buffer: HashMap<u64, Vec<f32>> = HashMap::with_capacity(MAX_VECTORS_IN_VRAM);
-
-    // Start counters from our resume points so logs remain accurate
-    let mut total_inserted = resume_inserted;
-    let mut total_skipped_zeros = resume_skipped;
-
-    println!(
-        "{}: Streaming from disk via mmap (Skipping first {} items)...",
-        icons::DB_INSERT,
-        items_to_skip
-    );
-
-    // 4. Create zero-copy iterators
-    let id_lines = ids_mmap.split(|&b| b == b'\n');
-    let bin_chunks = bin_mmap.chunks_exact(768);
-
-    // 5. Iterate lockstep, fast-forwarding to where we left off!
-    let zipped_iter = id_lines.zip(bin_chunks).skip(items_to_skip);
-
-    for (id_bytes, bin_chunk) in zipped_iter {
-        if id_bytes.is_empty() {
-            continue;
-        }
-
-        // Fast zero-copy parse
-        let id_str = unsafe { std::str::from_utf8_unchecked(id_bytes) };
-        let id = match id_str.parse::<u64>() {
-            Ok(parsed) => parsed,
-            Err(_) => continue,
-        };
-
-        // Convert f16 bytes to f32 vector
-        let mut vector_f32 = Vec::with_capacity(384);
-        let mut sum_sq = 0.0;
-        let mut is_garbage = true;
-
-        for i in 0..384 {
-            let bytes = [bin_chunk[i * 2], bin_chunk[i * 2 + 1]];
-            let val_f16 = f16::from_le_bytes(bytes);
-            let val_f32 = val_f16.to_f32();
-
-            if val_f32 != 0.0 {
-                is_garbage = false;
-            }
-
-            sum_sq += val_f32 * val_f32;
-            vector_f32.push(val_f32);
-        }
-
-        // Drop perfectly 0 vectors (garbage pages)
-        if is_garbage || sum_sq == 0.0 {
-            total_skipped_zeros += 1;
-            continue;
-        }
-
-        // --- PRE-NORMALIZATION (L2) ---
-        let norm = sum_sq.sqrt();
-        for v in vector_f32.iter_mut() {
-            *v /= norm;
-        }
-
-        vector_idx_buffer.insert(id, vector_f32);
-        total_inserted += 1;
-
-        if total_inserted % 1_000_000 == 0 {
-            println!(
-                "{}: Buffered {} million vectors (Skipped Garbage: {})",
-                icons::DB_INSERT,
-                total_inserted / 1_000_000,
-                total_skipped_zeros
-            );
-        }
-
-        // Trigger GPU Assignment when RAM is full
-        if vector_idx_buffer.len() >= MAX_VECTORS_IN_VRAM {
-            println!(
-                "{}: VRAM limit reached. Committing {} vectors to GPU...",
-                icons::DB_INSERT,
-                vector_idx_buffer.len()
-            );
-            vector_process(&mut vector_idx_buffer)?;
-            println!("{}: GPU batch complete.", icons::DB_INSERT);
-        }
-    }
-
-    // Flush any remaining vectors in the buffer
-    if !vector_idx_buffer.is_empty() {
-        println!(
-            "{}: Flushing final {} vectors to GPU...",
-            icons::DB_INSERT,
-            vector_idx_buffer.len()
-        );
-        vector_process(&mut vector_idx_buffer)?;
-    }
-
-    println!(
-        "{}: Binary import complete! Total Valid Vectors: {} | Total Skipped Garbage: {}",
-        icons::DB_INSERT,
-        total_inserted,
-        total_skipped_zeros
-    );
-
-    println!(
-        "{}: Merging staging files into buckets...",
-        icons::DB_INSERT
-    );
-
-    let staging_files: Vec<usize> = read_dir(&PRIECO_CONFIG.vector_path)?
-        .filter_map(|e| e.ok())
-        .filter_map(|e| {
-            let name = e.file_name();
-            let s = name.to_string_lossy();
-            s.strip_prefix("staging_")
-                .and_then(|r| r.strip_suffix(".bin"))
-                .and_then(|id_str| id_str.parse::<usize>().ok())
-        })
-        .collect();
-
-    let total_buckets = staging_files.len();
-    let mut merged_count = 0;
-    for bucket_id in &staging_files {
-        merge_bucket(*bucket_id)?;
-        merged_count += 1;
-        if merged_count % 100 == 0 || merged_count == total_buckets {
-            println!(
-                "{}: Merge progress: {}/{} ({:.1}%)",
-                icons::DB_INSERT,
-                merged_count,
-                total_buckets,
-                merged_count as f64 / total_buckets as f64 * 100.0
-            );
-        }
-    }
-    Ok(())
 }

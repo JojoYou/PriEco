@@ -24,6 +24,15 @@ pub struct RankingWeights {
     pub path_depth_penalty: f64,
     pub confidence_multi: f64,
     pub effort_multi: f64,
+    pub has_500_words_boost: f64,
+    pub is_mobile_boost: f64,
+    pub mobile_unfriendly_penalty: f64,
+    pub shopping_product_boost: f64,
+    pub shopping_domain_boost: f64,
+    pub info_wiki_boost: f64,
+    pub info_gov_edu_boost: f64,
+    pub info_shop_penalty: f64,
+    pub title_match_boost: f64,
 }
 
 impl Default for RankingWeights {
@@ -42,6 +51,15 @@ impl Default for RankingWeights {
             path_depth_penalty: 0.9,
             confidence_multi: 0.01,
             effort_multi: 0.08,
+            has_500_words_boost: 1.15,
+            is_mobile_boost: 1.35,
+            mobile_unfriendly_penalty: 0.6,
+            shopping_product_boost: 1.2,
+            shopping_domain_boost: 1.1,
+            info_wiki_boost: 1.4,
+            info_gov_edu_boost: 1.25,
+            info_shop_penalty: 0.8,
+            title_match_boost: 1.3,
         }
     }
 }
@@ -56,6 +74,7 @@ pub fn run(
     loc: &str,
     intent: &QueryIntent,
     goggles: &[Arc<GoggleRules>],
+    user_is_mobile: bool,
 ) {
     // Training
     check_for_updated_weights(); // PHP might have generated new weights to be tested
@@ -97,32 +116,32 @@ pub fn run(
                 || clean_url.contains("/item/")
                 || clean_url.contains("review")
             {
-                boost *= 1.2;
+                boost *= weights.shopping_product_boost;
             }
 
             if clean_url.contains(".com")
                 || clean_url.contains(".shop")
                 || clean_url.contains(".store")
             {
-                boost *= 1.1;
+                boost *= weights.shopping_domain_boost;
             }
         }
 
         // Informational: learning
         if *intent == QueryIntent::Informational {
             if clean_url.contains(".wikipedia.org") {
-                boost *= 1.4;
+                boost *= weights.info_wiki_boost;
             }
 
             if clean_url.contains(".org")
                 || clean_url.contains(".edu")
                 || clean_url.contains(".gov")
             {
-                boost *= 1.25;
+                boost *= weights.info_gov_edu_boost;
             }
 
             if clean_url.contains(".shop") || clean_url.contains("/product/") {
-                boost *= 0.8;
+                boost *= weights.info_shop_penalty;
             }
         }
 
@@ -205,7 +224,7 @@ pub fn run(
 
         // Query in title
         if doc.title.to_lowercase().contains(&query.to_lowercase()) {
-            boost *= 1.3;
+            boost *= weights.title_match_boost;
         }
 
         // Quality score
@@ -285,6 +304,26 @@ pub fn run(
             }
         }
 
+        // Usability
+        if user_is_mobile {
+            if doc.is_mobile {
+                boost *= weights.is_mobile_boost;
+            } else {
+                boost *= weights.mobile_unfriendly_penalty;
+            }
+        }
+        if doc.has_500_words {
+            if *intent == QueryIntent::Informational
+                || *intent == QueryIntent::CommercialInvestigation
+            {
+                boost *= weights.has_500_words_boost * 1.1;
+            } else {
+                boost *= weights.has_500_words_boost;
+            }
+        } else if *intent == QueryIntent::Informational {
+            boost *= 0.9;
+        }
+
         doc.search_score = (doc.search_score as f64 * boost) as f32;
     }
 
@@ -346,7 +385,4 @@ fn is_effectively_homepage(url: &str) -> bool {
     // Single locale segment: /en-CA/ or /en/
     let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
     matches!(segments.as_slice(), [seg] if is_locale(seg))
-}
-fn sigmoid(x: f64) -> f64 {
-    1.0 / (1.0 + (-x).exp())
 }

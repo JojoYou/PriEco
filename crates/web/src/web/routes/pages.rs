@@ -259,6 +259,10 @@ pub async fn search(
 
         let user_qt_prefs: UserQtPrefs = serde_json::from_str(raw_qt_cookie).unwrap_or_default();
 
+        // Is user mobile
+        let ua = user_agent.0.to_lowercase();
+        let user_is_mobile = ua.contains("mobi") || ua.contains("android") || ua.contains("iphone");
+
         // Results
         let results_ctx = search_endpoint::run(
             t,
@@ -268,6 +272,7 @@ pub async fn search(
             embedding_service,
             active_goggles,
             &user_qt_prefs,
+            user_is_mobile,
         )
         .await;
 
@@ -312,11 +317,16 @@ pub async fn results_htmls(
     loc: &str,
     embedding_service: &State<EmbeddingService>,
     cookie_jar: &CookieJar<'_>,
+    user_agent: UserAgent<'_>,
 ) -> Template {
     ANALYTICS.record_query();
 
     let active_goggles = load_goggles(&get_goggle_ids(None, Some(cookie_jar)));
     let user_qt_prefs = get_user_qt_prefs(cookie_jar);
+
+    // Is user mobile
+    let ua = user_agent.0.to_lowercase();
+    let user_is_mobile = ua.contains("mobi") || ua.contains("android") || ua.contains("iphone");
 
     let mut ctx = search_endpoint::run(
         t,
@@ -326,6 +336,7 @@ pub async fn results_htmls(
         embedding_service,
         active_goggles,
         &user_qt_prefs,
+        user_is_mobile,
     )
     .await;
 

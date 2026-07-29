@@ -99,3 +99,6 @@ h2 {
     margin-top: 10px;
     margin-left: auto;
 }
+.footer-content-right a {
+    color: gray;
+}

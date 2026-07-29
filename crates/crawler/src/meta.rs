@@ -39,7 +39,7 @@ pub fn extract_metadata(
         safe_search: false,
         html: String::new(),
         language: String::new(),
-        location: String::new(), // Master will fill this via GeoIP
+        location: String::new(),
         points: Vec::new(),
         loading_time,
         date_of_crawling: Local::now().format("%y%m%d").to_string(),
@@ -174,6 +174,8 @@ pub fn extract_metadata(
         }
     }
     result.language = get_language_code(detect_lang(&combined_text));
+
+    result.location = get_website_country(&result.url);
 
     //  NSFW Check
     result.safe_search = nsfw_check(&result);

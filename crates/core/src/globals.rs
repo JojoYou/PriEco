@@ -25,7 +25,6 @@ use std::{
     net::{Ipv4Addr, Ipv6Addr},
     ops::Range,
     path::Path,
-    process::exit,
     str::FromStr,
     sync::Arc,
     time::Duration as stdDuration,
@@ -536,6 +535,8 @@ pub static META_DICTIONARY: Lazy<Vec<u8>> =
     Lazy::new(|| read("idx/prieco_zstd.dict").expect("Failed to load zstd dictionary into memory"));
 pub static META_DECODER: Lazy<DecoderDictionary<'static>> =
     Lazy::new(|| DecoderDictionary::copy(&*META_DICTIONARY));
+
+pub const BLOB_IMPORT_DIR: &str = "/mnt/hdd/imp_blob/";
 
 pub struct PriecoStorage {
     // Meta data: Titles, Descriptions, URLs...
@@ -1204,10 +1205,17 @@ impl Reranker {
             ..Default::default()
         }));
 
-        tokenizer.with_truncation(Some(TruncationParams {
+        if let Err(e) = tokenizer.with_truncation(Some(TruncationParams {
             max_length: 512,
             ..Default::default()
-        }));
+        })) {
+            println!(
+                "{}Failed to set tokenizer truncation!{} {}",
+                colors::RED,
+                colors::RESET,
+                e
+            );
+        };
 
         Self { session, tokenizer }
     }

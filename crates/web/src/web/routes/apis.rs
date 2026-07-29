@@ -71,7 +71,8 @@ pub async fn api(
 
     let active_goggles = load_goggles(&get_goggle_ids(goggles, None));
 
-    let full_results = search_db::run_json(q, lang, loc, embedding_service, active_goggles).await;
+    let full_results =
+        search_db::run_json(q, lang, loc, embedding_service, active_goggles, false).await;
 
     let results: Vec<serde_json::Value> = full_results
         .into_iter()

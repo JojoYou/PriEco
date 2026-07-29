@@ -50,6 +50,7 @@ pub async fn run(
     embedding_service: &State<EmbeddingService>,
     goggles: Vec<Arc<GoggleRules>>,
     user_qt_prefs: &UserQtPrefs,
+    user_is_mobile: bool,
 ) -> HashMap<String, Value> {
     // Don't perform a search on bang
     if q.contains("!") {
@@ -96,6 +97,7 @@ pub async fn run(
                 embedding_service,
                 goggles,
                 &user_qt_prefs,
+                user_is_mobile,
             )
             .await;
         }
@@ -182,6 +184,7 @@ async fn all_search(
     embedding_service: &State<EmbeddingService>,
     mut goggles: Vec<Arc<GoggleRules>>,
     user_qt_prefs: &UserQtPrefs,
+    user_is_mobile: bool,
 ) {
     // Spell check
     if let Some(suggestion) = spell_check_query(q) {
@@ -195,7 +198,16 @@ async fn all_search(
     let user_rules = user_qt_prefs.into_goggle_rules();
     goggles.push(Arc::new(user_rules));
 
-    let _ = search_db::run(&mut results_vec, q, lang, loc, &embedding_service, goggles).await; // Search database: Modify results + return confidence score
+    let _ = search_db::run(
+        &mut results_vec,
+        q,
+        lang,
+        loc,
+        &embedding_service,
+        goggles,
+        user_is_mobile,
+    )
+    .await; // Search database: Modify results + return confidence score
 
     // QUICK TUNE DOMAIN EXTRACTION
     let mut unique_domains = std::collections::HashSet::new();

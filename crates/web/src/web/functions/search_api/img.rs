@@ -1,4 +1,3 @@
-use reqwest::Client;
 use serde_json::Value;
 use std::fs::{metadata, write};
 

@@ -5,18 +5,18 @@ use std::{
     collections::HashMap,
     error::Error,
     fs::{File, OpenOptions, create_dir_all, metadata, read_dir, remove_file},
-    io::{BufRead, BufReader, BufWriter, Read, Write},
+    io::{BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 /*
   Import external libraries
 */
 use fjall::PersistMode;
-use half::f16;
-use memmap2::MmapOptions;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use zip::ZipArchive;
-use zstd::stream::{Encoder as ZstdEncoder, decode_all};
+use zstd::stream::Encoder as ZstdEncoder;
 
 /*
   Import own libraries
@@ -262,7 +262,9 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
             "{}: Merging staging files into buckets...",
             icons::DB_INSERT
         );
-        let staging_files: Vec<usize> = read_dir(&PRIECO_CONFIG.vector_path)?
+
+        let staging_files: Vec<usize> = read_dir(&PRIECO_CONFIG.vector_path)
+            .unwrap()
             .filter_map(|e| e.ok())
             .filter_map(|e| {
                 let name = e.file_name();
@@ -274,20 +276,26 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
             .collect();
 
         let total_buckets = staging_files.len();
-        let mut merged_count = 0;
-        for bucket_id in &staging_files {
-            merge_bucket(*bucket_id)?;
-            merged_count += 1;
-            if merged_count % 100 == 0 || merged_count == total_buckets {
-                println!(
-                    "{}: Merge progress: {}/{} ({:.1}%)",
-                    icons::DB_INSERT,
-                    merged_count,
-                    total_buckets,
-                    merged_count as f64 / total_buckets as f64 * 100.0
-                );
+        let merged_count = AtomicUsize::new(0);
+
+        staging_files.par_iter().for_each(|bucket_id| {
+            if let Err(e) = merge_bucket(*bucket_id) {
+                println!("Failed to merge bucket {}! {}", bucket_id, e);
+            } else {
+                let current = merged_count.fetch_add(1, Ordering::Relaxed) + 1;
+
+                if current % 100 == 0 || current == total_buckets {
+                    println!(
+                        "{}: Merge progress: {}/{} ({:.1}%)",
+                        icons::DB_INSERT,
+                        current,
+                        total_buckets,
+                        current as f64 / total_buckets as f64 * 100.0
+                    );
+                }
             }
-        }
+        });
+
         println!("{}: Merge complete", icons::DB_INSERT);
     }
 
@@ -411,68 +419,59 @@ pub fn merge_bucket(bucket_id: usize) -> Result<(), Box<dyn Error + Send + Sync>
         file.set_len(clean_bytes as u64)?;
     }
 
-    // Collect staging IDs
     let mut staging: HashMap<u64, u64> = HashMap::new();
     {
         let mut f = BufReader::with_capacity(1 << 20, File::open(&staging_path)?);
         let mut id_buf = [0u8; ID_SIZE];
-        let mut skip = vec![0u8; VECTOR_DIM * 4];
         let mut current_offset = 0u64;
+        let skip_bytes = (VECTOR_DIM * 4) as i64;
 
         while f.read_exact(&mut id_buf).is_ok() {
             let id = u64::from_le_bytes(id_buf);
             staging.insert(id, current_offset);
-            f.read_exact(&mut skip)?;
+            f.seek(SeekFrom::Current(skip_bytes))?;
             current_offset += RECORD_SIZE as u64;
         }
     }
 
-    // Read existing zst
-    let existing: Option<Vec<u8>> = if Path::new(&zst_path).exists() {
-        let compressed = std::fs::read(&zst_path)?;
-        match decode_all(compressed.as_slice()) {
-            Ok(data) => Some(data),
+    let out = AtomicFile::new(&zst_path)?;
+    let mut encoder = ZstdEncoder::new(out, ZSTD_LEVEL)?;
+
+    if Path::new(&zst_path).exists() {
+        let zst_file = File::open(&zst_path)?;
+        let mut decoder = match zstd::stream::Decoder::new(zst_file) {
+            Ok(dec) => dec,
             Err(e) => {
                 println!(
                     "{}: Bucket {} zst corrupted ({e}), rebuilding from staging only",
                     icons::DB_INSERT,
                     bucket_id
                 );
-                let _ = remove_file(&zst_path);
-                None
+                return Err(e.into());
             }
-        }
-    } else {
-        None
-    };
+        };
 
-    let out = AtomicFile::new(&zst_path)?;
-    let mut encoder = ZstdEncoder::new(out, ZSTD_LEVEL)?;
+        let mut record_buf = vec![0u8; RECORD_SIZE];
 
-    // Stream existing data
-    if let Some(data) = existing {
-        let count = data.len() / RECORD_SIZE;
-        for i in 0..count {
-            let base = i * RECORD_SIZE;
-            let id = u64::from_le_bytes(data[base..base + ID_SIZE].try_into().unwrap());
+        while decoder.read_exact(&mut record_buf).is_ok() {
+            let id = u64::from_le_bytes(record_buf[0..ID_SIZE].try_into().unwrap());
+
             if !staging.contains_key(&id) {
-                encoder.write_all(&data[base..base + RECORD_SIZE])?;
+                encoder.write_all(&record_buf)?;
             }
         }
     }
 
-    // Append staging into encoder
     {
         let mut f = BufReader::with_capacity(1 << 20, File::open(&staging_path)?);
-        let mut buf = vec![0u8; RECORD_SIZE];
+        let mut record_buf = vec![0u8; RECORD_SIZE];
         let mut current_offset = 0u64;
 
-        while f.read_exact(&mut buf).is_ok() {
-            let id = u64::from_le_bytes(buf[0..ID_SIZE].try_into().unwrap());
+        while f.read_exact(&mut record_buf).is_ok() {
+            let id = u64::from_le_bytes(record_buf[0..ID_SIZE].try_into().unwrap());
 
-            // Write last embed
             if staging.get(&id) == Some(&current_offset) {
-                encoder.write_all(&buf)?;
+                encoder.write_all(&record_buf)?;
             }
 
             current_offset += RECORD_SIZE as u64;
@@ -482,6 +481,7 @@ pub fn merge_bucket(bucket_id: usize) -> Result<(), Box<dyn Error + Send + Sync>
     let atomic = encoder.finish()?;
     atomic.commit()?;
     remove_file(&staging_path)?;
+
     Ok(())
 }
 
