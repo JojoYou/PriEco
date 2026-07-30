@@ -2,10 +2,12 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::web::functions::general::get_domain;
-use prieco_core::WebDocument;
+use prieco_core::{QueryIntent, WebDocument};
 
 pub fn run(
     query: &str,
+    lang: &str,
+    intent: &QueryIntent,
     dir_results: Vec<WebDocument>,
     fts_results: Vec<WebDocument>,
     ivf_results: Vec<WebDocument>,
@@ -31,7 +33,16 @@ pub fn run(
 
     for (results, weight, source_name) in sources {
         for (rank, mut doc) in results.into_iter().enumerate() {
-            let rrf_score = weight * (1.0 / (k + rank as f32 + 1.0));
+            let mut rrf_score = weight * (1.0 / (k + rank as f32 + 1.0));
+
+            // Enforce Vector index lang
+            if lang != "all" && !lang.is_empty() && doc.lang != lang && source_name == "IVF" {
+                if intent == &QueryIntent::Navigational {
+                    rrf_score *= 0.7;
+                } else {
+                    rrf_score *= 0.1;
+                }
+            }
 
             scores
                 .entry(doc.url.clone())

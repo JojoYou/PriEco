@@ -416,6 +416,8 @@ pub async fn run_json(
         // RRF Merge & Deduplicate
         let mut results: Vec<WebDocument> = ranking::rrf::run(
             query,
+            lang,
+            &intent,
             dir_results,
             tantivy_results,
             vector_results,
@@ -620,6 +622,18 @@ fn search_tantivy(
         let boosted_intent_query = Box::new(BoostQuery::new(intent_term_query, 2.0));
 
         clauses.push((Occur::Should, boosted_intent_query));
+    }
+
+    if lang != "all" && !lang.is_empty() {
+        let lang_term = Term::from_field_text(lang_field, lang);
+        let lang_query = Box::new(TermQuery::new(lang_term, IndexRecordOption::Basic));
+
+        if intent == &QueryIntent::Navigational {
+            let boosted_lang = Box::new(BoostQuery::new(lang_query, 2.0));
+            clauses.push((Occur::Should, boosted_lang));
+        } else {
+            clauses.push((Occur::Must, lang_query));
+        }
     }
 
     if intent != &QueryIntent::Navigational && lang != "all" && !lang.is_empty() {
