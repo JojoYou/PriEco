@@ -39,7 +39,7 @@ use rocket::{
     uri,
 };
 use rocket_dyn_templates::Template;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use urlencoding::encode;
 
@@ -54,7 +54,7 @@ use crate::web::{
     modules::settings,
 };
 use prieco_core::{
-    CLIENT, PRIECO_FJALL, TANTIVY_INDEX,
+    BANGS, CLIENT, PRIECO_FJALL, TANTIVY_INDEX,
     globals::{ANALYTICS, CSS_VERSION, EmbeddingService, JS_VERSION, UserAgent},
 };
 
@@ -158,7 +158,7 @@ pub async fn search_post(
     host: &Host<'_>,
     uri: &Origin<'_>,
     embedding_service: &State<EmbeddingService>,
-) -> Template {
+) -> Result<(ContentType, Template), Redirect> {
     search(
         form.t,
         form.q,
@@ -186,7 +186,7 @@ pub async fn search(
     host: &Host<'_>,
     uri: &Origin<'_>,
     embedding_service: &State<EmbeddingService>,
-) -> Template {
+) -> Result<(ContentType, Template), Redirect> {
     let raw_qt_cookie = cookie_jar
         .get("prieco_qt_prefs")
         .map(|c| c.value())
@@ -253,6 +253,22 @@ pub async fn search(
     context.insert(String::from("no_js"), json!(no_js));
 
     if no_js {
+        if let Some((_clean_query, redirects)) = multibangs(q) {
+            if redirects.len() == 1 {
+                return Err(Redirect::to(redirects[0].url.clone()));
+            } else if redirects.len() > 1 {
+                let mut multibang_ctx = HashMap::new();
+                multibang_ctx.insert("query", json!(q));
+                multibang_ctx.insert("redirects", json!(redirects));
+                multibang_ctx.insert("css_version", json!(CSS_VERSION));
+
+                return Ok((
+                    ContentType::HTML,
+                    Template::render("multibang", &multibang_ctx),
+                ));
+            }
+        }
+
         let lang = cookie_jar.get("lang").map_or("all", |c| c.value());
         let loc = cookie_jar.get("loc").map_or("all", |c| c.value());
         let active_goggles = load_goggles(&get_goggle_ids(None, Some(cookie_jar)));
@@ -300,7 +316,67 @@ pub async fn search(
         cookie_jar.get("loc").map(|c| c.value()),
     );
 
-    Template::render("search", &context)
+    Ok((ContentType::HTML, Template::render("search", &context)))
+}
+
+// Bangs
+#[derive(Serialize, Clone)]
+pub struct BangRedirect {
+    pub title: String,
+    pub domain: String,
+    pub url: String,
+}
+
+fn multibangs(query: &str) -> Option<(String, Vec<BangRedirect>)> {
+    let words: Vec<&str> = query.split_whitespace().collect();
+    let bang_candidates: Vec<&str> = words
+        .iter()
+        .filter(|w| w.starts_with('!'))
+        .cloned()
+        .collect();
+
+    if bang_candidates.is_empty() {
+        return None;
+    }
+
+    let mut bangs = Vec::new();
+    for token in &bang_candidates {
+        let candidate = token[1..].to_lowercase();
+        if let Some(bang) = BANGS.get(&candidate) {
+            bangs.push(bang);
+        }
+    }
+
+    if bangs.is_empty() {
+        return None;
+    }
+
+    let clean_query = words
+        .into_iter()
+        .filter(|w| !bang_candidates.contains(w))
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    let encoded_query = urlencoding::encode(&clean_query)
+        .into_owned()
+        .replace("%2F", "/");
+
+    let mut redirects = Vec::new();
+    for bang in bangs {
+        let target_url = if clean_query.is_empty() {
+            format!("https://{}", bang.d)
+        } else {
+            bang.u.replace("{{{s}}}", &encoded_query)
+        };
+
+        redirects.push(BangRedirect {
+            title: bang.t.clone(),
+            domain: bang.d.clone(),
+            url: target_url,
+        });
+    }
+
+    Some((clean_query, redirects))
 }
 
 /*

@@ -90,9 +90,12 @@ use crate::{ID_SIZE, RECORD_SIZE};
 /*
   Import own libraries
 */
-use crate::constants::{FINAL_SCORES, ID_MAP_FILE};
 use crate::helpers::{normalize_url, url_to_id};
 use crate::set_up;
+use crate::{
+    constants::{FINAL_SCORES, ID_MAP_FILE},
+    read_file,
+};
 
 /*
   Constants
@@ -1933,6 +1936,50 @@ impl QueryUnderstandingPipeline {
             })
             .collect()
     }
+}
+
+/*
+  Server-side bangs
+*/
+#[derive(Deserialize, Debug, Clone)]
+pub struct Bang {
+    pub d: String,
+    pub t: String,
+    pub u: String,
+}
+pub static BANGS: Lazy<AHashMap<String, Bang>> = Lazy::new(|| {
+    let content = read_file("static/js/unduck/bangs.js");
+    let mut map = AHashMap::new();
+
+    if content.is_empty() {
+        return map;
+    }
+
+    let blocks = content.split("},{");
+
+    for block in blocks {
+        let t = extract_val(block, "t:\"");
+        let d = extract_val(block, "d:\"");
+        let u = extract_val(block, "u:\"");
+
+        if let (Some(t_val), Some(d_val), Some(u_val)) = (t, d, u) {
+            map.insert(
+                t_val.clone(),
+                Bang {
+                    t: t_val,
+                    d: d_val,
+                    u: u_val,
+                },
+            );
+        }
+    }
+
+    map
+});
+fn extract_val(block: &str, key: &str) -> Option<String> {
+    let start = block.find(key)? + key.len();
+    let end = block[start..].find('"')?;
+    Some(block[start..start + end].to_string())
 }
 
 pub static ARTISTS_DB: Lazy<Arc<Database>> =

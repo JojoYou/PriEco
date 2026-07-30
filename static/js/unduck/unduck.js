@@ -1,77 +1,105 @@
 if ("serviceWorker" in navigator) {
-    window.addEventListener("load", async () => {
-        try {
-            const registration =
-                await navigator.serviceWorker.register("/sw.js");
-            console.log("ServiceWorker registered:", registration.scope);
-        } catch (err) {
-            console.warn("ServiceWorker registration failed:", err);
-            return;
-        }
+  window.addEventListener("load", async () => {
+    try {
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      console.log("ServiceWorker registered:", registration.scope);
+    } catch (err) {
+      console.warn("ServiceWorker registration failed:", err);
+      return;
+    }
 
-        // Listen for SW messages
-        navigator.serviceWorker.addEventListener("message", (event) => {
-            if (event.data.action === "cacheInvalidated") {
-                console.log(
-                    "Cache invalidated, new version:",
-                    event.data.newVersion,
-                );
-            }
-            if (event.data.action === "cacheCleared") {
-                console.log("Cache manually cleared.");
-            }
-        });
-
-        // Check version
-        navigator.serviceWorker.ready.then((reg) => {
-            if (reg.active) {
-                reg.active.postMessage({ action: "checkVersion" });
-            }
-        });
+    // Listen for SW messages
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      if (event.data.action === "cacheInvalidated") {
+        console.log("Cache invalidated, new version:", event.data.newVersion);
+      }
+      if (event.data.action === "cacheCleared") {
+        console.log("Cache manually cleared.");
+      }
     });
+
+    // Check version
+    navigator.serviceWorker.ready.then((reg) => {
+      if (reg.active) {
+        reg.active.postMessage({ action: "checkVersion" });
+      }
+    });
+  });
 }
 
 // Bangs
-function getBangredirectUrl() {
-    var url = new URL(window.location.href);
-    var query = url.searchParams.get("q");
-    query = query ? query.trim() : "";
-    if (!query) return null;
+function getBangRedirectUrls() {
+  var url = new URL(window.location.href);
+  var query = url.searchParams.get("q");
+  if (!query) return [];
 
-    var match = query.match(/!(\S+)/i);
-    var bangCandidate = match && match[1] ? match[1].toLowerCase() : null;
-    var selectedBang = null;
+  var words = query.split(/\s+/);
+  var bangTokens = words.filter((w) => w.startsWith("!"));
+  if (bangTokens.length === 0) return [];
 
-    if (bangCandidate) {
-        for (var i = 0; i < bangs.length; i++) {
-            if (bangs[i].t === bangCandidate) {
-                selectedBang = bangs[i];
-                break;
-            }
-        }
+  var selectedBangs = [];
+  var bangCandidates = bangTokens.map((b) => b.substring(1).toLowerCase());
+
+  for (var i = 0; i < bangCandidates.length; i++) {
+    var candidate = bangCandidates[i];
+    for (var j = 0; j < bangs.length; j++) {
+      if (bangs[j].t === candidate) {
+        selectedBangs.push(bangs[j]);
+        break;
+      }
     }
+  }
 
-    if (!selectedBang) return null;
+  if (selectedBangs.length === 0) return [];
 
-    var cleanQuery = query.replace(/!\S+\s*/i, "").trim();
-    if (cleanQuery === "") {
-        return "https://" + selectedBang.d;
-    }
+  var cleanQuery = query;
+  bangTokens.forEach((token) => {
+    var regex = new RegExp(
+      token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*",
+      "gi",
+    );
+    cleanQuery = cleanQuery.replace(regex, "");
+  });
+  cleanQuery = cleanQuery.trim();
 
-    var searchUrl = selectedBang.u
-        ? selectedBang.u.replace(
-              "{{{s}}}",
-              encodeURIComponent(cleanQuery).replace(/%2F/g, "/"),
+  return selectedBangs
+    .map((bang) => {
+      if (cleanQuery === "") {
+        return "https://" + bang.d;
+      }
+      return bang.u
+        ? bang.u.replace(
+            "{{{s}}}",
+            encodeURIComponent(cleanQuery).replace(/%2F/g, "/"),
           )
         : null;
-
-    return searchUrl;
+    })
+    .filter((u) => u !== null);
 }
 
 function doRedirect() {
-    var searchUrl = getBangredirectUrl();
-    if (!searchUrl) return;
-    window.location.replace(searchUrl);
+  var searchUrls = getBangRedirectUrls();
+  if (!searchUrls || searchUrls.length === 0) return;
+
+  if (searchUrls.length === 1) {
+    window.location.replace(searchUrls[0]);
+    return;
+  }
+
+  var blockedCount = 0;
+
+  for (var i = 0; i < searchUrls.length - 1; i++) {
+    var win = window.open(searchUrls[i], "_blank");
+    if (!win || win.closed || typeof win.closed === "undefined") {
+      blockedCount++;
+    }
+  }
+
+  if (blockedCount > 0) {
+    return;
+  }
+
+  window.location.replace(searchUrls[searchUrls.length - 1]);
 }
 
 doRedirect();
