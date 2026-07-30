@@ -262,7 +262,6 @@ fn thread_manager() {
     let _ = VECTOR_CENTROPOIDS.search(&vec![0.0; 384], 1, 1);
 
     // Blob storage
-    println!("Blob starting");
     let blob_thread = {
         spawn(move || {
             while !stop_requested() {

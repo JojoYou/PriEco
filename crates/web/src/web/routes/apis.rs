@@ -30,6 +30,7 @@ use rocket::{
     serde::json::{Json, Value as RocketValue},
 };
 use serde_json::json;
+use url::{Host as URL_HOST, Url};
 
 /*
   Import own libraries
@@ -127,7 +128,24 @@ pub async fn proxy_get(
     width: Option<u32>,
     height: Option<u32>,
 ) -> Result<(ContentType, Vec<u8>), Status> {
-    proxy_request(u, None, "GET", width, height).await
+    let url = match Url::parse(u) {
+        Ok(ur) => ur,
+        Err(_) => return Err(Status::BadRequest),
+    };
+
+    // Localhost check
+    if internal_url(&url) {
+        return Err(Status::Forbidden);
+    }
+
+    // File type
+    let (content_type, body) = proxy_request(u, None, "GET", width, height).await?;
+
+    if allowed_type(&url, &content_type) {
+        Ok((content_type, body))
+    } else {
+        Err(Status::UnsupportedMediaType)
+    }
 }
 
 /*
@@ -143,10 +161,94 @@ pub async fn proxy_post(
     width: Option<u32>,
     height: Option<u32>,
 ) -> Result<(ContentType, Vec<u8>), Status> {
-    proxy_request(u, Some(body), "POST", width, height).await
+    let url = match Url::parse(u) {
+        Ok(ur) => ur,
+        Err(_) => return Err(Status::BadRequest),
+    };
+
+    // Localhost check
+    if internal_url(&url) {
+        return Err(Status::Forbidden);
+    }
+
+    // File type
+    let (content_type, body) = proxy_request(u, Some(body), "POST", width, height).await?;
+
+    if allowed_type(&url, &content_type) {
+        Ok((content_type, body))
+    } else {
+        Err(Status::UnsupportedMediaType)
+    }
 }
 
 /* Helper functions */
+/*
+  Description: Validates URL for Proxy for security reasons
+
+  Input: URL
+  Output: If URL is internal
+*/
+fn internal_url(url: &Url) -> bool {
+    match url.host() {
+        Some(URL_HOST::Domain(domain)) => {
+            domain == "localhost" || domain.ends_with(".local") || domain == "broadcasthost"
+        }
+        Some(URL_HOST::Ipv4(ip)) => {
+            ip.is_loopback() ||    // 127.x.x.x
+            ip.is_private() ||     // 10.x, 192.168.x, 172.16-31.x
+            ip.is_unspecified() || // 0.0.0.0
+            ip.is_link_local() ||  // 169.254.x
+            ip.is_broadcast() // 255.255.255.255
+        }
+
+        Some(URL_HOST::Ipv6(ip)) => {
+            ip.is_loopback() ||    // ::1
+            ip.is_unspecified() // ::
+        }
+
+        None => true, // file:// and similar
+    }
+}
+
+/*
+  Description: Validates Proxied content, allowed are all images and (CSS,JS) only from SearchExpander
+
+  Input: URL, Content type
+  Output: If type is allowed
+*/
+fn allowed_type(url: &Url, content_type: &ContentType) -> bool {
+    let top = content_type.top().as_str(); // "image", "text", "application"
+    let sub = content_type.sub().as_str(); // "png", "css", "javascript"
+
+    let allowed_data = (top == "text" && sub == "css")
+        || (top == "text" && sub == "javascript")
+        || (top == "application" && sub == "javascript")
+        || (top == "application" && sub == "x-javascript")
+        || (top == "application" && sub == "json");
+
+    let allowed_domain = match url.domain() {
+        Some(d) => {
+            d == "searchexpander.com"
+                || d.ends_with(".searchexpander.com")
+                || d == "duckduckgo.com"
+                || d.ends_with(".duckduckgo.com")
+        }
+        None => false,
+    };
+
+    // Images are allowed
+    if top == "image" {
+        true
+    }
+    // CSS and JS only Search Expander
+    else if allowed_data && allowed_domain {
+        true
+    }
+    // Reject the rest
+    else {
+        false
+    }
+}
 
 /*
   Description: Proxies the contenct based on request type from route
@@ -206,11 +308,6 @@ async fn proxy_request(
     };
 
     if !resp.status().is_success() {
-        println!("Fetched URL: {}", decoded_url);
-        println!("Status: {}", resp.status());
-        if let Some(ct) = resp.headers().get("content-type") {
-            println!("Content-Type: {:?}", ct);
-        }
         return Err(Status::NotFound);
     }
 
