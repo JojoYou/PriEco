@@ -101,6 +101,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     let loc_field = schema.get_field("loc").unwrap();
     let date_field = schema.get_field("date").unwrap();
     let safe_s_field = schema.get_field("safe_s").unwrap();
+    let intent_field = schema.get_field("intent").unwrap();
 
     let mut compressor = zstd::bulk::Compressor::with_dictionary(3, &META_DICTIONARY)?;
 
@@ -123,9 +124,9 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
             for line in reader.lines() {
                 let line = line?;
 
-                // Create a web document with checks
                 let parts: Vec<&str> = line.split("<-->").collect();
-                if parts.len() != 15 {
+
+                if parts.len() != 18 {
                     continue;
                 }
 
@@ -142,7 +143,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     continue;
                 }
 
-                let vector: Vec<f32> = parts[14]
+                let vector: Vec<f32> = parts[17]
                     .split_whitespace()
                     .filter_map(|s| s.parse().ok())
                     .collect();
@@ -180,9 +181,9 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     load: parts[12].parse().unwrap_or_default(),
                     date: parts[13].parse().unwrap_or(0),
 
-                    has_500_words: false,
-                    intent: 0,
-                    is_mobile: false,
+                    intent: parts[14].parse().unwrap_or(5),
+                    is_mobile: parts[15] == "1" || parts[15] == "true",
+                    has_500_words: parts[16] == "1" || parts[16] == "true",
 
                     search_score: 0.0,
                     source: String::new(),
@@ -199,14 +200,15 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                 TANTIVY_WRITER.lock().add_document(tantivy::doc!(
                     doc_id_field => id,
                     domain_id_field => url_to_domain_id(&url),
-                        title_field => doc.title.clone(),
-                        description_field => doc.description.clone(),
-                        content_field => doc.content.clone(),
-                        keywords_field => doc.keywords.clone(),
-                        lang_field => doc.lang.clone(),
-                        loc_field => doc.loc.clone(),
-                        date_field => doc.date,
-                        safe_s_field => doc.safe_s
+                    title_field => doc.title.clone(),
+                    description_field => doc.description.clone(),
+                    content_field => doc.content.clone(),
+                    keywords_field => doc.keywords.clone(),
+                    lang_field => doc.lang.clone(),
+                    loc_field => doc.loc.clone(),
+                    date_field => doc.date,
+                    safe_s_field => doc.safe_s,
+                    intent_field => doc.intent as u64
                 ))?;
 
                 vector_idx_buffer.insert(id, vector);

@@ -38,13 +38,13 @@ pub struct RankingWeights {
 impl Default for RankingWeights {
     fn default() -> Self {
         Self {
-            domain_match_boost: 4.164824041987222,
-            homepage_boost: 1.6227153067582822,
-            lang_boost: 1.2422396900328991,
-            loc_boost: 1.2422396900328991,
+            domain_match_boost: 4.164,
+            homepage_boost: 1.622,
+            lang_boost: 1.01,
+            loc_boost: 1.242,
             tld_loc_boost: 1.2,
-            wiki_boost: 1.3977276102163492,
-            https_boost: 1.2874976244929701,
+            wiki_boost: 1.397,
+            https_boost: 1.287,
             dev_com_boost: 1.04,
             org_net_boost: 1.02,
             bad_url_penalty: 0.8,
@@ -63,7 +63,6 @@ impl Default for RankingWeights {
         }
     }
 }
-
 static ACTIVE_WEIGHTS: Lazy<RwLock<RankingWeights>> =
     Lazy::new(|| RwLock::new(RankingWeights::default()));
 

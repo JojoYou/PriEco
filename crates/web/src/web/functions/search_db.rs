@@ -499,7 +499,8 @@ pub async fn run_json(
             .collect();
 
         let q = query.to_string();
-        let scores = tokio::task::spawn_blocking(move || RERANKER.score_batch(&q, &passages))
+        let scores = RERANKER
+            .score_batch(query, &passages)
             .await
             .unwrap_or_else(|_| vec![0.0; candidates]);
         rerank_time_total = rerank_start.elapsed().as_secs_f32();

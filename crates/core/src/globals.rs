@@ -1172,8 +1172,8 @@ pub static BGE_TOKENIZER: &[u8] = include_bytes!("../../../data/bge/tokenizer.js
 pub static RERANKER: Lazy<Reranker> = Lazy::new(Reranker::new);
 
 pub struct Reranker {
-    session: InMemorySession<'static>,
-    tokenizer: Tokenizer,
+    session: Arc<tokio::sync::Mutex<InMemorySession<'static>>>,
+    tokenizer: Arc<tokio::sync::Mutex<Tokenizer>>,
 }
 
 impl Reranker {
@@ -1192,8 +1192,6 @@ impl Reranker {
             .with_execution_providers([ExecutionProvider::CUDA(
                 ort::execution_providers::CUDAExecutionProviderOptions {
                     enable_cuda_graph: false,
-                    arena_extend_strategy:
-                        ort::execution_providers::ArenaExtendStrategy::SameAsRequested,
                     ..Default::default()
                 },
             )])
@@ -1205,6 +1203,7 @@ impl Reranker {
 
         tokenizer.with_padding(Some(PaddingParams {
             strategy: PaddingStrategy::BatchLongest,
+            pad_to_multiple_of: Some(64),
             ..Default::default()
         }));
 
@@ -1220,78 +1219,108 @@ impl Reranker {
             );
         };
 
-        Self { session, tokenizer }
+        Self {
+            session: Arc::new(tokio::sync::Mutex::new(session)),
+            tokenizer: Arc::new(tokio::sync::Mutex::new(tokenizer)),
+        }
     }
 
-    pub fn score_batch(&self, query: &str, passages: &[String]) -> Vec<f32> {
+    pub async fn score_batch(
+        &self,
+        query: &str,
+        passages: &[String],
+    ) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
         if passages.is_empty() {
-            return Vec::new();
+            return Ok(Vec::new());
         }
 
-        let batch_size = passages.len();
+        let query = query.to_string();
+        let passages: Vec<String> = passages.to_vec();
 
-        let input_pairs: Vec<(&str, &str)> = passages.iter().map(|p| (query, p.as_str())).collect();
-        let encodings = self.tokenizer.encode_batch(input_pairs, true).unwrap();
-        let seq_len = encodings[0].get_ids().len();
+        let session_arc = self.session.clone();
+        let tokenizer_arc = self.tokenizer.clone();
 
-        let mut ids = Vec::with_capacity(batch_size * seq_len);
-        let mut mask = Vec::with_capacity(batch_size * seq_len);
+        let scores = tokio::task::spawn_blocking(
+            move || -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
+                // 1. Lock the tokenizer (Only 1 thread can tokenize at a time)
+                let tokenizer = tokio::runtime::Handle::current().block_on(tokenizer_arc.lock());
 
-        for enc in &encodings {
-            ids.extend(enc.get_ids().iter().map(|&x| x as i64));
-            mask.extend(enc.get_attention_mask().iter().map(|&x| x as i64));
-        }
+                let batch_size = passages.len();
+                let input_pairs: Vec<(&str, &str)> = passages
+                    .iter()
+                    .map(|p| (query.as_str(), p.as_str()))
+                    .collect();
+                let encodings = tokenizer
+                    .encode_batch(input_pairs, true)
+                    .map_err(|e| e.to_string())?;
+                let seq_len = encodings[0].get_ids().len();
 
-        let input_ids =
-            CowArray::from(Array2::from_shape_vec((batch_size, seq_len), ids).unwrap()).into_dyn();
-        let attention_mask =
-            CowArray::from(Array2::from_shape_vec((batch_size, seq_len), mask).unwrap()).into_dyn();
+                let mut ids = Vec::with_capacity(batch_size * seq_len);
+                let mut mask = Vec::with_capacity(batch_size * seq_len);
 
-        let mut io_binding = self.session.bind().unwrap();
+                for enc in &encodings {
+                    ids.extend(enc.get_ids().iter().map(|&x| x as i64));
+                    mask.extend(enc.get_attention_mask().iter().map(|&x| x as i64));
+                }
 
-        io_binding
-            .bind_input(
-                "input_ids",
-                Value::from_array(self.session.allocator(), &input_ids).unwrap(),
-            )
-            .unwrap();
+                drop(tokenizer);
 
-        io_binding
-            .bind_input(
-                "attention_mask",
-                Value::from_array(self.session.allocator(), &attention_mask).unwrap(),
-            )
-            .unwrap();
+                let input_ids =
+                    CowArray::from(Array2::from_shape_vec((batch_size, seq_len), ids).unwrap())
+                        .into_dyn();
+                let attention_mask =
+                    CowArray::from(Array2::from_shape_vec((batch_size, seq_len), mask).unwrap())
+                        .into_dyn();
 
-        let mem_info = ort::MemoryInfo::new(
-            ort::AllocationDevice::CPU,
-            0,
-            ort::AllocatorType::Arena,
-            ort::MemType::Default,
+                let session = tokio::runtime::Handle::current().block_on(session_arc.lock());
+
+                let mut io_binding = session.bind().unwrap();
+
+                io_binding
+                    .bind_input(
+                        "input_ids",
+                        Value::from_array(session.allocator(), &input_ids).unwrap(),
+                    )
+                    .unwrap();
+                io_binding
+                    .bind_input(
+                        "attention_mask",
+                        Value::from_array(session.allocator(), &attention_mask).unwrap(),
+                    )
+                    .unwrap();
+
+                let mem_info = ort::MemoryInfo::new(
+                    ort::AllocationDevice::CPU,
+                    0,
+                    ort::AllocatorType::Arena,
+                    ort::MemType::Default,
+                )
+                .unwrap();
+
+                io_binding.bind_output("logits", mem_info).unwrap();
+                session.run_with_binding(&io_binding).unwrap();
+
+                let outputs = io_binding.outputs().unwrap();
+                let scores_tensor = outputs["logits"].try_extract::<f32>().unwrap();
+                let view = scores_tensor.view();
+
+                let mut results = Vec::with_capacity(batch_size);
+                if view.ndim() == 2 {
+                    for i in 0..batch_size {
+                        results.push(view[[i, 0]]);
+                    }
+                } else {
+                    for i in 0..batch_size {
+                        results.push(view[[i]]);
+                    }
+                }
+
+                Ok(results)
+            },
         )
-        .unwrap();
+        .await??;
 
-        io_binding.bind_output("logits", mem_info).unwrap();
-
-        self.session.run_with_binding(&io_binding).unwrap();
-
-        let outputs = io_binding.outputs().unwrap();
-        let scores = outputs["logits"].try_extract::<f32>().unwrap();
-        let view = scores.view();
-
-        let mut results = Vec::with_capacity(batch_size);
-
-        if view.ndim() == 2 {
-            for i in 0..batch_size {
-                results.push(view[[i, 0]]);
-            }
-        } else {
-            for i in 0..batch_size {
-                results.push(view[[i]]);
-            }
-        }
-
-        results
+        Ok(scores)
     }
 }
 
