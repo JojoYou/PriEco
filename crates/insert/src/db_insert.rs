@@ -108,6 +108,8 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Process files
     let mut vector_idx_buffer: HashMap<u64, Vec<f32>> = HashMap::with_capacity(1_000_000);
     for file_name in &files {
+        println!("Insertiong: {}", file_name);
+
         let zip_file = File::open(file_name)?;
         let mut archive = ZipArchive::new(zip_file)?;
 
@@ -117,6 +119,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
             if !entry_name.ends_with(".txt") {
                 continue;
             }
+            println!("Entry: {}", &entry_name);
 
             let reader = BufReader::with_capacity(1 << 20, entry);
             let mut inserted = 0;
@@ -127,6 +130,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                 let parts: Vec<&str> = line.split("<-->").collect();
 
                 if parts.len() != 18 {
+                    println!("bad count! {}", parts.len());
                     continue;
                 }
 
@@ -140,6 +144,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     .unwrap()
                     .is_some()
                 {
+                    println!("Contians: {}", &url);
                     continue;
                 }
 
@@ -148,6 +153,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     .filter_map(|s| s.parse().ok())
                     .collect();
                 if vector.len() != VECTOR_DIM {
+                    println!("Vector: {}", &url);
                     continue;
                 }
 
@@ -157,6 +163,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     .filter_map(|s| s.parse().ok())
                     .collect();
                 if points.len() != 4 {
+                    println!("Point len: {}", points.len());
                     continue;
                 }
 

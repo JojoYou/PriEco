@@ -288,7 +288,6 @@ fn thread_manager() {
                     );
                 };
                 sleep(Duration::from_mins(1));
-                break;
             }
         })
     };
