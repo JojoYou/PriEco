@@ -121,7 +121,7 @@ document.addEventListener("DOMContentLoaded", () => {
           e.preventDefault();
           items[currentFocus].click();
         }
-      } else if (e.key === "Tab") {
+      } else if (e.key === "Tab" || e.key == "ArrowRight") {
         if (currentFocus > -1) {
           e.preventDefault();
           const newQuery = items[currentFocus].textContent;
