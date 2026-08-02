@@ -39,30 +39,31 @@ impl Default for RankingWeights {
     fn default() -> Self {
         Self {
             domain_match_boost: 4.164,
-            homepage_boost: 1.622,
+            homepage_boost: 1.8207127570559796,
             lang_boost: 1.01,
             loc_boost: 1.242,
             tld_loc_boost: 1.2,
-            wiki_boost: 1.397,
-            https_boost: 1.287,
-            dev_com_boost: 1.04,
-            org_net_boost: 1.02,
-            bad_url_penalty: 0.8,
-            path_depth_penalty: 0.9,
-            confidence_multi: 0.01,
-            effort_multi: 0.08,
+            wiki_boost: 1.3905070941466917,
+            https_boost: 1.3521680592049155,
+            dev_com_boost: 1.01,
+            org_net_boost: 1.0343461125773576,
+            bad_url_penalty: 0.99,
+            path_depth_penalty: 0.7579354778664352,
+            confidence_multi: 0.001,
+            effort_multi: 0.26516713994470764,
             has_500_words_boost: 1.15,
-            is_mobile_boost: 1.35,
-            mobile_unfriendly_penalty: 0.6,
+            is_mobile_boost: 1.448943024361014,
+            mobile_unfriendly_penalty: 0.6294524011059146,
             shopping_product_boost: 1.2,
-            shopping_domain_boost: 1.1,
-            info_wiki_boost: 1.4,
-            info_gov_edu_boost: 1.25,
-            info_shop_penalty: 0.8,
-            title_match_boost: 1.3,
+            shopping_domain_boost: 1.1151867372193276,
+            info_wiki_boost: 1.3623035283335967,
+            info_gov_edu_boost: 1.2588360222339798,
+            info_shop_penalty: 0.6423278191323988,
+            title_match_boost: 1.3818951856263455,
         }
     }
 }
+
 static ACTIVE_WEIGHTS: Lazy<RwLock<RankingWeights>> =
     Lazy::new(|| RwLock::new(RankingWeights::default()));
 

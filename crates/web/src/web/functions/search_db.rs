@@ -27,7 +27,6 @@ use std::{
 */
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use prieco_blob::blob::decode_blob_to_text;
 use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 use rocket::{State, serde::json::Json};
 use serde_json::Value as Json_Value;
