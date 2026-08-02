@@ -13,7 +13,6 @@ use std::{
 /*
   Import external libraries
 */
-use fjall::PersistMode;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use zip::ZipArchive;
 use zstd::stream::Encoder as ZstdEncoder;

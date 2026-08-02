@@ -160,10 +160,13 @@ form.suggestions-active .search_button::before {
     justify-content: center;
     align-items: center;
     flex-wrap: wrap;
-    position: relative;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    box-sizing: border-box;
     z-index: 10;
-    padding: 0 10vw 0 10vw;
-    margin-top: 20px;
+    padding: 0 10vw;
 }
 
 .shortcutBtn {

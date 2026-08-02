@@ -1,5 +1,3 @@
-use once_cell::sync::Lazy;
-
 use primp::Client;
 use url::Url;
 

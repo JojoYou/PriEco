@@ -61,7 +61,6 @@ use primp::{Client as PIMP_CLIENT, Impersonate, ImpersonateOS};
 #[cfg(feature = "cuda")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use redb::{Database, ReadableDatabase, TableDefinition};
-use reqwest::Client;
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use rocket::{
     Request,
