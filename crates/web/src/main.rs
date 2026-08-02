@@ -211,6 +211,7 @@ async fn rocket() -> _ {
                 // Landing page
                 index,
                 index_head,
+                handle_shortcuts,
                 // Search
                 search,
                 search_post,

@@ -2,7 +2,7 @@ const CACHE_NAME = "prieco-cache";
 const CACHE_VER_URL = "/cache-ver";
 const MAX_CACHE_ITEMS = 50;
 
-const STATIC_ASSETS = ["/", "/bangs.js"];
+const STATIC_ASSETS = ["/bangs.js"];
 
 function swLog(...args) {
   console.log("[SW]", ...args);
@@ -160,6 +160,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
   if (
+    url.pathname === "/" ||
     url.pathname === "/sw.js" ||
     url.pathname === CACHE_VER_URL ||
     url.pathname === "/settings_html" ||

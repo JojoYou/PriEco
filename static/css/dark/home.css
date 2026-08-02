@@ -3,7 +3,10 @@
 }
 .search_button,
 .search_box,
-.suggestions_container {
+.suggestions_container,
+.shortcutForm,
+.shortcutElemenet img,
+#addShortcutBtn {
     background: #181a1b;
     color: #fff;
 }
@@ -16,4 +19,20 @@
 .suggestion_item.active,
 .suggestion_item:hover {
     background: #202124;
+}
+
+.shortcutEditBtn,
+.calculator button,
+.weatherCsetting,
+.sh_txt {
+    color: #fff;
+}
+
+.addShortcut {
+    border: solid 10px #181a1b;
+}
+
+.shortcutForm form input {
+    color: #fff;
+    background-color: #000;
 }

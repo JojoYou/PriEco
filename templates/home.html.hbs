@@ -30,7 +30,7 @@
       <div class="search_input_wrapper">
         <div class="ghost_box search_box"></div>
         <input name="q" placeholder="Search" class="search_box" id="search_box" autocomplete="off" required>
-        <div class="suggestions_container" style="display: none;"></div>
+        <div class="suggestions_container"></div>
       </div>
 
       {{#unless no_js}}
@@ -40,6 +40,52 @@
       {{/unless}}
     </form>
 
+<div class="shortcuts">
+  {{#each shortcuts}}
+    <div class="shortcut">
+      <div>
+        <div tabindex="0" class="shortcutEditBtn{{this.id}} shortcutEditBtn">•</div>
+
+        <a href="{{this.url}}" class="shortcutBtn{{this.id}}">
+          <div tabindex="0" class="shortcutElemenet">
+            <img src="/proxy?u=https://www.google.com/s2/favicons?domain={{this.host}}&sz=512" alt="{{this.name}}">
+          </div>
+        </a>
+
+        <div class="shortcutEditForm{{this.id}} shortcutEditForm shortcutForm">
+          <form method="post" action="/">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="shortcutID" value="{{this.id}}">
+            <input type="submit" name="shortcutDelete" value="Delete" class="redBtn DelShortcut">
+          </form>
+
+          <p><b>Edit</b></p>
+          <p>{{this.name}}</p>
+
+          <form method="post" action="/">
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="shortcutID" value="{{this.id}}">
+            <input type="text" name="shortcutName" placeholder="Name" value="{{this.name}}" required>
+            <input type="text" name="shortcutURL" placeholder="URL" value="{{this.url}}" required>
+            <input type="submit" name="shortcutEdit" class="Pointer" value="Edit">
+          </form>
+        </div>
+          <p class="sh_txt">{{this.display_name}}</p>
+      </div>
+    </div>
+  {{/each}}
+
+  <div tabindex="0" id="addShortcutBtn" class="shortcutElemenet">+</div>
+  <div class="addShortcut shortcutForm">
+    <p><b>Add shortcut</b></p>
+    <form method="POST" action="/">
+      <input type="hidden" name="action" value="add">
+      <input type="text" name="shortcutName" placeholder="Name" required>
+      <input type="text" name="shortcutURL" placeholder="URL" required>
+      <input type="submit" name="shortcutSubmit" value="Add" class="Pointer">
+    </form>
+  </div>
+</div>
   </div>
 </div>
 

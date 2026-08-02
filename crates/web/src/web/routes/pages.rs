@@ -41,13 +41,15 @@ use rocket::{
 use rocket_dyn_templates::Template;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use urlencoding::encode;
+use url::Url;
+use urlencoding::{decode, encode};
 
 /*
   Import own libraries
 */
 use crate::web::{
     functions::{
+        general::set_cookie,
         ranking::goggles::{fetch_and_store, get_goggle_ids, load_goggles, refresh_stale_goggles},
         search_endpoint::{self, UserQtPrefs, get_user_qt_prefs},
     },
@@ -110,7 +112,7 @@ pub fn index_head() -> &'static str {
 */
 #[get("/")]
 pub fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
-    let ip_addr = client_ip.0; // Extract IP address
+    let ip_addr = client_ip.0;
 
     let mut context: HashMap<String, RocketValue> = HashMap::new();
 
@@ -132,7 +134,121 @@ pub fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host) -> Te
         context.insert(String::from("settings"), json!(settings_ctx));
     }
 
+    // Shortcuts
+    let mut shortcuts = Vec::new();
+    if let Some(cookie) = cookie_jar.get("shortcuts") {
+        let decoded = decode(cookie.value()).unwrap_or_default().into_owned();
+        let items: Vec<&str> = decoded.split(',').collect();
+
+        for (i, item) in items.iter().enumerate() {
+            if i == 0 {
+                continue;
+            }
+
+            let parts: Vec<&str> = item.splitn(2, '=').collect();
+            if parts.len() == 2 {
+                let name = parts[0].to_string();
+                let url_str = parts[1].to_string();
+
+                let display_name = if name.len() > 10 {
+                    format!("{}...", &name[..7])
+                } else {
+                    name.clone()
+                };
+
+                let host = Url::parse(&url_str)
+                    .map(|u| u.host_str().unwrap_or("").to_string())
+                    .unwrap_or_default();
+
+                shortcuts.push(ShortcutView {
+                    id: i,
+                    name,
+                    display_name,
+                    url: url_str,
+                    host,
+                });
+            }
+        }
+    }
+    context.insert(String::from("shortcuts"), json!(shortcuts));
+
     Template::render("home", &context)
+}
+
+#[derive(Serialize)]
+pub struct ShortcutView {
+    pub id: usize,
+    pub name: String,
+    pub display_name: String,
+    pub url: String,
+    pub host: String,
+}
+
+#[derive(FromForm)]
+pub struct ShortcutAction<'r> {
+    action: &'r str,
+    shortcutID: Option<usize>,
+    shortcutName: Option<&'r str>,
+    shortcutURL: Option<&'r str>,
+}
+#[post("/", data = "<form>")]
+pub fn handle_shortcuts(form: Form<ShortcutAction<'_>>, cookie_jar: &CookieJar<'_>) -> Redirect {
+    let mut items: Vec<String> = Vec::new();
+
+    if let Some(cookie) = cookie_jar.get("shortcuts") {
+        let decoded = decode(cookie.value()).unwrap_or_default().into_owned();
+        items = decoded.split(',').map(|s| s.to_string()).collect();
+    }
+
+    match form.action {
+        "add" => {
+            if let (Some(name), Some(url)) = (form.shortcutName, form.shortcutURL) {
+                if items.is_empty() {
+                    items.push("dummy=dummy".to_string());
+                }
+
+                let final_url = if url.starts_with("http://") || url.starts_with("https://") {
+                    url.to_string()
+                } else {
+                    format!("https://{}", url)
+                };
+
+                items.push(format!("{}={}", name, final_url));
+            }
+        }
+        "edit" => {
+            if let (Some(id), Some(name), Some(url)) =
+                (form.shortcutID, form.shortcutName, form.shortcutURL)
+            {
+                if id < items.len() {
+                    let final_url = if url.starts_with("http://") || url.starts_with("https://") {
+                        url.to_string()
+                    } else {
+                        format!("https://{}", url)
+                    };
+
+                    items[id] = format!("{}={}", name, final_url);
+                }
+            }
+        }
+        "delete" => {
+            if let Some(id) = form.shortcutID {
+                if id < items.len() {
+                    items.remove(id);
+                }
+            }
+        }
+        _ => {}
+    }
+
+    set_cookie(
+        cookie_jar,
+        String::from("shortcuts"),
+        encode(&items.join(",")).into_owned(),
+        true,
+        true,
+    );
+    Redirect::to(uri!(index))
 }
 
 /*
