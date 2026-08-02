@@ -188,6 +188,10 @@ async fn rocket() -> _ {
                 println!("Flushing Fjall to disk...");
                 let _ = PRIECO_FJALL.meta_db.persist(PersistMode::SyncAll);
                 let _ = PRIECO_FJALL.blob_db.persist(PersistMode::SyncAll);
+
+                println!("Flushing Tantivy to disk...");
+                let _ = TANTIVY_WRITER.lock().commit();
+
                 println!("{}Shutdown!{}", colors::GREEN, colors::RESET);
             })
         }))
@@ -236,6 +240,7 @@ async fn rocket() -> _ {
                 export_quick_tune,
                 // Thanks page
                 thanks,
+                submit,
                 // Blob storage
                 view_blob
             ],

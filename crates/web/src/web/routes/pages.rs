@@ -828,6 +828,25 @@ pub fn ext_privacy(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
 }
 
 /*
+  Description: PriEco URL submit
+
+  Input:
+  Output: URL submit page html
+*/
+#[get("/submit")]
+pub fn submit(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
+    let mut context: HashMap<String, RocketValue> = HashMap::from([
+        (String::from("css_version"), json!(CSS_VERSION)),
+        (String::from("js_version"), json!(JS_VERSION)),
+        (String::from("title_query"), json!("Submit | ")),
+    ]);
+
+    settings::run(&mut context, &None, cookie_jar, host);
+
+    Template::render("search/submit", context)
+}
+
+/*
   Description: PriEco roadmap
 
   Input:

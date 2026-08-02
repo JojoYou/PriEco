@@ -118,7 +118,7 @@ pub fn extract_metadata(
         .map(String::from)
         .unwrap_or_default();
 
-    // 4. Favicon URL (Master will download the actual image)
+    // Favicon URL
     result.favicon = document
         .select(&selectors.link_icon_selector)
         .next()
@@ -195,14 +195,14 @@ fn extract_title(
     title_selector: &Selector,
     h_selectors: &Vec<Selector>,
 ) -> String {
-    // Check if site owner set different title for search engines than for browsers
+    // Site specified title
     if let Some(og_site_name_element) = document.select(og_selector).next() {
         if let Some(content) = og_site_name_element.value().attr("content") {
             return content.to_string();
         }
     }
 
-    // Extract <title> tag
+    // <title> tag
     if let Some(title_element) = document.select(title_selector).next() {
         return title_element
             .text()
@@ -212,7 +212,7 @@ fn extract_title(
             .to_string();
     }
 
-    // Check <h1..6> tags
+    // <h1..6> tags
     for i in 1..6 {
         if let Some(h_selector) = h_selectors.get(i) {
             if let Some(h_element) = document.select(h_selector).next() {
@@ -226,7 +226,6 @@ fn extract_title(
         }
     }
 
-    // If everything fails, return empty string
     String::new()
 }
 
@@ -243,7 +242,7 @@ fn extract_description(
     p_selector: &Selector,
     title: &str,
 ) -> String {
-    // Check if site owner set different description for search engines
+    // Site specified description
     if let Some(og_description_element) = document.select(og_selector).next() {
         if let Some(content) = og_description_element.value().attr("content") {
             if content != title {
@@ -252,7 +251,6 @@ fn extract_description(
         }
     }
 
-    // Second place
     if let Some(description_element) = document.select(meta_selector).next() {
         if let Some(content) = description_element.value().attr("content") {
             if content != title {
@@ -274,7 +272,6 @@ fn extract_description(
         }
     }
 
-    // If everything fails, return empty string
     String::new()
 }
 

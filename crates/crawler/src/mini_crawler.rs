@@ -340,7 +340,6 @@ impl CompiledSelectors {
             img_selector: Selector::parse("img").unwrap(),
             a_selector: Selector::parse("a").unwrap(),
 
-            // Add new selectors
             title_selector: Selector::parse("title").unwrap(),
             p_selector: Selector::parse("p").unwrap(),
             meta_keywords_selector: Selector::parse("meta[name='keywords']").unwrap(),

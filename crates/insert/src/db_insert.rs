@@ -108,8 +108,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Process files
     let mut vector_idx_buffer: HashMap<u64, Vec<f32>> = HashMap::with_capacity(1_000_000);
     for file_name in &files {
-        println!("Insertiong: {}", file_name);
-
         let zip_file = File::open(file_name)?;
         let mut archive = ZipArchive::new(zip_file)?;
 
@@ -119,7 +117,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
             if !entry_name.ends_with(".txt") {
                 continue;
             }
-            println!("Entry: {}", &entry_name);
 
             let reader = BufReader::with_capacity(1 << 20, entry);
             let mut inserted = 0;
@@ -130,7 +127,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                 let parts: Vec<&str> = line.split("<-->").collect();
 
                 if parts.len() != 18 {
-                    println!("bad count! {}", parts.len());
                     continue;
                 }
 
@@ -144,7 +140,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     .unwrap()
                     .is_some()
                 {
-                    println!("Contians: {}", &url);
                     continue;
                 }
 
@@ -153,7 +148,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     .filter_map(|s| s.parse().ok())
                     .collect();
                 if vector.len() != VECTOR_DIM {
-                    println!("Vector: {}", &url);
                     continue;
                 }
 
@@ -204,6 +198,14 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     .insert(&id.to_be_bytes(), &compressed_doc)?;
 
                 /* Tantivy */
+                println!(
+                    "Tantivy seq: {}",
+                    TANTIVY_INDEX
+                        .searchable_segment_ids()
+                        .expect("Failed to get searchable segment IDs")
+                        .len()
+                );
+
                 TANTIVY_WRITER.lock().add_document(tantivy::doc!(
                     doc_id_field => id,
                     domain_id_field => url_to_domain_id(&url),
@@ -236,18 +238,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     println!("{}: Vector idx commited", icons::DB_INSERT);
                 }
             }
-
-            // Commit after file
-            PRIECO_FJALL.meta_db.persist(PersistMode::SyncAll)?;
-
-            println!("{}: META commited", icons::DB_INSERT);
-
-            TANTIVY_WRITER.lock().commit()?;
-            println!(
-                "{}: Tantivy commited {} vectors",
-                icons::DB_INSERT,
-                vector_idx_buffer.len()
-            );
 
             vector_process(&mut vector_idx_buffer)?;
             println!("{}: Vector idx commited", icons::DB_INSERT);

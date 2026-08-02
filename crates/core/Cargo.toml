@@ -40,6 +40,7 @@ aho-corasick = { workspace = true }
 fst = { workspace = true }
 bincode-next = { workspace = true }
 rkyv = { workspace = true }
+primp = { workspace = true }
 
 [features]
 default = []

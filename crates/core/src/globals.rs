@@ -57,6 +57,7 @@ use ort::{
     tensor::OrtOwnedTensor,
 };
 use parking_lot::{Condvar, Mutex, RwLock};
+use primp::{Client as PIMP_CLIENT, Impersonate, ImpersonateOS};
 #[cfg(feature = "cuda")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use redb::{Database, ReadableDatabase, TableDefinition};
@@ -72,6 +73,7 @@ use symspell::{SymSpell, UnicodeStringStrategy};
 use tantivy::{
     Index, IndexReader, IndexWriter, ReloadPolicy,
     directory::MmapDirectory,
+    indexer::LogMergePolicy,
     schema::{
         FAST, INDEXED, IndexRecordOption, STORED, STRING, Schema, TextFieldIndexing, TextOptions,
     },
@@ -252,19 +254,16 @@ pub struct PriEcoConfig {
 /*
  Request Client
 */
-pub static CLIENT: Lazy<Client> = Lazy::new(|| {
-    println!("Created client!");
-    Client::builder()
-        .use_rustls_tls()
-        .connect_timeout(stdDuration::from_secs(3))
+pub static CLIENT: Lazy<PIMP_CLIENT> = Lazy::new(|| {
+    println!("Created primp client!");
+
+    PIMP_CLIENT::builder()
+        .impersonate(Impersonate::ChromeV148)
+        .impersonate_os(ImpersonateOS::Windows)
         .timeout(stdDuration::from_secs(15))
-        .pool_max_idle_per_host(50)
-        .pool_idle_timeout(stdDuration::from_secs(90))
-        .tcp_keepalive(stdDuration::from_secs(60))
-        .tcp_keepalive_interval(stdDuration::from_secs(30))
-        .http2_keep_alive_timeout(stdDuration::from_secs(20))
+        .connect_timeout(stdDuration::from_secs(5))
         .build()
-        .expect("Failed to create client")
+        .expect("Failed to create primp client")
 });
 
 /*
@@ -659,11 +658,16 @@ pub static TANTIVY_READER: Lazy<Arc<IndexReader>> = Lazy::new(|| {
 });
 
 pub static TANTIVY_WRITER: Lazy<Arc<Mutex<IndexWriter>>> = Lazy::new(|| {
-    Arc::new(Mutex::new(
-        TANTIVY_INDEX
-            .writer(TANTIVY_HEAP_SIZE)
-            .expect("Failed to create Tantivy V2 writer"),
-    ))
+    let writer = TANTIVY_INDEX
+        .writer(TANTIVY_HEAP_SIZE)
+        .expect("Failed to create Tantivy V2 writer");
+
+    let mut merge_policy = LogMergePolicy::default();
+    merge_policy.set_min_num_segments(5);
+
+    writer.set_merge_policy(Box::new(merge_policy));
+
+    Arc::new(Mutex::new(writer))
 });
 
 // Multilang tokenization

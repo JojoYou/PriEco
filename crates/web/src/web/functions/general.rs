@@ -90,6 +90,7 @@ pub fn set_cookie(
     let mut cookie = Cookie::new(cookie_name, cookie_value);
     cookie.set_same_site(SameSite::Strict);
     cookie.set_secure(true);
+    cookie.set_path("/");
 
     if cookie_long_life {
         cookie.set_max_age(Duration::days(365));
