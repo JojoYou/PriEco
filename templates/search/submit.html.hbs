@@ -5,16 +5,16 @@
   <div class="background"></div>
 
   <div class="container">
-    <h1 class="title">Roadmap</h1>
-    <p><a href="https://prieco.net/" target="_blank" class="link">PriEco</a> roadmap. Check out what's coming, vote on features and suggest new ones!</p>
+    <h1 class="title">Submission</h1>
 
 <div class="response">
-    <h3>Send us help!</h3>
-    <p>Do you have an idea for a new feature? Do you know what PriEco could improve? Say it here</p>
-    <form action="/roadmap/submit" method="POST">
-        <textarea id="message" name="message" rows="8" placeholder="What's on your mind?" required></textarea>
-        <button type="submit">Send</button>
-    </form>
+    <p>Send us URLs you'd like PriEco to index</p>
+    <p>After submission it should take just a few minutes to add them to PriEco</p>
+    <p>Please 1 URL a line</p>
+    <form action="/submit" method="POST">
+    <textarea id="message" name="message" rows="8" placeholder="Links line by line" required></textarea>
+    <button type="submit">Send</button>
+</form>
 </div>
 
 {{> footer }}

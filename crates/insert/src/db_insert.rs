@@ -198,14 +198,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     .insert(&id.to_be_bytes(), &compressed_doc)?;
 
                 /* Tantivy */
-                println!(
-                    "Tantivy seq: {}",
-                    TANTIVY_INDEX
-                        .searchable_segment_ids()
-                        .expect("Failed to get searchable segment IDs")
-                        .len()
-                );
-
                 TANTIVY_WRITER.lock().add_document(tantivy::doc!(
                     doc_id_field => id,
                     domain_id_field => url_to_domain_id(&url),

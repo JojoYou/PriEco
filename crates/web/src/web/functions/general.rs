@@ -88,7 +88,7 @@ pub fn set_cookie(
     js: bool,
 ) {
     let mut cookie = Cookie::new(cookie_name, cookie_value);
-    cookie.set_same_site(SameSite::Strict);
+    cookie.set_same_site(SameSite::Lax);
     cookie.set_secure(true);
     cookie.set_path("/");
 

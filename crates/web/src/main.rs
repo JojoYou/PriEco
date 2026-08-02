@@ -241,6 +241,7 @@ async fn rocket() -> _ {
                 // Thanks page
                 thanks,
                 submit,
+                submit_post,
                 // Blob storage
                 view_blob
             ],

@@ -846,6 +846,51 @@ pub fn submit(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     Template::render("search/submit", context)
 }
 
+#[derive(FromForm)]
+pub struct SubmitForm {
+    message: String,
+}
+
+#[derive(Serialize)]
+struct PageDataPayload {
+    page_url: String,
+    links: Vec<String>,
+}
+
+#[post("/submit", data = "<form>")]
+pub async fn submit_post(form: Form<SubmitForm>) -> String {
+    let links: Vec<String> = form
+        .message
+        .lines()
+        .map(|line| line.trim().to_string())
+        .filter(|line| !line.is_empty())
+        .collect();
+
+    let payload = PageDataPayload {
+        page_url: "user-submission".to_string(),
+        links,
+    };
+
+    let client = reqwest::Client::new();
+    let res = client
+        .post("https://crawler.prieco.net/web-discovery")
+        .json(&payload)
+        .send()
+        .await;
+
+    match res {
+        Ok(response) if response.status().is_success() => {
+            "Successfully sent to crawler!".to_string()
+        }
+        Ok(response) => {
+            format!("Crawler rejected the payload: {}", response.status())
+        }
+        Err(e) => {
+            format!("Failed to reach crawler: {}", e)
+        }
+    }
+}
+
 /*
   Description: PriEco roadmap
 
