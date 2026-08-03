@@ -48,6 +48,7 @@ log = { workspace = true }
 symspell = { workspace = true }
 rayon = { workspace = true }
 fjall = { workspace = true }
+aes-gcm = { workspace = true }
 
 [features]
 default = []

@@ -68,7 +68,7 @@ const MAX_PER_DOMAIN: usize = 5;
   Structures
 */
 pub static QUERY_CACHE: Lazy<RwLock<HashMap<String, Vec<WebDocument>>>> =
-    Lazy::new(|| RwLock::new(HashMap::new()));
+    Lazy::new(|| RwLock::new(HashMap::with_capacity(1_000)));
 
 /*
   Description: Gets database results and confidence score
