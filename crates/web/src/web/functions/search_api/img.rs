@@ -11,7 +11,7 @@ use std::{
 use twox_hash::XxHash64;
 
 use crate::web::functions::general::get_domain;
-use prieco_core::{CLIENT, ImgResult, colors, read_file, url_to_id};
+use prieco_core::{CLIENT, ImgResult, colors, url_to_id};
 
 /*
   Description: 3rd party image search with 0 knowledge cache

@@ -2535,17 +2535,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "io-uring"
-version = "0.7.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9080b15e63775b9a2ac7dca720f7050a8b955e092ea0f6020a4a80f69998cdc0"
-dependencies = [
- "bitflags 2.13.0",
- "cfg-if",
- "libc",
-]
-
-[[package]]
 name = "ipnet"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3937,26 +3926,17 @@ dependencies = [
 name = "prieco_blob"
 version = "3.0.0"
 dependencies = [
- "ahash 0.8.12",
  "bincode-next",
  "dashmap",
  "fjall",
  "flate2",
- "half",
- "io-uring",
- "libc",
- "memmap2",
  "once_cell",
  "prieco_core",
- "prieco_insert",
- "rand 0.9.2",
- "rayon",
  "rocksdb",
  "serde",
  "serde_json",
  "tantivy",
  "tar",
- "tokio",
  "urlencoding",
  "zstd",
 ]

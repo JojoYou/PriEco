@@ -19,19 +19,9 @@ tantivy = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 bincode-next = { workspace = true }
-
-ahash = { workspace = true }
 once_cell = { workspace = true }
-tokio = { workspace = true }
-rand = { workspace = true }
-rayon = { workspace = true }
-memmap2 = { workspace = true }
-libc = { workspace = true }
-io-uring  = { workspace = true }
-urlencoding = { workspace = true }
 dashmap = { workspace = true }
-prieco_insert = { workspace = true }
-half = { workspace = true }
+urlencoding = { workspace = true }
 
 flate2 = "1.1.9"
 tar = "0.4.44"
