@@ -343,8 +343,6 @@ async fn proxy_request(
         response = match request_builder.send().await {
             Ok(response) => response,
             Err(e) => {
-                println!("Request failed for URL: {}", url);
-                println!("Error: {:?}", e);
                 return Err(Status::BadGateway);
             }
         };
@@ -361,7 +359,6 @@ async fn proxy_request(
                     };
 
                     if bad_url(&current_url) {
-                        println!("Blocked malicious redirect to: {}", current_url.as_str());
                         return Err(Status::Forbidden);
                     }
 
