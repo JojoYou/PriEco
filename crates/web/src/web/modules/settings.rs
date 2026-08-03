@@ -71,7 +71,7 @@ pub fn run(
             match IP_TO_LOC.lookup_country(&ip_addr.to_string()) {
                 Ok(Some(country)) => country,
                 Ok(None) => String::new(),
-                Err(e) => String::new(),
+                Err(_) => String::new(),
             }
         } else {
             String::from("all")

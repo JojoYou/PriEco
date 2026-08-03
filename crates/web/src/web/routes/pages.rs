@@ -163,10 +163,6 @@ pub fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host) -> Te
                     name.clone()
                 };
 
-                let host = Url::parse(&url)
-                    .map(|u| u.host_str().unwrap_or("").to_string())
-                    .unwrap_or_default();
-
                 shortcuts.push(ShortcutView {
                     id: i,
                     name,

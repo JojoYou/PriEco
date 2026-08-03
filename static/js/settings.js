@@ -19,7 +19,7 @@ checkbox_index.addEventListener("change", () => {
   document.cookie =
     "index=" +
     (checkbox_index.checked ? "1; max-age=31536000" : "; max-age=0") +
-    "; path=/; SameSite=Strict; Secure";
+    "; path=/; SameSite=Lax; Secure";
   location.reload();
 });
 
@@ -28,9 +28,7 @@ document
   .getElementById("lang_select")
   .addEventListener("change", async function () {
     document.cookie =
-      "lang=" +
-      this.value +
-      "; path=/; SameSite=Strict; Secure; max-age=31536000";
+      "lang=" + this.value + "; path=/; SameSite=Lax; Secure; max-age=31536000";
     await clearPriecoCache();
     location.reload();
   });
@@ -40,9 +38,7 @@ document
   .getElementById("loc_select")
   .addEventListener("change", async function () {
     document.cookie =
-      "loc=" +
-      this.value +
-      "; path=/; SameSite=Strict; Secure; max-age=31536000";
+      "loc=" + this.value + "; path=/; SameSite=Lax; Secure; max-age=31536000";
     await clearPriecoCache();
     location.reload();
   });
@@ -63,7 +59,7 @@ checkbox_newtab.addEventListener("change", () => {
   document.cookie =
     "newtab=" +
     (checkbox_newtab.checked ? "1; max-age=31536000" : "; max-age=0") +
-    "; path=/; SameSite=Strict; Secure;";
+    "; path=/; SameSite=Lax; Secure;";
   updateLinks();
 });
 
@@ -84,7 +80,7 @@ function setScreenWidthCookie() {
     document.cookie =
       "screen_width=" +
       currentWidth +
-      "; path=/; SameSite=Strict; Secure; max-age=31536000";
+      "; path=/; SameSite=Lax; Secure; max-age=31536000";
     location.reload();
   }
 }
@@ -133,7 +129,7 @@ let c = document.getElementById("check_js");
 if (c) {
   c.checked = /\bjs=1/.test(document.cookie);
   c.onchange = async () => {
-    document.cookie = `js=${c.checked ? "1;max-age=31536000" : ";max-age=0"};path=/;SameSite=Strict;Secure`;
+    document.cookie = `js=${c.checked ? "1;max-age=31536000" : ";max-age=0"};path=/;SameSite=Lax;Secure`;
 
     if (c.checked) {
       await clearPriecoCache();
@@ -158,7 +154,7 @@ let check_post = document.getElementById("check_post");
 if (check_post) {
   check_post.checked = /\bpost=1/.test(document.cookie);
   check_post.onchange = async () => {
-    document.cookie = `post=${check_post.checked ? "1;max-age=31536000" : ";max-age=0"};path=/;SameSite=Strict;Secure`;
+    document.cookie = `post=${check_post.checked ? "1;max-age=31536000" : ";max-age=0"};path=/;SameSite=Lax;Secure`;
 
     await clearPriecoCache();
     if ("serviceWorker" in navigator) {
