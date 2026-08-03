@@ -49,7 +49,7 @@ use urlencoding::{decode, encode};
 */
 use crate::web::{
     functions::{
-        general::set_cookie,
+        general::{get_domain, set_cookie},
         ranking::goggles::{fetch_and_store, get_goggle_ids, load_goggles, refresh_stale_goggles},
         search_endpoint::{self, UserQtPrefs, get_user_qt_prefs},
     },
@@ -148,7 +148,14 @@ pub fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host) -> Te
             let parts: Vec<&str> = item.splitn(2, '=').collect();
             if parts.len() == 2 {
                 let name = parts[0].to_string();
-                let url_str = parts[1].to_string();
+                let url = parts[1].to_string();
+                let icon = format!(
+                    "/proxy?u={}",
+                    urlencoding::encode(&format!(
+                        "https://fav.prieco.net/icon?url={}&size=32",
+                        urlencoding::encode(&get_domain(&url, false))
+                    ))
+                );
 
                 let display_name = if name.len() > 10 {
                     format!("{}...", &name[..7])
@@ -156,7 +163,7 @@ pub fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host) -> Te
                     name.clone()
                 };
 
-                let host = Url::parse(&url_str)
+                let host = Url::parse(&url)
                     .map(|u| u.host_str().unwrap_or("").to_string())
                     .unwrap_or_default();
 
@@ -164,8 +171,8 @@ pub fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host) -> Te
                     id: i,
                     name,
                     display_name,
-                    url: url_str,
-                    host,
+                    url,
+                    icon,
                 });
             }
         }
@@ -181,7 +188,7 @@ pub struct ShortcutView {
     pub name: String,
     pub display_name: String,
     pub url: String,
-    pub host: String,
+    pub icon: String,
 }
 
 #[derive(FromForm)]

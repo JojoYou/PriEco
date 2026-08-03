@@ -478,10 +478,13 @@ fn format_google(json: Value) -> Vec<SearchResult> {
                         )
                     })
                     .unwrap_or_default(),
-                favicon: format!(
-                    "/proxy?u=https://fav.prieco.net/icon?url={}&size=32",
-                    urlencoding::encode(&get_domain(url, false))
-                ),
+                favicon: {
+                    let icon = format!(
+                        "https://fav.prieco.net/icon?url={}&size=32",
+                        urlencoding::encode(&get_domain(&url, false))
+                    );
+                    format!("/proxy?u={}", urlencoding::encode(&icon))
+                },
                 html_id: None,
 
                 reading_level: String::new(),
@@ -544,10 +547,11 @@ fn format_bing(json: Value) -> Vec<SearchResult> {
                             .and_then(|v| v.as_str())
                             .map(|s| format!("/proxy?u={}", urlencoding::encode(s)))
                             .unwrap_or_else(|| {
-                                format!(
-                                    "/proxy?u=https://fav.prieco.net/icon?url={}&size=32",
-                                    urlencoding::encode(&get_domain(url, false))
-                                )
+                                let icon = format!(
+                                    "https://fav.prieco.net/icon?url={}&size=32",
+                                    urlencoding::encode(&get_domain(&url, false))
+                                );
+                                format!("/proxy?u={}", urlencoding::encode(&icon))
                             }),
                         html_id: None,
 
@@ -581,10 +585,11 @@ fn format_brave(json: Value) -> Vec<SearchResult> {
                 .and_then(|v| v.as_str())
                 .map(|s| format!("/proxy?u={}", s))
                 .unwrap_or_else(|| {
-                    format!(
-                        "/proxy?u=https://fav.prieco.net/icon?url={}&size=32",
-                        get_domain(url, false)
-                    )
+                    let icon = format!(
+                        "https://fav.prieco.net/icon?url={}&size=32",
+                        urlencoding::encode(&get_domain(&url, false))
+                    );
+                    format!("/proxy?u={}", urlencoding::encode(&icon))
                 });
 
             let image = item
@@ -667,10 +672,11 @@ fn format_brave2(json: Value) -> Vec<SearchResult> {
                     .and_then(|v| v.as_str())
                     .map(|s| format!("/proxy?u={}", s))
                     .unwrap_or_else(|| {
-                        format!(
-                            "/proxy?u=https://fav.prieco.net/icon?url={}&size=32",
-                            get_domain(url, false)
-                        )
+                        let icon = format!(
+                            "https://fav.prieco.net/icon?url={}&size=32",
+                            urlencoding::encode(&get_domain(&url, false))
+                        );
+                        format!("/proxy?u={}", urlencoding::encode(&icon))
                     }),
                 html_id: None,
 

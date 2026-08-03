@@ -308,7 +308,8 @@ async fn proxy_request(
     };
 
     if !resp.status().is_success() {
-        return Err(Status::NotFound);
+        let fallback_svg = std::fs::read("static/img/icon/image.svg").unwrap_or_default();
+        return Ok((ContentType::SVG, fallback_svg));
     }
 
     let content_type = if let Some(ct) = resp.headers().get("content-type") {
@@ -330,6 +331,8 @@ async fn proxy_request(
                         ContentType::WEBP
                     } else if s.contains("svg") {
                         ContentType::SVG
+                    } else if s.contains("icon") || s.contains("ico") {
+                        ContentType::Icon
                     } else {
                         ContentType::Binary
                     }

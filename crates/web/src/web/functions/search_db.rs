@@ -186,10 +186,11 @@ pub async fn run(
                     .filter(|s| !s.is_empty())
                     .map(|s| format!("static/prieco_favicons/{}", s))
                     .unwrap_or_else(|| {
-                        format!(
-                            "/proxy?u=https://fav.prieco.net/icon?url={}&size=32",
-                            get_domain(&url, false)
-                        )
+                        let icon = format!(
+                            "https://fav.prieco.net/icon?url={}&size=32",
+                            urlencoding::encode(&get_domain(&url, false))
+                        );
+                        format!("/proxy?u={}", urlencoding::encode(&icon))
                     }),
                 html_id,
 
