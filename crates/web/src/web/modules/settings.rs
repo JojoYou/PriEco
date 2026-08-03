@@ -70,14 +70,8 @@ pub fn run(
         let loc: String = if !prieco_url.domain().as_str().ends_with(".onion") {
             match IP_TO_LOC.lookup_country(&ip_addr.to_string()) {
                 Ok(Some(country)) => country,
-                Ok(None) => {
-                    println!("IP {} not found in database", ip_addr);
-                    String::new()
-                }
-                Err(e) => {
-                    println!("Error looking up {}: {}", ip_addr, e);
-                    String::new()
-                }
+                Ok(None) => String::new(),
+                Err(e) => String::new(),
             }
         } else {
             String::from("all")
