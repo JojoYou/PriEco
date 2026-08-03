@@ -187,7 +187,7 @@ pub async fn run(
                     .map(|s| format!("static/prieco_favicons/{}", s))
                     .unwrap_or_else(|| {
                         format!(
-                            "/proxy?u=https://www.google.com/s2/favicons?domain={}&sz=512",
+                            "/proxy?u=https://fav.prieco.net/icon?url={}&size=32",
                             get_domain(&url, false)
                         )
                     }),

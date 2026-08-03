@@ -479,7 +479,7 @@ fn format_google(json: Value) -> Vec<SearchResult> {
                     })
                     .unwrap_or_default(),
                 favicon: format!(
-                    "/proxy?u=https://www.google.com/s2/favicons?domain={}&sz=512",
+                    "/proxy?u=https://fav.prieco.net/icon?url={}&size=32",
                     urlencoding::encode(&get_domain(url, false))
                 ),
                 html_id: None,
@@ -545,7 +545,7 @@ fn format_bing(json: Value) -> Vec<SearchResult> {
                             .map(|s| format!("/proxy?u={}", urlencoding::encode(s)))
                             .unwrap_or_else(|| {
                                 format!(
-                                    "/proxy?u=https://www.google.com/s2/favicons?domain={}&sz=512",
+                                    "/proxy?u=https://fav.prieco.net/icon?url={}&size=32",
                                     urlencoding::encode(&get_domain(url, false))
                                 )
                             }),
@@ -582,7 +582,7 @@ fn format_brave(json: Value) -> Vec<SearchResult> {
                 .map(|s| format!("/proxy?u={}", s))
                 .unwrap_or_else(|| {
                     format!(
-                        "/proxy?u=https://www.google.com/s2/favicons?domain={}&sz=512",
+                        "/proxy?u=https://fav.prieco.net/icon?url={}&size=32",
                         get_domain(url, false)
                     )
                 });
@@ -668,7 +668,7 @@ fn format_brave2(json: Value) -> Vec<SearchResult> {
                     .map(|s| format!("/proxy?u={}", s))
                     .unwrap_or_else(|| {
                         format!(
-                            "/proxy?u=https://www.google.com/s2/favicons?domain={}&sz=512",
+                            "/proxy?u=https://fav.prieco.net/icon?url={}&size=32",
                             get_domain(url, false)
                         )
                     }),
