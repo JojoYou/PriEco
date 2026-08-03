@@ -15,7 +15,12 @@
 /*
   Import system libraries
 */
-use std::{fs::read_to_string, io::Cursor, path::Path};
+use std::{
+    fs::read_to_string,
+    io::Cursor,
+    net::{IpAddr, ToSocketAddrs},
+    path::Path,
+};
 
 /*
   Import external libraries
@@ -44,7 +49,7 @@ use crate::web::{
     routes::pages::ClientIp,
 };
 use prieco_core::{
-    CLIENT, colors,
+    CLIENT, PROXY_CLIENT, colors,
     globals::{ANALYTICS, EmbeddingService, UserAgent},
 };
 
@@ -128,18 +133,23 @@ pub async fn proxy_get(
     width: Option<u32>,
     height: Option<u32>,
 ) -> Result<(ContentType, Vec<u8>), Status> {
-    let url = match Url::parse(u) {
+    let decoded_url = match urlencoding::decode(u) {
+        Ok(dec) => dec.into_owned(),
+        Err(_) => return Err(Status::BadRequest),
+    };
+
+    let url = match Url::parse(&decoded_url) {
         Ok(ur) => ur,
         Err(_) => return Err(Status::BadRequest),
     };
 
-    // Localhost check
-    if internal_url(&url) {
+    // URL check
+    if bad_url(&url) {
         return Err(Status::Forbidden);
     }
 
     // File type
-    let (content_type, body) = proxy_request(u, None, "GET", width, height).await?;
+    let (content_type, body) = proxy_request(&url, None, "GET", width, height).await?;
 
     if allowed_type(&url, &content_type) {
         Ok((content_type, body))
@@ -161,18 +171,23 @@ pub async fn proxy_post(
     width: Option<u32>,
     height: Option<u32>,
 ) -> Result<(ContentType, Vec<u8>), Status> {
-    let url = match Url::parse(u) {
+    let decoded_url = match urlencoding::decode(u) {
+        Ok(dec) => dec.into_owned(),
+        Err(_) => return Err(Status::BadRequest),
+    };
+
+    let url = match Url::parse(&decoded_url) {
         Ok(ur) => ur,
         Err(_) => return Err(Status::BadRequest),
     };
 
-    // Localhost check
-    if internal_url(&url) {
+    // URL check
+    if bad_url(&url) {
         return Err(Status::Forbidden);
     }
 
     // File type
-    let (content_type, body) = proxy_request(u, Some(body), "POST", width, height).await?;
+    let (content_type, body) = proxy_request(&url, Some(body), "POST", width, height).await?;
 
     if allowed_type(&url, &content_type) {
         Ok((content_type, body))
@@ -188,25 +203,50 @@ pub async fn proxy_post(
   Input: URL
   Output: If URL is internal
 */
-fn internal_url(url: &Url) -> bool {
-    match url.host() {
-        Some(URL_HOST::Domain(domain)) => {
-            domain == "localhost" || domain.ends_with(".local") || domain == "broadcasthost"
-        }
-        Some(URL_HOST::Ipv4(ip)) => {
-            ip.is_loopback() ||    // 127.x.x.x
-            ip.is_private() ||     // 10.x, 192.168.x, 172.16-31.x
-            ip.is_unspecified() || // 0.0.0.0
-            ip.is_link_local() ||  // 169.254.x
-            ip.is_broadcast() // 255.255.255.255
-        }
+fn bad_url(url: &Url) -> bool {
+    if !is_valid_url(url.as_str()) {
+        return true;
+    }
 
-        Some(URL_HOST::Ipv6(ip)) => {
-            ip.is_loopback() ||    // ::1
-            ip.is_unspecified() // ::
-        }
+    if url.username() != "" || url.password().is_some() {
+        return true;
+    }
 
-        None => true, // file:// and similar
+    let host_str = match url.host_str() {
+        Some(h) => h,
+        None => return true,
+    };
+    let port = url.port_or_known_default().unwrap_or(80);
+
+    // DNS
+    let addrs = format!("{}:{}", host_str, port).to_socket_addrs();
+    let mut addrs_iter = match addrs {
+        Ok(a) => a,
+        Err(_) => return true,
+    };
+
+    // Get first IP
+    let ip = match addrs_iter.next() {
+        Some(socket) => socket.ip(),
+        None => return true,
+    };
+
+    match ip {
+        IpAddr::V4(ipv4) => {
+            ipv4.is_loopback()
+                || ipv4.is_private()
+                || ipv4.is_link_local()
+                || ipv4.is_broadcast()
+                || ipv4.is_documentation()
+                || ipv4.is_unspecified()
+        }
+        IpAddr::V6(ipv6) => {
+            ipv6.is_loopback()
+                || ipv6.is_unspecified()
+                || ipv6.to_ipv4_mapped().is_some()
+                || (ipv6.segments()[0] & 0xfe00) == 0xfc00
+                || (ipv6.segments()[0] & 0xffc0) == 0xfe80
+        }
     }
 }
 
@@ -257,57 +297,114 @@ fn allowed_type(url: &Url, content_type: &ContentType) -> bool {
   Output: Content
 */
 async fn proxy_request(
-    url: &str,
+    url: &Url,
     body: Option<Vec<u8>>,
     method: &str,
     width: Option<u32>,
     height: Option<u32>,
 ) -> Result<(ContentType, Vec<u8>), Status> {
-    let decoded_url = match urlencoding::decode(url) {
-        Ok(url) => url.to_string(),
-        Err(_) => return Err(Status::BadRequest),
-    };
-
-    if !is_valid_url(&decoded_url) {
-        return Err(Status::BadRequest);
+    let mut target_url = url.clone();
+    if target_url
+        .domain()
+        .map_or(false, |d| d.contains("searchexpander.com"))
+    {
+        target_url.query_pairs_mut().clear().extend_pairs(
+            url.query_pairs()
+                .filter(|(k, _)| k != "width" && k != "height"),
+        );
     }
 
+    let mut current_url = target_url;
+    let mut current_method = method.to_string();
+    let mut current_body = body.clone();
+    let mut redirects_left = 2;
+
+    let mut resp;
+
     let client = Client::builder()
-            .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36")
-            .gzip(true)
-            .brotli(true)
-            .deflate(true)
-            .build()
-            .map_err(|_| Status::InternalServerError)?;
+             .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36")
+             .gzip(true)
+             .brotli(true)
+             .deflate(true)
+             .build()
+             .map_err(|_| Status::InternalServerError)?;
 
-    let request_builder = match method {
-        "GET" => client
-            .get(&decoded_url)
-            .header("Referer", "https://dev.prieco.net/"),
-        "POST" => {
-            let mut req = client
-                .post(&decoded_url)
-                .header("Referer", "https://dev.prieco.net/");
-            if let Some(body_data) = body {
-                req = req
-                    .body(body_data)
-                    .header("Content-Type", "application/json");
+    loop {
+        let referer = if current_url
+            .domain()
+            .map_or(false, |d| d.contains("searchexpander.com"))
+        {
+            "https://searchexpander.com/"
+        } else {
+            "https://prieco.net/"
+        };
+
+        let request_builder = match current_method.as_str() {
+            "GET" => client.get(current_url.as_str()).header("Referer", referer),
+            "POST" => {
+                let mut req = client.post(current_url.as_str());
+
+                if let Some(ref body_data) = current_body {
+                    req = req
+                        .body(body_data.clone())
+                        .header("Content-Type", "application/json");
+                }
+                req
             }
-            req
-        }
-        _ => return Err(Status::MethodNotAllowed),
-    };
+            _ => return Err(Status::MethodNotAllowed),
+        };
 
-    let resp = match request_builder.send().await {
-        Ok(response) => response,
-        Err(e) => {
-            println!("Request failed for URL: {}", decoded_url);
-            println!("Error: {:?}", e);
-            return Err(Status::BadGateway);
+        resp = match request_builder.send().await {
+            Ok(response) => response,
+            Err(e) => {
+                println!("Request failed for URL: {}", url);
+                println!("Error: {:?}", e);
+                return Err(Status::BadGateway);
+            }
+        };
+
+        if resp.status().is_redirection() {
+            if redirects_left == 0 {
+                return Err(Status::BadGateway);
+            }
+            if let Some(loc) = resp.headers().get("location") {
+                if let Ok(loc_str) = loc.to_str() {
+                    current_url = match current_url.join(loc_str) {
+                        Ok(u) => u,
+                        Err(_) => return Err(Status::BadGateway),
+                    };
+
+                    if bad_url(&current_url) {
+                        println!("Blocked malicious redirect to: {}", current_url.as_str());
+                        return Err(Status::Forbidden);
+                    }
+
+                    if resp.status().as_u16() == 303
+                        || ((resp.status().as_u16() == 301 || resp.status().as_u16() == 302)
+                            && current_method == "POST")
+                    {
+                        current_method = "GET".to_string();
+                        current_body = None;
+                    }
+
+                    redirects_left -= 1;
+                    continue;
+                }
+            }
+            // Broken redirect
+            break;
         }
-    };
+
+        // 200, 404...
+        break;
+    }
 
     if !resp.status().is_success() {
+        println!(
+            "API call failed with status: {} and body: {:?}",
+            resp.status(),
+            resp.text().await.ok()
+        );
         let fallback_svg = std::fs::read("static/img/icon/image.svg").unwrap_or_default();
         return Ok((ContentType::SVG, fallback_svg));
     }
@@ -340,11 +437,15 @@ async fn proxy_request(
                 _ => ContentType::Binary,
             }
         } else {
-            detect_content_type_from_url(&decoded_url)
+            detect_content_type_from_url(url)
         }
     } else {
-        detect_content_type_from_url(&decoded_url)
+        detect_content_type_from_url(url)
     };
+
+    if resp.content_length().unwrap_or(0) > 10 * 1024 * 1024 {
+        return Err(Status::PayloadTooLarge);
+    }
 
     let mut body = match resp.bytes().await {
         Ok(bytes) => bytes.to_vec(),
@@ -373,8 +474,8 @@ async fn proxy_request(
   Input: URL
   Output: ContentType
 */
-fn detect_content_type_from_url(url: &str) -> ContentType {
-    let path = Path::new(url);
+fn detect_content_type_from_url(url: &Url) -> ContentType {
+    let path = Path::new(url.as_str());
     match path.extension().and_then(|ext| ext.to_str()) {
         Some("js") => ContentType::JavaScript,
         Some("css") => ContentType::CSS,

@@ -57,7 +57,7 @@ use ort::{
     tensor::OrtOwnedTensor,
 };
 use parking_lot::{Condvar, Mutex, RwLock};
-use primp::{Client as PIMP_CLIENT, Impersonate, ImpersonateOS};
+use primp::{Client as PIMP_CLIENT, Impersonate, ImpersonateOS, redirect::Policy};
 #[cfg(feature = "cuda")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use redb::{Database, ReadableDatabase, TableDefinition};
@@ -263,6 +263,19 @@ pub static CLIENT: Lazy<PIMP_CLIENT> = Lazy::new(|| {
         .connect_timeout(stdDuration::from_secs(5))
         .build()
         .expect("Failed to create primp client")
+});
+
+pub static PROXY_CLIENT: Lazy<PIMP_CLIENT> = Lazy::new(|| {
+    println!("Created primp proxy client!");
+
+    PIMP_CLIENT::builder()
+        .impersonate(Impersonate::ChromeV148)
+        .impersonate_os(ImpersonateOS::Windows)
+        .redirect(Policy::none())
+        .timeout(stdDuration::from_secs(15))
+        .connect_timeout(stdDuration::from_secs(5))
+        .build()
+        .expect("Failed to create primp proxy client")
 });
 
 /*

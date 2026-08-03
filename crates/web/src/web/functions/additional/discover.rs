@@ -127,8 +127,11 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
                     description: String::from("Adding to PriEco index..."),
                     content: String::new(),
                     favicon: format!(
-                        "https://www.google.com/s2/favicons?domain={}&sz=512",
-                        domain
+                        "/proxy?u={}",
+                        urlencoding::encode(&format!(
+                            "https://fav.prieco.net/icon?url={}&size=32",
+                            &domain
+                        ))
                     ),
                     image: String::new(),
                     keywords: String::new(),
