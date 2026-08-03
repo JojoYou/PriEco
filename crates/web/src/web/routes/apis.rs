@@ -27,7 +27,6 @@ use std::{
 */
 use dotenv_codegen::dotenv;
 use image::GenericImageView;
-use reqwest::Client;
 use rocket::{
     State, get,
     http::{ContentType, CookieJar, Status, uri::Host},
@@ -35,7 +34,7 @@ use rocket::{
     serde::json::{Json, Value as RocketValue},
 };
 use serde_json::json;
-use url::{Host as URL_HOST, Url};
+use url::Url;
 
 /*
   Import own libraries
@@ -319,30 +318,17 @@ async fn proxy_request(
     let mut current_body = body.clone();
     let mut redirects_left = 2;
 
-    let mut resp;
-
-    let client = Client::builder()
-             .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36")
-             .gzip(true)
-             .brotli(true)
-             .deflate(true)
-             .build()
-             .map_err(|_| Status::InternalServerError)?;
+    let mut response;
 
     loop {
-        let referer = if current_url
-            .domain()
-            .map_or(false, |d| d.contains("searchexpander.com"))
-        {
-            "https://searchexpander.com/"
-        } else {
-            "https://prieco.net/"
-        };
-
         let request_builder = match current_method.as_str() {
-            "GET" => client.get(current_url.as_str()).header("Referer", referer),
+            "GET" => PROXY_CLIENT
+                .get(current_url.as_str())
+                .header("Referer", "https://dev.prieco.net/"),
             "POST" => {
-                let mut req = client.post(current_url.as_str());
+                let mut req = PROXY_CLIENT
+                    .post(current_url.as_str())
+                    .header("Referer", "https://dev.prieco.net/");
 
                 if let Some(ref body_data) = current_body {
                     req = req
@@ -354,7 +340,7 @@ async fn proxy_request(
             _ => return Err(Status::MethodNotAllowed),
         };
 
-        resp = match request_builder.send().await {
+        response = match request_builder.send().await {
             Ok(response) => response,
             Err(e) => {
                 println!("Request failed for URL: {}", url);
@@ -363,11 +349,11 @@ async fn proxy_request(
             }
         };
 
-        if resp.status().is_redirection() {
+        if response.status().is_redirection() {
             if redirects_left == 0 {
                 return Err(Status::BadGateway);
             }
-            if let Some(loc) = resp.headers().get("location") {
+            if let Some(loc) = response.headers().get("location") {
                 if let Ok(loc_str) = loc.to_str() {
                     current_url = match current_url.join(loc_str) {
                         Ok(u) => u,
@@ -379,8 +365,9 @@ async fn proxy_request(
                         return Err(Status::Forbidden);
                     }
 
-                    if resp.status().as_u16() == 303
-                        || ((resp.status().as_u16() == 301 || resp.status().as_u16() == 302)
+                    if response.status().as_u16() == 303
+                        || ((response.status().as_u16() == 301
+                            || response.status().as_u16() == 302)
                             && current_method == "POST")
                     {
                         current_method = "GET".to_string();
@@ -391,6 +378,7 @@ async fn proxy_request(
                     continue;
                 }
             }
+
             // Broken redirect
             break;
         }
@@ -399,17 +387,12 @@ async fn proxy_request(
         break;
     }
 
-    if !resp.status().is_success() {
-        println!(
-            "API call failed with status: {} and body: {:?}",
-            resp.status(),
-            resp.text().await.ok()
-        );
+    if !response.status().is_success() {
         let fallback_svg = std::fs::read("static/img/icon/image.svg").unwrap_or_default();
         return Ok((ContentType::SVG, fallback_svg));
     }
 
-    let content_type = if let Some(ct) = resp.headers().get("content-type") {
+    let content_type = if let Some(ct) = response.headers().get("content-type") {
         if let Ok(ct_str) = ct.to_str() {
             match ct_str {
                 s if s.starts_with("text/javascript") => ContentType::JavaScript,
@@ -443,11 +426,11 @@ async fn proxy_request(
         detect_content_type_from_url(url)
     };
 
-    if resp.content_length().unwrap_or(0) > 10 * 1024 * 1024 {
+    if response.content_length().unwrap_or(0) > 10 * 1024 * 1024 {
         return Err(Status::PayloadTooLarge);
     }
 
-    let mut body = match resp.bytes().await {
+    let mut body = match response.bytes().await {
         Ok(bytes) => bytes.to_vec(),
         Err(_) => return Err(Status::InternalServerError),
     };
