@@ -3953,6 +3953,7 @@ dependencies = [
  "chrono",
  "cudarc",
  "dashmap",
+ "dotenv_codegen",
  "fjall",
  "fst",
  "memmap2",

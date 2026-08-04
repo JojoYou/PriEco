@@ -44,6 +44,7 @@ use cudarc::{
     nvrtc::compile_ptx,
 };
 use dashmap::DashSet;
+use dotenv_codegen::dotenv;
 use fjall::{
     CompressionType, Database as FJALL_DATABASE, Keyspace, KeyspaceCreateOptions,
     KvSeparationOptions, config::CompressionPolicy,
@@ -2284,6 +2285,7 @@ impl AnalyticsDb {
 
     fn fingerprint(&self, ip: &str, user_agent: &str, entity_id: &str, date: NaiveDate) -> String {
         let mut hasher = XxHash3_64::default();
+        dotenv!("SALT").hash(&mut hasher);
         ip.hash(&mut hasher);
         user_agent.hash(&mut hasher);
         date.to_string().hash(&mut hasher);
