@@ -156,6 +156,10 @@ pub fn script(
     loc: Option<&str>,
     q: Option<&str>,
 ) -> RawJavaScript<String> {
+    if script_name.contains("..") || script_name.contains('/') {
+        return RawJavaScript(String::new());
+    }
+
     let mut hbs = Handlebars::new();
 
     let template_path = format!("static/js/hbs/{}", script_name);
@@ -191,12 +195,10 @@ pub fn script(
 */
 #[rocket::get("/static/prieco_favicons/<filename>")]
 pub async fn favicon(filename: String) -> Result<DecompressedImage, Status> {
-    // Sanitize the filename to prevent directory traversal
     if filename.contains("..") || filename.contains("/") {
         return Err(Status::BadRequest);
     }
 
-    // The filename comes in as "name.ext", we need to look for "name.ext.br"
     let file_path = format!("static/prieco_favicons/{}.br", filename);
     let path = Path::new(&file_path);
 
@@ -204,7 +206,6 @@ pub async fn favicon(filename: String) -> Result<DecompressedImage, Status> {
         return Err(Status::NotFound);
     }
 
-    // Rest of the decompression logic remains the same...
     let compressed_data = match std::fs::read(path) {
         Ok(data) => data,
         Err(_) => return Err(Status::InternalServerError),
@@ -238,7 +239,7 @@ fn detect_image_type(data: &[u8]) -> ContentType {
         return ContentType::Binary;
     }
 
-    // Check file signatures (magic numbers)
+    // Check file signatures
     match &data[0..8] {
         // PNG: 89 50 4E 47 0D 0A 1A 0A
         [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] => ContentType::PNG,
