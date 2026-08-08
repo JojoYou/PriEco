@@ -108,7 +108,7 @@ impl Fairing for GlobalHeaders {
              connect-src 'self'; \
              frame-src 'self' https://cartes.app; \
              frame-ancestors 'self'; \
-             form-action 'self'; \
+             form-action 'self' https: http:; \
              object-src 'none'; \
              base-uri 'self';",
         ));

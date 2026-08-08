@@ -767,24 +767,13 @@ pub struct SettingsForm<'r> {
 pub fn settings_update(form: Form<SettingsForm<'_>>, cookie_jar: &CookieJar<'_>) -> Redirect {
     // Helpers
     let remove_cookie = |name: &str| {
-        let mut cookie = Cookie::build((name.to_string(), ""))
-            .path("/")
-            .same_site(SameSite::Strict)
-            .secure(true)
-            .build();
-        cookie.make_removal();
-        cookie_jar.add(cookie);
+        let mut cookie = Cookie::from(name.to_string());
+        cookie.set_path("/");
+        cookie_jar.remove(cookie);
     };
 
     let add_cookie = |name: &str, value: &str| {
-        cookie_jar.add(
-            Cookie::build((name.to_string(), value.to_string()))
-                .path("/")
-                .same_site(SameSite::Strict)
-                .secure(true)
-                .max_age(Duration::days(365))
-                .build(),
-        );
+        set_cookie(cookie_jar, name.to_string(), value.to_string(), true, true);
     };
 
     if form.newtab.is_some() {

@@ -16,12 +16,11 @@ build:
     - build-essential
     - libc6-dev
     - libclang-dev
+    - llvm
 
   commands:
     - mkdir -p _readthedocs/html/
-
+    - export BINDGEN_EXTRA_CLANG_ARGS="-I$(clang -print-file-name=include) -I/usr/include/x86_64-linux-gnu -I/usr/include"
     - cargo doc --workspace --no-deps --document-private-items
-
     - echo '<meta http-equiv="refresh" content="0; url=prieco_core/index.html">' > target/doc/index.html
-
     - cp -a target/doc/. _readthedocs/html/
