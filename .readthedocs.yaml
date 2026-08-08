@@ -13,6 +13,9 @@ build:
     - clang
     - pkg-config
     - libssl-dev
+    - build-essential
+    - libc6-dev
+    - libclang-dev
 
   commands:
     - mkdir -p _readthedocs/html/
