@@ -36,7 +36,6 @@ document.addEventListener("DOMContentLoaded", () => {
         ghostInput.textContent = "";
 
         if (data && data.length > 0) {
-          // --- GHOST TEXT LOGIC ---
           const firstSuggestion = data[0].phrase.toLowerCase();
           const userQuery = input.value.toLowerCase();
 
@@ -52,7 +51,6 @@ document.addEventListener("DOMContentLoaded", () => {
             ghostInput.appendChild(invisibleSpan);
             ghostInput.appendChild(document.createTextNode(remainderPart));
           }
-          // ------------------------
 
           data.forEach((item) => {
             const div = document.createElement("div");
@@ -157,7 +155,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    // UPDATED: Re-show suggestions on focus, or fetch them if they don't exist yet
     input.addEventListener("focus", () => {
       const query = input.value.trim();
 

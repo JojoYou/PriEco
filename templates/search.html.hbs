@@ -33,15 +33,19 @@
 {{/if}}
 
 {{#if img_active}}
-  <div id="js_load_results" class="div_images">
-      {{#each placeholder_number}}
-      <div class="placeholder_img output">
-        <div></div>
-        <br>
-        <div></div>
-      </div>
-    {{/each}}
-  </div>
+  {{#if no_js}}
+    {{> search/results search_results}}
+  {{else}}
+    <div id="js_load_results" class="div_images">
+        {{#each placeholder_number}}
+        <div class="placeholder_img output">
+          <div></div>
+          <br>
+          <div></div>
+        </div>
+      {{/each}}
+    </div>
+  {{/if}}
 {{/if}}
 
 {{#if map_active}}

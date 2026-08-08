@@ -18,7 +18,6 @@ const observer = new IntersectionObserver((entries, observer) => {
   });
 });
 
-// Start observing each lazy image
 lazyImages.forEach((lazyImage) => {
   observer.observe(lazyImage);
 });

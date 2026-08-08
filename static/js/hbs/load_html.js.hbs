@@ -1,6 +1,6 @@
 function loadSection(containerId, url, scriptPath) {
   const container = document.getElementById(containerId);
-  if (!container) return Promise.resolve(); // keep Promise.all happy
+  if (!container) return Promise.resolve();
 
   return fetch(url, {
     headers: {
@@ -12,10 +12,8 @@ function loadSection(containerId, url, scriptPath) {
       const tempDiv = document.createElement("div");
       tempDiv.innerHTML = html;
 
-      // Replace the old element
       container.replaceWith(...tempDiv.childNodes);
 
-      // Dynamically load the script if provided
       if (scriptPath) {
         const script = document.createElement("script");
         script.src = scriptPath;
