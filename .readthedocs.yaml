@@ -1,13 +1,10 @@
 # .readthedocs.yaml
 # See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
-
 version: 2
-
 build:
   os: ubuntu-24.04
   tools:
     rust: "1.96"
-
   apt_packages:
     - cmake
     - clang
@@ -17,10 +14,10 @@ build:
     - libc6-dev
     - libclang-dev
     - llvm
-
   commands:
     - mkdir -p _readthedocs/html/
-    - export BINDGEN_EXTRA_CLANG_ARGS="-I$(clang -print-file-name=include) -I/usr/include/x86_64-linux-gnu -I/usr/include"
-    - cargo doc --workspace --no-deps --document-private-items
+    - >
+      export BINDGEN_EXTRA_CLANG_ARGS="-I$(clang -print-file-name=include) -I/usr/include/x86_64-linux-gnu -I/usr/include" &&
+      cargo doc --workspace --no-deps --document-private-items
     - echo '<meta http-equiv="refresh" content="0; url=prieco_core/index.html">' > target/doc/index.html
     - cp -a target/doc/. _readthedocs/html/
