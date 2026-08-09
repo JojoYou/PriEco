@@ -49,6 +49,12 @@ build:
 
     # Output
     - |
-      echo '<meta http-equiv="refresh" content="0; url=prieco_core/index.html">' > target/doc/index.html
-
+          cat << 'EOF' > target/doc/index.html
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta http-equiv="refresh" content="0; url=prieco_core/index.html">
+            </head>
+          </html>
+          EOF
     - cp -a target/doc/. _readthedocs/html/
