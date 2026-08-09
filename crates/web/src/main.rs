@@ -65,7 +65,7 @@ use prieco_core::{
     TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_MODEL,
     VECTOR_EMBEDDING_TOKENIZER, colors, icons,
 };
-use prieco_insert::db_insert;
+use prieco_insert::db_insert::{self, merge_tantivy};
 use prieco_mini_crawler::mini_crawler;
 use prieco_pagerank as pagerank;
 
@@ -267,6 +267,8 @@ fn thread_manager() {
 
     println!("Starting GPU!");
     let _ = VECTOR_CENTROPOIDS.search(&vec![0.0; 384], 1, 1);
+
+    merge_tantivy();
 
     // Blob storage
     let blob_thread = {
