@@ -39,7 +39,7 @@ build:
       NEWS_API_KEY="key"
       SIGNAL_BOT_NUMBER="number"
       SIGNAL_RECIPIENT_NUMBER="number"
-      SALT="docs_build_dummy_salt"
+      SALT="salt"
       EOF
 
     # Documentation
@@ -48,5 +48,7 @@ build:
       cargo doc --workspace --no-deps --document-private-items
 
     # Output
-    - echo '<meta http-equiv="refresh" content="0; url=prieco_core/index.html">' > target/doc/index.html
+    - |
+      echo '<meta http-equiv="refresh" content="0; url=prieco_core/index.html">' > target/doc/index.html
+
     - cp -a target/doc/. _readthedocs/html/
