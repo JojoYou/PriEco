@@ -1,10 +1,13 @@
 # .readthedocs.yaml
 # See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
 version: 2
+
 build:
   os: ubuntu-24.04
   tools:
     rust: "1.96"
+
   apt_packages:
     - cmake
     - clang
@@ -14,10 +17,36 @@ build:
     - libc6-dev
     - libclang-dev
     - llvm
+
   commands:
     - mkdir -p _readthedocs/html/
+
+    # Generate .env file
+    - |
+      cat << 'EOF' > .env
+      POLAR_API_KEY="key"
+      URUKY_ID="id"
+      RESULTI_API_KEY="key"
+      URUKY_API_KEY="key"
+      GOOGLE_API_KEY="key"
+      GOOGLE_CX_KEY="key"
+      BB2_URL="http://localhost"
+      BB2_API_KEY="key"
+      BRAVE_API_KEY="key"
+      YADORE_API_KEY="key"
+      UNSPLASH_API_KEY="key"
+      FANART_API_KEY="key"
+      NEWS_API_KEY="key"
+      SIGNAL_BOT_NUMBER="number"
+      SIGNAL_RECIPIENT_NUMBER="number"
+      SALT="docs_build_dummy_salt"
+      EOF
+
+    # Documentation
     - >
       export BINDGEN_EXTRA_CLANG_ARGS="-I$(clang -print-file-name=include) -I/usr/include/x86_64-linux-gnu -I/usr/include" &&
       cargo doc --workspace --no-deps --document-private-items
+
+    # Output
     - echo '<meta http-equiv="refresh" content="0; url=prieco_core/index.html">' > target/doc/index.html
     - cp -a target/doc/. _readthedocs/html/
