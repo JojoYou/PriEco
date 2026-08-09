@@ -15,7 +15,6 @@ prieco_core = { workspace = true }
 
 ahash = { workspace = true }
 rayon = { workspace = true }
-rocksdb = { workspace = true }
 tantivy = { workspace = true }
 zip = { workspace = true }
 zstd = { workspace = true }

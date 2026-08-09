@@ -67,7 +67,6 @@ use rocket::{
     Request,
     request::{FromRequest, Outcome},
 };
-use rocksdb::{DB, Options, WriteBatch};
 use serde::{Deserialize, Serialize};
 use symspell::{SymSpell, UnicodeStringStrategy};
 use tantivy::{
@@ -561,6 +560,9 @@ pub struct PriecoStorage {
     // Goggles
     pub goggles_ks: Keyspace,
 
+    // Analytics
+    pub analytics_ks: Keyspace,
+
     // Blob storage: Compressed web page data
     pub blob_db: FJALL_DATABASE,
     pub blobs_ks: Keyspace,
@@ -585,6 +587,12 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
         .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
         .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
     let goggles_ks = meta_db.keyspace("goggles", || goggles_opts).unwrap();
+
+    // Analytics storage
+    let analytics_opts = KeyspaceCreateOptions::default()
+        .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
+        .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
+    let analytics_ks = meta_db.keyspace("analytics", || analytics_opts).unwrap();
 
     // Blob storage
     let blob_db = FJALL_DATABASE::builder(Path::new("/mnt/ssd/blobs"))
@@ -612,6 +620,8 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
         meta_ks,
 
         goggles_ks,
+
+        analytics_ks,
 
         blob_db,
         blobs_ks,
@@ -2076,20 +2086,17 @@ pub static SPELL_CHECKER: Lazy<Arc<SymSpell<UnicodeStringStrategy>>> = Lazy::new
 /*
   Analytics
 */
-pub static ANALYTICS: Lazy<AnalyticsDb> = Lazy::new(|| AnalyticsDb::open("kv/analytics"));
+pub static ANALYTICS: Lazy<AnalyticsDb> = Lazy::new(|| AnalyticsDb {
+    db: PRIECO_FJALL.meta_db.clone(),
+    ks: PRIECO_FJALL.analytics_ks.clone(),
+});
 
 pub struct AnalyticsDb {
-    db: Arc<DB>,
+    db: FJALL_DATABASE,
+    ks: Keyspace,
 }
 
 impl AnalyticsDb {
-    fn open(path: &str) -> Self {
-        let mut opts = Options::default();
-        opts.create_if_missing(true);
-        let db = DB::open(&opts, path).expect("Failed to open analytics RocksDB");
-        Self { db: Arc::new(db) }
-    }
-
     // Write
     pub fn record_query(&self) {
         self.inc(&format!("queries:{}", self.today()), 1);
@@ -2104,48 +2111,55 @@ impl AnalyticsDb {
     ) {
         let date = self.today();
 
-        // Always count the raw pageview
         let pvk = format!("pageviews:{}", date);
-        let mut batch = WriteBatch::default();
-        batch.put(pvk.as_bytes(), (self.get_u64(&pvk) + 1).to_le_bytes());
+        let mut batch = self.db.batch();
+        batch.insert(
+            &self.ks,
+            pvk.as_bytes(),
+            (self.get_u64(&pvk) + 1).to_le_bytes(),
+        );
 
-        // Unique visitor dedup
         let seen_key = format!(
             "seen:{}:{}",
             date,
             self.fingerprint(ip, user_agent, entity_id, date)
         );
-        if self.db.get(seen_key.as_bytes()).ok().flatten().is_none() {
-            batch.put(seen_key.as_bytes(), &[1u8]);
+
+        if self.ks.get(seen_key.as_bytes()).ok().flatten().is_none() {
+            batch.insert(&self.ks, seen_key.as_bytes(), &[1u8]);
 
             let vk = format!("visitors:{}", date);
-            batch.put(vk.as_bytes(), (self.get_u64(&vk) + 1).to_le_bytes());
+            batch.insert(
+                &self.ks,
+                vk.as_bytes(),
+                (self.get_u64(&vk) + 1).to_le_bytes(),
+            );
 
             if let Some(cc) = country_code {
-                // Skip "all" — that's the default no-selection value
                 if cc != "all" {
                     let ck = format!("country:{}:{}", date, cc.to_lowercase());
-                    batch.put(ck.as_bytes(), (self.get_u64(&ck) + 1).to_le_bytes());
+                    batch.insert(
+                        &self.ks,
+                        ck.as_bytes(),
+                        (self.get_u64(&ck) + 1).to_le_bytes(),
+                    );
                 }
             }
         }
 
-        self.db
-            .write(batch)
-            .expect("Analytics visitor write failed");
+        batch.commit().expect("Analytics visitor write failed");
     }
 
     pub fn record_api_request(&self) {
         let date = self.today();
-        let mut batch = WriteBatch::default();
+        let mut batch = self.db.batch();
         let total_key = format!("api:total:{}", date);
-        batch.put(
+        batch.insert(
+            &self.ks,
             total_key.as_bytes(),
             (self.get_u64(&total_key) + 1).to_le_bytes(),
         );
-        self.db
-            .write(batch)
-            .expect("API request tracking write failed");
+        batch.commit().expect("API request tracking write failed");
     }
 
     // Read
@@ -2160,7 +2174,6 @@ impl AnalyticsDb {
             .collect()
     }
 
-    // (today_visitors, yesterday_visitors, today_pageviews, yesterday_pageviews)
     pub fn visitor_stats(&self) -> (u64, u64, u64, u64) {
         let today = self.today();
         let yesterday = today - Duration::days(1);
@@ -2175,14 +2188,20 @@ impl AnalyticsDb {
     pub fn top_countries(&self) -> Vec<(String, u64)> {
         let prefix = format!("country:{}:", self.today());
         let mut results: Vec<(String, u64)> = self
-            .db
-            .prefix_iterator(prefix.as_bytes())
+            .ks
+            .prefix(prefix.as_bytes())
             .filter_map(|item| {
-                let (k, v) = item.ok()?;
+                let (k, v) = match item.into_inner() {
+                    Ok(kv) => kv,
+                    Err(_) => return None,
+                };
+
                 let key_str = std::str::from_utf8(&k).ok()?;
+
                 if !key_str.starts_with(&prefix) {
                     return None;
                 }
+
                 let cc = key_str.rsplit(':').next()?.to_string();
                 let count = u64::from_le_bytes((&v[..]).try_into().unwrap_or([0; 8]));
                 Some((cc, count))
@@ -2218,7 +2237,7 @@ impl AnalyticsDb {
     // Purge
     pub fn purge_expired(&self) {
         let cutoff = self.today() - Duration::days(30);
-        let mut batch = WriteBatch::default();
+        let mut batch = self.db.batch();
         for prefix in [
             "queries:",
             "visitors:",
@@ -2227,23 +2246,24 @@ impl AnalyticsDb {
             "seen:",
             "api:",
         ] {
-            for item in self.db.prefix_iterator(prefix.as_bytes()) {
-                let Ok((k, _)) = item else { continue };
+            for item in self.ks.prefix(prefix.as_bytes()) {
+                let k = match item.key() {
+                    Ok(i) => i,
+                    Err(_) => continue,
+                };
                 let Ok(key_str) = std::str::from_utf8(&k) else {
                     continue;
                 };
-                if !key_str.starts_with(prefix) {
-                    break;
-                }
+
                 let date_part = key_str[prefix.len()..].splitn(2, ':').next().unwrap_or("");
                 if let Ok(date) = NaiveDate::parse_from_str(date_part, "%Y-%m-%d") {
                     if date < cutoff {
-                        batch.delete(&k);
+                        batch.remove(&self.ks, k);
                     }
                 }
             }
         }
-        self.db.write(batch).expect("Analytics purge failed");
+        batch.commit().expect("Analytics purge failed");
     }
 
     pub async fn background_purge_task(&self) {
@@ -2268,7 +2288,7 @@ impl AnalyticsDb {
     }
 
     fn get_u64(&self, key: &str) -> u64 {
-        self.db
+        self.ks
             .get(key.as_bytes())
             .ok()
             .flatten()
@@ -2278,8 +2298,8 @@ impl AnalyticsDb {
 
     fn inc(&self, key: &str, delta: u64) {
         let current = self.get_u64(key);
-        self.db
-            .put(key.as_bytes(), (current + delta).to_le_bytes())
+        self.ks
+            .insert(key.as_bytes(), (current + delta).to_le_bytes())
             .expect("Analytics write failed");
     }
 

@@ -61,13 +61,12 @@ serde = "1.0.219"
 serde_json = "1.0.142"
 
 # Database
-rocksdb = "0.24.0" # Results' data
+fjall = "3.1.5"
 tantivy = "0.25.0" # Full-text index
 zip = "8.6.0" # Stream zip results files to index
 redb = "3.0.1"            # Key-Value
 
 # Blob storage
-fjall = "3.1.5"
 flate2 = "1.1.9" # Streamed file compression and decompression (RAM)
 tar = "0.4.44" # Tar archive
 

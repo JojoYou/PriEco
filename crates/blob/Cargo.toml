@@ -12,7 +12,6 @@ homepage = "https://prieco.net"
 
 [dependencies]
 prieco_core = { workspace = true }
-rocksdb = { workspace = true }
 zstd = { workspace = true }
 fjall = { workspace = true }
 tantivy = { workspace = true }
