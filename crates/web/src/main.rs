@@ -240,14 +240,17 @@ async fn rocket() -> _ {
                 submit,
                 submit_post,
                 // Blob storage
-                view_blob
+                view_blob,
+                // Blog
+                blog,
+                blog_post
             ],
         )
         .mount("/static", FileServer::from("./static"))
 }
 
 /// Description: Manages different PriEco threads like blob storage, database insertion and mini crawler
-/// 
+///
 /// Input: None
 /// Output: None
 fn thread_manager() {

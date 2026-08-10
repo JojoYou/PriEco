@@ -1,0 +1,22 @@
+{{> header }}
+
+  <link href="{{ css_path }}roadmap.css" rel="stylesheet" type="text/css">
+
+  <div class="background"></div>
+
+  <div class="container">
+    <h1 class="title">PriEco Blog</h1>
+
+{{#each posts}}
+ <a href="/blog/{{this.slug}}"><section class="center-wrapper">
+    <div>
+      <h2>{{this.title}}</h2>
+      <p>{{this.desc}}</p>
+        <span class="post-date">{{this.date}}</span>
+    </div>
+ </section></a>
+        {{/each}}
+
+</div>
+
+{{> footer }}

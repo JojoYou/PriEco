@@ -43,7 +43,7 @@ struct GoggleView {
 }
 
 /// Description: Integrates settings to the page
-/// 
+///
 /// Input: Shared context beteween functions, Optional IP address, CookieJar, Host (PriEco URL)
 /// Output: None
 pub fn run(
@@ -151,20 +151,20 @@ pub fn run(
             .unwrap_or(1024)
             < 890
         {
-            "static/css/mobile/"
+            "/static/css/mobile/"
         } else {
-            "static/css/desktop/"
+            "/static/css/desktop/"
         }),
     );
 
     context.insert(
         String::from("css_theme"),
         json!(if theme == "light" {
-            "static/css/light/"
+            "/static/css/light/"
         } else if theme == "dark" {
-            "static/css/dark/"
+            "/static/css/dark/"
         } else {
-            "static/css/system/"
+            "/static/css/system/"
         }),
     );
 

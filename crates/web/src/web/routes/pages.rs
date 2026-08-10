@@ -13,7 +13,13 @@
 /*
   Import system libraries
 */
-use std::{collections::HashMap, io::Cursor, net::IpAddr};
+use std::{
+    collections::HashMap,
+    fs::{read_dir, read_to_string},
+    io::Cursor,
+    net::IpAddr,
+    path::Path,
+};
 
 /*
   Import external libraries
@@ -31,7 +37,7 @@ use rocket::{
     },
     post,
     request::{FromRequest, Outcome},
-    response::{Redirect, Responder, Result as RocketResult, content::RawHtml},
+    response::{Redirect, Responder, Result as RocketResult, content::RawHtml, status::NotFound},
     serde::json::{Json, Value as RocketValue},
     time::Duration,
     uri,
@@ -92,7 +98,7 @@ impl<'r> FromRequest<'r> for ClientIp {
 }
 
 /// Description: Responds if PriEco is alive
-/// 
+///
 /// Input:
 /// Output: OK
 #[head("/")]
@@ -1533,4 +1539,116 @@ pub fn country_info(code: &str) -> (&'static str, &'static str) {
         "zw" => ("Zimbabwe", "🇿🇼"),
         _ => ("Unknown", "🏳"),
     }
+}
+
+/*
+  Blog
+*/
+#[derive(Serialize)]
+pub struct BlogPost {
+    pub title: String,
+    pub desc: String,
+    pub slug: String,
+    pub date: String,
+}
+
+#[get("/blog")]
+pub fn blog(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
+    // Get posts
+    let mut posts: Vec<BlogPost> = read_dir("templates/blog/post")
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            let file_name = path.file_name()?.to_str()?;
+
+            let slug = file_name.strip_suffix(".html.hbs")?;
+            if slug.is_empty() || !path.is_file() {
+                return None;
+            }
+
+            let content = read_to_string(&path).ok()?;
+            let (title, date, desc) = extract_metadata(&content);
+
+            Some(BlogPost {
+                title,
+                slug: slug.to_string(),
+                date,
+                desc,
+            })
+        })
+        .collect();
+
+    // Sort posts
+    posts.sort_by(|a, b| b.date.cmp(&a.date));
+
+    // Render page
+    let mut context: HashMap<String, RocketValue> = HashMap::from([
+        (String::from("css_version"), json!(CSS_VERSION)),
+        (String::from("js_version"), json!(JS_VERSION)),
+        (String::from("title_query"), json!("Blog | ")),
+        (String::from("posts"), json!(posts)),
+    ]);
+    settings::run(&mut context, &None, cookie_jar, host);
+    Template::render("blog/index", context)
+}
+
+#[get("/blog/<slug>")]
+pub fn blog_post(
+    slug: &str,
+    cookie_jar: &CookieJar<'_>,
+    host: &Host,
+) -> Result<Template, NotFound<String>> {
+    let file_path = format!("templates/blog/post/{}.html.hbs", slug);
+
+    let content =
+        read_to_string(&file_path).map_err(|_| NotFound("Blog post not found".to_string()))?;
+
+    let (title, date, desc) = extract_metadata(&content);
+
+    let mut context: HashMap<String, RocketValue> = HashMap::from([
+        (String::from("css_version"), json!(CSS_VERSION)),
+        (String::from("js_version"), json!(JS_VERSION)),
+        (String::from("title_query"), json!(format!("{} | ", title))), // Much better page title!
+        (String::from("post_title"), json!(title)),
+        (String::from("post_date"), json!(date)),
+        (String::from("post_desc"), json!(desc)),
+    ]);
+
+    settings::run(&mut context, &None, cookie_jar, host);
+
+    Ok(Template::render(format!("blog/post/{}", slug), context))
+}
+
+fn extract_metadata(content: &str) -> (String, String, String) {
+    let mut title = String::from("Untitled");
+    let mut desc = String::from("Empty description");
+    let mut date = String::from("No date");
+
+    // Load comment with metadata
+    let mut in_metadata = false;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed == "{{!--" {
+            in_metadata = true;
+            continue;
+        }
+        if trimmed == "--}}" {
+            break;
+        }
+
+        // Extract them
+        if in_metadata {
+            if let Some(rest) = trimmed.strip_prefix("title: ") {
+                title = rest.to_string();
+            } else if let Some(rest) = trimmed.strip_prefix("date: ") {
+                date = rest.to_string();
+            } else if let Some(rest) = trimmed.strip_prefix("desc: ") {
+                desc = rest.to_string();
+            }
+        }
+    }
+
+    (title, date, desc)
 }
