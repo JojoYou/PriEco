@@ -3,12 +3,10 @@ use scraper::{Html, Selector};
 
 use crate::mini_crawler::{PARSER_SELECTORS, is_valid_url};
 
-/*
-  Description: extract data from html documnet and format them to tag_data
-
-  Input: document
-  Output: tag_data
-*/
+/// Description: extract data from html documnet and format them to tag_data
+/// 
+/// Input: document
+/// Output: tag_data
 pub fn extract_tag_data(document: &Html) -> AHashMap<String, Vec<String>> {
     /*
       Description: tag_data is a very important variable. It provides organized, extracted access to important data from the html.

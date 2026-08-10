@@ -1,16 +1,14 @@
-/*
-  File: web/modules/settings.rs
-  Description: PriEco settings module
-
-  Author: Roman Lancos <support@prieco.net>
-  License: AGPL v3.0
-
-  Date Created: 2025-09-20
-  Last Modified: 2026-02-06
-
-  Usage: Run run() on any page to integrate settings to the page
-  TODO:
-*/
+//!  File: web/modules/settings.rs
+//!  Description: PriEco settings module
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created: 2025-09-20
+//!  Last Modified: 2026-02-06
+//!
+//!  Usage: Run run() on any page to integrate settings to the page
+//!  TODO:
 
 /*
   Import system libraries
@@ -44,12 +42,10 @@ struct GoggleView {
     checked: bool,
 }
 
-/*
-  Description: Integrates settings to the page
-
-  Input: Shared context beteween functions, Optional IP address, CookieJar, Host (PriEco URL)
-  Output: None
-*/
+/// Description: Integrates settings to the page
+/// 
+/// Input: Shared context beteween functions, Optional IP address, CookieJar, Host (PriEco URL)
+/// Output: None
 pub fn run(
     context: &mut HashMap<String, serde_json::Value>,
     maybe_ip: &Option<IpAddr>,

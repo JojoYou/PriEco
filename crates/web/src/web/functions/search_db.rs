@@ -1,16 +1,14 @@
-/*
-  File: web/functions/search_db.rs
-  Description: Searches own index for results
-
-  Author: Roman Lancos <support@prieco.net>
-  License: AGPL v3.0
-
-  Date Created: 2025-09-20
-  Last Modified: 2026-03-31
-
-  Usage: Run run() with parameters
-  TODO: Pull up HTMLs for more context; do bm25f on htmls
-*/
+//!  File: web/functions/search_db.rs
+//!  Description: Searches own index for results
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created: 2025-09-20
+//!  Last Modified: 2026-03-31
+//!
+//!  Usage: Run run() with parameters
+//!  TODO: Pull up HTMLs for more context; do bm25f on htmls
 
 /*
   Import system libraries
@@ -70,12 +68,10 @@ const MAX_PER_DOMAIN: usize = 5;
 pub static QUERY_CACHE: Lazy<RwLock<HashMap<String, Vec<WebDocument>>>> =
     Lazy::new(|| RwLock::new(HashMap::with_capacity(1_000)));
 
-/*
-  Description: Gets database results and confidence score
-
-  Input: Results to add to, Query, Language, Location, Embedding service
-  Output: Confidence score of the results, decides if call external APIs too & Modified results
-*/
+/// Description: Gets database results and confidence score
+/// 
+/// Input: Results to add to, Query, Language, Location, Embedding service
+/// Output: Confidence score of the results, decides if call external APIs too & Modified results
 pub async fn run(
     results: &mut Vec<SearchResult>,
     q: &str,

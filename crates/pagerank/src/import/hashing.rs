@@ -1,16 +1,14 @@
-/*
-  File: pagerank/import/hashing.rs
-  Description:
-
-  Author: Roman Lancos <support@prieco.net>
-  License: AGPL v3.0
-
-  Date Created:: 2026-02-26
-  Last Modified: 2026-02-27
-
-  Usage:
-  TODO:
-*/
+//!  File: pagerank/import/hashing.rs
+//!  Description:
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created:: 2026-02-26
+//!  Last Modified: 2026-02-27
+//!
+//!  Usage:
+//!  TODO:
 
 /*
   Import system libraries
@@ -29,12 +27,10 @@ use prieco_core::{
     normalize_url, url_to_id,
 };
 
-/*
-  Description: Classical call, split like this so that the tests could call it with custom paths
-
-  Input: None
-  Output: Result shards paths
-*/
+/// Description: Classical call, split like this so that the tests could call it with custom paths
+/// 
+/// Input: None
+/// Output: Result shards paths
 pub fn run() -> Result<Vec<String>, Box<dyn std::error::Error>> {
     run_in(CONNECTIONS_DIR, EDGES_DIR)
 }

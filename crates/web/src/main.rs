@@ -1,16 +1,14 @@
-/*
-  File: main.rs
-  Description: Sets up configuration for PriEco, starts web server and threads
-
-  Author: Roman Lancos <support@prieco.net>
-  License: AGPL v3.0
-
-  Date Created: 2025-09-20
-  Last Modified: 2026-01-31
-
-  Usage: Run PriEco and complete set up questions
-  TODO:
-*/
+//!  File: main.rs
+//!  Description: Sets up configuration for PriEco, starts web server and threads
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created: 2025-09-20
+//!  Last Modified: 2026-01-31
+//!
+//!  Usage: Run PriEco and complete set up questions
+//!  TODO:
 
 /*
   Set global allovator
@@ -65,7 +63,7 @@ use prieco_core::{
     TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_MODEL,
     VECTOR_EMBEDDING_TOKENIZER, colors, icons,
 };
-use prieco_insert::db_insert::{self, merge_tantivy};
+use prieco_insert::db_insert;
 use prieco_mini_crawler::mini_crawler;
 use prieco_pagerank as pagerank;
 
@@ -119,12 +117,10 @@ impl Fairing for GlobalHeaders {
     }
 }
 
-/*
-  Description: Creates embeder + launches thread manager + launches Rocket web server
-
-  Input: None
-  Output: None
-*/
+/// Description: Creates embeder + launches thread manager + launches Rocket web server
+///
+/// Input: None
+/// Output: None
 #[launch]
 async fn rocket() -> _ {
     // Disable foster parenting warning
@@ -250,12 +246,10 @@ async fn rocket() -> _ {
         .mount("/static", FileServer::from("./static"))
 }
 
-/*
-  Description: Manages different PriEco threads like blob storage, database insertion and mini crawler
-
-  Input: None
-  Output: None
-*/
+/// Description: Manages different PriEco threads like blob storage, database insertion and mini crawler
+/// 
+/// Input: None
+/// Output: None
 fn thread_manager() {
     // Initialize data
     let _ = &*PRIECO_FJALL;
@@ -267,8 +261,6 @@ fn thread_manager() {
 
     println!("Starting GPU!");
     let _ = VECTOR_CENTROPOIDS.search(&vec![0.0; 384], 1, 1);
-
-    merge_tantivy();
 
     // Blob storage
     let blob_thread = {

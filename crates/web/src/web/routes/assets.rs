@@ -1,16 +1,14 @@
-/*
-  File: web/routes/assets.rs
-  Description: Handles PriEco's static assets
-
-  Author: Roman Lancos <support@prieco.net>
-  License: AGPL v3.0
-
-  Date Created: 2026-01-31
-  Last Modified: 2026-02-01
-
-  Usage: Call routes to get PriEco's static assets
-  TODO:
-*/
+//!  File: web/routes/assets.rs
+//!  Description: Handles PriEco's static assets
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created: 2026-01-31
+//!  Last Modified: 2026-02-01
+//!
+//!  Usage: Call routes to get PriEco's static assets
+//!  TODO:
 
 /*
   Import system libraries
@@ -53,12 +51,10 @@ impl<'r> Responder<'r, 'static> for DecompressedImage {
     }
 }
 
-/*
-  Description: PriEco service worker. Had to be moved to root
-
-  Input:
-  Output: Service worker JS
-*/
+/// Description: PriEco service worker. Had to be moved to root
+/// 
+/// Input:
+/// Output: Service worker JS
 #[get("/sw.js")]
 pub async fn sw_js() -> Option<NamedFile> {
     NamedFile::open(Path::new("static/js/unduck/sw.js"))

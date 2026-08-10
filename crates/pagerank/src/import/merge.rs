@@ -13,12 +13,10 @@ use std::{
 use crate::compute::{BUFFER_SIZE, IdMap, MERGED_DIR, NODES_DIR, TOTAL_NODES, read_u64_pair};
 use prieco_core::ID_MAP_FILE;
 
-/*
-  Description: Classical call, split like this so that the tests could call it with custom paths
-
-  Input: paths of shard files
-  Output: Total number of nodes after merge
-*/
+/// Description: Classical call, split like this so that the tests could call it with custom paths
+/// 
+/// Input: paths of shard files
+/// Output: Total number of nodes after merge
 pub fn run(hash_shards: &[String]) -> Result<u64, Box<dyn std::error::Error>> {
     run_with(hash_shards, ID_MAP_FILE, NODES_DIR, MERGED_DIR, TOTAL_NODES)
 }

@@ -1,16 +1,14 @@
-/*
-  File: web/functions/general.rs
-  Description: PriEco settings module
-
-  Author: Roman Lancos <support@prieco.net>
-  License: AGPL v3.0
-
-  Date Created: 2025-09-20
-  Last Modified: 2026-02-06
-
-  Usage: Call these usually used functions for website
-  TODO:
-*/
+//!  File: web/functions/general.rs
+//!  Description: PriEco settings module
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created: 2025-09-20
+//!  Last Modified: 2026-02-06
+//!
+//!  Usage: Call these usually used functions for website
+//!  TODO:
 
 /*
   Import system libraries
@@ -30,12 +28,10 @@ use url::Url;
 
 use prieco_core::globals::colors;
 
-/*
-  Description: Checks if URL is valid
-
-  Input: URL
-  Output: true if valid, false otherwise
-*/
+/// Description: Checks if URL is valid
+/// 
+/// Input: URL
+/// Output: true if valid, false otherwise
 pub fn is_valid_url(input: &str) -> bool {
     match Url::parse(input) {
         Ok(url) => match url.scheme() {

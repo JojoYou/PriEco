@@ -3,12 +3,10 @@ use url::Url;
 
 use std::time::Instant;
 
-/*
-  Description: Download remote file
-
-  Input: Client, URL
-  Output: body, status_code, downloading_time, final_url
-*/
+/// Description: Download remote file
+/// 
+/// Input: Client, URL
+/// Output: body, status_code, downloading_time, final_url
 pub async fn download(client: &Client, url: &str) -> (String, u16, f64, String) {
     let start_downloading_time = Instant::now();
     let mut current_url = url.to_string();

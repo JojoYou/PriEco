@@ -1,16 +1,14 @@
-/*
-  File: web/routes/apis.rs
-  Description: Opens up API endpoints
-
-  Author: Roman Lancos <support@prieco.net>
-  License: AGPL v3.0
-
-  Date Created: 2026-01-31
-  Last Modified: 2026-02-01
-
-  Usage: Call these APIs in browser, your app or culr...
-  TODO:
-*/
+//!  File: web/routes/apis.rs
+//!  Description: Opens up API endpoints
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created: 2026-01-31
+//!  Last Modified: 2026-02-01
+//!
+//!  Usage: Call these APIs in browser, your app or culr...
+//!  TODO:
 
 /*
   Import system libraries
@@ -52,12 +50,10 @@ use prieco_core::{
     globals::{ANALYTICS, EmbeddingService, UserAgent},
 };
 
-/*
-  Description: Opens up API that calls PriEco index and returns results in JSON
-
-  Input: API key, language, location, query
-  Output: JSON
-*/
+/// Description: Opens up API that calls PriEco index and returns results in JSON
+/// 
+/// Input: API key, language, location, query
+/// Output: JSON
 #[get("/api?<a>&<lang>&<loc>&<q>&<goggles>")]
 pub async fn api(
     a: &str,

@@ -1,16 +1,14 @@
-/*
-  File: blob/blob.rs
-  Description:
-
-  Author: Roman Lancos <support@prieco.net>
-  License: AGPL v3.0
-
-  Date Created: 2025-02-07
-  Last Modified: 2026-07-10
-
-  Usage: Run() to take archived htmls and insert them into Blob storage
-  TODO:
-*/
+//!  File: blob/blob.rs
+//!  Description:
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created: 2025-02-07
+//!  Last Modified: 2026-07-10
+//!
+//!  Usage: Run() to take archived htmls and insert them into Blob storage
+//!  TODO:
 
 /*
   Import system libraries

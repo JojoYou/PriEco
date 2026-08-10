@@ -1,16 +1,14 @@
-/*
-  File: pagerank/compute.rs
-  Description: Import & Calculate pagerank on a new connections
-
-  Author: Roman Lancos <support@prieco.net>
-  License: AGPL v3.0
-
-  Date Created:: 2026-02-26
-  Last Modified: 2026-03-31
-
-  Usage: Call to process connections in
-  TODO:
-*/
+//!  File: pagerank/compute.rs
+//!  Description: Import & Calculate pagerank on a new connections
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created:: 2026-02-26
+//!  Last Modified: 2026-03-31
+//!
+//!  Usage: Call to process connections in
+//!  TODO:
 
 /*
   Import system libraries
@@ -99,12 +97,10 @@ impl IdMap {
     }
 }
 
-/*
-  Description: Decide how to proceed and call responsible functions to import connections to the graph and compute pagerank
-
-  Input: None
-  Output: None
-*/
+/// Description: Decide how to proceed and call responsible functions to import connections to the graph and compute pagerank
+/// 
+/// Input: None
+/// Output: None
 pub fn run() {
     // Create required directories
     for dir in DIRS {

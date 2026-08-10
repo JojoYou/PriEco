@@ -1,16 +1,14 @@
-/*
-  File: pagerank/nodes/csr.rs
-  Description:
-
-  Author: Roman Lancos <support@prieco.net>
-  License: AGPL v3.0
-
-  Date Created:: 2026-02-26
-  Last Modified: 2026-02-31
-
-  Usage:
-  TODO:
-*/
+//!  File: pagerank/nodes/csr.rs
+//!  Description:
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created:: 2026-02-26
+//!  Last Modified: 2026-02-31
+//!
+//!  Usage:
+//!  TODO:
 
 /*
   Import system libraries

@@ -1,16 +1,14 @@
-/*
-  File: globals.rs
-  Description: Manages global variables
-
-  Author: Roman Lancos <support@prieco.net>
-  License: AGPL v3.0
-
-  Date Created: 2025-09-20
-  Last Modified: 2026-02-06
-
-  Usage:
-  TODO:
-*/
+//!  File: globals.rs
+//!  Description: Manages global variables
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created: 2025-09-20
+//!  Last Modified: 2026-02-06
+//!
+//!  Usage:
+//!  TODO:
 
 /*
   Import system libraries

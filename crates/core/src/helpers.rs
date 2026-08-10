@@ -1,16 +1,14 @@
-/*
-  File: lib.rs
-  Description: Joins whole project & Holds universal functions
-
-  Author: Roman Lancos <support@prieco.net>
-  License: AGPL v3.0
-
-  Date Created: 2025-09-20
-  Last Modified: 2026-02-06
-
-  Usage: Call these functions to develop faster
-  TODO:
-*/
+//!  File: lib.rs
+//!  Description: Joins whole project & Holds universal functions
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created: 2025-09-20
+//!  Last Modified: 2026-02-06
+//!
+//!  Usage: Call these functions to develop faster
+//!  TODO:
 
 /*
   Import system libraries
@@ -27,12 +25,10 @@ use url::Url;
 
 use crate::globals::{FILE_LOCKS, colors};
 
-/*
-  Description: I find it more intuitive than Path exists
-
-  Input: file path
-  Output: true if file exists, false otherwise
-*/
+/// Description: I find it more intuitive than Path exists
+/// 
+/// Input: file path
+/// Output: true if file exists, false otherwise
 pub fn file_exists(file_path: &str) -> bool {
     Path::new(file_path).exists()
 }

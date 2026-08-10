@@ -1,16 +1,14 @@
-/*
-  File: web/routes/pages.rs
-  Description: PriEco web pages
-
-  Author: Roman Lancos <support@prieco.net>
-  License: AGPL v3.0
-
-  Date Created: 2026-01-31
-  Last Modified: 2026-02-01
-
-  Usage: Visit them in a browser
-  TODO:
-*/
+//!  File: web/routes/pages.rs
+//!  Description: PriEco web pages
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created: 2026-01-31
+//!  Last Modified: 2026-02-01
+//!
+//!  Usage: Visit them in a browser
+//!  TODO:
 
 /*
   Import system libraries
@@ -93,12 +91,10 @@ impl<'r> FromRequest<'r> for ClientIp {
     }
 }
 
-/*
-  Description: Responds if PriEco is alive
-
-  Input:
-  Output: OK
-*/
+/// Description: Responds if PriEco is alive
+/// 
+/// Input:
+/// Output: OK
 #[head("/")]
 pub fn index_head() -> &'static str {
     ""

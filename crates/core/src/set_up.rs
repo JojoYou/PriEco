@@ -1,16 +1,14 @@
-/*
-  File: set_up.rs
-  Description: Loads config or questions user
-
-  Author: Roman Lancos <support@prieco.net>
-  License: AGPL v3.0
-
-  Date Created: 2026-01-31
-  Last Modified: 2026-02-06
-
-  Usage: Run PriEco and complete set up questions
-  TODO:
-*/
+//!  File: set_up.rs
+//!  Description: Loads config or questions user
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created: 2026-01-31
+//!  Last Modified: 2026-02-06
+//!
+//!  Usage: Run PriEco and complete set up questions
+//!  TODO:
 
 use std::{
     fs::{read_to_string, write},

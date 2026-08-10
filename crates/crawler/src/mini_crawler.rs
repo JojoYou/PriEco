@@ -287,12 +287,10 @@ pub async fn run() {
 }
 
 /* Helper functions */
-/*
-  Description: Checks if URL is valid
-
-  Input: URL
-  Output: true if valid, false otherwise
-*/
+/// Description: Checks if URL is valid
+/// 
+/// Input: URL
+/// Output: true if valid, false otherwise
 pub fn is_valid_url(input: &str) -> bool {
     match Url::parse(input) {
         Ok(url) => match url.scheme() {

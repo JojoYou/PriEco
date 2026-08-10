@@ -1,16 +1,14 @@
-/*
-  File: web/modules/search_endpoint.rs
-  Description: Decided what to do with the search query
-
-  Author: Roman Lancos <support@prieco.net>
-  License: AGPL v3.0
-
-  Date Created: 2025-09-20
-  Last Modified: 2026-02-06
-
-  Usage Call this to get results in Rocket template format (context that gets inserted to the template)
-  TODO:
-*/
+//!  File: web/modules/search_endpoint.rs
+//!  Description: Decided what to do with the search query
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created: 2025-09-20
+//!  Last Modified: 2026-02-06
+//!
+//!  Usage Call this to get results in Rocket template format (context that gets inserted to the template)
+//!  TODO:
 
 /*
   Import system libraries
@@ -37,11 +35,9 @@ use crate::web::functions::{
 };
 use prieco_core::{EmbeddingService, SearchResult, url_to_domain_id};
 
-/*
-  Description: Decides what kind of search to perform
-  Input: Search type, Search query, Language, Location, Embedding service, Cookie jar
-  Output: Search results in Rocket template format
-*/
+/// Description: Decides what kind of search to perform
+/// Input: Search type, Search query, Language, Location, Embedding service, Cookie jar
+/// Output: Search results in Rocket template format
 pub async fn run(
     t: &str,
     q: &str,

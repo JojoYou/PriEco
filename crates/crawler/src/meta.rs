@@ -183,12 +183,10 @@ pub fn extract_metadata(
     result
 }
 
-/*
-  Description: Extract title text from html
-
-  Input: document
-  Output: title as String
-*/
+/// Description: Extract title text from html
+/// 
+/// Input: document
+/// Output: title as String
 fn extract_title(
     document: &Html,
     og_selector: &Selector,

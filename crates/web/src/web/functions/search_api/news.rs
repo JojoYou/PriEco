@@ -1,16 +1,14 @@
-/*
-  File: web/modules/search_api/news.rs
-  Description: Manages PriEco News
-
-  Author: Roman Lancos <support@prieco.net>
-  License: AGPL v3.0
-
-  Date Created: 2026-04-14
-  Last Modified: 2026-04-14
-
-  Usage Call this to get news results
-  TODO:
-*/
+//!  File: web/modules/search_api/news.rs
+//!  Description: Manages PriEco News
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created: 2026-04-14
+//!  Last Modified: 2026-04-14
+//!
+//!  Usage Call this to get news results
+//!  TODO:
 
 /*
   Import system libraries

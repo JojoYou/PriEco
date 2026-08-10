@@ -13,14 +13,12 @@ use twox_hash::XxHash64;
 use crate::web::functions::general::get_domain;
 use prieco_core::{CLIENT, ImgResult, colors, url_to_id};
 
-/*
-  Description: 3rd party image search with 0 knowledge cache
-               Query is hashed: used to find JSON blob
-               Original query is used to decrypt the blob
-               Disk stores encrypted files with hashed names
-  Input: Query
-  Output: Image results
-*/
+/// Description: 3rd party image search with 0 knowledge cache
+/// Query is hashed: used to find JSON blob
+/// Original query is used to decrypt the blob
+/// Disk stores encrypted files with hashed names
+/// Input: Query
+/// Output: Image results
 pub async fn run(query: &str) -> Vec<ImgResult> {
     ////
     // Cache

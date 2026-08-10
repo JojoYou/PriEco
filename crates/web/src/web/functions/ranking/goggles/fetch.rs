@@ -49,12 +49,10 @@ pub async fn fetch_and_store(url: String) -> Goggle {
     store_goggle(text, url)
 }
 
-/*
-  Description: Cache Goggle for 1 day and then recheck if it's still online
-
-  Input: None
-  Output: None
-*/
+/// Description: Cache Goggle for 1 day and then recheck if it's still online
+/// 
+/// Input: None
+/// Output: None
 pub async fn refresh_stale_goggles() {
     const STALE_AFTER_SECS: i64 = 86_400; // 1 day
 
