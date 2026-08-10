@@ -215,7 +215,17 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
 
                 inserted += 1;
                 if inserted % 1_000 == 0 {
-                    println!("{}: Inserted {}", icons::DB_INSERT, inserted);
+                    let segment_count = TANTIVY_INDEX
+                        .searchable_segment_ids()
+                        .map(|segments| segments.len())
+                        .unwrap_or(0);
+
+                    println!(
+                        "{}: Inserted {} | Tantivy Segments: {}",
+                        icons::DB_INSERT,
+                        inserted,
+                        segment_count
+                    );
                 }
 
                 if vector_idx_buffer.len() >= MAX_VECTORS_IN_VRAM {

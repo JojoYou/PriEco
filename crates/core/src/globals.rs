@@ -679,16 +679,11 @@ pub static TANTIVY_READER: Lazy<Arc<IndexReader>> = Lazy::new(|| {
 });
 
 pub static TANTIVY_WRITER: Lazy<Arc<Mutex<IndexWriter>>> = Lazy::new(|| {
-    let writer = TANTIVY_INDEX
-        .writer(TANTIVY_HEAP_SIZE)
-        .expect("Failed to create Tantivy V2 writer");
-
-    let mut merge_policy = LogMergePolicy::default();
-    merge_policy.set_min_num_segments(5);
-
-    writer.set_merge_policy(Box::new(merge_policy));
-
-    Arc::new(Mutex::new(writer))
+    Arc::new(Mutex::new(
+        TANTIVY_INDEX
+            .writer(TANTIVY_HEAP_SIZE)
+            .expect("Failed to create Tantivy V2 writer"),
+    ))
 });
 
 // Multilang tokenization
