@@ -607,7 +607,7 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
             compression: CompressionType::None,
             file_target_size: 2048 * 1024 * 1024, // 2GB blobs
             separation_threshold: 100,
-            staleness_threshold: 0.5,
+            staleness_threshold: 0.9,
             age_cutoff: 0.0,
         }));
 

@@ -49,11 +49,14 @@ section.center-wrapper.blog-content {
 .blog-content h2 {
     margin-top: 50px;
     margin-bottom: 20px;
-    font-size: 2rem;
     color: #ffffff;
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 400;
+    line-height: 1.2;
 }
 
 .blog-content p {
+    max-width: unset;
     line-height: 1.8;
     font-size: 1.15rem;
     margin-bottom: 24px;
@@ -76,4 +79,11 @@ section.center-wrapper.blog-content {
     border-radius: 32px;
     margin: 30px 0;
     object-fit: contain;
+}
+
+.top-img {
+    width: 100%;
+    max-height: 700px;
+    border-radius: 64px;
+    object-fit: cover;
 }

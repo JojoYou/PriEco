@@ -26,11 +26,11 @@ use url::Url;
 use crate::globals::{FILE_LOCKS, colors};
 
 /// Description: I find it more intuitive than Path exists
-/// 
+///
 /// Input: file path
 /// Output: true if file exists, false otherwise
-pub fn file_exists(file_path: &str) -> bool {
-    Path::new(file_path).exists()
+pub fn file_exists<P: AsRef<Path>>(file_path: P) -> bool {
+    file_path.as_ref().exists()
 }
 
 /*

@@ -18,7 +18,6 @@ use std::{
     fs::{read_dir, read_to_string},
     io::Cursor,
     net::IpAddr,
-    path::Path,
 };
 
 /*
@@ -26,7 +25,7 @@ use std::{
 */
 use chrono::Utc;
 use dotenv_codegen::dotenv;
-use prieco_blob::blob::decode_blob_to_html_rendered;
+use prieco_blob::decode::decode_blob_to_html_rendered;
 use rocket::{
     Request, Response, State,
     form::{Form, FromForm},

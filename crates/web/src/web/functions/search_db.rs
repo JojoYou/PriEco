@@ -1,14 +1,22 @@
-//!  File: web/functions/search_db.rs
-//!  Description: Searches own index for results
+//! # Index search
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! Performs an index search (JSON) and creates search results out of it.
 //!
-//!  Date Created: 2025-09-20
-//!  Last Modified: 2026-03-31
+//! ## Architecture
 //!
-//!  Usage: Run run() with parameters
-//!  TODO: Pull up HTMLs for more context; do bm25f on htmls
+//! 1. [**run()**:][run] Calls [run_json]() and creates search results.
+//! 2. [**run_json()**:][run_json] Performs search indexes pipeline.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2025-09-20
+//! * Last Modified: 2026-08-11
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 /*
   Import system libraries
@@ -68,20 +76,39 @@ const MAX_PER_DOMAIN: usize = 5;
 pub static QUERY_CACHE: Lazy<RwLock<HashMap<String, Vec<WebDocument>>>> =
     Lazy::new(|| RwLock::new(HashMap::with_capacity(1_000)));
 
-/// Description: Gets database results and confidence score
-/// 
-/// Input: Results to add to, Query, Language, Location, Embedding service
-/// Output: Confidence score of the results, decides if call external APIs too & Modified results
+/// # Calls [run_json]() and creates [SearchResult]
+///
+/// This funtion calls [run_json]() for JSON results.
+/// Generates result info, the 3 dots next to each result.
+/// Formats JSON as a [SearchResult] object and pushes them to a vector.
+///
+/// # Arguments
+///
+/// * `results` - Mutable vector of [SearchResult].
+/// * `query` - Search query.
+/// * `lang` - Prefered language.
+/// * `loc` - Prefered location.
+/// * `embedding_manager` - Query embedder.
+/// * `goggles` - Filters.
+/// * `mobile` - Is user using mobile.
+///
+/// # Returns
+///
+/// None
+///
+/// # Panics
+///
+/// Only if system runs out of memory.
 pub async fn run(
     results: &mut Vec<SearchResult>,
-    q: &str,
+    query: &str,
     lang: &str,
     loc: &str,
     embedding_service: &State<EmbeddingService>,
     goggles: Vec<Arc<GoggleRules>>,
-    user_is_mobile: bool,
+    mobile: bool,
 ) {
-    let local_results = run_json(q, lang, loc, embedding_service, goggles, user_is_mobile).await;
+    let local_results = run_json(query, lang, loc, embedding_service, goggles, mobile).await;
 
     // Create final results
     if let Some(arr) = Json(Json_Value::from(local_results)).as_array() {
@@ -200,19 +227,66 @@ pub async fn run(
     }
 }
 
-/*
-  Description: Queries indexes for results and returns them in a format that is convertable to SERP or JSON
-
-  Input:
-  Output:
-*/
+/// # Search Index Pipeline
+///
+/// This function checks if results for the same query + lang + loc are already in RAM cache.
+/// It's unsed internally and for API calls.
+///
+/// Performs [Intent classification][ranking::meaning::call::process_query],
+/// which also returns coordinates if the query contains a place.
+/// And synonym expansion for full-text search.
+///
+/// Embeds query.
+///
+/// Performs 4 differnt styles of searches at the same time.
+/// * Direct search
+///     * Checks for domain results of .com, .net, .org where domain is trimmed query.
+///     * Helpful for root domain searches such as YouTube.
+/// * Discovery search
+///     * Pings a lot of domains matching query. And waits (max 1s) for 200 response code.
+///     * Useful for root domain searches that PriEco doesn't yet know.
+///     * Successful findings are sent to PriEco web crawler.
+/// * Full-text search
+///     * PriEco uses Tantivy(https://github.com/quickwit-oss/tantivy).
+///     * Tantivy checks for keywords in web page `title`, `description`, `content` (first 500 page characters), `keywords` (manually set keywords by page).
+///     * Many rules are applied during this search, especially with query intent and preferred language.
+/// * Vector search
+///     * IVF index made by me. I needed a simple vector search that embeds query, finds closest centropoids, mmap sequencially reads those buckets and gets the closest vectors to the query in cosine similarity.
+///     * Vectors are normalized to size of 1 for faster math.
+///
+/// * Reciprocal Rank Fusion merge & Deduplication.
+///
+/// * Goggle discard filter.
+///
+/// * [Hand ranking][ranking::hand::run] (Weights calculated using genetic algorith on NDCG test).
+///
+/// * Reranker + PageRank.
+///
+/// * Caps results from single domain.
+///
+/// # Arguments
+///
+/// * `query` - Search query.
+/// * `lang` - Prefered language.
+/// * `loc` - Prefered location.
+/// * `embedding_manager` - Query embedder.
+/// * `goggles` - Filters.
+/// * `mobile` - Is user using mobile.
+///
+/// # Returns
+///
+/// Vector of JSONs that are made form [WebDocument] objects.
+///
+/// # Panics
+///
+/// Only if system runs out of memory.
 pub async fn run_json(
     query: &str,
     lang: &str,
     loc: &str,
-    embedding_service: &State<EmbeddingService>,
+    embedding_manager: &State<EmbeddingService>,
     goggles: Vec<Arc<GoggleRules>>,
-    user_is_mobile: bool,
+    mobile: bool,
 ) -> Vec<Json_Value> {
     // Cache
     let cache_key = format!("{}_{}_{}", query, lang, loc);
@@ -221,6 +295,7 @@ pub async fn run_json(
         cache.get(&cache_key).cloned()
     };
 
+    // Clone query to pass to parallel index calls
     let q_clone = query.to_string();
     let mut fts_query = q_clone.clone();
     let fts_original_query = q_clone.clone();
@@ -244,7 +319,7 @@ pub async fn run_json(
         };
 
         // Query to embed (vector)
-        let embed: Vec<f32> = match embedding_service.embed_query(&contextual_query).await {
+        let embed: Vec<f32> = match embedding_manager.embed_query(&contextual_query).await {
             Ok(embed) => embed,
             Err(e) => {
                 println!(
@@ -417,7 +492,6 @@ pub async fn run_json(
         println!("IVF: {}", vector_results.len());
         println!("DIS: {}", discovery_results.len());
 
-        // Stage: 1
         // RRF Merge & Deduplicate
         let mut results: Vec<WebDocument> = ranking::rrf::run(
             query,
@@ -478,19 +552,9 @@ pub async fn run_json(
         return Vec::new();
     }
 
-    // Stage: 2
     // Hand ranking
-    ranking::hand::run(
-        &mut results,
-        query,
-        lang,
-        loc,
-        &intent,
-        &goggles,
-        user_is_mobile,
-    );
+    ranking::hand::run(&mut results, query, lang, loc, &intent, &goggles, mobile);
 
-    // Stage: 3
     // Reranker + PageRank
     let mut pagerank_time_total: f32 = 0.0;
     let mut rerank_time_total: f32 = 0.0;
@@ -503,7 +567,6 @@ pub async fn run_json(
             .map(|d| format!("{} {} {}", d.title, d.description, d.content))
             .collect();
 
-        let q = query.to_string();
         let scores = RERANKER
             .score_batch(query, &passages)
             .await
@@ -524,7 +587,6 @@ pub async fn run_json(
         pagerank_time_total, rerank_time_total
     );
 
-    // Stage: 4
     // Cap result count from a single domain
     if !query.contains("site:") {
         let mut domain_counts: HashMap<String, usize> = HashMap::new();
@@ -542,19 +604,6 @@ pub async fn run_json(
 
     // Trim results
     let shown_results: Vec<WebDocument> = results.iter().take(20).cloned().collect();
-    /*let html_ids: Vec<u64> = shown_results
-    .iter()
-    .filter_map(|doc| {
-        doc.html
-            .split('/')
-            .nth(1)?
-            .trim_end_matches(".zst")
-            .trim_end_matches(".txt")
-            .parse::<u64>()
-            .ok()
-    })
-    .collect();*/
-
     let serialized_sites: Vec<_> = shown_results
         .into_iter()
         .filter_map(|s| match serde_json::to_value(s) {
@@ -575,6 +624,28 @@ pub async fn run_json(
 }
 
 /* Index search functions */
+
+/// # Performs FTS index search.
+///
+/// This funtion prepares a Tantivy call and performs it.
+/// FOr curation uses [QueryIntent], prefered lang and goggles (discard filter).
+///
+/// # Arguments
+///
+/// * `query_text` - Search query.
+/// * `lang` - Prefered language.
+/// * `loc` - Prefered location.
+/// * `intent` - [QueryIntent].
+/// * `limit` - How many results to return.
+/// * `goggles` - Filters.
+///
+/// # Returns
+///
+/// Option, vector of [WebDocument] IDs and their BM25 scores.
+///
+/// # Panics
+///
+/// Only if system runs out of memory.
 fn search_tantivy(
     query_text: &str,
     lang: &str,
@@ -711,6 +782,26 @@ fn search_tantivy(
 }
 
 /* Helper functions*/
+
+/// # Fetches documents from [PRIECO_FJALL] meta storage.
+///
+/// This funtion takes in batch all IDs needed for fetching.
+/// Deduplicates IDs.
+/// Sorts them for slightly better sequencial locality.
+/// Spins up multithreated disk seeks.
+/// [META_DICTIONARY] decompresses data.
+///
+/// # Arguments
+///
+/// * `engines` - Hashmap of index names and result IDs + scores they returned.
+///
+/// # Returns
+///
+/// Hashmap of index names and vector of [WebDocument].
+///
+/// # Panics
+///
+/// Only if system runs out of memory.
 fn fetch_documents(
     engines: HashMap<&'static str, Vec<(u64, f32)>>,
 ) -> HashMap<&'static str, Vec<WebDocument>> {
@@ -802,6 +893,7 @@ fn sanitize_string(s: &str) -> String {
     s.replace('"', "").replace('\'', "")
 }
 
+/// Helper function for discarting results whose path matches discard Goggle filter
 pub fn path_matches(url: &str, pattern: &str) -> bool {
     if let Some(rest) = pattern.strip_prefix('^') {
         if let Some(core) = rest.strip_suffix('$') {
