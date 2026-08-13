@@ -1,11 +1,9 @@
-# .readthedocs.yaml
-# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
-
 version: 2
 
 build:
   os: ubuntu-24.04
   tools:
+    python: "3.12"
     rust: "1.96"
 
   apt_packages:
@@ -42,19 +40,17 @@ build:
       SALT="salt"
       EOF
 
-    # Documentation
+    # Install MkDocs
+    - pip install mkdocs mkdocs-material
+
+    # Build MkDocs
+    - mkdocs build --site-dir _readthedocs/html/
+
+    # Build Rust Documentation
     - >
       export BINDGEN_EXTRA_CLANG_ARGS="-I$(clang -print-file-name=include) -I/usr/include/x86_64-linux-gnu -I/usr/include" &&
       cargo doc --workspace --no-deps --document-private-items
 
     # Output
-    - |
-          cat << 'EOF' > target/doc/index.html
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta http-equiv="refresh" content="0; url=prieco_core/index.html">
-            </head>
-          </html>
-          EOF
-    - cp -a target/doc/. _readthedocs/html/
+    - mkdir -p _readthedocs/html/api
+    - cp -a target/doc/. _readthedocs/html/api/

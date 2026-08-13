@@ -1,0 +1,7 @@
+.md-footer {
+    display: none !important;
+}
+.md-header {
+    box-shadow: none !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}

@@ -1,0 +1,24 @@
+site_name: PriEco Documentation
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+    - toc.integrate
+  palette:
+    - scheme: default
+      primary: white
+extra_css:
+  - stylesheets/extra.css
+nav:
+  - Getting Started:
+      - Introduction: index.md
+      - Installation: installation.md
+      - Configuration: configuration.md
+  - PriEco Architecture:
+      - Core System: core.md
+      - Mini Crawler: minicrawler.md
+      - Blob Storage: blob.md
+      - Data Inserter: inserter.md
+      - Web Search: search.md
+  - API Reference: api/prieco_core/index.html
