@@ -17,7 +17,7 @@ build:
     - llvm
 
   commands:
-    - mkdir -p _readthedocs/html/
+    - mkdir -p $READTHEDOCS_OUTPUT/html/
 
     # Generate .env file
     - |
@@ -44,7 +44,7 @@ build:
     - pip install mkdocs mkdocs-material
 
     # Build MkDocs
-    - mkdocs build --config-file docs/mkdocs.yml --site-dir _readthedocs/html/
+    - mkdocs build --site-dir $READTHEDOCS_OUTPUT/html/
 
     # Build Rust Documentation
     - >
@@ -52,5 +52,5 @@ build:
       cargo doc --workspace --no-deps --document-private-items
 
     # Output
-    - mkdir -p _readthedocs/html/api
-    - cp -a target/doc/. _readthedocs/html/api/
+    - mkdir -p $READTHEDOCS_OUTPUT/html/api
+    - cp -a target/doc/. $READTHEDOCS_OUTPUT/html/api/
