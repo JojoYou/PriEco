@@ -44,7 +44,7 @@ build:
     - pip install mkdocs mkdocs-material
 
     # Build MkDocs
-    - mkdocs build --site-dir _readthedocs/html/
+    - mkdocs build --config-file docs/mkdocs.yml --site-dir _readthedocs/html/
 
     # Build Rust Documentation
     - >

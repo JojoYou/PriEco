@@ -67,6 +67,7 @@ use prieco_core::{
 const MAX_FTS: usize = 80;
 const MAX_IVF: usize = 200;
 const NPROBS: usize = 4;
+const PAGERANK_CUTOFF: usize = 100;
 const RERANK_CUTOFF: usize = 30;
 const MAX_PER_DOMAIN: usize = 5;
 
@@ -554,15 +555,31 @@ pub async fn run_json(
 
     // Hand ranking
     ranking::hand::run(&mut results, query, lang, loc, &intent, &goggles, mobile);
+    results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
 
-    // Reranker + PageRank
+    // PageRank
+    let pr_candidates = results.len().min(PAGERANK_CUTOFF);
+
     let mut pagerank_time_total: f32 = 0.0;
+    if pr_candidates > 0 {
+        let pr_start = Instant::now();
+
+        for doc in results[..pr_candidates].iter_mut() {
+            let pr_score = PAGERANK.read().get_score(&doc.url);
+            doc.search_score *= 1.0 + pr_score;
+        }
+        pagerank_time_total = pr_start.elapsed().as_secs_f32();
+
+        results[..pr_candidates]
+            .sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+    }
+
+    // RERANKER
     let mut rerank_time_total: f32 = 0.0;
-    let candidates = results.len().min(RERANK_CUTOFF);
-    if candidates > 0 {
-        // Rerank
+    let nn_candidates = results.len().min(RERANK_CUTOFF);
+    if nn_candidates > 0 {
         let rerank_start = Instant::now();
-        let passages: Vec<String> = results[..candidates]
+        let passages: Vec<String> = results[..nn_candidates]
             .iter()
             .map(|d| format!("{} {} {}", d.title, d.description, d.content))
             .collect();
@@ -570,18 +587,17 @@ pub async fn run_json(
         let scores = RERANKER
             .score_batch(query, &passages)
             .await
-            .unwrap_or_else(|_| vec![0.0; candidates]);
+            .unwrap_or_else(|_| vec![0.0; nn_candidates]);
         rerank_time_total = rerank_start.elapsed().as_secs_f32();
 
-        // PageRank
-        let pr_start = Instant::now();
-        for (i, doc) in results[..candidates].iter_mut().enumerate() {
-            doc.search_score *= 1.0 + PAGERANK.read().get_score(&doc.url);
-            doc.search_score *= 0.7 + (1.0 / (1.0 + (-scores[i]).exp())) * 0.6;
+        for (i, doc) in results[..nn_candidates].iter_mut().enumerate() {
+            let neural_relevance = 1.0 / (1.0 + (-scores[i]).exp());
+            doc.search_score *= neural_relevance;
         }
-        pagerank_time_total = pr_start.elapsed().as_secs_f32();
+
+        results[..nn_candidates]
+            .sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
     }
-    results[..candidates].sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
     println!(
         "PageRank: {}s\nRerank: {}s",
         pagerank_time_total, rerank_time_total

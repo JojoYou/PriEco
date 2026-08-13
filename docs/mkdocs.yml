@@ -16,6 +16,7 @@ nav:
       - Installation: installation.md
       - Configuration: configuration.md
   - PriEco Architecture:
+      - Layout: layout.md
       - Core System: core.md
       - Mini Crawler: minicrawler.md
       - Blob Storage: blob.md

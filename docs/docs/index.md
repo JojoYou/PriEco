@@ -1,17 +1,14 @@
-# Welcome to MkDocs
+# Introduction
 
-For full documentation visit [mkdocs.org](https://www.mkdocs.org).
+**PriEco** is a general purpose web search engine.
 
-## Commands
+Its premise is to:
 
-* `mkdocs new [dir-name]` - Create a new project.
-* `mkdocs serve` - Start the live-reloading docs server.
-* `mkdocs build` - Build the documentation site.
-* `mkdocs -h` - Print help message and exit.
+- Privacy: Keep users private
+- Ecology: At least main node serves runs on renewable energy
 
-## Project layout
+and additional are:
 
-    mkdocs.yml    # The configuration file.
-    docs/
-        index.md  # The documentation homepage.
-        ...       # Other markdown pages, images and other files.
+- [Open source](https://codeberg.org/JojoYou/PriEco/) under AGPL v3
+- Indepent: Runs own index
+- Decentralized: Upcoming
