@@ -187,7 +187,7 @@ pub fn run(
         })
         .unwrap_or_default();
 
-    let goggles_list: Vec<GoggleView> = list_public()
+    /*let goggles_list: Vec<GoggleView> = list_public()
         .into_iter()
         .map(|g| GoggleView {
             checked: active_ids.contains(&g.id),
@@ -210,5 +210,5 @@ pub fn run(
                 .collect::<Vec<_>>()
                 .join(",")
         ),
-    );
+    );*/
 }

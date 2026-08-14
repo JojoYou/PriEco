@@ -26,9 +26,12 @@ use std::{
 use dotenv_codegen::dotenv;
 use image::GenericImageView;
 use rocket::{
-    State, get,
+    FromForm, State,
+    form::Form,
+    get,
     http::{ContentType, CookieJar, Status, uri::Host},
     post,
+    response::Redirect,
     serde::json::{Json, Value as RocketValue},
 };
 use serde_json::json;
@@ -51,7 +54,7 @@ use prieco_core::{
 };
 
 /// Description: Opens up API that calls PriEco index and returns results in JSON
-/// 
+///
 /// Input: API key, language, location, query
 /// Output: JSON
 #[get("/api?<a>&<lang>&<loc>&<q>&<goggles>")]
@@ -545,4 +548,42 @@ pub fn pageview(
         cookie_jar.get("loc").map(|c| c.value()),
     );
     "ok"
+}
+
+// Sends to Roman Láncoš a signal message with message
+#[derive(FromForm)]
+pub struct RoadmapFeedback<'r> {
+    pub message: &'r str,
+    pub return_path: &'r str,
+}
+
+#[post("/submit_msg", data = "<feedback>")]
+pub async fn send_signal(feedback: Form<RoadmapFeedback<'_>>) -> Redirect {
+    let payload = serde_json::json!({
+        "message": feedback.message,
+        "number": dotenv!("SIGNAL_BOT_NUMBER"),
+        "recipients": [dotenv!("SIGNAL_RECIPIENT_NUMBER")],
+        "text_mode": "styled",
+    });
+
+    match CLIENT
+        .post("http://localhost:8071/v2/send")
+        .json(&payload)
+        .send()
+        .await
+    {
+        Ok(response) if response.status().is_success() => {
+            println!("Message successfully forwarded to Signal!");
+        }
+        Ok(response) => {
+            let status_code = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            println!("Signal API Error ({}): {}", status_code, error_text);
+        }
+        Err(e) => {
+            println!("Failed to send message to Signal (Timeout/Network): {}", e);
+        }
+    }
+
+    Redirect::to(feedback.return_path.to_string())
 }

@@ -1019,46 +1019,6 @@ pub fn roadmap(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     Template::render("roadmap", context)
 }
 
-// Sends to Roman Láncoš a signal message with message
-#[derive(FromForm)]
-pub struct RoadmapFeedback<'r> {
-    pub message: &'r str,
-}
-
-#[post("/roadmap/submit", data = "<feedback>")]
-pub async fn submit_roadmap_feedback(feedback: Form<RoadmapFeedback<'_>>) -> Redirect {
-    let signal_message = format!("**New Roadmap Feedback**\n{}", feedback.message);
-
-    let payload = serde_json::json!({
-        "message": signal_message,
-        "number": dotenv!("SIGNAL_BOT_NUMBER"),
-        "recipients": [dotenv!("SIGNAL_RECIPIENT_NUMBER")],
-        "text_mode": "styled",
-    });
-
-    match CLIENT
-        .post("http://localhost:8071/v2/send")
-        .json(&payload)
-        .send()
-        .await
-    {
-        Ok(response) => {
-            if response.status().is_success() {
-                println!("Roadmap feedback successfully forwarded to Signal!");
-            } else {
-                let status_code = response.status();
-                let error_text = response.text().await.unwrap_or_default();
-                println!("Signal API Error ({}): {}", status_code, error_text);
-            }
-        }
-        Err(e) => {
-            println!("Failed to send feedback to Signal (Timeout/Network): {}", e);
-        }
-    }
-
-    Redirect::to(uri!(roadmap))
-}
-
 #[derive(Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct RoadmapVote {
@@ -1589,6 +1549,7 @@ pub fn blog(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
         (String::from("title_query"), json!("Blog | ")),
         (String::from("posts"), json!(posts)),
     ]);
+
     settings::run(&mut context, &None, cookie_jar, host);
     Template::render("blog/index", context)
 }
