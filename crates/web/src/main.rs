@@ -161,12 +161,12 @@ async fn rocket() -> _ {
     };
 
     // Spawn Thread Manager
-    /*spawn(move || {
+    spawn(move || {
         thread_manager();
-    });*/
+    });
 
     // Analytics
-    //tokio::spawn(async { ANALYTICS.background_purge_task().await });
+    tokio::spawn(async { ANALYTICS.background_purge_task().await });
 
     // Launch Rocket web server
     rocket::build()
