@@ -420,7 +420,13 @@ pub async fn run_json(
             .unwrap_or_default();
 
             let elapsed = start.elapsed().as_secs_f32();
-            println!("Tantivy took {elapsed:.3}s");
+            println!(
+                "Tantivy took {elapsed:.3}s, {} segments",
+                TANTIVY_INDEX
+                    .searchable_segments()
+                    .unwrap_or_default()
+                    .len()
+            );
             stdout().flush().ok();
 
             res
