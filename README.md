@@ -1,18 +1,14 @@
+# [PriEco](https://prieco.net)
+
 ![Logo](https://prieco.net/static/img/prieco.webp)
-
-# PriEco
-
-#### https://prieco.net
 
 A fast, privacy-first, eco-conscious hybrid web search engine written in Rust.
 
 ![version](https://img.shields.io/badge/version-3.0.0-red.svg)
-
 [![rust](https://img.shields.io/badge/built_with-Rust-dca282.svg?style=flat-square)](https://www.rust-lang.org/)
-
 [![AGPL License](https://img.shields.io/badge/license-AGPL-blue.svg)](http://www.gnu.org/licenses/agpl-3.0)
 
-## Benefits
+## Features
 
 - **🦝 Privacy**
 - **🔒 Security**
@@ -24,57 +20,47 @@ A fast, privacy-first, eco-conscious hybrid web search engine written in Rust.
 
 ## Switch to PriEco
 
-#### Chrome
+### Chrome
 
 Go to settings, go to Search engine, click add
 
 Set Name
 
-```
+```text
 PriEco
 ```
 
 Shortcut
 
-```
+```text
 :p
 ```
 
 URL with %s
 
-```
+```text
 https://prieco.net/search?t=all&q=%s
 ```
 
-#### Firefox
+### Firefox
 
-Visit https://prieco.net, right click on omnibox, click on "add PriEco".
+Visit <https://prieco.net>, right click on omnibox, click on "add PriEco".
 
 Go to settings, go to Search, select PriEco as your default web search engine
 
 ## Donation
 
-**Bitcoin**
-
-```
+```bash
+# Bitcoin
 bc1q9zs9n28jk4jx2w2659mhzd84skg0mlgkq7g3rr
-```
 
-**Ethereum**
-
-```
+# Ethereum
 0x61bF924B3E3Cf687D8FbE39d75daea9ACB204fE3
-```
 
-**Solana**
-
-```
+# Solana
 DJS1CEu1atr46Tkyg5Vq2fZKqW11gj27TmfQ9VF2fZ6h
-```
 
-**Monero**
-
-```
+# Monero
 43rNgiiG5PRGWaqDtKEuYmQrAGkXBEsJh5RXLagaQeMm9j7dGkAszjPS8T3XyBEviRGcBLFYFrZFyj8xByKVJ4PLSQtd8jE
 ```
 
