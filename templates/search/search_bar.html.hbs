@@ -47,6 +47,7 @@
         </button>
       </form>
 
+      {{#unless no_js}}
       <form action="search" method="{{#if check_post}}POST{{else}}GET{{/if}}">
         <input type="hidden" name="t" value="map">
         <input type="hidden" name="q" value="{{query}}">
@@ -55,6 +56,7 @@
           <p>Maps</p>
         </button>
       </form>
+      {{/unless}}
 
       <button class="btn_settings">
         <label for="open-settings" class="open-settings-btn">
