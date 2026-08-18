@@ -13,8 +13,14 @@ extra_css:
 nav:
   - Getting Started:
       - Introduction: index.md
-      - Installation: installation.md
-      - Configuration: configuration.md
+
+  - User:
+    - Quick Start: user/quickstart.md
+    - Contributing: user/contribute.md
+
+  - Node:
+      - Quick Start: node/quickstart.md
+
   - PriEco Architecture:
       - Layout: layout.md
       - Core System: core.md
@@ -22,4 +28,6 @@ nav:
       - Blob Storage: blob.md
       - Data Inserter: inserter.md
       - Web Search: search.md
+      - Crawler: crawler.md
+
   - API Reference: api/prieco_core/index.html
