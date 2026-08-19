@@ -1514,7 +1514,6 @@ pub struct BlogPost {
 
 #[get("/blog")]
 pub fn blog(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
-    // Get posts
     let mut posts: Vec<BlogPost> = read_dir("templates/blog/post")
         .into_iter()
         .flatten()
@@ -1541,10 +1540,8 @@ pub fn blog(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
         })
         .collect();
 
-    // Sort posts
     posts.sort_by(|a, b| b.date.cmp(&a.date));
 
-    // Render page
     let mut context: HashMap<String, RocketValue> = HashMap::from([
         (String::from("css_version"), json!(CSS_VERSION)),
         (String::from("js_version"), json!(JS_VERSION)),
@@ -1585,7 +1582,6 @@ pub fn blog_post(
 
 #[get("/blog/rss.xml")]
 pub fn rss_feed() -> (ContentType, String) {
-    // Get posts
     let mut posts: Vec<BlogPost> = read_dir("templates/blog/post")
         .into_iter()
         .flatten()
@@ -1614,10 +1610,8 @@ pub fn rss_feed() -> (ContentType, String) {
         })
         .collect();
 
-    // Sort posts
     posts.sort_by(|a, b| b.date.cmp(&a.date));
 
-    // Build XML
     let mut items = String::new();
     for post in posts {
         let parsed_date = NaiveDate::parse_from_str(&post.date, "%Y-%m-%d")
@@ -1630,10 +1624,10 @@ pub fn rss_feed() -> (ContentType, String) {
         items.push_str(&format!(
             r#"
         <item>
-            <title>{title}</title>
+            <title><![CDATA[{title}]]></title>
             <link>https://prieco.net/blog/{slug}</link>
             <guid>https://prieco.net/blog/{slug}</guid>
-            <description>{desc}</description>
+            <description><![CDATA[{desc}]]></description>
             <pubDate>{date}</pubDate>
             <content:encoded><![CDATA[{full_html}]]></content:encoded>
         </item>"#,
@@ -1645,13 +1639,13 @@ pub fn rss_feed() -> (ContentType, String) {
         ));
     }
 
-    // Wrap items
     let rss_xml = format!(
-        r#"<?xml version="1.0" encoding="UTF-8" ?>
-        <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom">
     <channel>
         <title>PriEco Blog</title>
         <link>https://prieco.net/blog</link>
+        <atom:link href="https://prieco.net/blog/rss.xml" rel="self" type="application/rss+xml"/>
         <description>News and updates from the PriEco search engine.</description>
         {items}
     </channel>
@@ -1667,7 +1661,6 @@ fn extract_metadata(content: &str) -> (String, String, String) {
     let mut desc = String::from("Empty description");
     let mut date = String::from("No date");
 
-    // Load comment with metadata
     let mut in_metadata = false;
     for line in content.lines() {
         let trimmed = line.trim();
@@ -1679,7 +1672,6 @@ fn extract_metadata(content: &str) -> (String, String, String) {
             break;
         }
 
-        // Extract them
         if in_metadata {
             if let Some(rest) = trimmed.strip_prefix("title: ") {
                 title = rest.to_string();

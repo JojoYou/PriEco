@@ -6,4 +6,3 @@ include:
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
   - template: Security/SAST-IaC.gitlab-ci.yml
-  - template: Security/Container-Scanning.gitlab-ci.yml
