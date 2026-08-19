@@ -33,9 +33,23 @@ If you wish to set up PriEco as a default web search engine manually here is how
 
 Fill in
 
-- Name: PriEco
-- Shortcut: prieco.net
-- URL with %s in place of query: https://prieco.net/search?t=all&q=%s
+- Name:
+
+```
+PriEco
+```
+
+- Shortcut:
+
+```
+prieco.net
+```
+
+- URL with %s in place of query:
+
+```
+https://prieco.net/search?t=all&q=%s
+```
 
 ### Firefox (Firefox based browsers)
 

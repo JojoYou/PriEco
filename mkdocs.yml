@@ -16,6 +16,8 @@ nav:
 
   - User:
     - Quick Start: user/quickstart.md
+    - Comparision:
+      - PriEco vs Google: user/com/google.md
     - Contributing: user/contribute.md
 
   - Node:

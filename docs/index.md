@@ -1,19 +1,18 @@
-**PriEco** is a general purpose web search engine.
-
-Its premise is to:
-
-- Privacy: Keep users private
-- Ecology: At least main node serves runs on renewable energy
-
-and additional are:
-
-- [Open source](https://codeberg.org/JojoYou/PriEco/) under AGPL v3
-- Indepent: Runs own index
-- Decentralized: Upcoming
-
 ## What is PriEco?
 
 PriEco is a general purpose web search engine. Its goal is find the best results for your queries and questions. That's it. We keep you private while searching, we run on renewable energy, we are transparent about how PriEco works and we develop what our users want.
+
+## Feature Matrix
+
+Here is a quick overview of PriEco's capabilities:
+
+| Feature          | Supported | Notes                                                                                               |
+| :--------------- | :-------: | :-------------------------------------------------------------------------------------------------- |
+| **Governance**   |    🏛️     | Led by Roman Láncoš. Users decide on most of PriEco development. There are no official enforcements |
+| **License**      |    📜     | [AGPL v3](https://codeberg.org/JojoYou/PriEco/src/branch/master/LICENCE)                            |
+| **Index Size**   |    📊     | [~400 million](https://prieco.net/stats) indexed pages and growing                                  |
+| **Image Search** |    ✅     | Available, from Brave search index                                                                  |
+| **Bangs (!)**    |    ✅     | Supported, even multibang, you can specify multiple bangs in the same query                         |
 
 ## Mission & Vision
 
