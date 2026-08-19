@@ -23,7 +23,7 @@ use std::{
 /*
   Import external libraries
 */
-use chrono::Utc;
+use chrono::{NaiveDate, NaiveTime, Utc};
 use dotenv_codegen::dotenv;
 use prieco_blob::decode::decode_blob_to_html_rendered;
 use rocket::{
@@ -1509,6 +1509,7 @@ pub struct BlogPost {
     pub desc: String,
     pub slug: String,
     pub date: String,
+    pub html: String,
 }
 
 #[get("/blog")]
@@ -1535,6 +1536,7 @@ pub fn blog(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
                 slug: slug.to_string(),
                 date,
                 desc,
+                html: String::new(),
             })
         })
         .collect();
@@ -1570,7 +1572,7 @@ pub fn blog_post(
     let mut context: HashMap<String, RocketValue> = HashMap::from([
         (String::from("css_version"), json!(CSS_VERSION)),
         (String::from("js_version"), json!(JS_VERSION)),
-        (String::from("title_query"), json!(format!("{} | ", title))), // Much better page title!
+        (String::from("title_query"), json!(format!("{} | ", title))),
         (String::from("post_title"), json!(title)),
         (String::from("post_date"), json!(date)),
         (String::from("post_desc"), json!(desc)),
@@ -1579,6 +1581,85 @@ pub fn blog_post(
     settings::run(&mut context, &None, cookie_jar, host);
 
     Ok(Template::render(format!("blog/post/{}", slug), context))
+}
+
+#[get("/blog/rss.xml")]
+pub fn rss_feed() -> (ContentType, String) {
+    // Get posts
+    let mut posts: Vec<BlogPost> = read_dir("templates/blog/post")
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            let file_name = path.file_name()?.to_str()?;
+
+            let slug = file_name.strip_suffix(".html.hbs")?;
+            if slug.is_empty() || !path.is_file() {
+                return None;
+            }
+
+            let content = read_to_string(&path).ok()?;
+            let (title, date, desc) = extract_metadata(&content);
+
+            let html = extract_main_content(&content);
+
+            Some(BlogPost {
+                title,
+                slug: slug.to_string(),
+                date,
+                desc,
+                html,
+            })
+        })
+        .collect();
+
+    // Sort posts
+    posts.sort_by(|a, b| b.date.cmp(&a.date));
+
+    // Build XML
+    let mut items = String::new();
+    for post in posts {
+        let parsed_date = NaiveDate::parse_from_str(&post.date, "%Y-%m-%d")
+            .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap());
+
+        let datetime = parsed_date
+            .and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap())
+            .and_utc();
+
+        items.push_str(&format!(
+            r#"
+        <item>
+            <title>{title}</title>
+            <link>https://prieco.net/blog/{slug}</link>
+            <guid>https://prieco.net/blog/{slug}</guid>
+            <description>{desc}</description>
+            <pubDate>{date}</pubDate>
+            <content:encoded><![CDATA[{full_html}]]></content:encoded>
+        </item>"#,
+            title = post.title,
+            slug = post.slug,
+            desc = post.desc,
+            date = datetime.to_rfc2822(),
+            full_html = post.html
+        ));
+    }
+
+    // Wrap items
+    let rss_xml = format!(
+        r#"<?xml version="1.0" encoding="UTF-8" ?>
+        <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+    <channel>
+        <title>PriEco Blog</title>
+        <link>https://prieco.net/blog</link>
+        <description>News and updates from the PriEco search engine.</description>
+        {items}
+    </channel>
+</rss>"#,
+        items = items
+    );
+
+    (ContentType::XML, rss_xml)
 }
 
 fn extract_metadata(content: &str) -> (String, String, String) {
@@ -1611,4 +1692,21 @@ fn extract_metadata(content: &str) -> (String, String, String) {
     }
 
     (title, date, desc)
+}
+
+fn extract_main_content(content: &str) -> String {
+    if let Some(start_idx) = content.find(r#"<div class="content-main">"#) {
+        if let Some(end_idx) = content[start_idx..].find(r#"<div class="content-sidebar">"#) {
+            let chunk = &content[start_idx..start_idx + end_idx];
+
+            let inner_start = r#"<div class="content-main">"#.len();
+            let inner_content = &chunk[inner_start..];
+
+            if let Some(last_div) = inner_content.rfind("</div>") {
+                return inner_content[..last_div].trim().to_string();
+            }
+            return inner_content.trim().to_string();
+        }
+    }
+    String::new()
 }

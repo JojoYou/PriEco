@@ -243,7 +243,8 @@ async fn rocket() -> _ {
                 view_blob,
                 // Blog
                 blog,
-                blog_post
+                blog_post,
+                rss_feed
             ],
         )
         .mount("/static", FileServer::from("./static"))
