@@ -18,12 +18,12 @@ use std::io::{Cursor, Read};
 use std::{
     collections::HashMap,
     error::Error,
-    fs::{File, read},
+    fs::{File, read, write},
     hash::{Hash, Hasher},
     net::{Ipv4Addr, Ipv6Addr},
     ops::Range,
     path::Path,
-    str::FromStr,
+    str::{FromStr, from_utf8},
     sync::Arc,
     time::Duration as stdDuration,
 };
@@ -57,6 +57,7 @@ use ort::{
 };
 use parking_lot::{Condvar, Mutex, RwLock};
 use primp::{Client as PIMP_CLIENT, Impersonate, ImpersonateOS, redirect::Policy};
+use rand::RngCore;
 #[cfg(feature = "cuda")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use redb::{Database, ReadableDatabase, TableDefinition};
@@ -70,7 +71,6 @@ use symspell::{SymSpell, UnicodeStringStrategy};
 use tantivy::{
     Index, IndexReader, IndexWriter, ReloadPolicy,
     directory::MmapDirectory,
-    indexer::LogMergePolicy,
     schema::{
         FAST, INDEXED, IndexRecordOption, STORED, STRING, Schema, TextFieldIndexing, TextOptions,
     },
@@ -2079,14 +2079,21 @@ pub static SPELL_CHECKER: Lazy<Arc<SymSpell<UnicodeStringStrategy>>> = Lazy::new
 /*
   Analytics
 */
-pub static ANALYTICS: Lazy<AnalyticsDb> = Lazy::new(|| AnalyticsDb {
-    db: PRIECO_FJALL.meta_db.clone(),
-    ks: PRIECO_FJALL.analytics_ks.clone(),
+pub static ANALYTICS: Lazy<AnalyticsDb> = Lazy::new(|| {
+    let date = Utc::now().date_naive();
+
+    AnalyticsDb {
+        db: PRIECO_FJALL.meta_db.clone(),
+        ks: PRIECO_FJALL.analytics_ks.clone(),
+
+        salt: RwLock::new((date, generate_analytics_salt(date))),
+    }
 });
 
 pub struct AnalyticsDb {
     db: FJALL_DATABASE,
     ks: Keyspace,
+    salt: RwLock<(NaiveDate, [u8; 32])>,
 }
 
 impl AnalyticsDb {
@@ -2296,13 +2303,77 @@ impl AnalyticsDb {
             .expect("Analytics write failed");
     }
 
+    fn get_daily_salt(&self, today: NaiveDate) -> [u8; 32] {
+        {
+            let guard = self.salt.read();
+            if guard.0 == today {
+                return guard.1;
+            }
+        }
+
+        let mut guard = self.salt.write();
+
+        if guard.0 == today {
+            return guard.1;
+        }
+
+        let new_salt = generate_analytics_salt(today);
+
+        *guard = (today, new_salt);
+
+        new_salt
+    }
+
     fn fingerprint(&self, ip: &str, user_agent: &str, entity_id: &str, date: NaiveDate) -> String {
         let mut hasher = XxHash3_64::default();
-        dotenv!("SALT").hash(&mut hasher);
+        self.get_daily_salt(date).hash(&mut hasher);
         ip.hash(&mut hasher);
         user_agent.hash(&mut hasher);
         date.to_string().hash(&mut hasher);
         entity_id.hash(&mut hasher);
         format!("{:016x}", hasher.finish())
     }
+}
+
+fn generate_analytics_salt(date: NaiveDate) -> [u8; 32] {
+    let path = "analytics_daily_salt.txt";
+
+    let data = read_file(path);
+
+    let parts: Vec<&str> = data.split(':').collect();
+    if parts.len() == 2 && parts[0] == date.to_string() {
+        let mut salt = [0u8; 32];
+        let mut valid = true;
+
+        for (i, chunk) in parts[1].as_bytes().chunks(2).enumerate() {
+            if i >= 32 {
+                break;
+            }
+
+            if let Ok(str_chunk) = from_utf8(chunk) {
+                if let Ok(byte) = u8::from_str_radix(str_chunk, 16) {
+                    salt[i] = byte;
+                } else {
+                    valid = false;
+                }
+            } else {
+                valid = false;
+            }
+        }
+
+        if valid {
+            return salt;
+        }
+    }
+
+    // Generate new salt
+    let mut new_salt = [0u8; 32];
+    rand::rng().fill_bytes(&mut new_salt);
+
+    let salt_hex: String = new_salt.iter().map(|b| format!("{:02x}", b)).collect();
+    let content = format!("{}:{}", date, salt_hex);
+
+    write(path, content).expect("Failed to write daily salt file");
+
+    new_salt
 }

@@ -41,6 +41,7 @@ bincode-next = { workspace = true }
 rkyv = { workspace = true }
 primp = { workspace = true }
 dotenv_codegen = { workspace = true }
+rand = { workspace = true }
 
 [features]
 default = []
