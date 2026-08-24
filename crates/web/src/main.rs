@@ -41,7 +41,7 @@ use std::{
 */
 use env_logger::Env;
 use fjall::PersistMode;
-use ort::{Environment, GraphOptimizationLevel, InMemorySession, LoggingLevel, SessionBuilder};
+use ort::{Environment, GraphOptimizationLevel, LoggingLevel, Session, SessionBuilder};
 use rocket::{
     Request, Response,
     fairing::{AdHoc, Fairing, Info, Kind},
@@ -60,8 +60,7 @@ use crate::web::routes::{apis::*, assets::*, pages::*};
 use prieco_blob as blob;
 use prieco_core::{
     ANALYTICS, EmbeddingService, META_DECODER, PAGERANK, PRIECO_CONFIG, PRIECO_FJALL,
-    TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_MODEL,
-    VECTOR_EMBEDDING_TOKENIZER, colors, icons,
+    TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_TOKENIZER, colors, icons,
 };
 use prieco_insert::db_insert;
 use prieco_mini_crawler::mini_crawler;
@@ -358,7 +357,7 @@ fn create_tokenizer() -> Tokenizer {
 
     tokenizer
 }
-fn create_embeder() -> InMemorySession<'static> {
+fn create_embeder() -> Session {
     let environment: Arc<Environment> = match Environment::builder()
         .with_name("embedder")
         .with_log_level(LoggingLevel::Warning)
@@ -415,7 +414,8 @@ fn create_embeder() -> InMemorySession<'static> {
         }
     };
 
-    match session_builder.with_model_from_memory(VECTOR_EMBEDDING_MODEL) {
+    match session_builder.with_model_from_file("data/paraphrase-multilingual-MiniLM-L12-v2_O3.onnx")
+    {
         Ok(emb) => emb,
         Err(e) => {
             println!(

@@ -39,7 +39,7 @@ use serde_json::Value as Json_Value;
 use tantivy::{
     Term,
     collector::TopDocs,
-    query::{BooleanQuery, BoostQuery, Occur, Query, QueryParser, TermQuery, TermSetQuery},
+    query::{BooleanQuery, BoostQuery, Occur, Query, TermQuery, TermSetQuery},
     schema::{IndexRecordOption, Value},
 };
 use zstd::bulk::Decompressor;
@@ -53,7 +53,7 @@ use crate::web::functions::{
     ranking::{self, goggles::GoggleRules},
 };
 use prieco_core::{
-    META_DECODER, PRIECO_FJALL, QueryIntent,
+    META_DECODER, PRIECO_FJALL, QueryIntent, TANTIVY_QUERY_PARSER,
     globals::{
         EmbeddingService, PAGERANK, RERANKER, SearchResult, TANTIVY_INDEX, TANTIVY_READER,
         VECTOR_CENTROPOIDS, WebDocument, colors,
@@ -680,27 +680,12 @@ fn search_tantivy(
     let doc_id = schema.get_field("doc_id").ok()?;
     let domain_id_field = schema.get_field("domain_id").ok()?;
 
-    let title_field = schema.get_field("title").ok()?;
-    let description_field = schema.get_field("description").ok()?;
-    let content_field = schema.get_field("content").ok()?;
-    let keywords_field = schema.get_field("keywords").ok()?;
-
     let lang_field = schema.get_field("lang").ok()?;
     let loc_field = schema.get_field("loc").ok()?;
 
     let intent_field = schema.get_field("intent").ok()?;
 
-    let query_parser = QueryParser::for_index(
-        &TANTIVY_INDEX,
-        vec![
-            title_field,
-            description_field,
-            content_field,
-            keywords_field,
-        ],
-    );
-
-    let parsed_query = query_parser.parse_query(query_text).ok()?;
+    let parsed_query = TANTIVY_QUERY_PARSER.parse_query(query_text).ok()?;
 
     let mut clauses: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Must, parsed_query)];
 

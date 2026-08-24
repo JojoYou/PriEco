@@ -42,7 +42,6 @@ use cudarc::{
     nvrtc::compile_ptx,
 };
 use dashmap::DashSet;
-use dotenv_codegen::dotenv;
 use fjall::{
     CompressionType, Database as FJALL_DATABASE, Keyspace, KeyspaceCreateOptions,
     KvSeparationOptions, config::CompressionPolicy,
@@ -52,7 +51,7 @@ use memmap2::{Mmap, MmapOptions};
 use ndarray::{Array, Array2, CowArray, IxDyn};
 use once_cell::sync::Lazy;
 use ort::{
-    Environment, ExecutionProvider, GraphOptimizationLevel, InMemorySession, SessionBuilder, Value,
+    Environment, ExecutionProvider, GraphOptimizationLevel, Session, SessionBuilder, Value,
     tensor::OrtOwnedTensor,
 };
 use parking_lot::{Condvar, Mutex, RwLock};
@@ -71,6 +70,7 @@ use symspell::{SymSpell, UnicodeStringStrategy};
 use tantivy::{
     Index, IndexReader, IndexWriter, ReloadPolicy,
     directory::MmapDirectory,
+    query::QueryParser,
     schema::{
         FAST, INDEXED, IndexRecordOption, STORED, STRING, Schema, TextFieldIndexing, TextOptions,
     },
@@ -280,12 +280,10 @@ pub static PROXY_CLIENT: Lazy<PIMP_CLIENT> = Lazy::new(|| {
  Vector embeder
 */
 pub static VECTOR_EMBEDDING_TOKENIZER: &[u8] = include_bytes!("../../../data/tokenizer.json");
-pub static VECTOR_EMBEDDING_MODEL: &[u8] =
-    include_bytes!("../../../data/paraphrase-multilingual-MiniLM-L12-v2_O3.onnx");
 #[derive(Clone)]
 pub struct EmbeddingService {
     pub tokenizer: Arc<tokio::sync::Mutex<Tokenizer>>,
-    pub model: Arc<tokio::sync::Mutex<InMemorySession<'static>>>,
+    pub model: Arc<tokio::sync::Mutex<Session>>,
 }
 impl EmbeddingService {
     pub async fn embed_query(
@@ -684,6 +682,24 @@ pub static TANTIVY_WRITER: Lazy<Arc<Mutex<IndexWriter>>> = Lazy::new(|| {
             .writer(TANTIVY_HEAP_SIZE)
             .expect("Failed to create Tantivy V2 writer"),
     ))
+});
+
+pub static TANTIVY_QUERY_PARSER: Lazy<QueryParser> = Lazy::new(|| {
+    let schema = TANTIVY_INDEX.schema();
+    let title_field = schema.get_field("title").unwrap();
+    let description_field = schema.get_field("description").unwrap();
+    let content_field = schema.get_field("content").unwrap();
+    let keywords_field = schema.get_field("keywords").unwrap();
+
+    QueryParser::for_index(
+        &TANTIVY_INDEX,
+        vec![
+            title_field,
+            description_field,
+            content_field,
+            keywords_field,
+        ],
+    )
 });
 
 // Multilang tokenization
@@ -1187,13 +1203,12 @@ impl PageRank {
 /*
   Reranker
 */
-pub static BGE_MODEL: &[u8] = include_bytes!("../../../data/bge/model.onnx");
 pub static BGE_TOKENIZER: &[u8] = include_bytes!("../../../data/bge/tokenizer.json");
 pub static RERANKER: Lazy<Reranker> = Lazy::new(Reranker::new);
 
 pub struct Reranker {
-    session: Arc<tokio::sync::Mutex<InMemorySession<'static>>>,
-    tokenizer: Arc<tokio::sync::Mutex<Tokenizer>>,
+    pub session: Arc<tokio::sync::Mutex<Session>>,
+    pub tokenizer: Arc<tokio::sync::Mutex<Tokenizer>>,
 }
 
 impl Reranker {
@@ -1216,7 +1231,7 @@ impl Reranker {
                 },
             )])
             .expect("Failed to attach CUDA provider")
-            .with_model_from_memory(BGE_MODEL)
+            .with_model_from_file("data/model.onnx")
             .expect("Failed to load BGE model");
 
         let mut tokenizer = Tokenizer::from_bytes(BGE_TOKENIZER).unwrap();

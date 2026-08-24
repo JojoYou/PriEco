@@ -44,7 +44,6 @@ use rocket::{
 use rocket_dyn_templates::Template;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use url::Url;
 use urlencoding::{decode, encode};
 
 /*
@@ -191,9 +190,9 @@ pub struct ShortcutView {
 #[derive(FromForm)]
 pub struct ShortcutAction<'r> {
     action: &'r str,
-    shortcutID: Option<usize>,
-    shortcutName: Option<&'r str>,
-    shortcutURL: Option<&'r str>,
+    shortcut_id: Option<usize>,
+    shortcut_name: Option<&'r str>,
+    shortcut_url: Option<&'r str>,
 }
 #[post("/", data = "<form>")]
 pub fn handle_shortcuts(form: Form<ShortcutAction<'_>>, cookie_jar: &CookieJar<'_>) -> Redirect {
@@ -206,7 +205,7 @@ pub fn handle_shortcuts(form: Form<ShortcutAction<'_>>, cookie_jar: &CookieJar<'
 
     match form.action {
         "add" => {
-            if let (Some(name), Some(url)) = (form.shortcutName, form.shortcutURL) {
+            if let (Some(name), Some(url)) = (form.shortcut_name, form.shortcut_url) {
                 if items.is_empty() {
                     items.push("dummy=dummy".to_string());
                 }
@@ -222,7 +221,7 @@ pub fn handle_shortcuts(form: Form<ShortcutAction<'_>>, cookie_jar: &CookieJar<'
         }
         "edit" => {
             if let (Some(id), Some(name), Some(url)) =
-                (form.shortcutID, form.shortcutName, form.shortcutURL)
+                (form.shortcut_id, form.shortcut_name, form.shortcut_url)
             {
                 if id < items.len() {
                     let final_url = if url.starts_with("http://") || url.starts_with("https://") {
@@ -236,7 +235,7 @@ pub fn handle_shortcuts(form: Form<ShortcutAction<'_>>, cookie_jar: &CookieJar<'
             }
         }
         "delete" => {
-            if let Some(id) = form.shortcutID {
+            if let Some(id) = form.shortcut_id {
                 if id < items.len() {
                     items.remove(id);
                 }

@@ -341,7 +341,7 @@ async fn proxy_request(
 
         response = match request_builder.send().await {
             Ok(response) => response,
-            Err(e) => {
+            Err(_) => {
                 return Err(Status::BadGateway);
             }
         };
