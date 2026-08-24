@@ -42,6 +42,7 @@ use cudarc::{
     nvrtc::compile_ptx,
 };
 use dashmap::DashSet;
+use dotenv_codegen::dotenv;
 use fjall::{
     CompressionType, Database as FJALL_DATABASE, Keyspace, KeyspaceCreateOptions,
     KvSeparationOptions, config::CompressionPolicy,
@@ -691,7 +692,7 @@ pub static TANTIVY_QUERY_PARSER: Lazy<QueryParser> = Lazy::new(|| {
     let content_field = schema.get_field("content").unwrap();
     let keywords_field = schema.get_field("keywords").unwrap();
 
-    QueryParser::for_index(
+    let mut parser = QueryParser::for_index(
         &TANTIVY_INDEX,
         vec![
             title_field,
@@ -699,7 +700,11 @@ pub static TANTIVY_QUERY_PARSER: Lazy<QueryParser> = Lazy::new(|| {
             content_field,
             keywords_field,
         ],
-    )
+    );
+
+    parser.set_conjunction_by_default();
+
+    parser
 });
 
 // Multilang tokenization
@@ -1277,7 +1282,6 @@ impl Reranker {
 
         let scores = tokio::task::spawn_blocking(
             move || -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
-                // 1. Lock the tokenizer (Only 1 thread can tokenize at a time)
                 let tokenizer = tokio::runtime::Handle::current().block_on(tokenizer_arc.lock());
 
                 let batch_size = passages.len();
