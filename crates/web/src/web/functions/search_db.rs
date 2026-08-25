@@ -564,7 +564,7 @@ pub async fn run_json(
     results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
 
     // PageRank
-    /*let pr_candidates = results.len().min(PAGERANK_CUTOFF);
+    let pr_candidates = results.len().min(PAGERANK_CUTOFF);
 
     let mut pagerank_time_total: f32 = 0.0;
     if pr_candidates > 0 {
@@ -578,7 +578,7 @@ pub async fn run_json(
 
         results[..pr_candidates]
             .sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
-    }*/
+    }
 
     // RERANKER
     let mut rerank_time_total: f32 = 0.0;
@@ -604,7 +604,10 @@ pub async fn run_json(
         results[..nn_candidates]
             .sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
     }
-    println!("Rerank: {}s", rerank_time_total);
+    println!(
+        "PageRank: {}s\nRerank: {}s",
+        pagerank_time_total, rerank_time_total
+    );
 
     // Cap result count from a single domain
     if !query.contains("site:") {
