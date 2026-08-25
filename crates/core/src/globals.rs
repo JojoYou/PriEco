@@ -1212,8 +1212,8 @@ pub static BGE_TOKENIZER: &[u8] = include_bytes!("../../../data/bge/tokenizer.js
 pub static RERANKER: Lazy<Reranker> = Lazy::new(Reranker::new);
 
 pub struct Reranker {
-    pub session: Arc<tokio::sync::Mutex<Session>>,
-    pub tokenizer: Arc<tokio::sync::Mutex<Tokenizer>>,
+    pub session: Arc<Session>,
+    pub tokenizer: Arc<Tokenizer>,
 }
 
 impl Reranker {
@@ -1260,8 +1260,8 @@ impl Reranker {
         };
 
         Self {
-            session: Arc::new(tokio::sync::Mutex::new(session)),
-            tokenizer: Arc::new(tokio::sync::Mutex::new(tokenizer)),
+            session: Arc::new(session),
+            tokenizer: Arc::new(tokenizer),
         }
     }
 
@@ -1275,72 +1275,48 @@ impl Reranker {
         }
 
         let query = query.to_string();
-        let passages: Vec<String> = passages.to_vec();
+        let passages = passages.to_vec();
 
-        let session_arc = self.session.clone();
-        let tokenizer_arc = self.tokenizer.clone();
+        let session = self.session.clone();
+        let tokenizer = self.tokenizer.clone();
 
         let scores = tokio::task::spawn_blocking(
             move || -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
-                let tokenizer = tokio::runtime::Handle::current().block_on(tokenizer_arc.lock());
-
                 let batch_size = passages.len();
+
                 let input_pairs: Vec<(&str, &str)> = passages
                     .iter()
                     .map(|p| (query.as_str(), p.as_str()))
                     .collect();
+
                 let encodings = tokenizer
                     .encode_batch(input_pairs, true)
                     .map_err(|e| e.to_string())?;
+
                 let seq_len = encodings[0].get_ids().len();
 
                 let mut ids = Vec::with_capacity(batch_size * seq_len);
                 let mut mask = Vec::with_capacity(batch_size * seq_len);
 
                 for enc in &encodings {
-                    ids.extend(enc.get_ids().iter().map(|&x| x as i64));
-                    mask.extend(enc.get_attention_mask().iter().map(|&x| x as i64));
+                    ids.extend(enc.get_ids().iter().map(|&x| x as i32));
+                    mask.extend(enc.get_attention_mask().iter().map(|&x| x as i32));
                 }
 
-                drop(tokenizer);
+                let input_ids_arr = Array2::from_shape_vec((batch_size, seq_len), ids).unwrap();
+                let attention_mask_arr =
+                    Array2::from_shape_vec((batch_size, seq_len), mask).unwrap();
 
-                let input_ids =
-                    CowArray::from(Array2::from_shape_vec((batch_size, seq_len), ids).unwrap())
-                        .into_dyn();
-                let attention_mask =
-                    CowArray::from(Array2::from_shape_vec((batch_size, seq_len), mask).unwrap())
-                        .into_dyn();
+                let input_ids = CowArray::from(input_ids_arr).into_dyn();
+                let attention_mask = CowArray::from(attention_mask_arr).into_dyn();
 
-                let session = tokio::runtime::Handle::current().block_on(session_arc.lock());
+                let input_ids_val = Value::from_array(session.allocator(), &input_ids).unwrap();
+                let attention_mask_val =
+                    Value::from_array(session.allocator(), &attention_mask).unwrap();
 
-                let mut io_binding = session.bind().unwrap();
+                let outputs = session.run(vec![input_ids_val, attention_mask_val])?;
 
-                io_binding
-                    .bind_input(
-                        "input_ids",
-                        Value::from_array(session.allocator(), &input_ids).unwrap(),
-                    )
-                    .unwrap();
-                io_binding
-                    .bind_input(
-                        "attention_mask",
-                        Value::from_array(session.allocator(), &attention_mask).unwrap(),
-                    )
-                    .unwrap();
-
-                let mem_info = ort::MemoryInfo::new(
-                    ort::AllocationDevice::CPU,
-                    0,
-                    ort::AllocatorType::Arena,
-                    ort::MemType::Default,
-                )
-                .unwrap();
-
-                io_binding.bind_output("logits", mem_info).unwrap();
-                session.run_with_binding(&io_binding).unwrap();
-
-                let outputs = io_binding.outputs().unwrap();
-                let scores_tensor = outputs["logits"].try_extract::<f32>().unwrap();
+                let scores_tensor = outputs[0].try_extract::<f32>()?;
                 let view = scores_tensor.view();
 
                 let mut results = Vec::with_capacity(batch_size);
