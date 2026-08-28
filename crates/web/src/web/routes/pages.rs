@@ -981,7 +981,7 @@ pub async fn submit_post(form: Form<SubmitForm>) -> String {
 
     let client = reqwest::Client::new();
     let res = client
-        .post("https://crawler.prieco.net/web-discovery")
+        .post("http://0.0.0.0:8090/user-submission")
         .json(&payload)
         .send()
         .await;

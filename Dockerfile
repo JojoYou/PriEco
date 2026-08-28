@@ -34,7 +34,7 @@ COPY data/bge/model.onnx     data/bge/model.onnx
 COPY data/bge/tokenizer.json data/bge/tokenizer.json
 COPY data/domains.txt        data/domains.txt
 COPY data/tokenizer.json     data/tokenizer.json
-COPY data/model_int8.onnx    data/model_int8.onnx
+COPY data/paraphrase-multilingual-MiniLM-L12-v2_O3.onnx    data/paraphrase-multilingual-MiniLM-L12-v2_O3.onnx
 
 # Sources
 COPY crates/ crates/

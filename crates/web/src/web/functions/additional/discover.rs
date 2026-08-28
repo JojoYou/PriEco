@@ -176,7 +176,7 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
             });
 
             if let Err(e) = CLIENT
-                .post("http://0.0.0.0:8090/web-discovery")
+                .post("http://0.0.0.0:8090/user-submission")
                 .json(&payload)
                 .send()
                 .await
