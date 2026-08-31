@@ -128,6 +128,9 @@ async fn rocket() -> _ {
         .filter_module("markup5ever", log::LevelFilter::Error)
         .init();
 
+    // Load .env
+    dotenvy::dotenv().ok();
+
     // Print banner
     println!(
         "{}{}{}",

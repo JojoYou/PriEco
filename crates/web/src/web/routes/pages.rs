@@ -24,7 +24,6 @@ use std::{
   Import external libraries
 */
 use chrono::{NaiveDate, NaiveTime, Utc};
-use dotenv_codegen::dotenv;
 use prieco_blob::decode::decode_blob_to_html_rendered;
 use rocket::{
     Request, Response, State,
@@ -1026,6 +1025,24 @@ pub struct RoadmapVote {
 }
 #[post("/roadmap/vote", format = "json", data = "<vote>")]
 pub async fn submit_roadmap_vote(vote: Json<RoadmapVote>) -> Status {
+    let signal_bot_number = match std::env::var("SIGNAL_BOT_NUMBER") {
+        Ok(key) => key,
+        Err(_) => {
+            eprintln!("Warning: SIGNAL_BOT_NUMBER is missing!");
+
+            return Status::InternalServerError;
+        }
+    };
+
+    let signal_recipient_number = match std::env::var("SIGNAL_RECIPIENT_NUMBER") {
+        Ok(key) => key,
+        Err(_) => {
+            eprintln!("Warning: SIGNAL_RECIPIENT_NUMBER is missing!");
+
+            return Status::InternalServerError;
+        }
+    };
+
     let vote_emoji = if vote.is_like { "👍" } else { "👎" };
     let signal_message = format!(
         "**PriEco Roadmap Vote**\n**Feature:** {}\n**Vote:** {}",
@@ -1034,8 +1051,8 @@ pub async fn submit_roadmap_vote(vote: Json<RoadmapVote>) -> Status {
 
     let payload = serde_json::json!({
         "message": signal_message,
-        "number": dotenv!("SIGNAL_BOT_NUMBER"),
-        "recipients": [dotenv!("SIGNAL_RECIPIENT_NUMBER")],
+        "number": signal_bot_number,
+        "recipients": [signal_recipient_number],
         "text_mode": "styled",
     });
 

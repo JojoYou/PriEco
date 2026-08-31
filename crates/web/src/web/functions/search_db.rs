@@ -826,7 +826,10 @@ fn fetch_documents(
     let fetched_docs: HashMap<u64, WebDocument> = ids_to_fetch
         .par_chunks(chunk_size)
         .map_init(
-            || Decompressor::with_prepared_dictionary(&*META_DECODER).unwrap(),
+            || match &*META_DECODER {
+                Some(decoder) => Decompressor::with_prepared_dictionary(decoder).unwrap(),
+                None => Decompressor::new().unwrap(),
+            },
             |decompressor, chunk| {
                 let mut local_docs = Vec::with_capacity(chunk.len());
 

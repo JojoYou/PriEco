@@ -17,4 +17,13 @@ services:
       - ROCKET_PORT=8000
     env_file:
       - .env
+
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+
+    stdin_open: true
+    tty: true
+
     restart: unless-stopped

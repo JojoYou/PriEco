@@ -18,7 +18,7 @@ use std::io::{Cursor, Read};
 use std::{
     collections::HashMap,
     error::Error,
-    fs::{File, read, write},
+    fs::{File, write},
     hash::{Hash, Hasher},
     net::{Ipv4Addr, Ipv6Addr},
     ops::Range,
@@ -42,7 +42,6 @@ use cudarc::{
     nvrtc::compile_ptx,
 };
 use dashmap::DashSet;
-use dotenv_codegen::dotenv;
 use fjall::{
     CompressionType, Database as FJALL_DATABASE, Keyspace, KeyspaceCreateOptions,
     KvSeparationOptions, config::CompressionPolicy,
@@ -242,9 +241,12 @@ pub static PRIECO_CONFIG: Lazy<PriEcoConfig> = Lazy::new(|| set_up::set_up_wizar
 pub struct PriEcoConfig {
     pub ip: String,
     pub port: i32,
+
     pub tantivy_path: String,
     pub meta_path: String,
     pub vector_path: String,
+    pub blob_path: String,
+
     pub worker_id: String,
     pub worker_concurrent: u32,
 }
@@ -542,10 +544,27 @@ pub static COUNTRY_TO_LANG: Lazy<Arc<AHashMap<&'static str, &'static str>>> = La
   PriEco Storage
   Description: FJALL key-value storage. Stores results meta data and html blobs
 */
-pub static META_DICTIONARY: Lazy<Vec<u8>> =
-    Lazy::new(|| read("idx/prieco_zstd.dict").expect("Failed to load zstd dictionary into memory"));
-pub static META_DECODER: Lazy<DecoderDictionary<'static>> =
-    Lazy::new(|| DecoderDictionary::copy(&*META_DICTIONARY));
+pub static META_DICTIONARY: Lazy<Option<Vec<u8>>> = Lazy::new(|| {
+    let path =
+        std::env::var("PRIECO_ZSTD_DICT").unwrap_or_else(|_| "idx/prieco_zstd.dict".to_string());
+
+    match std::fs::read(&path) {
+        Ok(bytes) => {
+            println!("Loaded ZSTD dictionary from {}", path);
+            Some(bytes)
+        }
+        Err(_) => {
+            eprintln!("Warning: ZSTD dictionary not found. Proceeding with standard compression.");
+            None
+        }
+    }
+});
+
+pub static META_DECODER: Lazy<Option<DecoderDictionary<'static>>> = Lazy::new(|| {
+    META_DICTIONARY
+        .as_ref()
+        .map(|dict_bytes| DecoderDictionary::copy(dict_bytes))
+});
 
 pub const BLOB_IMPORT_DIR: &str = "/mnt/hdd/imp_blob/";
 
@@ -592,7 +611,7 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
     let analytics_ks = meta_db.keyspace("analytics", || analytics_opts).unwrap();
 
     // Blob storage
-    let blob_db = FJALL_DATABASE::builder(Path::new("/mnt/ssd/blobs"))
+    let blob_db = FJALL_DATABASE::builder(Path::new(&PRIECO_CONFIG.blob_path))
         .worker_threads(2)
         .cache_size(1 * 1024 * 1024 * 1024)
         .open()

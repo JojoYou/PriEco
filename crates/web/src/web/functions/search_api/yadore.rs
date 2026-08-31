@@ -1,4 +1,3 @@
-use dotenv_codegen::dotenv;
 use reqwest::Client;
 use serde_json::Value;
 use std::time::Duration;
@@ -10,6 +9,15 @@ pub async fn run(
     query: &str,
     loc: &str,
 ) -> Result<Vec<WebScrollResult>, Box<dyn std::error::Error + Send + Sync>> {
+    let api_key = match std::env::var("YADORE_API_KEY") {
+        Ok(key) => key,
+        Err(_) => {
+            eprintln!("Warning: YADORE_API_KEY is missing!");
+
+            return Err("NEWS_API_KEY is missing".into());
+        }
+    };
+
     let client = match Client::builder()
         .user_agent("PriEco/1.0.0 ( support@prieco.net )")
         .timeout(Duration::from_secs(2))
@@ -33,7 +41,7 @@ pub async fn run(
     .get(&format!(
         "https://api.yadore.com/v2/offer?market={}&keyword={}&precision=fuzzy&sort=rel_desc&limit=20",
         loc, query
-    ))   .header("API-Key", dotenv!("YADORE_API_KEY")))
+    ))   .header("API-Key", api_key))
     .await;
     let yadore_json = match yadore_option {
         Some(json) => json,

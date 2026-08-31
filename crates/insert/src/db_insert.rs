@@ -102,7 +102,10 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     let safe_s_field = schema.get_field("safe_s").unwrap();
     let intent_field = schema.get_field("intent").unwrap();
 
-    let mut compressor = zstd::bulk::Compressor::with_dictionary(3, &META_DICTIONARY)?;
+    let mut compressor = match &*META_DICTIONARY {
+        Some(dict) => zstd::bulk::Compressor::with_dictionary(3, dict)?,
+        None => zstd::bulk::Compressor::new(3)?,
+    };
 
     // Process files
     let mut vector_idx_buffer: HashMap<u64, Vec<f32>> = HashMap::with_capacity(1_000_000);

@@ -17,7 +17,6 @@
 /*
   Import external libraries
 */
-use dotenv_codegen::dotenv;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -59,6 +58,15 @@ pub async fn run(
     loc: &str,
     count: u32,
 ) -> Result<Vec<Article>, Box<dyn std::error::Error + Send + Sync>> {
+    let news_api_key = match std::env::var("NEWS_API_KEY") {
+        Ok(key) => key,
+        Err(_) => {
+            eprintln!("Warning: NEWS_API_KEY is missing!");
+
+            return Err("NEWS_API_KEY is missing".into());
+        }
+    };
+
     let client = Client::new();
 
     let final_lang = if lang == "all" { "en" } else { lang };
@@ -76,7 +84,7 @@ pub async fn run(
             ("country", final_loc.as_str()), // .as_str() keeps the array types uniform
             ("page_number", "1"),
             ("page_size", &count.to_string()),
-            ("apiKey", dotenv!("NEWS_API_KEY")),
+            ("apiKey", &news_api_key),
         ])
         .send()
         .await?

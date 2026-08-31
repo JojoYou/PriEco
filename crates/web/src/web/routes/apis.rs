@@ -23,7 +23,6 @@ use std::{
 /*
   Import external libraries
 */
-use dotenv_codegen::dotenv;
 use image::GenericImageView;
 use rocket::{
     FromForm, State,
@@ -67,7 +66,42 @@ pub async fn api(
 
     embedding_service: &State<EmbeddingService>,
 ) -> Json<Vec<RocketValue>> {
-    if ![dotenv!("RESULTI_API_KEY"), dotenv!("URUKY_API_KEY")].contains(&a) {
+    let resulti_api_key = match std::env::var("RESULTI_API_KEY") {
+        Ok(key) => key,
+        Err(_) => {
+            eprintln!("Warning: RESULTI_API_KEY is missing!");
+
+            return Json(vec![]);
+        }
+    };
+
+    let polar_api_key = match std::env::var("POLAR_API_KEY") {
+        Ok(key) => key,
+        Err(_) => {
+            eprintln!("Warning: POLAR_API_KEY is missing!");
+
+            return Json(vec![]);
+        }
+    };
+    // Uruky
+    let uruky_api_key = match std::env::var("URUKY_API_KEY") {
+        Ok(key) => key,
+        Err(_) => {
+            eprintln!("Warning: URUKY_API_KEY is missing!");
+
+            return Json(vec![]);
+        }
+    };
+    let uruky_id = match std::env::var("URUKY_ID") {
+        Ok(key) => key,
+        Err(_) => {
+            eprintln!("Warning: URUKY_ID is missing!");
+
+            return Json(vec![]);
+        }
+    };
+
+    if ![&resulti_api_key, &uruky_api_key].contains(&&a.to_string()) {
         return Json(vec![]);
     }
 
@@ -93,19 +127,16 @@ pub async fn api(
         })
         .collect();
 
-    if !results.is_empty() && a == dotenv!("URUKY_API_KEY") {
+    if !results.is_empty() && a == uruky_api_key {
         if let Err(e) = CLIENT
             .post("https://api.polar.sh/v1/events/ingest")
-            .header(
-                "Authorization",
-                format!("Bearer {}", dotenv!("POLAR_API_KEY")),
-            )
+            .header("Authorization", format!("Bearer {}", polar_api_key))
             .header("Content-Type", "application/json")
             .json(&json!({
                 "events": [
                     {
                         "name": "api_call",
-                        "external_customer_id": dotenv!("URUKY_ID")
+                        "external_customer_id": uruky_id
                     }
                 ]
             }))
@@ -559,10 +590,28 @@ pub struct RoadmapFeedback<'r> {
 
 #[post("/submit_msg", data = "<feedback>")]
 pub async fn send_signal(feedback: Form<RoadmapFeedback<'_>>) -> Redirect {
+    let signal_bot_number = match std::env::var("SIGNAL_BOT_NUMBER") {
+        Ok(key) => key,
+        Err(_) => {
+            eprintln!("Warning: SIGNAL_BOT_NUMBER is missing!");
+
+            return Redirect::to(feedback.return_path.to_string());
+        }
+    };
+
+    let signal_recipient_number = match std::env::var("SIGNAL_RECIPIENT_NUMBER") {
+        Ok(key) => key,
+        Err(_) => {
+            eprintln!("Warning: SIGNAL_RECIPIENT_NUMBER is missing!");
+
+            return Redirect::to(feedback.return_path.to_string());
+        }
+    };
+
     let payload = serde_json::json!({
         "message": feedback.message,
-        "number": dotenv!("SIGNAL_BOT_NUMBER"),
-        "recipients": [dotenv!("SIGNAL_RECIPIENT_NUMBER")],
+        "number": signal_bot_number,
+        "recipients": [signal_recipient_number],
         "text_mode": "styled",
     });
 

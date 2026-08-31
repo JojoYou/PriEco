@@ -11,7 +11,7 @@
 //!  TODO:
 
 use std::{
-    fs::{read_to_string, write},
+    fs::{create_dir_all, read_to_string, write},
     io::{Write, stdin, stdout},
     net::IpAddr,
     process::exit,
@@ -27,9 +27,12 @@ pub fn set_up_wizard() -> PriEcoConfig {
     let mut conf = PriEcoConfig {
         ip: String::from("0.0.0.0"),
         port: 80,
+
         tantivy_path: String::from("idx/tantivy"),
         meta_path: String::from("idx/meta"),
         vector_path: String::from("idx/vectors"),
+        blob_path: String::from("idx/blob"),
+
         worker_id: String::new(),
         worker_concurrent: 1,
     };
@@ -91,9 +94,17 @@ pub fn set_up_wizard() -> PriEcoConfig {
         &conf.vector_path,
     );
 
+    conf.blob_path = ask(
+        &format!(
+            "\n🗨 6/{}: Path for Blob storage (default {}):",
+            TOTAL_QUESTIONS, &conf.blob_path
+        ),
+        &conf.blob_path,
+    );
+
     conf.worker_id = ask(
         &format!(
-            "\n🗨 6/{}: Worker ID (leave empty if you dont have one):",
+            "\n🗨 7/{}: Worker ID (leave empty if you dont have one):",
             TOTAL_QUESTIONS
         ),
         &conf.worker_id,
@@ -101,7 +112,7 @@ pub fn set_up_wizard() -> PriEcoConfig {
 
     conf.worker_concurrent = match ask(
         &format!(
-            "\n🗨 7/{}: Worker Condurent Website downloads (default: 1):",
+            "\n🗨 8/{}: Worker Condurent Website downloads (default: 1):",
             TOTAL_QUESTIONS
         ),
         &conf.worker_concurrent.to_string(),
@@ -133,6 +144,9 @@ pub fn set_up_wizard() -> PriEcoConfig {
             );
         }
     }
+
+    create_dirs(&conf);
+
     conf
 }
 
@@ -160,4 +174,25 @@ fn load_config() -> Option<PriEcoConfig> {
     let data = read_to_string(CONFIG_FILE).ok()?;
     let config: PriEcoConfig = serde_json::from_str(&data).ok()?;
     Some(config)
+}
+
+fn create_dirs(conf: &PriEcoConfig) {
+    let paths = [
+        &conf.tantivy_path,
+        &conf.meta_path,
+        &conf.vector_path,
+        &conf.blob_path,
+    ];
+
+    for path in paths {
+        if let Err(e) = create_dir_all(path) {
+            eprintln!(
+                "{}Warning: Failed to create directory '{}': {}{}",
+                colors::YELLOW,
+                path,
+                e,
+                colors::RESET
+            );
+        }
+    }
 }

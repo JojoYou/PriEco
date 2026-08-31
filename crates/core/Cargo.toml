@@ -40,15 +40,15 @@ fst = { workspace = true }
 bincode-next = { workspace = true }
 rkyv = { workspace = true }
 primp = { workspace = true }
-dotenv_codegen = { workspace = true }
+dotenvy = { workspace = true }
 rand = { workspace = true }
 
 [features]
 default = []
-cuda = ["dep:cudarc"]
+cuda = ["dep:cudarc", "ort/cuda"]
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-ort = { workspace = true, features = ["cuda", "load-dynamic"] }
+ort = { workspace = true, features = ["load-dynamic"] }
 cudarc = { workspace = true, optional = true, features = ["cublas", "nvrtc", "cuda-version-from-build-system"] }
 
 [target.'cfg(not(target_arch = "x86_64"))'.dependencies]

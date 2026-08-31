@@ -48,3 +48,9 @@ Amazing additional benefits are:
 
 - Self-hostability of nodes
 - Resiliance against cencorship
+
+## Financial sustainability
+
+PriEco is extremely cheap to run, it is perfectly sustainable on just a few **dolars a year**
+
+That said

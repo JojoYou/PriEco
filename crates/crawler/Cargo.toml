@@ -28,5 +28,5 @@ regex = { workspace = true }
 whatlang = { workspace = true }
 dashmap = { workspace = true }
 maxminddb = { workspace = true }
-dotenv_codegen = { workspace = true }
+dotenvy = { workspace = true }
 primp = { workspace = true }

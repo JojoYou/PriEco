@@ -29,12 +29,7 @@ RUN cargo build --release 2>/dev/null || true
 RUN find target/release -name "*.d" -delete
 
 # Data files
-COPY data/ivf/centroids.bin  data/ivf/centroids.bin
-COPY data/bge/model.onnx     data/bge/model.onnx
-COPY data/bge/tokenizer.json data/bge/tokenizer.json
-COPY data/domains.txt        data/domains.txt
-COPY data/tokenizer.json     data/tokenizer.json
-COPY data/paraphrase-multilingual-MiniLM-L12-v2_O3.onnx    data/paraphrase-multilingual-MiniLM-L12-v2_O3.onnx
+COPY data/ data/
 
 # Sources
 COPY crates/ crates/
@@ -43,27 +38,31 @@ COPY .env    .env
 RUN cargo build --release
 
 # Runtime
-FROM debian:bookworm-slim AS runtime
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04 AS runtime
 
+# Install required system libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates libssl3 libzstd1 libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
+RUN useradd -m -u 1001 prieco
+
 WORKDIR /app
 
-COPY --from=builder /build/target/release/prieco_web ./prieco_web
+RUN chown -R prieco:prieco /app
 
-# Libs
-COPY libs/ /usr/local/lib/
-RUN ln -sf /usr/local/lib/libonnxruntime.so.1.16.0 /usr/local/lib/libonnxruntime.so.1.16.3 && \
-    ln -sf /usr/local/lib/libonnxruntime.so.1.16.3 /usr/local/lib/libonnxruntime.so && \
-    ldconfig
+COPY --chown=prieco:prieco --from=builder /build/target/release/prieco_web ./prieco_web
+COPY --chown=prieco:prieco --from=builder /build/target/release/libonnxruntime*.so* /usr/local/lib/
+RUN ldconfig
 
-# Assets
-COPY templates/ ./templates/
-COPY static/    ./static/
+ENV ORT_STRATEGY=system
+ENV ORT_DYLIB_PATH=/usr/local/lib/libonnxruntime.so
 
-RUN useradd -m -u 1001 prieco
+COPY --chown=prieco:prieco data/      ./data/
+COPY --chown=prieco:prieco templates/ ./templates/
+COPY --chown=prieco:prieco static/    ./static/
+
+# 4. Finally, switch to the user
 USER prieco
 
 ENTRYPOINT ["./prieco_web"]

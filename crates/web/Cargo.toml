@@ -21,7 +21,7 @@ rocket = { workspace = true }
 rocket_dyn_templates = { workspace = true }
 tikv-jemallocator = { workspace = true }
 num_cpus = { workspace = true }
-dotenv_codegen = { workspace = true }
+dotenvy = { workspace = true }
 reqwest = { workspace = true }
 rand = { workspace = true }
 socket2 = { workspace = true }
