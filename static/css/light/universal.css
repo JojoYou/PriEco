@@ -1,7 +1,10 @@
 body {
-  background: #f2f4f7;
+    background: #f2f4f7;
 }
 .footer-content-right div,
 .footer-content-left a {
-  background: #fff;
+    background: #fff;
+}
+.link {
+    color: #1a0dab;
 }

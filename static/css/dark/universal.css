@@ -1,13 +1,16 @@
 body {
-  background: #181a1b;
+    background: #181a1b;
 }
 .footer {
-  color: #fff;
+    color: #fff;
 }
 .footer-content-right div,
 .footer-content-left a {
-  background: #202124;
+    background: #202124;
 }
 .filter-img {
-  filter: brightness(0) invert(1);
+    filter: brightness(0) invert(1);
+}
+.link {
+    color: #8ab4f8;
 }
