@@ -33,7 +33,6 @@ COPY data/ data/
 
 # Sources
 COPY crates/ crates/
-COPY .env    .env
 
 RUN cargo build --release
 
