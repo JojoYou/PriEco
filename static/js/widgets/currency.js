@@ -1,5 +1,3 @@
-console.log("Here");
-
 (function () {
   if (window.__fxWidgetInit) return;
   window.__fxWidgetInit = true;

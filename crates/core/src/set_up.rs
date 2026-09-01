@@ -20,7 +20,7 @@ use std::{
 use crate::globals::{PriEcoConfig, colors};
 use crate::helpers::file_exists;
 
-const CONFIG_FILE: &str = "settings.conf";
+const CONFIG_FILE: &str = "data/settings.conf";
 const TOTAL_QUESTIONS: usize = 7;
 
 pub fn set_up_wizard() -> PriEcoConfig {
@@ -49,7 +49,7 @@ pub fn set_up_wizard() -> PriEcoConfig {
         "Let's get PriEco set up. I am going to ask you {} questions. I promise it's simple.",
         TOTAL_QUESTIONS
     );
-    conf.ip=  match ask(&format!(
+    conf.ip=  match check_env("PRIECO_IP",&format!(
  "\n🗨 1/{}: Tell me my IP address. You can use 0.0.0.0 or 127.0.0.1 or something else.\n0.0.0.0 (Default if you just press enter) (Let's anyone on your locale network connect to this instance)\n127.0.0.1 (Connection can be established only from current device)\nYou will want to link public domain to this regardless\n\nWhat is my IP:",TOTAL_QUESTIONS),
  &conf.ip,
 ).parse::<IpAddr
@@ -60,7 +60,7 @@ pub fn set_up_wizard() -> PriEcoConfig {
 
            ;
 
-    conf.port=match ask(&format!(
+    conf.port=match check_env("PRIECO_PORT",&format!(
         "\n🗨 2/{}: Tell me my PORT. This can be anything, usually 80 (default) or 443 or 8080 is used\nWhat is my PORT:",TOTAL_QUESTIONS),
         &conf.port.to_string(),
     )  .trim()
@@ -70,7 +70,8 @@ pub fn set_up_wizard() -> PriEcoConfig {
         Err(_) =>{println!("{}Error: Invalid PORT. Please enter a valid NUMBER.{}", colors::RED, colors::RESET); exit(1)},
     };
 
-    conf.tantivy_path = ask(
+    conf.tantivy_path = check_env(
+        "PRIECO_TANTIVY",
         &format!(
             "\n🗨 3/{}: Path for Tantivy index (default {}):",
             TOTAL_QUESTIONS, &conf.tantivy_path
@@ -78,7 +79,8 @@ pub fn set_up_wizard() -> PriEcoConfig {
         &conf.tantivy_path,
     );
 
-    conf.meta_path = ask(
+    conf.meta_path = check_env(
+        "PRIECO_META",
         &format!(
             "\n🗨 4/{}: Path for LMDB database (default {}):",
             TOTAL_QUESTIONS, &conf.meta_path
@@ -86,7 +88,8 @@ pub fn set_up_wizard() -> PriEcoConfig {
         &conf.meta_path,
     );
 
-    conf.vector_path = ask(
+    conf.vector_path = check_env(
+        "PRIECO_VECTOR",
         &format!(
             "\n🗨 5/{}: Path for Vector index (default {}):",
             TOTAL_QUESTIONS, &conf.vector_path
@@ -94,7 +97,8 @@ pub fn set_up_wizard() -> PriEcoConfig {
         &conf.vector_path,
     );
 
-    conf.blob_path = ask(
+    conf.blob_path = check_env(
+        "PRIECO_BLOB",
         &format!(
             "\n🗨 6/{}: Path for Blob storage (default {}):",
             TOTAL_QUESTIONS, &conf.blob_path
@@ -102,7 +106,8 @@ pub fn set_up_wizard() -> PriEcoConfig {
         &conf.blob_path,
     );
 
-    conf.worker_id = ask(
+    conf.worker_id = check_env(
+        "PRIECO_ID",
         &format!(
             "\n🗨 7/{}: Worker ID (leave empty if you dont have one):",
             TOTAL_QUESTIONS
@@ -110,7 +115,8 @@ pub fn set_up_wizard() -> PriEcoConfig {
         &conf.worker_id,
     );
 
-    conf.worker_concurrent = match ask(
+    conf.worker_concurrent = match check_env(
+        "PRIECO_WORKERS",
         &format!(
             "\n🗨 8/{}: Worker Condurent Website downloads (default: 1):",
             TOTAL_QUESTIONS
@@ -148,6 +154,15 @@ pub fn set_up_wizard() -> PriEcoConfig {
     create_dirs(&conf);
 
     conf
+}
+
+fn check_env(env_key: &str, prompt: &str, default: &str) -> String {
+    if let Ok(val) = std::env::var(env_key) {
+        println!("Loaded {} from environment.", env_key);
+        return val;
+    }
+
+    ask(prompt, default)
 }
 
 /* Helper functions */
