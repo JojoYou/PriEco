@@ -12,7 +12,8 @@
 }
 .search_button img,
 .btn_del_query img,
-.open-settings-btn img {
+.open-settings-btn img,
+.scroll_down img {
     filter: brightness(0) invert(1);
 }
 
@@ -21,6 +22,12 @@
     background: #202124;
 }
 
+h1,
+li,
+th,
+td,
+.answers,
+.question,
 .shortcutEditBtn,
 .calculator button,
 .weatherCsetting,
