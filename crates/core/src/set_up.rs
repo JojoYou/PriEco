@@ -14,6 +14,7 @@ use std::{
     fs::{create_dir_all, read_to_string, write},
     io::{Write, stdin, stdout},
     net::IpAddr,
+    path::Path,
     process::exit,
 };
 
@@ -137,6 +138,8 @@ pub fn set_up_wizard() -> PriEcoConfig {
         }
     };
 
+    create_dirs(&conf);
+
     match save_config(&conf) {
         Ok(_) => {
             println!("{}Configuration was saved!{}", colors::GREEN, colors::RESET);
@@ -150,8 +153,6 @@ pub fn set_up_wizard() -> PriEcoConfig {
             );
         }
     }
-
-    create_dirs(&conf);
 
     conf
 }
@@ -192,19 +193,25 @@ fn load_config() -> Option<PriEcoConfig> {
 }
 
 fn create_dirs(conf: &PriEcoConfig) {
-    let paths = [
-        &conf.tantivy_path,
-        &conf.meta_path,
-        &conf.vector_path,
-        &conf.blob_path,
+    let mut paths: Vec<&Path> = vec![
+        std::path::Path::new(&conf.tantivy_path),
+        std::path::Path::new(&conf.meta_path),
+        std::path::Path::new(&conf.vector_path),
+        std::path::Path::new(&conf.blob_path),
     ];
+
+    if let Some(parent) = std::path::Path::new(CONFIG_FILE).parent() {
+        if !parent.as_os_str().is_empty() {
+            paths.push(parent);
+        }
+    }
 
     for path in paths {
         if let Err(e) = create_dir_all(path) {
             eprintln!(
                 "{}Warning: Failed to create directory '{}': {}{}",
                 colors::YELLOW,
-                path,
+                path.display(),
                 e,
                 colors::RESET
             );
