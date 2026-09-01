@@ -185,6 +185,7 @@ form.suggestions-active .search_button::before {
     width: 100%;
     box-sizing: border-box;
     padding: 0 10vw;
+    z-index: -1;
 }
 
 .shortcutBtn {

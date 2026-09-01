@@ -13,6 +13,23 @@
             </p>
        {{/if}}
 
+{{#if currency_widget}}
+<div class="fx_card" id="fx_widget_container" data-rate="{{currency_widget.rate}}">
+  <div class="fx_header">
+    <span class="fx_amount_sub">
+      {{#unless @root.no_js}}
+        <input type="number" id="fx_input_amount" value="{{currency_widget.amount}}" step="any">
+        {{currency_widget.from}} equals
+      {{else}}
+        <span id="fx_display_amount">{{currency_widget.amount}}</span> {{currency_widget.from}} equals
+      {{/unless}}
+    </span>
+    <h2 class="fx_amount_main"><span id="fx_display_converted">{{currency_widget.converted}}</span> {{currency_widget.to}}</h2>
+  </div>
+</div>
+{{/if}}
+
+
       {{#each results}}
         <div class='output'>
             <div class="output_text">
@@ -34,6 +51,10 @@
 
 <b>Actions</b>
   <div class="res_opt_actions">
+   <a href="https://sitebehavior.org/#scan?url={{{ url }}}" target="_blank" title="Privacy Shield">
+      <img src="static/img/icon/shield.svg" alt="Shield">
+      <p>Privacy</p>
+    </a>
     {{#if html_id}}
       <a href="/archive/{{html_id}}" target="_blank" title="Cached View">
         <img src="static/img/icon/cache.svg" alt="Cache">

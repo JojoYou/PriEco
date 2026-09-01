@@ -34,6 +34,7 @@ pub mod functions {
     }
 
     pub mod search_api {
+        pub mod currency;
         pub mod img;
         pub mod news;
         pub mod video;

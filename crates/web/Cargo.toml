@@ -49,6 +49,7 @@ symspell = { workspace = true }
 rayon = { workspace = true }
 fjall = { workspace = true }
 aes-gcm = { workspace = true }
+regex = { workspace = true }
 
 [features]
 default = []

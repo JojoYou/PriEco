@@ -576,6 +576,9 @@ pub struct PriecoStorage {
     // Goggles
     pub goggles_ks: Keyspace,
 
+    // Widgets
+    pub widgets_ks: Keyspace,
+
     // Analytics
     pub analytics_ks: Keyspace,
 
@@ -603,6 +606,12 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
         .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
         .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
     let goggles_ks = meta_db.keyspace("goggles", || goggles_opts).unwrap();
+
+    // Widgets storage
+    let widgets_opts = KeyspaceCreateOptions::default()
+        .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
+        .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
+    let widgets_ks = meta_db.keyspace("widgets", || widgets_opts).unwrap();
 
     // Analytics storage
     let analytics_opts = KeyspaceCreateOptions::default()
@@ -636,6 +645,8 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
         meta_ks,
 
         goggles_ks,
+
+        widgets_ks,
 
         analytics_ks,
 

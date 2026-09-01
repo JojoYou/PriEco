@@ -30,10 +30,10 @@ use crate::web::functions::{
     additional::spell_check::spell_check_query,
     general::get_domain,
     ranking::goggles::GoggleRules,
-    search_api::{img, news},
+    search_api::{currency::get_fx_widget, img, news},
     search_db,
 };
-use prieco_core::{EmbeddingService, SearchResult, url_to_domain_id};
+use prieco_core::{EmbeddingService, PRIECO_FJALL, SearchResult, url_to_domain_id};
 
 /// Description: Decides what kind of search to perform
 /// Input: Search type, Search query, Language, Location, Embedding service, Cookie jar
@@ -249,6 +249,10 @@ async fn all_search(
     context.insert(String::from("qt_domains_count"), json!(qt_domains.len()));
     context.insert(String::from("qt_domains"), json!(qt_domains));
     context.insert(String::from("saved_qt_domains"), json!(saved_qt_domains));
+
+    if let Some(fx_widget) = get_fx_widget(q).await {
+        context.insert(String::from("currency_widget"), json!(fx_widget));
+    }
 
     // If PriEco confidence is too low, use other indexes too
     /*if !cookie_jar.get("index").is_some() && index_confidence < 0.95 {

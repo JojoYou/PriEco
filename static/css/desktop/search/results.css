@@ -481,3 +481,15 @@
 .res_opt_actions p {
     width: unset;
 }
+
+#fx_input_amount {
+    background: none;
+    border: none;
+    text-align: right;
+    font-size: 24px;
+    width: 90px;
+}
+
+.fx_header {
+    margin-bottom: 30px;
+}

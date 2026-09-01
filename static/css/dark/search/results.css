@@ -28,7 +28,9 @@
 .sx-title,
 .products,
 .yadore_price,
-.sx-kp-attributions a {
+.sx-kp-attributions a,
+.fx_header,
+#fx_input_amount {
     color: #fff !important;
 }
 
@@ -65,4 +67,12 @@
 .res_opt_menu {
     background: #202124;
     border: 1px solid #181a1b;
+}
+
+#fx_input_amount {
+    background: none;
+    border: none;
+    text-align: right;
+    font-size: 24px;
+    width: 90px;
 }
