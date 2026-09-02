@@ -21,7 +21,7 @@ use std::{
 use crate::globals::{PriEcoConfig, colors};
 use crate::helpers::file_exists;
 
-const CONFIG_FILE: &str = "data/settings.conf";
+const CONFIG_FILE: &str = "config/settings.conf";
 const TOTAL_QUESTIONS: usize = 7;
 
 pub fn set_up_wizard() -> PriEcoConfig {
