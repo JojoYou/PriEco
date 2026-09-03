@@ -60,7 +60,6 @@ ENV ORT_DYLIB_PATH=/usr/local/lib/libonnxruntime.so
 COPY --chown=prieco:prieco data/      ./data/
 COPY --chown=prieco:prieco templates/ ./templates/
 COPY --chown=prieco:prieco static/    ./static/
-COPY --chown=prieco:prieco GeoLite2-Country.mmdb ./
 
 
 RUN mkdir -p /app/data/tantivy /app/data/blobs /app/data/meta /app/data/vectors \
@@ -73,9 +72,9 @@ VOLUME [ \
   "/app/config", "/app/models", "/app/GeoLite2-Country.mmdb" \
 ]
 
-USER prieco
+ENTRYPOINT ["/app/entrypoint.sh"]
 
-ENTRYPOINT ["./prieco_web"]
+
 
 # Build
 # docker build -t prieco:latest .
