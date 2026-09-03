@@ -3,12 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-
     image: prieco:latest
-
     ports:
       - "8000:8000"
-
     read_only: true
 
     tmpfs:
@@ -17,21 +14,20 @@ services:
     volumes:
       - tantivy:/app/data/tantivy
       - blobs:/app/data/blobs
-      - meta:/app/data/meta
+      - meta:/app/data/rocksdb
       - vectors:/app/data/vectors
-      - ./config:/app/config:z
       - ./models:/app/models:ro,z
       - ./GeoLite2-Country.mmdb:/app/GeoLite2-Country.mmdb:ro,z
 
     environment:
-      - PRIECO_IP=0.0.0.0
-      - PRIECO_PORT=8000
+      - PRIECO_IP=${PRIECO_IP:-0.0.0.0}
+      - PRIECO_PORT=${PRIECO_PORT:-8000}
       - PRIECO_TANTIVY=data/tantivy
-      - PRIECO_META=data/meta
+      - PRIECO_META=data/rocksdb
       - PRIECO_VECTOR=data/vectors
       - PRIECO_BLOB=data/blobs
-      - PRIECO_ID=123
-      - PRIECO_WORKERS=0
+      - PRIECO_ID=${PRIECO_ID:-}
+      - PRIECO_WORKERS=${PRIECO_WORKERS:-1}
 
     labels:
       # Podman auto-update
@@ -43,9 +39,7 @@ services:
       nofile:
         soft: 65535
         hard: 65535
-
     tty: true
-
     restart: unless-stopped
 
 volumes:
