@@ -3,29 +3,34 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+
     image: prieco:latest
+
     ports:
       - "8000:8000"
+
     read_only: true
+
+    tmpfs:
+      - /tmp
+
     volumes:
-      - ./data/tantivy:/app/data/tantivy:z
-      - ./data/blobs:/app/data/blobs:z
-      - ./data/meta:/app/data/meta:z
-      - ./data/vectors:/app/data/vectors:z
-
+      - tantivy:/app/data/tantivy
+      - blobs:/app/data/blobs
+      - meta:/app/data/meta
+      - vectors:/app/data/vectors
       - ./config:/app/config:z
+      - ./models:/app/models:ro,z
+      - ./GeoLite2-Country.mmdb:/app/GeoLite2-Country.mmdb:ro,z
 
-      - ./models:/app/models:z
-      - ./GeoLite2-Country.mmdb:/app/GeoLite2-Country.mmdb:z
     environment:
-      - ROCKET_ADDRESS=0.0.0.0
-      - ROCKET_PORT=8000
-      - PRIECO_IP=${PRIECO_IP:-0.0.0.0}
-      - PRIECO_PORT=${PRIECO_PORT:-8000}
+      - PRIECO_IP=0.0.0.0
+      - PRIECO_PORT=8000
       - PRIECO_TANTIVY=data/tantivy
       - PRIECO_META=data/meta
       - PRIECO_VECTOR=data/vectors
       - PRIECO_BLOB=data/blobs
+      - PRIECO_ID=123
       - PRIECO_WORKERS=0
 
     labels:
@@ -42,3 +47,9 @@ services:
     tty: true
 
     restart: unless-stopped
+
+volumes:
+  tantivy:
+  blobs:
+  meta:
+  vectors:

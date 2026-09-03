@@ -274,7 +274,6 @@ fn thread_manager() {
             while !stop_requested() {
                 blob::run();
                 sleep(Duration::from_mins(1));
-                break;
             }
         })
     };
