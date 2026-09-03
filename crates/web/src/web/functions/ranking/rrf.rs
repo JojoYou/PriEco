@@ -71,11 +71,29 @@ pub fn run(
     merged.sort_unstable_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
     let mut result: Vec<WebDocument> = merged.into_iter().map(|(_, doc)| doc).collect();
 
-    // Filter: site:
-    if query.starts_with("site:") {
-        let clean_query = query.replace("site:", "");
+    static RRF_DOMAIN_RE: once_cell::sync::Lazy<regex::Regex> = once_cell::sync::Lazy::new(|| {
+        regex::Regex::new(r"(?i)(site|domain):([^\s\(\)]+)").unwrap()
+    });
 
-        result.retain(|doc| get_domain(&doc.url, true) == clean_query);
+    let mut target_domains = Vec::new();
+    for caps in RRF_DOMAIN_RE.captures_iter(query) {
+        let mut target = caps[2].to_lowercase();
+        target = target.replace("https://", "").replace("http://", "");
+        target = target
+            .strip_prefix("www.")
+            .unwrap_or(&target)
+            .trim_end_matches('/')
+            .to_string();
+        target_domains.push(target);
+    }
+
+    if !target_domains.is_empty() {
+        result.retain(|doc| {
+            let doc_domain = get_domain(&doc.url, true);
+            target_domains.iter().any(|target| {
+                doc_domain == *target || doc_domain.ends_with(&format!(".{}", target))
+            })
+        });
     }
 
     // Remove HTTP duplicates of HTTPS URLs

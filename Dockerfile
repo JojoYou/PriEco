@@ -60,7 +60,7 @@ ENV ORT_DYLIB_PATH=/usr/local/lib/libonnxruntime.so
 COPY --chown=prieco:prieco data/      ./data/
 COPY --chown=prieco:prieco templates/ ./templates/
 COPY --chown=prieco:prieco static/    ./static/
-
+COPY --chown=prieco:prieco --from=builder /build/crates/crawler/src/data/GeoLite2-Country.mmdb ./GeoLite2-Country.mmdb
 
 RUN mkdir -p /app/data/tantivy /app/data/blobs /app/data/meta /app/data/vectors \
              /app/config /app/models \

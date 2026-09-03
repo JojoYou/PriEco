@@ -21,11 +21,13 @@ pub fn synynyms_and_optimize(
     tags: &[TaggedEntity],
 ) {
     if query.contains('"')
+        || query.contains(':')
+        || query.contains('-')
+        || query.contains('|')
+        || query.contains(" OR ")
+        || query.contains(" AND ")
         || query.contains("def")
         || query.contains("definition")
-        || query.contains(" AND ")
-        || query.contains(" OR ")
-        || query.starts_with('-')
     {
         return;
     }

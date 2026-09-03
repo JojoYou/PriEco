@@ -45,6 +45,8 @@
     display: flex;
     margin-top: 10px;
     transition: filter 0.3s ease-in-out;
+    position: relative;
+    z-index: 10;
 }
 .search_bar:hover,
 .search_bar:focus-within {
@@ -193,7 +195,6 @@ form.suggestions-active .search_button::before {
     justify-content: center;
     flex-wrap: wrap;
     position: relative;
-    z-index: -1;
 }
 
 .shortcutBtn {

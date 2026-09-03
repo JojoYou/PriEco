@@ -28,12 +28,14 @@ use std::{
     time::Instant,
 };
 
+use chrono::NaiveDate;
 /*
   Import external libraries
 */
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use rayon::{iter::ParallelIterator, slice::ParallelSlice};
+use regex::Regex;
 use rocket::{State, serde::json::Json};
 use serde_json::Value as Json_Value;
 use tantivy::{
@@ -298,13 +300,16 @@ pub async fn run_json(
 
     // Clone query to pass to parallel index calls
     let q_clone = query.to_string();
-    let mut fts_query = q_clone.clone();
-    let fts_original_query = q_clone.clone();
     let q_clone3 = q_clone.clone();
     let q_clone4 = q_clone.to_string();
 
+    let mut fts_query = normalize_search_operators(&q_clone);
+    let fts_original_query = fts_query.clone();
+
     // Clasify query intent
     let (intent, coords) = ranking::meaning::call::process_query(&mut fts_query, lang, loc);
+
+    fts_query = normalize_search_operators(&fts_query);
 
     let mut results = if let Some(cached) = cached_data {
         cached
@@ -395,20 +400,6 @@ pub async fn run_json(
 
             let start = Instant::now();
 
-            // Filter: site:
-            if fts_query.starts_with("site:") {
-                fts_query = fts_query.replace("site:", "");
-
-                fts_query = fts_query
-                    .rsplit_once('.')
-                    .map(|(left, _)| left.to_string())
-                    .unwrap_or(fts_query);
-                fts_query = fts_query
-                    .rsplit_once('.')
-                    .map(|(_, right)| right.to_string())
-                    .unwrap_or(fts_query);
-            }
-
             let res = search_tantivy(
                 &fts_query,
                 &lang_clone,
@@ -434,11 +425,10 @@ pub async fn run_json(
 
         let vector_task = tokio::task::spawn_blocking(move || {
             if q_clone3.contains('"')
-                || q_clone3.contains("site:")
-                || q_clone3.contains("filetype:")
-                || q_clone3.contains("inurl:")
-                || q_clone3.contains("intitle:")
-                || q_clone3.starts_with('-')
+                || q_clone3.contains(':')
+                || q_clone3.contains('-')
+                || q_clone3.contains('|')
+                || q_clone3.contains(" OR ")
             {
                 return Vec::new();
             }
@@ -668,6 +658,9 @@ pub async fn run_json(
 /// # Panics
 ///
 /// Only if system runs out of memory.
+static SITE_EXTRACT_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)(site|domain):([^\s\(\)]+)").unwrap());
+
 fn search_tantivy(
     query_text: &str,
     lang: &str,
@@ -679,15 +672,52 @@ fn search_tantivy(
     let schema = TANTIVY_INDEX.schema();
     let doc_id = schema.get_field("doc_id").ok()?;
     let domain_id_field = schema.get_field("domain_id").ok()?;
-
     let lang_field = schema.get_field("lang").ok()?;
     let loc_field = schema.get_field("loc").ok()?;
-
     let intent_field = schema.get_field("intent").ok()?;
 
-    let parsed_query = TANTIVY_QUERY_PARSER.parse_query(query_text).ok()?;
+    let mut clean_query_text = query_text.to_string();
+    let mut site_hashes = Vec::new();
+
+    for caps in SITE_EXTRACT_RE.captures_iter(&clean_query_text.clone()) {
+        let mut raw_domain = caps[2].to_string();
+        raw_domain = raw_domain.replace("https://", "").replace("http://", "");
+        raw_domain = raw_domain
+            .strip_prefix("www.")
+            .unwrap_or(&raw_domain)
+            .trim_end_matches('/')
+            .to_string();
+
+        for prefix in ["", "www.", "en.", "m."] {
+            let url = format!("http://{}{}", prefix, raw_domain);
+            let hash = url_to_domain_id(&url);
+            if hash != 0 {
+                site_hashes.push(hash);
+            }
+        }
+    }
+
+    clean_query_text = SITE_EXTRACT_RE
+        .replace_all(&clean_query_text, "")
+        .to_string();
+
+    let parsed_query = match TANTIVY_QUERY_PARSER.parse_query(&clean_query_text) {
+        Ok(q) => q,
+        Err(e) => {
+            println!("❌ Tantivy Parse Error on '{}': {}", clean_query_text, e);
+            return None;
+        }
+    };
 
     let mut clauses: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Must, parsed_query)];
+
+    if !site_hashes.is_empty() {
+        let terms: Vec<Term> = site_hashes
+            .into_iter()
+            .map(|id| Term::from_field_u64(domain_id_field, id))
+            .collect();
+        clauses.push((Occur::Must, Box::new(TermSetQuery::new(terms))));
+    }
 
     let intent_val: u64 = match intent {
         QueryIntent::Informational => 0,
@@ -700,9 +730,7 @@ fn search_tantivy(
     if intent != &QueryIntent::Unknown {
         let intent_term = Term::from_field_u64(intent_field, intent_val);
         let intent_term_query = Box::new(TermQuery::new(intent_term, IndexRecordOption::Basic));
-
         let boosted_intent_query = Box::new(BoostQuery::new(intent_term_query, 2.0));
-
         clauses.push((Occur::Should, boosted_intent_query));
     }
 
@@ -716,14 +744,6 @@ fn search_tantivy(
         } else {
             clauses.push((Occur::Must, lang_query));
         }
-    }
-
-    if intent != &QueryIntent::Navigational && lang != "all" && !lang.is_empty() {
-        let lang_term = Term::from_field_text(lang_field, lang);
-        clauses.push((
-            Occur::Must,
-            Box::new(TermQuery::new(lang_term, IndexRecordOption::Basic)),
-        ));
     }
 
     if intent == &QueryIntent::Local && loc != "all" && !loc.is_empty() {
@@ -915,4 +935,38 @@ pub fn path_matches(url: &str, pattern: &str) -> bool {
         return url.ends_with(core); // Anchored end
     }
     url.contains(pattern)
+}
+
+static DATE_OPERATOR_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)(before|after):(\d{4}-\d{2}-\d{2})").unwrap());
+
+fn normalize_search_operators(query: &str) -> String {
+    let mut normalized = query.to_string();
+
+    normalized = DATE_OPERATOR_RE
+        .replace_all(&normalized, |caps: &regex::Captures| {
+            let operator = caps[1].to_lowercase();
+            let date_str = &caps[2];
+
+            if let Ok(date) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+                let formatted_date = date.format("%y%m%d").to_string();
+                if let Ok(date_int) = formatted_date.parse::<i64>() {
+                    match operator.as_str() {
+                        "before" => format!("date:{{* TO {}}}", date_int),
+                        "after" => format!("date:{{{} TO *}}", date_int),
+                        _ => caps[0].to_string(),
+                    }
+                } else {
+                    caps[0].to_string()
+                }
+            } else {
+                caps[0].to_string()
+            }
+        })
+        .to_string();
+
+    normalized = normalized.replace("intitle:", "title:");
+    normalized = normalized.replace(" | ", " OR ");
+
+    normalized
 }
