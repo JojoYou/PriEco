@@ -67,11 +67,13 @@ RUN mkdir -p /app/data/tantivy /app/data/blobs /app/data/meta /app/data/vectors 
     && touch /app/GeoLite2-Country.mmdb \
     && chown -R prieco:prieco /app/data /app/config /app/models /app/GeoLite2-Country.mmdb
 
-VOLUME [ \
-  "/app/data/tantivy", "/app/data/blobs", "/app/data/meta", "/app/data/vectors", \
-  "/app/config", "/app/models", "/app/GeoLite2-Country.mmdb" \
-]
+    VOLUME [ \
+      "/app/data/tantivy", "/app/data/blobs", "/app/data/meta", "/app/data/vectors", \
+      "/app/config", "/app/models" \
+    ]
 
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 ENTRYPOINT ["/app/entrypoint.sh"]
 
 

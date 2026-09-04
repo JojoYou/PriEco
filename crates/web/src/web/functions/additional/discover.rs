@@ -1,4 +1,4 @@
-use prieco_core::{CLIENT, PRIECO_FJALL, WebDocument, url_to_id};
+use prieco_core::{CLIENT, PRIECO_META, WebDocument, url_to_id};
 
 pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
     let trimmed = query.trim();
@@ -90,7 +90,7 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
             .iter()
             .any(|url| {
                 matches!(
-                    PRIECO_FJALL.meta_ks.get(&url_to_id(url).to_be_bytes()),
+                    PRIECO_META.meta_ks.get(&url_to_id(url).to_be_bytes()),
                     Ok(Some(_))
                 )
             });

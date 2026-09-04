@@ -568,7 +568,7 @@ pub static META_DECODER: Lazy<Option<DecoderDictionary<'static>>> = Lazy::new(||
 
 pub const BLOB_IMPORT_DIR: &str = "/mnt/hdd/imp_blob/";
 
-pub struct PriecoStorage {
+pub struct PriecoMetaStorage {
     // Meta data: Titles, Descriptions, URLs...
     pub meta_db: FJALL_DATABASE,
     pub meta_ks: Keyspace,
@@ -581,14 +581,15 @@ pub struct PriecoStorage {
 
     // Analytics
     pub analytics_ks: Keyspace,
+}
 
+pub struct PriecoBlobStorage {
     // Blob storage: Compressed web page data
     pub blob_db: FJALL_DATABASE,
     pub blobs_ks: Keyspace,
 }
 
-pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
-    // Meta storage
+pub static PRIECO_META: Lazy<Arc<PriecoMetaStorage>> = Lazy::new(|| {
     let meta_db = FJALL_DATABASE::builder(Path::new(&PRIECO_CONFIG.meta_path))
         .worker_threads(4)
         .cache_size(2 * 1024 * 1024 * 1024)
@@ -598,28 +599,36 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
     let meta_opts = KeyspaceCreateOptions::default()
         .data_block_compression_policy(CompressionPolicy::disabled())
         .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
-
     let meta_ks = meta_db.keyspace("meta", || meta_opts.clone()).unwrap();
 
-    // Goggles storage
     let goggles_opts = KeyspaceCreateOptions::default()
         .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
         .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
     let goggles_ks = meta_db.keyspace("goggles", || goggles_opts).unwrap();
 
-    // Widgets storage
     let widgets_opts = KeyspaceCreateOptions::default()
         .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
         .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
     let widgets_ks = meta_db.keyspace("widgets", || widgets_opts).unwrap();
 
-    // Analytics storage
     let analytics_opts = KeyspaceCreateOptions::default()
         .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
         .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
     let analytics_ks = meta_db.keyspace("analytics", || analytics_opts).unwrap();
 
-    // Blob storage
+    Arc::new(PriecoMetaStorage {
+        meta_db,
+        meta_ks,
+
+        goggles_ks,
+
+        widgets_ks,
+
+        analytics_ks,
+    })
+});
+
+pub static PRIECO_BLOBS: Lazy<Arc<PriecoBlobStorage>> = Lazy::new(|| {
     let blob_db = FJALL_DATABASE::builder(Path::new(&PRIECO_CONFIG.blob_path))
         .worker_threads(2)
         .cache_size(1 * 1024 * 1024 * 1024)
@@ -632,7 +641,7 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
         .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
         .with_kv_separation(Some(KvSeparationOptions {
             compression: CompressionType::None,
-            file_target_size: 2048 * 1024 * 1024, // 2GB blobs
+            file_target_size: 2048 * 1024 * 1024,
             separation_threshold: 100,
             staleness_threshold: 0.9,
             age_cutoff: 0.0,
@@ -640,19 +649,7 @@ pub static PRIECO_FJALL: Lazy<Arc<PriecoStorage>> = Lazy::new(|| {
 
     let blobs_ks = blob_db.keyspace("blobs", || blob_opts).unwrap();
 
-    Arc::new(PriecoStorage {
-        meta_db,
-        meta_ks,
-
-        goggles_ks,
-
-        widgets_ks,
-
-        analytics_ks,
-
-        blob_db,
-        blobs_ks,
-    })
+    Arc::new(PriecoBlobStorage { blob_db, blobs_ks })
 });
 
 /*
@@ -2108,8 +2105,8 @@ pub static ANALYTICS: Lazy<AnalyticsDb> = Lazy::new(|| {
     let date = Utc::now().date_naive();
 
     AnalyticsDb {
-        db: PRIECO_FJALL.meta_db.clone(),
-        ks: PRIECO_FJALL.analytics_ks.clone(),
+        db: PRIECO_META.meta_db.clone(),
+        ks: PRIECO_META.analytics_ks.clone(),
 
         salt: RwLock::new((date, generate_analytics_salt(date))),
     }
@@ -2360,10 +2357,10 @@ impl AnalyticsDb {
     }
 }
 
-fn generate_analytics_salt(date: NaiveDate) -> [u8; 32] {
-    let path = "analytics_daily_salt.txt";
+const DAILY_SALT_PATH: &str = "config/analytics_daily_salt.txt";
 
-    let data = read_file(path);
+fn generate_analytics_salt(date: NaiveDate) -> [u8; 32] {
+    let data = read_file(DAILY_SALT_PATH);
 
     let parts: Vec<&str> = data.split(':').collect();
     if parts.len() == 2 && parts[0] == date.to_string() {
@@ -2398,7 +2395,7 @@ fn generate_analytics_salt(date: NaiveDate) -> [u8; 32] {
     let salt_hex: String = new_salt.iter().map(|b| format!("{:02x}", b)).collect();
     let content = format!("{}:{}", date, salt_hex);
 
-    write(path, content).expect("Failed to write daily salt file");
+    write(DAILY_SALT_PATH, content).expect("Failed to write daily salt file");
 
     new_salt
 }

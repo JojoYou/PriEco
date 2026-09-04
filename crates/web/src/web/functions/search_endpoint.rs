@@ -33,7 +33,7 @@ use crate::web::functions::{
     search_api::{currency::get_fx_widget, img, news},
     search_db,
 };
-use prieco_core::{EmbeddingService, PRIECO_FJALL, SearchResult, url_to_domain_id};
+use prieco_core::{EmbeddingService, SearchResult, url_to_domain_id};
 
 /// Description: Decides what kind of search to perform
 /// Input: Search type, Search query, Language, Location, Embedding service, Cookie jar

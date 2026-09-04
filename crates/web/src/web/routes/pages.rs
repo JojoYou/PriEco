@@ -57,7 +57,7 @@ use crate::web::{
     modules::settings,
 };
 use prieco_core::{
-    BANGS, CLIENT, PRIECO_FJALL, TANTIVY_INDEX,
+    BANGS, CLIENT, PRIECO_BLOBS, TANTIVY_INDEX,
     globals::{ANALYTICS, CSS_VERSION, EmbeddingService, JS_VERSION, UserAgent},
 };
 
@@ -550,7 +550,7 @@ pub async fn results_htmls(
 
 #[get("/archive/<id>")]
 pub async fn view_blob(id: u64) -> Option<RawHtml<String>> {
-    let raw_blob = match PRIECO_FJALL.blobs_ks.get(&id.to_le_bytes()) {
+    let raw_blob = match PRIECO_BLOBS.blobs_ks.get(&id.to_le_bytes()) {
         Ok(Some(blob)) => blob,
         _ => return None,
     };

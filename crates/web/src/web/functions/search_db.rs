@@ -55,7 +55,7 @@ use crate::web::functions::{
     ranking::{self, goggles::GoggleRules},
 };
 use prieco_core::{
-    META_DECODER, PRIECO_FJALL, QueryIntent, TANTIVY_QUERY_PARSER,
+    META_DECODER, PRIECO_META, QueryIntent, TANTIVY_QUERY_PARSER,
     globals::{
         EmbeddingService, PAGERANK, RERANKER, SearchResult, TANTIVY_INDEX, TANTIVY_READER,
         VECTOR_CENTROPOIDS, WebDocument, colors,
@@ -703,8 +703,7 @@ fn search_tantivy(
 
     let parsed_query = match TANTIVY_QUERY_PARSER.parse_query(&clean_query_text) {
         Ok(q) => q,
-        Err(e) => {
-            println!("❌ Tantivy Parse Error on '{}': {}", clean_query_text, e);
+        Err(_) => {
             return None;
         }
     };
@@ -857,7 +856,7 @@ fn fetch_documents(
                     let key = id.to_be_bytes();
 
                     // Get data
-                    let compressed_data = match PRIECO_FJALL.meta_ks.get(&key) {
+                    let compressed_data = match PRIECO_META.meta_ks.get(&key) {
                         Ok(Some(data)) => data,
                         _ => {
                             continue;

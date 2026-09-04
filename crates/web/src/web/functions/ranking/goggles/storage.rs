@@ -1,22 +1,23 @@
+use prieco_core::PRIECO_META;
+
 use super::types::Goggle;
-use prieco_core::PRIECO_FJALL;
 
 pub fn put(goggle: &Goggle) {
     let key = goggle.id.to_be_bytes();
     let value = serde_json::to_vec(goggle).expect("Failed to serialize StoredGoggle");
-    PRIECO_FJALL
+    PRIECO_META
         .goggles_ks
         .insert(&key, &value)
         .expect("Failed to write goggle");
 }
 
 pub fn get(id: u64) -> Option<Goggle> {
-    let raw = PRIECO_FJALL.goggles_ks.get(&id.to_be_bytes()).ok()??;
+    let raw = PRIECO_META.goggles_ks.get(&id.to_be_bytes()).ok()??;
     serde_json::from_slice(&raw).ok()
 }
 
 pub fn delete(id: u64) {
-    let _ = PRIECO_FJALL.goggles_ks.remove(&id.to_be_bytes());
+    let _ = PRIECO_META.goggles_ks.remove(&id.to_be_bytes());
 }
 
 pub fn touch_fetched_at(id: u64) {
@@ -27,7 +28,7 @@ pub fn touch_fetched_at(id: u64) {
 }
 
 pub fn list_all() -> Vec<Goggle> {
-    PRIECO_FJALL
+    PRIECO_META
         .goggles_ks
         .iter()
         .filter_map(|guard| serde_json::from_slice(&guard.value().ok()?).ok())

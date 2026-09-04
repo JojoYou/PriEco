@@ -10,6 +10,7 @@
 //!  Usage: Run PriEco and complete set up questions
 //!  TODO:
 
+use once_cell::sync::Lazy;
 /*
   Set global allovator
   Reason: Default was insufficient for deallocating RAM from crawler HTTP connections
@@ -59,7 +60,7 @@ pub mod web;
 use crate::web::routes::{apis::*, assets::*, pages::*};
 use prieco_blob as blob;
 use prieco_core::{
-    ANALYTICS, EmbeddingService, META_DECODER, PAGERANK, PRIECO_CONFIG, PRIECO_FJALL,
+    ANALYTICS, EmbeddingService, META_DECODER, PAGERANK, PRIECO_BLOBS, PRIECO_CONFIG, PRIECO_META,
     TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_TOKENIZER, colors, icons,
 };
 use prieco_insert::db_insert;
@@ -184,8 +185,11 @@ async fn rocket() -> _ {
         .attach(AdHoc::on_shutdown("Flush DBs", |_| {
             Box::pin(async move {
                 println!("Flushing Fjall to disk...");
-                let _ = PRIECO_FJALL.meta_db.persist(PersistMode::SyncAll);
-                let _ = PRIECO_FJALL.blob_db.persist(PersistMode::SyncAll);
+                let _ = PRIECO_META.meta_db.persist(PersistMode::SyncAll);
+                if let Some(blobs) = Lazy::get(&PRIECO_BLOBS) {
+                    println!("Flushing Blob DB to disk...");
+                    let _ = blobs.blob_db.persist(PersistMode::SyncAll);
+                }
 
                 println!("Flushing Tantivy to disk...");
                 let _ = TANTIVY_WRITER.lock().commit();
@@ -258,7 +262,7 @@ async fn rocket() -> _ {
 /// Output: None
 fn thread_manager() {
     // Initialize data
-    let _ = &*PRIECO_FJALL;
+    let _ = &*PRIECO_META;
     let _ = &*META_DECODER;
 
     let _ = TANTIVY_READER;

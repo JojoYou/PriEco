@@ -21,7 +21,7 @@ use zstd::stream::Encoder as ZstdEncoder;
   Import own libraries
 */
 use prieco_core::{
-    ID_SIZE, INSERTER_IMPORT_DIR, META_DICTIONARY, PRIECO_CONFIG, PRIECO_FJALL, RECORD_SIZE,
+    ID_SIZE, INSERTER_IMPORT_DIR, META_DICTIONARY, PRIECO_CONFIG, PRIECO_META, RECORD_SIZE,
     TANTIVY_INDEX, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_DIM, WebDocument, file_exists,
     globals::icons, url_to_domain_id, url_to_id,
 };
@@ -136,7 +136,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                 let id = url_to_id(&url);
 
                 // Preserve uniqness
-                if PRIECO_FJALL
+                if PRIECO_META
                     .meta_ks
                     .get(&id.to_be_bytes())
                     .unwrap()
@@ -196,7 +196,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                 /* FJALL */
                 let doc_bytes = serde_json::to_vec(&doc)?;
                 let compressed_doc = compressor.compress(&doc_bytes)?;
-                PRIECO_FJALL
+                PRIECO_META
                     .meta_ks
                     .insert(&id.to_be_bytes(), &compressed_doc)?;
 
@@ -259,7 +259,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
         merge_tantivy();
 
         println!("Compacting Meta...");
-        PRIECO_FJALL
+        PRIECO_META
             .meta_ks
             .major_compact()
             .expect("Failed to run major compaction");

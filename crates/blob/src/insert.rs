@@ -42,7 +42,7 @@ use tar::Archive;
   Import own libraries
 */
 use prieco_core::{
-    BLOB_IMPORT_DIR, PRIECO_FJALL, file_exists,
+    BLOB_IMPORT_DIR, PRIECO_BLOBS, PRIECO_META, file_exists,
     globals::{colors, icons},
 };
 
@@ -260,7 +260,7 @@ fn process_file(tar_path: &Path, single_blob_buffer: &mut Vec<u8>) -> io::Result
     }
 
     // Get a FJALL batch to buffer writes to disk
-    let mut batch = PRIECO_FJALL.blob_db.batch();
+    let mut batch = PRIECO_BLOBS.blob_db.batch();
 
     // Get archive handler
     let file = File::open(tar_path)?;
@@ -302,7 +302,7 @@ fn process_file(tar_path: &Path, single_blob_buffer: &mut Vec<u8>) -> io::Result
         entry.read_to_end(single_blob_buffer)?;
 
         batch.insert(
-            &PRIECO_FJALL.blobs_ks,
+            &PRIECO_BLOBS.blobs_ks,
             name.to_le_bytes(),
             single_blob_buffer.clone(),
         );
@@ -323,7 +323,7 @@ fn process_file(tar_path: &Path, single_blob_buffer: &mut Vec<u8>) -> io::Result
                 ));
             };
 
-            batch = PRIECO_FJALL.blob_db.batch();
+            batch = PRIECO_BLOBS.blob_db.batch();
 
             println!(
                 "{}: Inserted {} files from {:?}",
@@ -337,7 +337,7 @@ fn process_file(tar_path: &Path, single_blob_buffer: &mut Vec<u8>) -> io::Result
             );
 
             // Simple data integrity check
-            let missing = match PRIECO_FJALL.meta_ks.get(&name.to_le_bytes()) {
+            let missing = match PRIECO_META.meta_ks.get(&name.to_le_bytes()) {
                 Ok(Some(_)) => false,
                 Ok(None) => true,
                 Err(e) => {
@@ -372,7 +372,7 @@ fn process_file(tar_path: &Path, single_blob_buffer: &mut Vec<u8>) -> io::Result
         ));
     };
 
-    if let Err(e) = PRIECO_FJALL.blob_db.persist(PersistMode::SyncAll) {
+    if let Err(e) = PRIECO_BLOBS.blob_db.persist(PersistMode::SyncAll) {
         return Err(Error::new(
             ErrorKind::InvalidData,
             format!(

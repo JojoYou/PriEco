@@ -1,5 +1,5 @@
 use chrono::{Duration, Utc};
-use prieco_core::{CLIENT, PRIECO_FJALL};
+use prieco_core::{CLIENT, PRIECO_META};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -74,7 +74,7 @@ pub async fn get_fx_widget(q: &str) -> Option<FxWidget> {
         .unwrap()
         .as_secs();
 
-    if let Ok(Some(bytes)) = PRIECO_FJALL.widgets_ks.get(cache_key.as_bytes()) {
+    if let Ok(Some(bytes)) = PRIECO_META.widgets_ks.get(cache_key.as_bytes()) {
         if let Ok(c) = serde_json::from_slice::<CachedFx>(&bytes) {
             if now.saturating_sub(c.timestamp) < 21600 {
                 return Some(c.data);
@@ -137,7 +137,7 @@ pub async fn get_fx_widget(q: &str) -> Option<FxWidget> {
         timestamp: now,
         data: widget.clone(),
     }) {
-        let _ = PRIECO_FJALL.widgets_ks.insert(cache_key.as_bytes(), bytes);
+        let _ = PRIECO_META.widgets_ks.insert(cache_key.as_bytes(), bytes);
     }
 
     Some(widget)
