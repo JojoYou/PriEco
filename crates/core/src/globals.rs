@@ -247,7 +247,7 @@ pub struct PriEcoConfig {
     pub vector_path: String,
     pub blob_path: String,
 
-    pub worker_id: String,
+    pub peer_ticket: String,
     pub worker_concurrent: u32,
 }
 

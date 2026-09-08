@@ -9,6 +9,7 @@ pub mod modules {
 }
 
 pub mod functions {
+    pub mod decentralized;
     pub mod general;
     pub mod search_db;
     pub mod search_endpoint;

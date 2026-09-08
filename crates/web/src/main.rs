@@ -10,6 +10,9 @@
 //!  Usage: Run PriEco and complete set up questions
 //!  TODO:
 
+use iroh::{Endpoint, PublicKey, SecretKey, endpoint::presets::N0, protocol::Router};
+use iroh_gossip::{ALPN, Gossip, TopicId, api::Event};
+use n0_future::StreamExt;
 use once_cell::sync::Lazy;
 /*
   Set global allovator
@@ -29,6 +32,7 @@ static GLOBAL: Jemalloc = Jemalloc;
 use std::{
     path::Path,
     process::exit,
+    str::FromStr,
     sync::{
         Arc,
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -57,11 +61,15 @@ use tokenizers::{PaddingDirection, PaddingParams, PaddingStrategy, Tokenizer};
   Import own libraries
 */
 pub mod web;
-use crate::web::routes::{apis::*, assets::*, pages::*};
+use crate::web::{
+    functions::decentralized::{Ticket, get_iroh_secret},
+    routes::{apis::*, assets::*, pages::*},
+};
 use prieco_blob as blob;
 use prieco_core::{
     ANALYTICS, EmbeddingService, META_DECODER, PAGERANK, PRIECO_BLOBS, PRIECO_CONFIG, PRIECO_META,
-    TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_TOKENIZER, colors, icons,
+    PriEcoConfig, TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_TOKENIZER,
+    colors, icons,
 };
 use prieco_insert::db_insert;
 use prieco_mini_crawler::mini_crawler;
@@ -163,6 +171,44 @@ async fn rocket() -> _ {
         model: Arc::new(tokio::sync::Mutex::new(create_embeder())),
     };
 
+    // Decentralization
+    let iroh_secret_key: SecretKey = get_iroh_secret();
+    let iroh_endpoint: Endpoint = Endpoint::builder(N0)
+        .secret_key(iroh_secret_key.clone())
+        .bind()
+        .await
+        .unwrap();
+
+    let iroh_gossip: Gossip = Gossip::builder().spawn(iroh_endpoint.clone());
+    let iroh_router: Router = Router::builder(iroh_endpoint.clone())
+        .accept(ALPN, iroh_gossip.clone())
+        .spawn();
+    let mut iroh_peers: Vec<PublicKey> = vec![];
+
+    let mut iroh_topic_id = TopicId::from_bytes([23u8; 32]);
+    if PRIECO_CONFIG.peer_ticket.is_empty() {
+        if let Ok(peer_ticket) = Ticket::from_str(&PRIECO_CONFIG.peer_ticket) {
+            iroh_topic_id = peer_ticket.topic;
+
+            for addr in peer_ticket.endpoints {
+                for ip in addr.ip_addrs() {
+                    iroh_endpoint.add_external_addr(*ip).await;
+                }
+                iroh_peers.push(addr.id);
+            }
+            println!("Loaded peer ticket! Joining topic: {:?}", iroh_topic_id);
+        } else {
+            println!("Failed to parse the provided peer ticket.");
+        }
+    }
+
+    let ticket = Ticket {
+        topic: iroh_topic_id,
+        endpoints: vec![iroh_endpoint.addr()],
+    };
+
+    println!("Your ticket to invite others is: {}", ticket);
+
     // Spawn Thread Manager
     spawn(move || {
         thread_manager();
@@ -184,6 +230,10 @@ async fn rocket() -> _ {
         .attach(Template::fairing())
         .attach(AdHoc::on_shutdown("Flush DBs", |_| {
             Box::pin(async move {
+                if let Err(e) = iroh_router.shutdown().await {
+                    eprintln!("Failed to shut down iroh router! {}", e);
+                };
+
                 println!("Flushing Fjall to disk...");
                 let _ = PRIECO_META.meta_db.persist(PersistMode::SyncAll);
                 if let Some(blobs) = Lazy::get(&PRIECO_BLOBS) {
@@ -313,7 +363,7 @@ fn thread_manager() {
     };
 
     // Mini crawler
-    let mini_crawler_thread = if PRIECO_CONFIG.worker_id.is_empty() {
+    let mini_crawler_thread = if PRIECO_CONFIG.peer_ticket.is_empty() {
         None
     } else {
         Some(spawn(move || {

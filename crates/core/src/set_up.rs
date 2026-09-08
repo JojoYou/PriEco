@@ -34,7 +34,7 @@ pub fn set_up_wizard() -> PriEcoConfig {
         vector_path: String::from("idx/vectors"),
         blob_path: String::from("idx/blob"),
 
-        worker_id: String::new(),
+        peer_ticket: String::new(),
         worker_concurrent: 1,
     };
 
@@ -107,13 +107,13 @@ pub fn set_up_wizard() -> PriEcoConfig {
         &conf.blob_path,
     );
 
-    conf.worker_id = check_env(
-        "PRIECO_ID",
+    conf.peer_ticket = check_env(
+        "PRIECO_TICKET",
         &format!(
-            "\n🗨 7/{}: Worker ID (leave empty if you dont have one):",
+            "\n🗨 7/{}: Peer ticket, a ticket that lets you connect to the decentralized network (leave empty if you dont have one):",
             TOTAL_QUESTIONS
         ),
-        &conf.worker_id,
+        &conf.peer_ticket,
     );
 
     conf.worker_concurrent = match check_env(

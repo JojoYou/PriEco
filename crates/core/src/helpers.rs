@@ -52,7 +52,7 @@ pub fn read_file(file_path: &str) -> String {
   Input: file path, content, should append the file (if false it removes all already written content)
   Output: None
 */
-pub fn write_file(file_path: &str, content: &str, append: bool) {
+pub fn write_file<C: AsRef<[u8]>>(file_path: &str, content: C, append: bool) {
     acquire_file_lock(file_path);
 
     // Create parent directories if needed
@@ -91,9 +91,7 @@ pub fn write_file(file_path: &str, content: &str, append: bool) {
     };
 
     // Write and flush
-    let _ = file
-        .write_all(content.as_bytes())
-        .and_then(|_| file.flush());
+    let _ = file.write_all(content.as_ref()).and_then(|_| file.flush());
 
     release_file_lock(file_path);
 }

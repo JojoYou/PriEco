@@ -1,23 +1,3 @@
-//! # Index search
-//!
-//! Performs an index search (JSON) and creates search results out of it.
-//!
-//! ## Architecture
-//!
-//! 1. [**run()**:][run] Calls [run_json]() and creates search results.
-//! 2. [**run_json()**:][run_json] Performs search indexes pipeline.
-//!
-//! ## Metadata
-//!
-//! * **Author:** Roman Láncoš (<support@prieco.net>)
-//! * **License:** AGPL-3.0
-//! * Date Created: 2025-09-20
-//! * Last Modified: 2026-08-11
-//!
-//! ## Planned Improvements
-//!
-//! - [ ] None
-
 /*
   Import system libraries
 */
@@ -36,8 +16,6 @@ use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 use regex::Regex;
-use rocket::{State, serde::json::Json};
-use serde_json::Value as Json_Value;
 use tantivy::{
     Term,
     collector::TopDocs,
@@ -51,14 +29,15 @@ use zstd::bulk::Decompressor;
 */
 use crate::web::functions::{
     additional::discover::discover_and_ping_domains,
+    decentralized::{ask_node, select_remote_nodes},
     general::get_domain,
     ranking::{self, goggles::GoggleRules},
 };
 use prieco_core::{
     META_DECODER, PRIECO_META, QueryIntent, TANTIVY_QUERY_PARSER,
     globals::{
-        EmbeddingService, PAGERANK, RERANKER, SearchResult, TANTIVY_INDEX, TANTIVY_READER,
-        VECTOR_CENTROPOIDS, WebDocument, colors,
+        EmbeddingService, PAGERANK, RERANKER, TANTIVY_INDEX, TANTIVY_READER, VECTOR_CENTROPOIDS,
+        WebDocument, colors,
     },
     url_to_domain_id, url_to_id,
 };
@@ -78,157 +57,6 @@ const MAX_PER_DOMAIN: usize = 5;
 */
 pub static QUERY_CACHE: Lazy<RwLock<HashMap<String, Vec<WebDocument>>>> =
     Lazy::new(|| RwLock::new(HashMap::with_capacity(1_000)));
-
-/// # Calls [run_json]() and creates [SearchResult]
-///
-/// This funtion calls [run_json]() for JSON results.
-/// Generates result info, the 3 dots next to each result.
-/// Formats JSON as a [SearchResult] object and pushes them to a vector.
-///
-/// # Arguments
-///
-/// * `results` - Mutable vector of [SearchResult].
-/// * `query` - Search query.
-/// * `lang` - Prefered language.
-/// * `loc` - Prefered location.
-/// * `embedding_manager` - Query embedder.
-/// * `goggles` - Filters.
-/// * `mobile` - Is user using mobile.
-///
-/// # Returns
-///
-/// None
-///
-/// # Panics
-///
-/// Only if system runs out of memory.
-pub async fn run(
-    results: &mut Vec<SearchResult>,
-    query: &str,
-    lang: &str,
-    loc: &str,
-    embedding_service: &State<EmbeddingService>,
-    goggles: Vec<Arc<GoggleRules>>,
-    mobile: bool,
-) {
-    let local_results = run_json(query, lang, loc, embedding_service, goggles, mobile).await;
-
-    // Create final results
-    if let Some(arr) = Json(Json_Value::from(local_results)).as_array() {
-        for item in arr {
-            let url = item
-                .get("url")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string();
-
-            let html_id = item
-                .get("html")
-                .and_then(|v| v.as_str())
-                .and_then(|html_str| html_str.rsplit('/').next())
-                .and_then(|f| f.strip_suffix(".zst").or_else(|| f.strip_suffix(".txt")))
-                .map(|id| id.to_string());
-
-            let confidence = item
-                .get("confidence")
-                .and_then(|v| v.as_f64())
-                .unwrap_or(0.0);
-            let reading_level = match confidence {
-                c if c >= 70.0 => "📖 Easy Read",
-                c if c >= 40.0 => "🎓 Intermediate Read",
-                c if c > 0.0 => "🔬 Dense / Academic Read",
-                _ => "📄 Unknown Read",
-            }
-            .to_string();
-
-            let load_time = item.get("load").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let formatted_load = if load_time <= 0.0 {
-                "❓ Unknown speed"
-            } else if load_time < 1.0 {
-                "⚡⚡⚡"
-            } else if load_time < 2.5 {
-                "⚡⚡"
-            } else {
-                "⚡"
-            };
-
-            let raw_intent = item.get("intent").and_then(|v| v.as_u64()).unwrap_or(5);
-            let intent = match raw_intent {
-                0 => "🧠 Informational",
-                1 => "💳 Transactional",
-                2 => "🛍️ Commercial Investigation",
-                3 => "🧭 Navigational",
-                4 => "📍 Local",
-                _ => "🎯 Unknown Intent",
-            }
-            .to_string();
-
-            let raw_source = item.get("source").and_then(|v| v.as_str()).unwrap_or("");
-            let mut source_engine = raw_source.to_string();
-            if source_engine.is_empty() {
-                source_engine = "🔍 PriEco Index".to_string();
-            } else {
-                source_engine = source_engine.replace("FTS", "🔍 Keyword");
-                source_engine = source_engine.replace("IVF", "🤖 Semantic");
-                source_engine = source_engine.replace("DIR", "🗂️ Directory");
-                source_engine = source_engine.replace("DIS", "🌐 Discovered");
-            }
-
-            let content = item.get("content").and_then(|v| v.as_str()).unwrap_or("");
-
-            results.push(SearchResult {
-                url: url.clone(),
-                display_url: url
-                    .replace("https://", "")
-                    .replace("http://", "")
-                    .replace("www.", "")
-                    .trim_end_matches('/')
-                    .replace("/", " › "),
-                domain: get_domain(&url, true),
-                title: item
-                    .get("title")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string(),
-                description: item
-                    .get("description")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string(),
-                image: item
-                    .get("image")
-                    .and_then(|v| v.as_str())
-                    .filter(|s| !s.is_empty())
-                    .map(|s| {
-                        format!(
-                            "<img loading='lazy' alt='‎' src='/proxy?u={}'>",
-                            urlencoding::encode(s)
-                        )
-                    })
-                    .unwrap_or_default(),
-                favicon: item
-                    .get("favicon")
-                    .and_then(|v| v.as_str())
-                    .filter(|s| !s.is_empty())
-                    .map(|s| format!("static/prieco_favicons/{}", s))
-                    .unwrap_or_else(|| {
-                        let icon = format!(
-                            "https://fav.prieco.net/icon?url={}&size=32",
-                            urlencoding::encode(&get_domain(&url, false))
-                        );
-                        format!("/proxy?u={}", urlencoding::encode(&icon))
-                    }),
-                html_id,
-
-                reading_level,
-                formatted_load: formatted_load.to_string(),
-                source_engine,
-                content: content.to_string(),
-                intent,
-            });
-        }
-    }
-}
 
 /// # Search Index Pipeline
 ///
@@ -283,14 +111,16 @@ pub async fn run(
 /// # Panics
 ///
 /// Only if system runs out of memory.
-pub async fn run_json(
+pub async fn run(
     query: &str,
     lang: &str,
     loc: &str,
-    embedding_manager: &State<EmbeddingService>,
+    embedding_manager: &EmbeddingService,
+    iroh_endpoint: &Endpoint,
     goggles: Vec<Arc<GoggleRules>>,
     mobile: bool,
-) -> Vec<Json_Value> {
+    decentralized: bool,
+) -> Vec<WebDocument> {
     // Cache
     let cache_key = format!("{}_{}_{}", query, lang, loc);
     let cached_data = {
@@ -390,6 +220,7 @@ pub async fn run_json(
         let lang_clone = lang.to_string();
         let loc_clone = loc.to_string();
         let goggles_clone = goggles.clone();
+        let fts_query_tantivy = fts_query.clone();
         let tantivy_task = tokio::task::spawn_blocking(move || {
             if (matches!(lang_clone.as_str(), "zh" | "ja" | "ko" | "th")
                 && fts_original_query.chars().count() >= 15)
@@ -401,7 +232,7 @@ pub async fn run_json(
             let start = Instant::now();
 
             let res = search_tantivy(
-                &fts_query,
+                &fts_query_tantivy,
                 &lang_clone,
                 &loc_clone,
                 &intent,
@@ -423,6 +254,7 @@ pub async fn run_json(
             res
         });
 
+        let embed_vector = embed.clone();
         let vector_task = tokio::task::spawn_blocking(move || {
             if q_clone3.contains('"')
                 || q_clone3.contains(':')
@@ -437,7 +269,7 @@ pub async fn run_json(
             // search vector DB
             let s = Instant::now();
             let res: Vec<(u64, f32)> = VECTOR_CENTROPOIDS
-                .search(&embed, 0, NPROBS)
+                .search(&embed_vector, 0, NPROBS)
                 .unwrap_or_default();
             println!("Nprobs: {}", s.elapsed().as_secs_f32());
 
@@ -454,8 +286,47 @@ pub async fn run_json(
         let discovery_task =
             tokio::spawn(async move { discover_and_ping_domains(&q_clone4).await });
 
-        let (tantivy_ids, vector_ids, dir_ids, discovery_results) =
-            tokio::join!(tantivy_task, vector_task, dir_task, discovery_task);
+        let decentralized_task = if decentralized {
+            let term_hashes: HashSet<u64> = fts_query.split_whitespace().map(url_to_id).collect();
+
+            let centroids: Vec<usize> = VECTOR_CENTROPOIDS
+                .search(&embed, 0, NPROBS)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(id, _)| id as usize)
+                .collect();
+
+            let nodes = select_remote_nodes(&term_hashes, &centroids);
+            let endpoint = iroh_endpoint.clone();
+            let req = (query.to_string(), lang.to_string(), loc.to_string(), mobile);
+
+            tokio::spawn(async move {
+                let mut set = tokio::task::JoinSet::new();
+                for n in nodes {
+                    let ep = endpoint.clone();
+                    let r = req.clone();
+                    set.spawn(async move { ask_node(ep, n, r).await });
+                }
+
+                let mut dec_results = Vec::new();
+                while let Some(res) = set.join_next().await {
+                    if let Ok(docs) = res {
+                        dec_results.extend(docs);
+                    }
+                }
+                dec_results
+            })
+        } else {
+            tokio::spawn(async { Vec::<WebDocument>::new() })
+        };
+
+        let (tantivy_ids, vector_ids, dir_ids, discovery_results, dec_results) = tokio::join!(
+            tantivy_task,
+            vector_task,
+            dir_task,
+            discovery_task,
+            decentralized_task
+        );
 
         let total_elapsed = total_start.elapsed().as_secs_f32();
         println!("Total concurrent time {total_elapsed:.3}s");
@@ -477,17 +348,20 @@ pub async fn run_json(
         let mut vector_results: Vec<WebDocument> =
             fetched_results.remove("IVF").unwrap_or_default();
         let mut discovery_results: Vec<WebDocument> = discovery_results.unwrap_or_default();
+        let mut decentralized_results: Vec<WebDocument> = dec_results.unwrap_or_default();
 
         // Sort each result vector in-place by search_score descending
         dir_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
         tantivy_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
         vector_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
         discovery_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+        decentralized_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
 
         println!("DIR: {}", dir_results.len());
         println!("Tantivy: {}", tantivy_results.len());
         println!("IVF: {}", vector_results.len());
         println!("DIS: {}", discovery_results.len());
+        println!("P2P: {}", decentralized_results.len());
 
         // RRF Merge & Deduplicate
         let mut results: Vec<WebDocument> = ranking::rrf::run(
@@ -498,6 +372,7 @@ pub async fn run_json(
             tantivy_results,
             vector_results,
             discovery_results,
+            decentralized_results,
             60.0,
         );
 
@@ -615,24 +490,7 @@ pub async fn run_json(
     }
 
     // Trim results
-    let shown_results: Vec<WebDocument> = results.iter().take(20).cloned().collect();
-    let serialized_sites: Vec<_> = shown_results
-        .into_iter()
-        .filter_map(|s| match serde_json::to_value(s) {
-            Ok(value) => Some(value),
-            Err(e) => {
-                println!(
-                    "{}Serialization error: {}{}",
-                    colors::YELLOW,
-                    e,
-                    colors::RESET
-                );
-                None
-            }
-        })
-        .collect();
-
-    serialized_sites
+    results.iter().take(20).cloned().collect()
 }
 
 /* Index search functions */

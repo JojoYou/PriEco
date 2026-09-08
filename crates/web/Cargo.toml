@@ -50,6 +50,11 @@ rayon = { workspace = true }
 fjall = { workspace = true }
 aes-gcm = { workspace = true }
 regex = { workspace = true }
+iroh = { workspace = true }
+iroh-gossip  = { workspace = true }
+futures-lite = { workspace = true }
+data-encoding = { workspace = true }
+n0-future = { workspace = true }
 
 [features]
 default = []

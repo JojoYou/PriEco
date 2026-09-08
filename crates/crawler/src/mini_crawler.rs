@@ -66,8 +66,8 @@ pub async fn run() {
             );
 
             let upload_url = format!(
-                "{}/api/worker/submit?id={}&batch_id={}",
-                MASTER_URL, PRIECO_CONFIG.worker_id, task.batch_id
+                "{}/api/worker/submit?batch_id={}",
+                MASTER_URL, task.batch_id
             );
 
             loop {
@@ -122,10 +122,7 @@ pub async fn run() {
     loop {
         // Fetch URLs
         let urls_req = CLIENT
-            .get(format!(
-                "{}/api/worker/urls?id={}",
-                MASTER_URL, PRIECO_CONFIG.worker_id,
-            ))
+            .get(format!("{}/api/worker/urls", MASTER_URL,))
             .send()
             .await;
 
@@ -288,7 +285,7 @@ pub async fn run() {
 
 /* Helper functions */
 /// Description: Checks if URL is valid
-/// 
+///
 /// Input: URL
 /// Output: true if valid, false otherwise
 pub fn is_valid_url(input: &str) -> bool {
