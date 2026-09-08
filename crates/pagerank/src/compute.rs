@@ -28,9 +28,7 @@ use zstd::{Decoder, Encoder};
 /*
   Import own libraries
 */
-use crate::{
-    import::{hashing, merge, translate},
-};
+use crate::import::{hashing, merge, translate};
 use prieco_core::{
     FINAL_SCORES, ID_MAP_FILE,
     globals::{PAGERANK, PageRank, colors, icons},
@@ -98,7 +96,7 @@ impl IdMap {
 }
 
 /// Description: Decide how to proceed and call responsible functions to import connections to the graph and compute pagerank
-/// 
+///
 /// Input: None
 /// Output: None
 pub fn run() {
@@ -257,13 +255,15 @@ pub fn run() {
         colors::RESET
     );
 
-    *PAGERANK.write() = Arc::new(PageRank::open(ID_MAP_FILE, FINAL_SCORES).unwrap());
+    *PAGERANK.write() = PageRank::open(ID_MAP_FILE, FINAL_SCORES).ok().map(Arc::new);
 
-    println!(
-        "{}: Google: {}",
-        icons::PAGERANK_ICON,
-        PAGERANK.read().get_score("https://www.google.com/")
-    );
+    let google_score = PAGERANK
+        .read()
+        .as_ref()
+        .map(|pr| pr.get_score("https://www.google.com/"))
+        .unwrap_or(0.0);
+
+    println!("{}: Google: {}", icons::PAGERANK_ICON, google_score);
 }
 
 /* Caller functions */

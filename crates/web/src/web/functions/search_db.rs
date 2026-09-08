@@ -32,6 +32,7 @@ use std::{
   Import external libraries
 */
 use chrono::NaiveDate;
+use iroh::{Endpoint, EndpointAddr};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use rayon::{iter::ParallelIterator, slice::ParallelSlice};
@@ -51,6 +52,7 @@ use zstd::bulk::Decompressor;
 */
 use crate::web::functions::{
     additional::discover::discover_and_ping_domains,
+    decentralized::{FedQuery, IROH_ENDPOINT, PROFILE_CACHE},
     general::get_domain,
     ranking::{self, goggles::GoggleRules},
 };
@@ -302,6 +304,9 @@ pub async fn run_json(
     let q_clone = query.to_string();
     let q_clone3 = q_clone.clone();
     let q_clone4 = q_clone.to_string();
+    let q_clone5 = q_clone.to_string();
+    let lang_clone2 = lang.to_string();
+    let loc_clone2 = loc.to_string();
 
     let mut fts_query = normalize_search_operators(&q_clone);
     let fts_original_query = fts_query.clone();
@@ -454,6 +459,95 @@ pub async fn run_json(
         let discovery_task =
             tokio::spawn(async move { discover_and_ping_domains(&q_clone4).await });
 
+        let experts_task = tokio::spawn(async move {
+            let start = std::time::Instant::now();
+            let mut federated_results = Vec::new();
+
+            let query_words: Vec<u64> = q_clone5
+                .split_whitespace()
+                .map(|w| url_to_id(&w.to_lowercase()))
+                .collect();
+
+            // Isolate the lock guard in a strict block scope
+            let mut scored_nodes: Vec<(iroh::PublicKey, usize)> = {
+                let cache = PROFILE_CACHE.read();
+                cache
+                    .iter()
+                    .map(|(pub_key, profile)| {
+                        let mut score = 0;
+                        for w in &query_words {
+                            if profile.rare_keywords.binary_search(w).is_ok() {
+                                score += 10;
+                            }
+                        }
+                        (*pub_key, score)
+                    })
+                    .collect()
+            }; // The non-Send guard is strictly destroyed here
+
+            scored_nodes.sort_unstable_by_key(|&(_, score)| std::cmp::Reverse(score));
+            let best_nodes: Vec<iroh::PublicKey> =
+                scored_nodes.into_iter().take(4).map(|(pk, _)| pk).collect();
+
+            println!(
+                "🌐 Gossip Cache Size: {}. Selected {} peer(s) to query.",
+                PROFILE_CACHE.read().len(),
+                best_nodes.len()
+            );
+
+            let fed_query = FedQuery {
+                query: q_clone5,
+                lang: lang_clone2,
+                loc: loc_clone2,
+            };
+
+            if let Ok(payload) = serde_json::to_vec(&fed_query) {
+                if let Some(endpoint) = IROH_ENDPOINT.get() {
+                    let mut handles = Vec::new();
+
+                    for pub_key in best_nodes {
+                        let ep = endpoint.clone();
+                        let pl = payload.clone();
+
+                        handles.push(tokio::spawn(async move {
+                            // Create EndpointAddr instead of NodeAddr
+                            let node_addr = EndpointAddr::from(pub_key);
+
+                            if let Ok(conn) = ep.connect(node_addr, b"prieco-search/0").await {
+                                if let Ok((mut send, mut recv)) = conn.open_bi().await {
+                                    let _ = send.write_all(&pl).await;
+                                    let _ = send.finish();
+
+                                    // Pass the usize size limit directly
+                                    if let Ok(data) = recv.read_to_end(5 * 1024 * 1024).await {
+                                        // Explicitly cast to a slice to satisfy the compiler
+                                        let data_slice: &[u8] = &data;
+
+                                        if let Ok(res) =
+                                            serde_json::from_slice::<Vec<WebDocument>>(data_slice)
+                                        {
+                                            return Some(res);
+                                        }
+                                    }
+                                }
+                            }
+                            None
+                        }));
+                    }
+
+                    for handle in handles {
+                        if let Ok(Some(res)) = handle.await {
+                            federated_results.extend(res);
+                        }
+                    }
+                }
+            }
+
+            let elapsed = start.elapsed().as_secs_f32();
+            println!("Experts query took {elapsed:.3}s");
+            federated_results
+        });
+
         let (tantivy_ids, vector_ids, dir_ids, discovery_results) =
             tokio::join!(tantivy_task, vector_task, dir_task, discovery_task);
 
@@ -558,12 +652,22 @@ pub async fn run_json(
 
     let mut pagerank_time_total: f32 = 0.0;
     if pr_candidates > 0 {
-        let pr_start = Instant::now();
+        let pr_start = std::time::Instant::now();
+
+        // Lock once, check if it exists
+        let pr_guard = PAGERANK.read();
 
         for doc in results[..pr_candidates].iter_mut() {
-            let pr_score = PAGERANK.read().get_score(&doc.url);
+            let pr_score = if let Some(pr) = pr_guard.as_ref() {
+                pr.get_score(&doc.url)
+            } else {
+                0.0
+            };
+
             doc.search_score *= 1.0 + pr_score;
         }
+
+        drop(pr_guard);
         pagerank_time_total = pr_start.elapsed().as_secs_f32();
 
         results[..pr_candidates]

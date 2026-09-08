@@ -1,15 +1,25 @@
 use std::{
+    collections::HashMap,
     fmt::{self, Display, Formatter},
     str::FromStr,
+    sync::{Arc, OnceLock},
 };
 
-use iroh::{EndpointAddr, SecretKey};
-use iroh_gossip::TopicId;
+use iroh::{
+    Endpoint, EndpointAddr, PublicKey, SecretKey,
+    endpoint::Connection,
+    protocol::{AcceptError, ProtocolHandler},
+};
+use iroh_gossip::{Gossip, TopicId, api::Event};
+use n0_future::StreamExt;
+use once_cell::sync::Lazy;
+use parking_lot::RwLock;
 use prieco_core::{
-    PRIECO_CONFIG, TANTIVY_INDEX, TANTIVY_READER, file_exists, read_file, url_to_id, write_file,
+    PRIECO_CONFIG, TANTIVY_INDEX, TANTIVY_READER, WebDocument, file_exists, url_to_id, write_file,
 };
 use serde::{Deserialize, Serialize};
-use tokio::fs::write;
+
+pub static IROH_ENDPOINT: OnceLock<Endpoint> = OnceLock::new();
 
 // Ticket
 #[derive(Debug, Serialize, Deserialize)]
@@ -85,21 +95,34 @@ pub struct NodeProfile {
 }
 
 pub fn build_node_profile(node_id: [u8; 32]) -> NodeProfile {
-    let mut top_centroids: Vec<usize> = std::fs::read_dir(&PRIECO_CONFIG.vector_path)
+    // Vector index
+    let mut centroid_sizes: Vec<(usize, u64)> = std::fs::read_dir(&PRIECO_CONFIG.vector_path)
         .into_iter()
         .flatten()
         .filter_map(|e| e.ok())
-        .filter_map(|e| e.file_name().into_string().ok())
-        .filter_map(|name| {
-            name.strip_prefix("bucket_")?
+        .filter_map(|e| {
+            let name = e.file_name().into_string().ok()?;
+            let id = name
+                .strip_prefix("bucket_")?
                 .strip_suffix(".bin.zst")?
                 .parse::<usize>()
-                .ok()
+                .ok()?;
+            let meta = e.metadata().ok()?;
+            Some((id, meta.len()))
         })
+        .collect();
+
+    centroid_sizes.sort_unstable_by_key(|&(_, size)| std::cmp::Reverse(size));
+
+    let mut top_centroids: Vec<usize> = centroid_sizes
+        .into_iter()
+        .take(1000)
+        .map(|(id, _)| id)
         .collect();
 
     top_centroids.sort_unstable();
 
+    // FTS index
     let mut rare_keywords = Vec::new();
     let schema = TANTIVY_INDEX.schema();
 
@@ -135,5 +158,122 @@ pub fn build_node_profile(node_id: [u8; 32]) -> NodeProfile {
         node_id,
         top_centroids,
         rare_keywords,
+    }
+}
+
+pub static PROFILE_CACHE: Lazy<Arc<RwLock<HashMap<PublicKey, NodeProfile>>>> =
+    Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FedQuery {
+    pub query: String,
+    pub lang: String,
+    pub loc: String,
+}
+
+pub async fn run_gossip_sync(
+    gossip: Gossip,
+    topic: TopicId,
+    bootstrap_peers: Vec<PublicKey>,
+    my_profile: NodeProfile,
+    cache: Arc<RwLock<HashMap<PublicKey, NodeProfile>>>,
+) -> Result<(), String> {
+    let (sender, mut receiver) = gossip
+        .subscribe(topic, bootstrap_peers)
+        .await
+        .map_err(|e| e.to_string())?
+        .split();
+
+    receiver.joined().await.map_err(|e| e.to_string())?;
+
+    let make_msg = || -> Vec<u8> {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        serde_json::to_vec(&serde_json::json!({ "profile": my_profile, "nonce": nonce }))
+            .unwrap_or_default()
+    };
+
+    sender
+        .broadcast(make_msg().into())
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let mut heartbeat = tokio::time::interval(std::time::Duration::from_secs(30));
+    heartbeat.tick().await;
+
+    loop {
+        tokio::select! {
+            _ = heartbeat.tick() => {
+             let _ = sender.broadcast(make_msg().into()).await;
+            }
+            event = receiver.next() => {
+                let Some(event) = event else { break };
+
+                if let Ok(Event::Received(msg)) = event {
+                    let profile_opt = if let Ok(parsed) =
+                        serde_json::from_slice::<serde_json::Value>(&msg.content)
+                    {
+                        if let Some(profile_val) = parsed.get("profile") {
+                            serde_json::from_value::<NodeProfile>(profile_val.clone()).ok()
+                        } else {
+                            serde_json::from_slice::<NodeProfile>(&msg.content).ok()
+                        }
+                    } else {
+                        serde_json::from_slice::<NodeProfile>(&msg.content).ok()
+                    };
+
+                    if let Some(profile) = profile_opt {
+                        if let Ok(pub_key) = PublicKey::from_bytes(&profile.node_id) {
+                            let mut is_new_peer = false;
+                            {
+                                let mut c = cache.write();
+                                if !c.contains_key(&pub_key) {
+                                    println!("🤝 Discovered peer {} via Gossip!", pub_key);
+                                    c.insert(pub_key, profile);
+                                    is_new_peer = true;
+                                }
+                            }
+                            if is_new_peer {
+                                let _ = sender.broadcast(make_msg().into()).await;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+pub struct SearchProtocol {
+    pub my_profile: NodeProfile,
+}
+
+impl ProtocolHandler for SearchProtocol {
+    async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
+        let (mut send, mut recv) = connection.accept_bi().await?;
+
+        if let Ok(data) = recv.read_to_end(1024 * 1024).await {
+            let data_slice: &[u8] = &data;
+
+            if let Ok(fed_query) = serde_json::from_slice::<FedQuery>(data_slice) {
+                println!("📞 Received peer query!");
+
+                // Tmp, reply with resul
+                let results: Vec<WebDocument> = Vec::new();
+
+                if let Ok(response_bytes) = serde_json::to_vec(&results) {
+                    let _ = send.write_all(&response_bytes).await;
+                }
+            }
+        }
+
+        let _ = send.finish();
+        connection.closed().await;
+        Ok(())
     }
 }

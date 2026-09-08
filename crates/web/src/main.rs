@@ -11,8 +11,7 @@
 //!  TODO:
 
 use iroh::{Endpoint, PublicKey, SecretKey, endpoint::presets::N0, protocol::Router};
-use iroh_gossip::{ALPN, Gossip, TopicId, api::Event};
-use n0_future::StreamExt;
+use iroh_gossip::{ALPN, Gossip, TopicId};
 use once_cell::sync::Lazy;
 /*
   Set global allovator
@@ -62,14 +61,16 @@ use tokenizers::{PaddingDirection, PaddingParams, PaddingStrategy, Tokenizer};
 */
 pub mod web;
 use crate::web::{
-    functions::decentralized::{Ticket, get_iroh_secret},
+    functions::decentralized::{
+        IROH_ENDPOINT, PROFILE_CACHE, SearchProtocol, Ticket, build_node_profile, get_iroh_secret,
+        run_gossip_sync,
+    },
     routes::{apis::*, assets::*, pages::*},
 };
 use prieco_blob as blob;
 use prieco_core::{
     ANALYTICS, EmbeddingService, META_DECODER, PAGERANK, PRIECO_BLOBS, PRIECO_CONFIG, PRIECO_META,
-    PriEcoConfig, TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_TOKENIZER,
-    colors, icons,
+    TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_TOKENIZER, colors, icons,
 };
 use prieco_insert::db_insert;
 use prieco_mini_crawler::mini_crawler;
@@ -178,15 +179,24 @@ async fn rocket() -> _ {
         .bind()
         .await
         .unwrap();
+    let _ = IROH_ENDPOINT.set(iroh_endpoint.clone());
 
     let iroh_gossip: Gossip = Gossip::builder().spawn(iroh_endpoint.clone());
+
+    let pub_key_bytes = *iroh_secret_key.public().as_bytes();
+    let my_profile = build_node_profile(pub_key_bytes);
+    let search_protocol = SearchProtocol {
+        my_profile: my_profile.clone(),
+    };
+
     let iroh_router: Router = Router::builder(iroh_endpoint.clone())
         .accept(ALPN, iroh_gossip.clone())
+        .accept(b"prieco-search/0", search_protocol)
         .spawn();
     let mut iroh_peers: Vec<PublicKey> = vec![];
 
     let mut iroh_topic_id = TopicId::from_bytes([23u8; 32]);
-    if PRIECO_CONFIG.peer_ticket.is_empty() {
+    if !PRIECO_CONFIG.peer_ticket.is_empty() {
         if let Ok(peer_ticket) = Ticket::from_str(&PRIECO_CONFIG.peer_ticket) {
             iroh_topic_id = peer_ticket.topic;
 
@@ -208,6 +218,24 @@ async fn rocket() -> _ {
     };
 
     println!("Your ticket to invite others is: {}", ticket);
+
+    let gossip_clone = iroh_gossip.clone();
+    let cache_clone = PROFILE_CACHE.clone();
+    let topic_clone = iroh_topic_id;
+
+    tokio::spawn(async move {
+        if let Err(e) = run_gossip_sync(
+            gossip_clone,
+            topic_clone,
+            iroh_peers,
+            my_profile,
+            cache_clone,
+        )
+        .await
+        {
+            println!("Gossip sync failed: {}", e);
+        }
+    });
 
     // Spawn Thread Manager
     spawn(move || {
@@ -363,19 +391,20 @@ fn thread_manager() {
     };
 
     // Mini crawler
-    let mini_crawler_thread = if PRIECO_CONFIG.peer_ticket.is_empty() {
-        None
-    } else {
-        Some(spawn(move || {
-            let rt = Runtime::new().expect("Failed to create Tokio runtime for mini crawler");
+    let mini_crawler_thread =
+        if PRIECO_CONFIG.peer_ticket.is_empty() || PRIECO_CONFIG.worker_concurrent < 1 {
+            None
+        } else {
+            Some(spawn(move || {
+                let rt = Runtime::new().expect("Failed to create Tokio runtime for mini crawler");
 
-            while !stop_requested() {
-                rt.block_on(async {
-                    crate::mini_crawler::run().await;
-                });
-            }
-        }))
-    };
+                while !stop_requested() {
+                    rt.block_on(async {
+                        crate::mini_crawler::run().await;
+                    });
+                }
+            }))
+        };
 
     let _ = blob_thread.join();
     let _ = insert_thread.join();

@@ -1171,8 +1171,8 @@ impl CentroidIndex {
 /*
   PageRank
 */
-pub static PAGERANK: Lazy<RwLock<Arc<PageRank>>> =
-    Lazy::new(|| RwLock::new(Arc::new(PageRank::open(ID_MAP_FILE, FINAL_SCORES).unwrap())));
+pub static PAGERANK: Lazy<RwLock<Option<Arc<PageRank>>>> =
+    Lazy::new(|| RwLock::new(PageRank::open(ID_MAP_FILE, FINAL_SCORES).ok().map(Arc::new)));
 
 pub struct PageRank {
     _id_mmap: Mmap,
