@@ -521,7 +521,6 @@ pub async fn run_json(
         .filter_map(|s| serde_json::to_value(s).ok())
         .collect()
 }
-
 pub async fn run_core_search(
     query: &str,
     lang: &str,
@@ -536,6 +535,7 @@ pub async fn run_core_search(
     Vec<WebDocument>,
     Vec<WebDocument>,
 ) {
+    let total_start = std::time::Instant::now();
     let q_clone = query.to_string();
     let q_clone3 = q_clone.clone();
     let q_clone4 = q_clone.clone();
@@ -547,6 +547,7 @@ pub async fn run_core_search(
     let loc_clone = loc.to_string();
 
     let dir_task = tokio::task::spawn_blocking(move || {
+        let start = std::time::Instant::now();
         let trimmed = sanitize_string(q_clone.trim()).to_lowercase();
         let mut id_score_vec: Vec<(u64, f32)> = Vec::new();
 
@@ -563,6 +564,7 @@ pub async fn run_core_search(
             for prefix in &prefixes {
                 id_score_vec.push((url_to_id(&format!("{}{}/", prefix, domain)), 0.0));
             }
+            println!("DIR lookup took {:.3}s", start.elapsed().as_secs_f32());
             return id_score_vec;
         }
 
@@ -578,19 +580,23 @@ pub async fn run_core_search(
                 id_score_vec.push((url_to_id(&format!("{}{}{}/", prefix, trimmed, tld)), 0.0));
             }
         }
+
+        println!("DIR lookup took {:.3}s", start.elapsed().as_secs_f32());
         id_score_vec
     });
 
     let intent_clone = intent.clone();
     let goggles_clone = goggles.clone();
     let tantivy_task = tokio::task::spawn_blocking(move || {
+        let start = std::time::Instant::now();
         if (matches!(lang_clone.as_str(), "zh" | "ja" | "ko" | "th")
             && fts_original_query.chars().count() >= 15)
             || fts_original_query.split_whitespace().count() >= 8
         {
             return Vec::new();
         }
-        search_tantivy(
+
+        let res = search_tantivy(
             &fts_query,
             &lang_clone,
             &loc_clone,
@@ -598,10 +604,14 @@ pub async fn run_core_search(
             MAX_FTS,
             &goggles_clone,
         )
-        .unwrap_or_default()
+        .unwrap_or_default();
+
+        println!("Tantivy took {:.3}s", start.elapsed().as_secs_f32());
+        res
     });
 
     let vector_task = tokio::task::spawn_blocking(move || {
+        let start = std::time::Instant::now();
         if q_clone3.contains('"')
             || q_clone3.contains(':')
             || q_clone3.contains('-')
@@ -613,7 +623,10 @@ pub async fn run_core_search(
         let res: Vec<(u64, f32)> = VECTOR_CENTROPOIDS
             .search(&embed, 0, NPROBS)
             .unwrap_or_default();
-        res.into_iter().take(MAX_IVF).collect()
+
+        let final_res: Vec<(u64, f32)> = res.into_iter().take(MAX_IVF).collect();
+        println!("Vector search took {:.3}s", start.elapsed().as_secs_f32());
+        final_res
     });
 
     let discovery_task = tokio::spawn(async move {
@@ -627,12 +640,19 @@ pub async fn run_core_search(
     let (tantivy_ids, vector_ids, dir_ids, discovery_results) =
         tokio::join!(tantivy_task, vector_task, dir_task, discovery_task);
 
+    println!(
+        "Total concurrent query time {:.3}s",
+        total_start.elapsed().as_secs_f32()
+    );
+
     let mut engines_map: HashMap<&'static str, Vec<(u64, f32)>> = HashMap::new();
     engines_map.insert("FTS", tantivy_ids.unwrap_or_default());
     engines_map.insert("IVF", vector_ids.unwrap_or_default());
     engines_map.insert("DIR", dir_ids.unwrap_or_default());
 
+    let fetch_start = std::time::Instant::now();
     let mut fetched_results = fetch_documents(engines_map);
+    println!("Fetch took {:.3}s", fetch_start.elapsed().as_secs_f32());
 
     let mut dir_results: Vec<WebDocument> = fetched_results.remove("DIR").unwrap_or_default();
     let mut tantivy_results: Vec<WebDocument> = fetched_results.remove("FTS").unwrap_or_default();
@@ -643,6 +663,11 @@ pub async fn run_core_search(
     tantivy_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
     vector_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
     dis_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+
+    println!("DIR: {}", dir_results.len());
+    println!("Tantivy: {}", tantivy_results.len());
+    println!("IVF: {}", vector_results.len());
+    println!("DIS: {}", dis_results.len());
 
     (dir_results, tantivy_results, vector_results, dis_results)
 }

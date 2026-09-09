@@ -63,7 +63,7 @@ pub mod web;
 use crate::web::{
     functions::decentralized::{
         IROH_ENDPOINT, PROFILE_CACHE, SearchProtocol, Ticket, build_node_profile, get_iroh_secret,
-        run_gossip_sync,
+        gossip_sync,
     },
     routes::{apis::*, assets::*, pages::*},
 };
@@ -224,7 +224,7 @@ async fn rocket() -> _ {
     let topic_clone = iroh_topic_id;
 
     tokio::spawn(async move {
-        if let Err(e) = run_gossip_sync(
+        if let Err(e) = gossip_sync(
             gossip_clone,
             topic_clone,
             iroh_peers,

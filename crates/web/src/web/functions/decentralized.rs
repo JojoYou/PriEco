@@ -178,7 +178,7 @@ pub struct FedQuery {
     pub embed: Vec<f32>,
 }
 
-pub async fn run_gossip_sync(
+pub async fn gossip_sync(
     gossip: Gossip,
     topic: TopicId,
     bootstrap_peers: Vec<PublicKey>,
