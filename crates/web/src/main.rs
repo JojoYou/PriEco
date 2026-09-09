@@ -186,7 +186,7 @@ async fn rocket() -> _ {
     let pub_key_bytes = *iroh_secret_key.public().as_bytes();
     let my_profile = build_node_profile(pub_key_bytes);
     let search_protocol = SearchProtocol {
-        my_profile: my_profile.clone(),
+        profile: my_profile.clone(),
     };
 
     let iroh_router: Router = Router::builder(iroh_endpoint.clone())

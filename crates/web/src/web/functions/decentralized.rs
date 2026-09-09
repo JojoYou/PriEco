@@ -1,10 +1,19 @@
+/*
+  Import system libraries
+*/
 use std::{
+    cmp::Reverse,
     collections::HashMap,
     fmt::{self, Display, Formatter},
-    str::FromStr,
+    str::{FromStr, from_utf8},
     sync::{Arc, OnceLock},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
+/*
+  Import external libraries
+*/
+use data_encoding::BASE32_NOPAD;
 use iroh::{
     Endpoint, EndpointAddr, PublicKey, SecretKey,
     endpoint::Connection,
@@ -18,12 +27,20 @@ use prieco_core::{
     PRIECO_CONFIG, TANTIVY_INDEX, TANTIVY_READER, WebDocument, file_exists, url_to_id, write_file,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use tokio::time::interval;
 
+/*
+  Import own libraries
+*/
 use crate::web::functions::{
     ranking::{self},
     search_db::run_core_search,
 };
 
+/*
+  Constants
+*/
 pub static IROH_ENDPOINT: OnceLock<Endpoint> = OnceLock::new();
 
 // Ticket
@@ -45,7 +62,7 @@ impl Ticket {
 
 impl Display for Ticket {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let mut text = data_encoding::BASE32_NOPAD.encode(&self.to_bytes()[..]);
+        let mut text = BASE32_NOPAD.encode(&self.to_bytes()[..]);
         text.make_ascii_lowercase();
         write!(f, "{}", text)
     }
@@ -55,7 +72,7 @@ impl FromStr for Ticket {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let bytes = data_encoding::BASE32_NOPAD
+        let bytes = BASE32_NOPAD
             .decode(s.to_ascii_uppercase().as_bytes())
             .map_err(|e| e.to_string())?;
 
@@ -93,10 +110,48 @@ fn gen_iroh_secret() -> SecretKey {
 
 // Profile
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeywordBloom {
+    pub bits: Vec<u8>,
+}
+
+impl KeywordBloom {
+    pub fn new() -> Self {
+        Self { bits: vec![0; 512] }
+    }
+
+    pub fn insert(&mut self, keyword_hash: u64) {
+        let (h1, h2, h3) = Self::derive_hashes(keyword_hash);
+        self.set_bit(h1);
+        self.set_bit(h2);
+        self.set_bit(h3);
+    }
+
+    pub fn contains(&self, keyword_hash: u64) -> bool {
+        let (h1, h2, h3) = Self::derive_hashes(keyword_hash);
+        self.get_bit(h1) && self.get_bit(h2) && self.get_bit(h3)
+    }
+
+    fn derive_hashes(h: u64) -> (usize, usize, usize) {
+        let h1 = (h & 0xFFF) as usize;
+        let h2 = ((h >> 12) & 0xFFF) as usize;
+        let h3 = ((h >> 24) & 0xFFF) as usize;
+        (h1, h2, h3)
+    }
+
+    fn set_bit(&mut self, index: usize) {
+        self.bits[index / 8] |= 1 << (index % 8);
+    }
+
+    fn get_bit(&self, index: usize) -> bool {
+        (self.bits[index / 8] & (1 << (index % 8))) != 0
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeProfile {
     pub node_id: [u8; 32],
     pub top_centroids: Vec<usize>,
-    pub rare_keywords: Vec<u64>,
+    pub keyword: KeywordBloom,
 }
 
 pub fn build_node_profile(node_id: [u8; 32]) -> NodeProfile {
@@ -117,7 +172,7 @@ pub fn build_node_profile(node_id: [u8; 32]) -> NodeProfile {
         })
         .collect();
 
-    centroid_sizes.sort_unstable_by_key(|&(_, size)| std::cmp::Reverse(size));
+    centroid_sizes.sort_unstable_by_key(|&(_, size)| Reverse(size));
 
     let mut top_centroids: Vec<usize> = centroid_sizes
         .into_iter()
@@ -128,7 +183,7 @@ pub fn build_node_profile(node_id: [u8; 32]) -> NodeProfile {
     top_centroids.sort_unstable();
 
     // FTS index
-    let mut rare_keywords = Vec::new();
+    let mut keyword = KeywordBloom::new();
     let schema = TANTIVY_INDEX.schema();
 
     if let Ok(content_field) = schema.get_field("content") {
@@ -138,7 +193,7 @@ pub fn build_node_profile(node_id: [u8; 32]) -> NodeProfile {
 
                 if let Ok(mut stream) = inv.terms().stream() {
                     while let Some((bytes, info)) = stream.next() {
-                        if let Ok(s) = std::str::from_utf8(bytes) {
+                        if let Ok(s) = from_utf8(bytes) {
                             if info.doc_freq >= 5 && info.doc_freq <= 50 {
                                 terms.push((s.to_string(), info.doc_freq as u64));
                             }
@@ -148,26 +203,22 @@ pub fn build_node_profile(node_id: [u8; 32]) -> NodeProfile {
 
                 terms.sort_by_key(|(_, df)| *df);
 
-                rare_keywords = terms
-                    .into_iter()
-                    .take(50)
-                    .map(|(t, _)| url_to_id(&t))
-                    .collect();
+                for (t, _) in terms.into_iter().take(5000) {
+                    keyword.insert(url_to_id(&t));
+                }
             }
         }
     }
 
-    rare_keywords.sort_unstable();
-
     NodeProfile {
         node_id,
         top_centroids,
-        rare_keywords,
+        keyword,
     }
 }
 
 pub static PROFILE_CACHE: Lazy<Arc<RwLock<HashMap<PublicKey, NodeProfile>>>> =
-    Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
+    Lazy::new(|| Arc::new(RwLock::new(HashMap::with_capacity(1_000))));
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FedQuery {
@@ -194,8 +245,8 @@ pub async fn gossip_sync(
     receiver.joined().await.map_err(|e| e.to_string())?;
 
     let make_msg = || -> Vec<u8> {
-        let nonce = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
 
@@ -207,7 +258,7 @@ pub async fn gossip_sync(
         println!("Initial broadcast failed: {}", e);
     }
 
-    let mut heartbeat = tokio::time::interval(std::time::Duration::from_secs(30));
+    let mut heartbeat = interval(std::time::Duration::from_secs(30));
     heartbeat.tick().await;
 
     loop {
@@ -220,7 +271,7 @@ pub async fn gossip_sync(
                 let Some(event) = event else { break };
 
                 if let Ok(Event::Received(msg)) = event {
-                    if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&msg.content) {
+                    if let Ok(parsed) = serde_json::from_slice::<Value>(&msg.content) {
 
                         if let Some(offline_node_id) = parsed.get("offline") {
                             if let Ok(node_id_bytes) = serde_json::from_value::<[u8; 32]>(offline_node_id.clone()) {
@@ -284,7 +335,7 @@ pub async fn gossip_sync(
 
 #[derive(Debug, Clone)]
 pub struct SearchProtocol {
-    pub my_profile: NodeProfile,
+    pub profile: NodeProfile,
 }
 
 impl ProtocolHandler for SearchProtocol {

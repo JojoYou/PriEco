@@ -22,6 +22,7 @@
   Import system libraries
 */
 use std::{
+    cmp::Reverse,
     collections::{HashMap, HashSet},
     sync::Arc,
 };
@@ -30,7 +31,7 @@ use std::{
   Import external libraries
 */
 use chrono::NaiveDate;
-use iroh::EndpointAddr;
+use iroh::{EndpointAddr, PublicKey};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use rayon::{iter::ParallelIterator, slice::ParallelSlice};
@@ -333,20 +334,20 @@ pub async fn run_json(
         let loc_clone_fed = loc.to_string();
 
         let experts_task = tokio::spawn(async move {
-            let mut federated_results = Vec::new();
+            let mut decentralized_results = Vec::new();
             let query_words: Vec<u64> = q_clone_fed
                 .split_whitespace()
                 .map(|w| url_to_id(&w.to_lowercase()))
                 .collect();
 
-            let mut scored_nodes: Vec<(iroh::PublicKey, usize)> = {
+            let mut scored_nodes: Vec<(PublicKey, usize)> = {
                 let cache = PROFILE_CACHE.read();
                 cache
                     .iter()
                     .map(|(pub_key, profile)| {
                         let mut score = 0;
                         for w in &query_words {
-                            if profile.rare_keywords.binary_search(w).is_ok() {
+                            if profile.keyword.contains(*w) {
                                 score += 10;
                             }
                         }
@@ -355,8 +356,8 @@ pub async fn run_json(
                     .collect()
             };
 
-            scored_nodes.sort_unstable_by_key(|&(_, score)| std::cmp::Reverse(score));
-            let best_nodes: Vec<iroh::PublicKey> =
+            scored_nodes.sort_unstable_by_key(|&(_, score)| Reverse(score));
+            let best_nodes: Vec<PublicKey> =
                 scored_nodes.into_iter().take(4).map(|(pk, _)| pk).collect();
 
             let fed_query = FedQuery {
@@ -393,13 +394,14 @@ pub async fn run_json(
                     }
                     for handle in handles {
                         if let Ok(Some(res)) = handle.await {
-                            federated_results.extend(res);
+                            decentralized_results.extend(res);
                         }
                     }
                 }
             }
-            federated_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
-            federated_results
+            decentralized_results
+                .sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+            decentralized_results
         });
 
         let federated_results = experts_task.await.unwrap_or_default();
