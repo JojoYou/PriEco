@@ -7,7 +7,7 @@ use std::{
     fmt::{self, Display, Formatter},
     str::{FromStr, from_utf8},
     sync::{Arc, OnceLock},
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 /*
@@ -258,7 +258,7 @@ pub async fn gossip_sync(
         println!("Initial broadcast failed: {}", e);
     }
 
-    let mut heartbeat = interval(std::time::Duration::from_secs(30));
+    let mut heartbeat = interval(Duration::from_hours(2));
     heartbeat.tick().await;
 
     loop {
