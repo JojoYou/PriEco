@@ -293,34 +293,19 @@ pub async fn run_json(
     goggles: Vec<Arc<GoggleRules>>,
     mobile: bool,
 ) -> Vec<Json_Value> {
-    // Cache
     let cache_key = format!("{}_{}_{}", query, lang, loc);
     let cached_data = {
         let cache = QUERY_CACHE.read();
         cache.get(&cache_key).cloned()
     };
 
-    // Clone query to pass to parallel index calls
-    let q_clone = query.to_string();
-    let q_clone3 = q_clone.clone();
-    let q_clone4 = q_clone.to_string();
-    let q_clone5 = q_clone.to_string();
-    let lang_clone2 = lang.to_string();
-    let loc_clone2 = loc.to_string();
-
-    let mut fts_query = normalize_search_operators(&q_clone);
-    let fts_original_query = fts_query.clone();
-
-    // Clasify query intent
+    let mut fts_query = normalize_search_operators(query);
     let (intent, coords) = ranking::meaning::call::process_query(&mut fts_query, lang, loc);
-
     fts_query = normalize_search_operators(&fts_query);
 
     let mut results = if let Some(cached) = cached_data {
         cached
     } else {
-        // Context
-        // Local query, add loc to embed for better locality
         let contextual_query = if intent == QueryIntent::Local
             || (query.split_whitespace().count() <= 2 && !loc.is_empty())
         {
@@ -329,146 +314,33 @@ pub async fn run_json(
             query.to_string()
         };
 
-        // Query to embed (vector)
-        let embed: Vec<f32> = match embedding_manager.embed_query(&contextual_query).await {
-            Ok(embed) => embed,
-            Err(e) => {
-                println!(
-                    "{}Failed to embed query!{}  {}",
-                    colors::YELLOW,
-                    colors::RESET,
-                    e
-                );
-                return Vec::new();
-            }
-        };
-
-        let total_start = Instant::now();
-
-        let dir_task = tokio::task::spawn_blocking(move || {
-            let start = Instant::now();
-            let trimmed = sanitize_string(q_clone.trim()).to_lowercase();
-            let mut id_score_vec: Vec<(u64, f32)> = Vec::new();
-
-            // Filter: site:
-            if trimmed.starts_with("site:") {
-                let domain = trimmed.to_lowercase().replace("site:", "");
-                let prefixes = [
-                    "",
-                    "www.",
-                    "http://",
-                    "http://www.",
-                    "https://",
-                    "https://www.",
-                ];
-                for prefix in &prefixes {
-                    let url = format!("{}{}/", prefix, domain);
-                    let id = url_to_id(&url);
-                    id_score_vec.push((id, 0.0));
-                }
-
-                return id_score_vec;
-            }
-
-            for tld in &[".com", ".net", ".org"] {
-                for prefix in &[
-                    "",
-                    "www.",
-                    "http://",
-                    "http://www.",
-                    "https://",
-                    "https://www.",
-                ] {
-                    let url = format!("{}{}{}/", prefix, trimmed, tld);
-                    let id = url_to_id(&url);
-                    id_score_vec.push((id, 0.0));
-                }
-            }
-
-            let elapsed = start.elapsed().as_secs_f32();
-            println!("DIR lookup took {elapsed:.3}s");
-            stdout().flush().ok();
-
-            id_score_vec
-        });
-
-        let lang_clone = lang.to_string();
-        let loc_clone = loc.to_string();
-        let goggles_clone = goggles.clone();
-        let tantivy_task = tokio::task::spawn_blocking(move || {
-            if (matches!(lang_clone.as_str(), "zh" | "ja" | "ko" | "th")
-                && fts_original_query.chars().count() >= 15)
-                || fts_original_query.split_whitespace().count() >= 8
-            {
-                return Vec::new();
-            }
-
-            let start = Instant::now();
-
-            let res = search_tantivy(
-                &fts_query,
-                &lang_clone,
-                &loc_clone,
-                &intent,
-                MAX_FTS,
-                &goggles_clone,
-            )
+        let embed: Vec<f32> = embedding_manager
+            .embed_query(&contextual_query)
+            .await
             .unwrap_or_default();
 
-            let elapsed = start.elapsed().as_secs_f32();
-            println!(
-                "Tantivy took {elapsed:.3}s, {} segments",
-                TANTIVY_INDEX
-                    .searchable_segments()
-                    .unwrap_or_default()
-                    .len()
-            );
-            stdout().flush().ok();
+        let (dir_results, tantivy_results, vector_results, discovery_results) = run_core_search(
+            query,
+            lang,
+            loc,
+            &intent,
+            embed.clone(),
+            true,
+            goggles.clone(),
+        )
+        .await;
 
-            res
-        });
-
-        let vector_task = tokio::task::spawn_blocking(move || {
-            if q_clone3.contains('"')
-                || q_clone3.contains(':')
-                || q_clone3.contains('-')
-                || q_clone3.contains('|')
-                || q_clone3.contains(" OR ")
-            {
-                return Vec::new();
-            }
-            let start = Instant::now();
-
-            // search vector DB
-            let s = Instant::now();
-            let res: Vec<(u64, f32)> = VECTOR_CENTROPOIDS
-                .search(&embed, 0, NPROBS)
-                .unwrap_or_default();
-            println!("Nprobs: {}", s.elapsed().as_secs_f32());
-
-            let vector_ids: Vec<(u64, f32)> = res.iter().take(MAX_IVF).cloned().collect();
-
-            let elapsed = start.elapsed().as_secs_f32();
-            println!("Vector search took {elapsed:.3}s");
-            stdout().flush().ok();
-
-            vector_ids
-        });
-
-        // Web discovery
-        let discovery_task =
-            tokio::spawn(async move { discover_and_ping_domains(&q_clone4).await });
+        let q_clone_fed = query.to_string();
+        let lang_clone_fed = lang.to_string();
+        let loc_clone_fed = loc.to_string();
 
         let experts_task = tokio::spawn(async move {
-            let start = std::time::Instant::now();
             let mut federated_results = Vec::new();
-
-            let query_words: Vec<u64> = q_clone5
+            let query_words: Vec<u64> = q_clone_fed
                 .split_whitespace()
                 .map(|w| url_to_id(&w.to_lowercase()))
                 .collect();
 
-            // Isolate the lock guard in a strict block scope
             let mut scored_nodes: Vec<(iroh::PublicKey, usize)> = {
                 let cache = PROFILE_CACHE.read();
                 cache
@@ -483,48 +355,35 @@ pub async fn run_json(
                         (*pub_key, score)
                     })
                     .collect()
-            }; // The non-Send guard is strictly destroyed here
+            };
 
             scored_nodes.sort_unstable_by_key(|&(_, score)| std::cmp::Reverse(score));
             let best_nodes: Vec<iroh::PublicKey> =
                 scored_nodes.into_iter().take(4).map(|(pk, _)| pk).collect();
 
-            println!(
-                "🌐 Gossip Cache Size: {}. Selected {} peer(s) to query.",
-                PROFILE_CACHE.read().len(),
-                best_nodes.len()
-            );
-
             let fed_query = FedQuery {
-                query: q_clone5,
-                lang: lang_clone2,
-                loc: loc_clone2,
+                query: q_clone_fed,
+                lang: lang_clone_fed,
+                loc: loc_clone_fed,
+                depth: 1,
+                embed: embed.clone(),
             };
 
             if let Ok(payload) = serde_json::to_vec(&fed_query) {
                 if let Some(endpoint) = IROH_ENDPOINT.get() {
                     let mut handles = Vec::new();
-
                     for pub_key in best_nodes {
                         let ep = endpoint.clone();
                         let pl = payload.clone();
-
                         handles.push(tokio::spawn(async move {
-                            // Create EndpointAddr instead of NodeAddr
                             let node_addr = EndpointAddr::from(pub_key);
-
                             if let Ok(conn) = ep.connect(node_addr, b"prieco-search/0").await {
                                 if let Ok((mut send, mut recv)) = conn.open_bi().await {
                                     let _ = send.write_all(&pl).await;
                                     let _ = send.finish();
-
-                                    // Pass the usize size limit directly
                                     if let Ok(data) = recv.read_to_end(5 * 1024 * 1024).await {
-                                        // Explicitly cast to a slice to satisfy the compiler
-                                        let data_slice: &[u8] = &data;
-
                                         if let Ok(res) =
-                                            serde_json::from_slice::<Vec<WebDocument>>(data_slice)
+                                            serde_json::from_slice::<Vec<WebDocument>>(&data)
                                         {
                                             return Some(res);
                                         }
@@ -534,7 +393,6 @@ pub async fn run_json(
                             None
                         }));
                     }
-
                     for handle in handles {
                         if let Ok(Some(res)) = handle.await {
                             federated_results.extend(res);
@@ -542,49 +400,13 @@ pub async fn run_json(
                     }
                 }
             }
-
-            let elapsed = start.elapsed().as_secs_f32();
-            println!("Experts query took {elapsed:.3}s");
+            federated_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
             federated_results
         });
 
-        let (tantivy_ids, vector_ids, dir_ids, discovery_results) =
-            tokio::join!(tantivy_task, vector_task, dir_task, discovery_task);
+        let federated_results = experts_task.await.unwrap_or_default();
 
-        let total_elapsed = total_start.elapsed().as_secs_f32();
-        println!("Total concurrent time {total_elapsed:.3}s");
-
-        // Fetch documents
-        let mut engines_map: HashMap<&'static str, Vec<(u64, f32)>> = HashMap::new();
-        engines_map.insert("FTS", tantivy_ids.unwrap_or_default());
-        engines_map.insert("IVF", vector_ids.unwrap_or_default());
-        engines_map.insert("DIR", dir_ids.unwrap_or_default());
-
-        let z = Instant::now();
-        let mut fetched_results = fetch_documents(engines_map);
-        println!("Fetch took: {}s", z.elapsed().as_secs_f32());
-
-        // Split
-        let mut dir_results: Vec<WebDocument> = fetched_results.remove("DIR").unwrap_or_default();
-        let mut tantivy_results: Vec<WebDocument> =
-            fetched_results.remove("FTS").unwrap_or_default();
-        let mut vector_results: Vec<WebDocument> =
-            fetched_results.remove("IVF").unwrap_or_default();
-        let mut discovery_results: Vec<WebDocument> = discovery_results.unwrap_or_default();
-
-        // Sort each result vector in-place by search_score descending
-        dir_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
-        tantivy_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
-        vector_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
-        discovery_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
-
-        println!("DIR: {}", dir_results.len());
-        println!("Tantivy: {}", tantivy_results.len());
-        println!("IVF: {}", vector_results.len());
-        println!("DIS: {}", discovery_results.len());
-
-        // RRF Merge & Deduplicate
-        let mut results: Vec<WebDocument> = ranking::rrf::run(
+        let mut rrf_results: Vec<WebDocument> = ranking::rrf::run(
             query,
             lang,
             &intent,
@@ -592,41 +414,41 @@ pub async fn run_json(
             tantivy_results,
             vector_results,
             discovery_results,
+            federated_results,
             60.0,
         );
 
         // Temp remove blocked terms
         let blocked_terms: &[&str] = &["porn", "sex", "dick", "fap"];
-        results.retain(|doc| {
+        rrf_results.retain(|doc| {
             let haystack = format!(
                 "{} {} {} {} {}",
                 doc.title.to_lowercase(),
                 doc.description.to_lowercase(),
                 doc.url.to_lowercase(),
                 doc.content.to_lowercase(),
-                doc.keywords.to_lowercase(),
+                doc.keywords.to_lowercase()
             );
             !blocked_terms.iter().any(|term| haystack.contains(term))
         });
+
         {
             let mut cache = QUERY_CACHE.write();
             if cache.len() > 5_000 {
                 cache.clear();
             }
-            cache.insert(cache_key, results.clone());
+            cache.insert(cache_key, rrf_results.clone());
         }
 
-        results
+        rrf_results
     };
 
     // Goggle Discard filter
     results.retain(|doc| {
         let domain_id = url_to_domain_id(&doc.url);
-
         if goggles.iter().any(|g| g.discard.contains(&domain_id)) {
             return false;
         }
-
         let discard_active = goggles.iter().any(|g| g.discard_by_default);
         if discard_active {
             return goggles.iter().any(|g| {
@@ -634,74 +456,51 @@ pub async fn run_json(
                     || g.path.iter().any(|(p, _)| path_matches(&doc.url, p))
             });
         }
-
         true
     });
 
     if results.is_empty() {
-        println!("No results → confidence = 0.0 (force fallback)");
         return Vec::new();
     }
 
-    // Hand ranking
     ranking::hand::run(&mut results, query, lang, loc, &intent, &goggles, mobile);
     results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
 
     // PageRank
     let pr_candidates = results.len().min(PAGERANK_CUTOFF);
-
-    let mut pagerank_time_total: f32 = 0.0;
     if pr_candidates > 0 {
-        let pr_start = std::time::Instant::now();
-
-        // Lock once, check if it exists
         let pr_guard = PAGERANK.read();
-
         for doc in results[..pr_candidates].iter_mut() {
             let pr_score = if let Some(pr) = pr_guard.as_ref() {
                 pr.get_score(&doc.url)
             } else {
                 0.0
             };
-
             doc.search_score *= 1.0 + pr_score;
         }
-
         drop(pr_guard);
-        pagerank_time_total = pr_start.elapsed().as_secs_f32();
-
         results[..pr_candidates]
             .sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
     }
 
     // RERANKER
-    let mut rerank_time_total: f32 = 0.0;
     let nn_candidates = results.len().min(RERANK_CUTOFF);
     if nn_candidates > 0 {
-        let rerank_start = Instant::now();
         let passages: Vec<String> = results[..nn_candidates]
             .iter()
             .map(|d| format!("{} {} {}", d.title, d.description, d.content))
             .collect();
-
         let scores = RERANKER
             .score_batch(query, &passages)
             .await
             .unwrap_or_else(|_| vec![0.0; nn_candidates]);
-        rerank_time_total = rerank_start.elapsed().as_secs_f32();
-
         for (i, doc) in results[..nn_candidates].iter_mut().enumerate() {
             let neural_relevance = 1.0 / (1.0 + (-scores[i]).exp());
             doc.search_score *= neural_relevance;
         }
-
         results[..nn_candidates]
             .sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
     }
-    println!(
-        "PageRank: {}s\nRerank: {}s",
-        pagerank_time_total, rerank_time_total
-    );
 
     // Cap result count from a single domain
     if !query.contains("site:") {
@@ -718,25 +517,136 @@ pub async fn run_json(
         results = deduped;
     }
 
-    // Trim results
     let shown_results: Vec<WebDocument> = results.iter().take(20).cloned().collect();
-    let serialized_sites: Vec<_> = shown_results
+    shown_results
         .into_iter()
-        .filter_map(|s| match serde_json::to_value(s) {
-            Ok(value) => Some(value),
-            Err(e) => {
-                println!(
-                    "{}Serialization error: {}{}",
-                    colors::YELLOW,
-                    e,
-                    colors::RESET
-                );
-                None
-            }
-        })
-        .collect();
+        .filter_map(|s| serde_json::to_value(s).ok())
+        .collect()
+}
 
-    serialized_sites
+pub async fn run_core_search(
+    query: &str,
+    lang: &str,
+    loc: &str,
+    intent: &QueryIntent,
+    embed: Vec<f32>,
+    run_discovery: bool,
+    goggles: Vec<Arc<GoggleRules>>,
+) -> (
+    Vec<WebDocument>,
+    Vec<WebDocument>,
+    Vec<WebDocument>,
+    Vec<WebDocument>,
+) {
+    let q_clone = query.to_string();
+    let q_clone3 = q_clone.clone();
+    let q_clone4 = q_clone.clone();
+
+    let mut fts_query = normalize_search_operators(&q_clone);
+    let fts_original_query = fts_query.clone();
+
+    let lang_clone = lang.to_string();
+    let loc_clone = loc.to_string();
+
+    let dir_task = tokio::task::spawn_blocking(move || {
+        let trimmed = sanitize_string(q_clone.trim()).to_lowercase();
+        let mut id_score_vec: Vec<(u64, f32)> = Vec::new();
+
+        if trimmed.starts_with("site:") {
+            let domain = trimmed.to_lowercase().replace("site:", "");
+            let prefixes = [
+                "",
+                "www.",
+                "http://",
+                "http://www.",
+                "https://",
+                "https://www.",
+            ];
+            for prefix in &prefixes {
+                id_score_vec.push((url_to_id(&format!("{}{}/", prefix, domain)), 0.0));
+            }
+            return id_score_vec;
+        }
+
+        for tld in &[".com", ".net", ".org"] {
+            for prefix in &[
+                "",
+                "www.",
+                "http://",
+                "http://www.",
+                "https://",
+                "https://www.",
+            ] {
+                id_score_vec.push((url_to_id(&format!("{}{}{}/", prefix, trimmed, tld)), 0.0));
+            }
+        }
+        id_score_vec
+    });
+
+    let intent_clone = intent.clone();
+    let goggles_clone = goggles.clone();
+    let tantivy_task = tokio::task::spawn_blocking(move || {
+        if (matches!(lang_clone.as_str(), "zh" | "ja" | "ko" | "th")
+            && fts_original_query.chars().count() >= 15)
+            || fts_original_query.split_whitespace().count() >= 8
+        {
+            return Vec::new();
+        }
+        search_tantivy(
+            &fts_query,
+            &lang_clone,
+            &loc_clone,
+            &intent_clone,
+            MAX_FTS,
+            &goggles_clone,
+        )
+        .unwrap_or_default()
+    });
+
+    let vector_task = tokio::task::spawn_blocking(move || {
+        if q_clone3.contains('"')
+            || q_clone3.contains(':')
+            || q_clone3.contains('-')
+            || q_clone3.contains('|')
+            || q_clone3.contains(" OR ")
+        {
+            return Vec::new();
+        }
+        let res: Vec<(u64, f32)> = VECTOR_CENTROPOIDS
+            .search(&embed, 0, NPROBS)
+            .unwrap_or_default();
+        res.into_iter().take(MAX_IVF).collect()
+    });
+
+    let discovery_task = tokio::spawn(async move {
+        if run_discovery {
+            discover_and_ping_domains(&q_clone4).await
+        } else {
+            Vec::new()
+        }
+    });
+
+    let (tantivy_ids, vector_ids, dir_ids, discovery_results) =
+        tokio::join!(tantivy_task, vector_task, dir_task, discovery_task);
+
+    let mut engines_map: HashMap<&'static str, Vec<(u64, f32)>> = HashMap::new();
+    engines_map.insert("FTS", tantivy_ids.unwrap_or_default());
+    engines_map.insert("IVF", vector_ids.unwrap_or_default());
+    engines_map.insert("DIR", dir_ids.unwrap_or_default());
+
+    let mut fetched_results = fetch_documents(engines_map);
+
+    let mut dir_results: Vec<WebDocument> = fetched_results.remove("DIR").unwrap_or_default();
+    let mut tantivy_results: Vec<WebDocument> = fetched_results.remove("FTS").unwrap_or_default();
+    let mut vector_results: Vec<WebDocument> = fetched_results.remove("IVF").unwrap_or_default();
+    let mut dis_results: Vec<WebDocument> = discovery_results.unwrap_or_default();
+
+    dir_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+    tantivy_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+    vector_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+    dis_results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+
+    (dir_results, tantivy_results, vector_results, dis_results)
 }
 
 /* Index search functions */

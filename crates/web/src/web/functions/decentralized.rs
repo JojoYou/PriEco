@@ -15,9 +15,15 @@ use n0_future::StreamExt;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use prieco_core::{
-    PRIECO_CONFIG, TANTIVY_INDEX, TANTIVY_READER, WebDocument, file_exists, url_to_id, write_file,
+    PRIECO_CONFIG, QueryIntent, TANTIVY_INDEX, TANTIVY_READER, WebDocument, file_exists, url_to_id,
+    write_file,
 };
 use serde::{Deserialize, Serialize};
+
+use crate::web::functions::{
+    ranking::{self, meaning::call::process_query},
+    search_db::run_core_search,
+};
 
 pub static IROH_ENDPOINT: OnceLock<Endpoint> = OnceLock::new();
 
@@ -116,7 +122,7 @@ pub fn build_node_profile(node_id: [u8; 32]) -> NodeProfile {
 
     let mut top_centroids: Vec<usize> = centroid_sizes
         .into_iter()
-        .take(1000)
+        .take(20)
         .map(|(id, _)| id)
         .collect();
 
@@ -145,7 +151,7 @@ pub fn build_node_profile(node_id: [u8; 32]) -> NodeProfile {
 
                 rare_keywords = terms
                     .into_iter()
-                    .take(5_000)
+                    .take(50)
                     .map(|(t, _)| url_to_id(&t))
                     .collect();
             }
@@ -169,6 +175,8 @@ pub struct FedQuery {
     pub query: String,
     pub lang: String,
     pub loc: String,
+    pub depth: u8,
+    pub embed: Vec<f32>,
 }
 
 pub async fn run_gossip_sync(
@@ -207,8 +215,9 @@ pub async fn run_gossip_sync(
     loop {
         tokio::select! {
             _ = heartbeat.tick() => {
-             let _ = sender.broadcast(make_msg().into()).await;
-            }
+                if let Err(e) = sender.broadcast(make_msg().into()).await {
+                    println!("Broadcast failed: {}", e);
+                }            }
             event = receiver.next() => {
                 let Some(event) = event else { break };
 
@@ -258,13 +267,50 @@ impl ProtocolHandler for SearchProtocol {
         let (mut send, mut recv) = connection.accept_bi().await?;
 
         if let Ok(data) = recv.read_to_end(1024 * 1024).await {
-            let data_slice: &[u8] = &data;
+            if let Ok(fed_query) = serde_json::from_slice::<FedQuery>(&data) {
+                println!(
+                    "📞 Received peer query: {} (Depth: {})",
+                    fed_query.query, fed_query.depth
+                );
 
-            if let Ok(fed_query) = serde_json::from_slice::<FedQuery>(data_slice) {
-                println!("📞 Received peer query!");
+                let mut results: Vec<WebDocument> = Vec::new();
 
-                // Tmp, reply with resul
-                let results: Vec<WebDocument> = Vec::new();
+                if fed_query.depth > 0 {
+                    let mut fts_query = fed_query.query.clone();
+                    let (intent, _) = ranking::meaning::call::process_query(
+                        &mut fts_query,
+                        &fed_query.lang,
+                        &fed_query.loc,
+                    );
+
+                    let embed = fed_query.embed.clone();
+
+                    let (dir_results, tantivy_results, vector_results, dis_results) =
+                        run_core_search(
+                            &fed_query.query,
+                            &fed_query.lang,
+                            &fed_query.loc,
+                            &intent,
+                            embed,
+                            false,
+                            Vec::new(),
+                        )
+                        .await;
+
+                    results = ranking::rrf::run(
+                        &fed_query.query,
+                        &fed_query.lang,
+                        &intent,
+                        dir_results,
+                        tantivy_results,
+                        vector_results,
+                        dis_results,
+                        Vec::new(),
+                        60.0,
+                    );
+
+                    results.truncate(20);
+                }
 
                 if let Ok(response_bytes) = serde_json::to_vec(&results) {
                     let _ = send.write_all(&response_bytes).await;
