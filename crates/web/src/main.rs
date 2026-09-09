@@ -246,6 +246,9 @@ async fn rocket() -> _ {
     tokio::spawn(async { ANALYTICS.background_purge_task().await });
 
     // Launch Rocket web server
+    let gossip_shutdown = iroh_gossip.clone();
+    let topic_shutdown = iroh_topic_id;
+    let pub_key_shutdown = pub_key_bytes;
     rocket::build()
         .configure(
             rocket::Config::figment()
@@ -256,8 +259,22 @@ async fn rocket() -> _ {
         .manage(embedding_service)
         .attach(GlobalHeaders)
         .attach(Template::fairing())
-        .attach(AdHoc::on_shutdown("Flush DBs", |_| {
+        .attach(AdHoc::on_shutdown("Flush DBs", move |_| {
             Box::pin(async move {
+                println!("Broadcasting offline status to peers...");
+                let offline_msg = serde_json::json!({
+                    "offline": pub_key_shutdown
+                });
+
+                if let Ok(payload) = serde_json::to_vec(&offline_msg) {
+                    if let Ok(ticket) = gossip_shutdown.subscribe(topic_shutdown, vec![]).await {
+                        let (sender, _) = ticket.split();
+                        let _ = sender.broadcast(payload.into()).await;
+                    }
+                }
+
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
                 if let Err(e) = iroh_router.shutdown().await {
                     eprintln!("Failed to shut down iroh router! {}", e);
                 };

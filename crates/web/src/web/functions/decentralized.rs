@@ -15,13 +15,12 @@ use n0_future::StreamExt;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use prieco_core::{
-    PRIECO_CONFIG, QueryIntent, TANTIVY_INDEX, TANTIVY_READER, WebDocument, file_exists, url_to_id,
-    write_file,
+    PRIECO_CONFIG, TANTIVY_INDEX, TANTIVY_READER, WebDocument, file_exists, url_to_id, write_file,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::web::functions::{
-    ranking::{self, meaning::call::process_query},
+    ranking::{self},
     search_db::run_core_search,
 };
 
@@ -204,10 +203,9 @@ pub async fn run_gossip_sync(
             .unwrap_or_default()
     };
 
-    sender
-        .broadcast(make_msg().into())
-        .await
-        .map_err(|e| e.to_string())?;
+    if let Err(e) = sender.broadcast(make_msg().into()).await {
+        println!("Initial broadcast failed: {}", e);
+    }
 
     let mut heartbeat = tokio::time::interval(std::time::Duration::from_secs(30));
     heartbeat.tick().await;
@@ -217,36 +215,63 @@ pub async fn run_gossip_sync(
             _ = heartbeat.tick() => {
                 if let Err(e) = sender.broadcast(make_msg().into()).await {
                     println!("Broadcast failed: {}", e);
-                }            }
+                }               }
             event = receiver.next() => {
                 let Some(event) = event else { break };
 
                 if let Ok(Event::Received(msg)) = event {
-                    let profile_opt = if let Ok(parsed) =
-                        serde_json::from_slice::<serde_json::Value>(&msg.content)
-                    {
-                        if let Some(profile_val) = parsed.get("profile") {
+                    if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&msg.content) {
+
+                        if let Some(offline_node_id) = parsed.get("offline") {
+                            if let Ok(node_id_bytes) = serde_json::from_value::<[u8; 32]>(offline_node_id.clone()) {
+                                if let Ok(pub_key) = PublicKey::from_bytes(&node_id_bytes) {
+                                    let mut c = cache.write();
+                                    if c.remove(&pub_key).is_some() {
+                                        println!("👋 Peer {} went offline and was removed from cache.", pub_key);
+                                    }
+                                }
+                            }
+                            continue;
+                        }
+
+                        let profile_opt = if let Some(profile_val) = parsed.get("profile") {
                             serde_json::from_value::<NodeProfile>(profile_val.clone()).ok()
                         } else {
                             serde_json::from_slice::<NodeProfile>(&msg.content).ok()
-                        }
-                    } else {
-                        serde_json::from_slice::<NodeProfile>(&msg.content).ok()
-                    };
+                        };
 
-                    if let Some(profile) = profile_opt {
-                        if let Ok(pub_key) = PublicKey::from_bytes(&profile.node_id) {
-                            let mut is_new_peer = false;
-                            {
-                                let mut c = cache.write();
-                                if !c.contains_key(&pub_key) {
-                                    println!("🤝 Discovered peer {} via Gossip!", pub_key);
-                                    c.insert(pub_key, profile);
-                                    is_new_peer = true;
+                        if let Some(profile) = profile_opt {
+                            if let Ok(pub_key) = PublicKey::from_bytes(&profile.node_id) {
+                                let mut is_new_peer = false;
+                                {
+                                    let mut c = cache.write();
+                                    if !c.contains_key(&pub_key) {
+                                        println!("🤝 Discovered peer {} via Gossip!", pub_key);
+                                        c.insert(pub_key, profile);
+                                        is_new_peer = true;
+                                    }
+                                }
+
+                                if is_new_peer {
+                                    let _ = sender.broadcast(make_msg().into()).await;
                                 }
                             }
-                            if is_new_peer {
-                                let _ = sender.broadcast(make_msg().into()).await;
+                        }
+                    } else {
+                        if let Ok(profile) = serde_json::from_slice::<NodeProfile>(&msg.content) {
+                            if let Ok(pub_key) = PublicKey::from_bytes(&profile.node_id) {
+                                let mut is_new_peer = false;
+                                {
+                                    let mut c = cache.write();
+                                    if !c.contains_key(&pub_key) {
+                                        println!("🤝 Discovered peer {} via Gossip!", pub_key);
+                                        c.insert(pub_key, profile);
+                                        is_new_peer = true;
+                                    }
+                                }
+                                if is_new_peer {
+                                    let _ = sender.broadcast(make_msg().into()).await;
+                                }
                             }
                         }
                     }
@@ -268,10 +293,7 @@ impl ProtocolHandler for SearchProtocol {
 
         if let Ok(data) = recv.read_to_end(1024 * 1024).await {
             if let Ok(fed_query) = serde_json::from_slice::<FedQuery>(&data) {
-                println!(
-                    "📞 Received peer query: {} (Depth: {})",
-                    fed_query.query, fed_query.depth
-                );
+                println!("📞 Received peer query!",);
 
                 let mut results: Vec<WebDocument> = Vec::new();
 

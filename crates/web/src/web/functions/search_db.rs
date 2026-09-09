@@ -23,16 +23,14 @@
 */
 use std::{
     collections::{HashMap, HashSet},
-    io::{Write, stdout},
     sync::Arc,
-    time::Instant,
 };
 
 /*
   Import external libraries
 */
 use chrono::NaiveDate;
-use iroh::{Endpoint, EndpointAddr};
+use iroh::EndpointAddr;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use rayon::{iter::ParallelIterator, slice::ParallelSlice};
@@ -542,7 +540,7 @@ pub async fn run_core_search(
     let q_clone3 = q_clone.clone();
     let q_clone4 = q_clone.clone();
 
-    let mut fts_query = normalize_search_operators(&q_clone);
+    let fts_query = normalize_search_operators(&q_clone);
     let fts_original_query = fts_query.clone();
 
     let lang_clone = lang.to_string();
