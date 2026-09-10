@@ -74,11 +74,6 @@ RUN mkdir -p /app/data/tantivy /app/data/blobs /app/data/meta /app/data/vectors 
 
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
+
+USER prieco
 ENTRYPOINT ["/app/entrypoint.sh"]
-
-
-
-# Build
-# docker build -t prieco:latest .
-# Run (example)
-# docker run -it -p 8088:8080   -v ./prieco_data:/app/data   -u root   --name prieco   prieco:latest

@@ -5,8 +5,14 @@ services:
       dockerfile: Dockerfile
     image: prieco:latest
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     read_only: true
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 2G
     tmpfs:
       - /tmp
     volumes:
@@ -17,7 +23,7 @@ services:
       - ./models:/app/models:ro,z
       - ./data/bge/model.onnx:/app/data/model.onnx:ro,z
     environment:
-      - PRIECO_IP=0.0.0.0
+      - PRIECO_IP=127.0.0.1
       - PRIECO_PORT=8000
       - PRIECO_TANTIVY=data/tantivy
       - PRIECO_META=data/meta
