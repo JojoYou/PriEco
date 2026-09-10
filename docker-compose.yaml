@@ -15,7 +15,7 @@ services:
       - meta:/app/data/meta
       - vectors:/app/data/vectors
       - ./models:/app/models:ro,z
-      - ./GeoLite2-Country.mmdb:/app/GeoLite2-Country.mmdb:ro,z
+      - ./data/bge/model.onnx:/app/data/model.onnx:ro,z
     environment:
       - PRIECO_IP=0.0.0.0
       - PRIECO_PORT=8000
@@ -23,7 +23,7 @@ services:
       - PRIECO_META=data/meta
       - PRIECO_VECTOR=data/vectors
       - PRIECO_BLOB=data/blobs
-      - PRIECO_ID=123
+      - PRIECO_TICKET=
       - PRIECO_WORKERS=0
     labels:
       # Podman auto-update
