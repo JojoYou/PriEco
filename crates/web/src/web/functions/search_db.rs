@@ -34,6 +34,7 @@ use chrono::NaiveDate;
 use iroh::{EndpointAddr, PublicKey};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
+use prieco_insert::db_insert::ingest_peer_documents;
 use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 use regex::Regex;
 use rocket::{State, serde::json::Json};
@@ -111,8 +112,18 @@ pub async fn run(
     embedding_service: &State<EmbeddingService>,
     goggles: Vec<Arc<GoggleRules>>,
     mobile: bool,
+    decentralize: bool,
 ) {
-    let local_results = run_json(query, lang, loc, embedding_service, goggles, mobile).await;
+    let local_results = run_json(
+        query,
+        lang,
+        loc,
+        embedding_service,
+        goggles,
+        mobile,
+        decentralize,
+    )
+    .await;
 
     // Create final results
     if let Some(arr) = Json(Json_Value::from(local_results)).as_array() {
@@ -291,6 +302,7 @@ pub async fn run_json(
     embedding_manager: &State<EmbeddingService>,
     goggles: Vec<Arc<GoggleRules>>,
     mobile: bool,
+    decentralize: bool,
 ) -> Vec<Json_Value> {
     let cache_key = format!("{}_{}_{}", query, lang, loc);
     let cached_data = {
@@ -318,93 +330,121 @@ pub async fn run_json(
             .await
             .unwrap_or_default();
 
-        let (dir_results, tantivy_results, vector_results, discovery_results) = run_core_search(
-            query,
-            lang,
-            loc,
-            &intent,
-            embed.clone(),
-            true,
-            goggles.clone(),
-        )
-        .await;
+        let q_clone = query.to_string();
+        let q_clone2 = query.to_string();
+        let l_clone = lang.to_string();
+        let lang_clone = lang.to_string();
+        let loc_clone = loc.to_string();
+        let loc_clone2 = loc.to_string();
+        let int_clone = intent.clone();
+        let emb_clone = embed.clone();
+        let g_clone = goggles.clone();
 
-        let q_clone_fed = query.to_string();
-        let lang_clone_fed = lang.to_string();
-        let loc_clone_fed = loc.to_string();
+        let local_task = tokio::spawn(async move {
+            run_core_search(
+                &q_clone, &l_clone, &loc_clone, &int_clone, emb_clone, true, g_clone,
+            )
+            .await
+        });
 
         let experts_task = tokio::spawn(async move {
-            let mut decentralized_results = Vec::new();
-            let query_words: Vec<u64> = q_clone_fed
-                .split_whitespace()
-                .map(|w| url_to_id(&w.to_lowercase()))
-                .collect();
+            if !decentralize {
+                return Vec::new();
+            }
 
-            let mut scored_nodes: Vec<(PublicKey, usize)> = {
-                let cache = PROFILE_CACHE.read();
-                cache
-                    .iter()
-                    .map(|(pub_key, profile)| {
-                        let mut score = 0;
-                        for w in &query_words {
-                            if profile.keyword.contains(*w) {
-                                score += 10;
+            let search_future = async {
+                let mut decentralized_results = Vec::new();
+                let query_words: Vec<u64> = q_clone2
+                    .split_whitespace()
+                    .map(|w| url_to_id(&w.to_lowercase()))
+                    .collect();
+
+                let mut scored_nodes: Vec<(PublicKey, usize)> = {
+                    let cache = PROFILE_CACHE.read();
+                    cache
+                        .iter()
+                        .map(|(pub_key, profile)| {
+                            let mut score = 0;
+                            for w in &query_words {
+                                if profile.keyword.contains(*w) {
+                                    score += 10;
+                                }
                             }
-                        }
-                        (*pub_key, score)
-                    })
-                    .collect()
-            };
+                            (*pub_key, score)
+                        })
+                        .collect()
+                };
 
-            scored_nodes.sort_unstable_by_key(|&(_, score)| Reverse(score));
-            let best_nodes: Vec<PublicKey> =
-                scored_nodes.into_iter().take(4).map(|(pk, _)| pk).collect();
+                scored_nodes.sort_unstable_by_key(|&(_, score)| Reverse(score));
+                let best_nodes: Vec<PublicKey> =
+                    scored_nodes.into_iter().take(4).map(|(pk, _)| pk).collect();
 
-            let fed_query = FedQuery {
-                query: q_clone_fed,
-                lang: lang_clone_fed,
-                loc: loc_clone_fed,
-                depth: 1,
-                embed: embed.clone(),
-            };
+                let fed_query = FedQuery {
+                    query: q_clone2,
+                    lang: lang_clone,
+                    loc: loc_clone2,
+                    depth: 1,
+                    embed: embed.clone(),
+                };
 
-            if let Ok(payload) = serde_json::to_vec(&fed_query) {
-                if let Some(endpoint) = IROH_ENDPOINT.get() {
-                    let mut handles = Vec::new();
-                    for pub_key in best_nodes {
-                        let ep = endpoint.clone();
-                        let pl = payload.clone();
-                        handles.push(tokio::spawn(async move {
-                            let node_addr = EndpointAddr::from(pub_key);
-                            if let Ok(conn) = ep.connect(node_addr, b"prieco-search/0").await {
-                                if let Ok((mut send, mut recv)) = conn.open_bi().await {
-                                    let _ = send.write_all(&pl).await;
-                                    let _ = send.finish();
-                                    if let Ok(data) = recv.read_to_end(5 * 1024 * 1024).await {
-                                        if let Ok(res) =
-                                            serde_json::from_slice::<Vec<WebDocument>>(&data)
-                                        {
-                                            return Some(res);
+                if let Ok(payload) = serde_json::to_vec(&fed_query) {
+                    if let Some(endpoint) = IROH_ENDPOINT.get() {
+                        let mut handles = Vec::new();
+                        for pub_key in best_nodes {
+                            let ep = endpoint.clone();
+                            let pl = payload.clone();
+                            handles.push(tokio::spawn(async move {
+                                let node_addr = EndpointAddr::from(pub_key);
+                                if let Ok(conn) = ep.connect(node_addr, b"prieco-search/0").await {
+                                    if let Ok((mut send, mut recv)) = conn.open_bi().await {
+                                        let _ = send.write_all(&pl).await;
+                                        let _ = send.finish();
+                                        if let Ok(data) = recv.read_to_end(5 * 1024 * 1024).await {
+                                            if let Ok(res) =
+                                                serde_json::from_slice::<Vec<WebDocument>>(&data)
+                                            {
+                                                return Some(res);
+                                            }
                                         }
                                     }
                                 }
+                                None
+                            }));
+                        }
+                        for handle in handles {
+                            if let Ok(Some(res)) = handle.await {
+                                decentralized_results.extend(res);
                             }
-                            None
-                        }));
-                    }
-                    for handle in handles {
-                        if let Ok(Some(res)) = handle.await {
-                            decentralized_results.extend(res);
                         }
                     }
                 }
+                decentralized_results
+                    .sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+                decentralized_results
+            };
+
+            match tokio::time::timeout(std::time::Duration::from_millis(2500), search_future).await
+            {
+                Ok(results) => results,
+                Err(_) => {
+                    println!("Decentralized search timed out!");
+                    Vec::new()
+                }
             }
-            decentralized_results
-                .sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
-            decentralized_results
         });
 
-        let federated_results = experts_task.await.unwrap_or_default();
+        let (local_res, dec_res) = tokio::join!(local_task, experts_task);
+
+        let (dir_results, tantivy_results, vector_results, discovery_results) = local_res.unwrap();
+        let decentralized_results = dec_res.unwrap();
+
+        // Local save
+        if !decentralized_results.is_empty() {
+            let docs_to_ingest = decentralized_results.clone();
+            tokio::spawn(async move {
+                ingest_peer_documents(docs_to_ingest).await;
+            });
+        }
 
         let mut rrf_results: Vec<WebDocument> = ranking::rrf::run(
             query,
@@ -414,7 +454,7 @@ pub async fn run_json(
             tantivy_results,
             vector_results,
             discovery_results,
-            federated_results,
+            decentralized_results,
             60.0,
         );
 

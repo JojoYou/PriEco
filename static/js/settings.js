@@ -170,3 +170,16 @@ if (check_post) {
     location.reload();
   };
 }
+
+// Decentralized
+let check_dec = document.getElementById("check_dec");
+if (check_dec) {
+  check_dec.checked = !/(?:^|;\s*)dec=0/.test(document.cookie);
+
+  check_dec.onchange = async () => {
+    document.cookie = `dec=${check_dec.checked ? ";max-age=0" : "0;max-age=31536000"};path=/;SameSite=Lax;Secure`;
+
+    await clearPriecoCache();
+    location.reload();
+  };
+}

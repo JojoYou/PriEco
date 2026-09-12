@@ -14,7 +14,7 @@ use std::{
   Import external libraries
 */
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use zip::ZipArchive;
+use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 use zstd::stream::Encoder as ZstdEncoder;
 
 /*
@@ -23,7 +23,7 @@ use zstd::stream::Encoder as ZstdEncoder;
 use prieco_core::{
     ID_SIZE, INSERTER_IMPORT_DIR, META_DICTIONARY, PRIECO_CONFIG, PRIECO_META, RECORD_SIZE,
     TANTIVY_INDEX, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_DIM, WebDocument, file_exists,
-    globals::icons, url_to_domain_id, url_to_id,
+    get_dir_size, globals::icons, url_to_domain_id, url_to_id,
 };
 
 /*
@@ -71,7 +71,7 @@ impl Write for AtomicFile {
 pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     create_dir_all(INSERTER_IMPORT_DIR)?;
 
-    // Get *results.txt
+    // Get files
     let mut files = Vec::with_capacity(100);
     for entry in read_dir(INSERTER_IMPORT_DIR)? {
         let entry = entry?;
@@ -87,6 +87,35 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     if files.is_empty() {
         println!("{}: No files found. Sleeping...", icons::DB_INSERT,);
         return Ok(());
+    }
+
+    // Enforce disk limit
+    let max_storage_gb: u64 = std::env::var("PRIECO_MAX_STORAGE")
+        .unwrap_or_else(|_| "0".to_string())
+        .parse()
+        .unwrap_or(0);
+    if max_storage_gb > 0 {
+        let max_storage_bytes: u64 = max_storage_gb * 1024 * 1024 * 1024;
+
+        let tantivy_size = get_dir_size("/app/data/tantivy");
+        let meta_size = get_dir_size("/app/data/meta");
+        let vector_size = get_dir_size(&PRIECO_CONFIG.vector_path);
+        let total_size = tantivy_size + meta_size + vector_size;
+
+        if total_size >= max_storage_bytes {
+            println!(
+                "{}: Storage limit reached ({:.2} GB / {} GB). Skipping insertion and discarding pending documents.",
+                icons::DB_INSERT,
+                total_size as f64 / 1_073_741_824.0,
+                max_storage_gb
+            );
+
+            // Delete the zip files
+            for file_name in &files {
+                let _ = remove_file(file_name);
+            }
+            return Ok(());
+        }
     }
 
     let schema = TANTIVY_INDEX.schema();
@@ -215,7 +244,9 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     intent_field => doc.intent as u64
                 ))?;
 
-                vector_idx_buffer.insert(id, vector);
+                if !vector.iter().all(|&val| val == 0.0) {
+                    vector_idx_buffer.insert(id, vector);
+                }
 
                 inserted += 1;
                 if inserted % 1_000 == 0 {
@@ -494,4 +525,71 @@ pub fn merge_bucket(bucket_id: usize) -> Result<(), Box<dyn Error + Send + Sync>
 /* Helper functions */
 fn sanitize_string(s: &str) -> String {
     s.replace('"', "").replace('\'', "")
+}
+
+/* Insert Decentralized results */
+pub async fn ingest_peer_documents(docs: Vec<WebDocument>) {
+    tokio::task::spawn_blocking(move || {
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+
+        let file_path = format!(
+            "{}/peer_import_{}.zip",
+            prieco_core::INSERTER_IMPORT_DIR,
+            timestamp
+        );
+
+        let file = match File::create(&file_path) {
+            Ok(f) => f,
+            Err(_) => return,
+        };
+
+        let mut zip = ZipWriter::new(file);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+
+        if zip
+            .start_file(format!("peer_{}.txt", timestamp), options)
+            .is_err()
+        {
+            return;
+        }
+
+        let vector = vec!["0.0"; prieco_core::VECTOR_DIM].join(" ");
+
+        for doc in docs {
+            let points = format!(
+                "[{}, {}, {}, {}]",
+                doc.confidence, doc.effort, doc.qna, doc.sts
+            );
+
+            let line = format!(
+                "{}<-->{}<-->{}<-->{}<-->{}<-->{}<-->{}<-->{}<-->{}<-->{}<-->{}<-->{}<-->{}<-->{}<-->{}<-->{}<-->{}<-->{}\n",
+                doc.url,
+                doc.title,
+                doc.description,
+                doc.content,
+                doc.favicon,
+                doc.image,
+                doc.keywords,
+                doc.safe_s,
+                doc.html,
+                doc.lang,
+                doc.loc,
+                points,
+                doc.load,
+                doc.date,
+                doc.intent,
+                doc.is_mobile,
+                doc.has_500_words,
+                vector
+            );
+
+            let _ = zip.write_all(line.as_bytes());
+        }
+
+        let _ = zip.finish();
+    });
 }

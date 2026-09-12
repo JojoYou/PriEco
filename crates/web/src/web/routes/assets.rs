@@ -52,7 +52,7 @@ impl<'r> Responder<'r, 'static> for DecompressedImage {
 }
 
 /// Description: PriEco service worker. Had to be moved to root
-/// 
+///
 /// Input:
 /// Output: Service worker JS
 #[get("/sw.js")]
@@ -144,13 +144,14 @@ pub fn osd(host: &Host) -> RawXml<String> {
   Input: JS template name, Optional type, Optional language, Optional location, Optional query
   Output:
 */
-#[get("/static/js/hbs/<script_name>?<t>&<lang>&<loc>&<q>")]
+#[get("/static/js/hbs/<script_name>?<t>&<lang>&<loc>&<q>&<dec>")]
 pub fn script(
     script_name: &str,
     t: Option<&str>,
     lang: Option<&str>,
     loc: Option<&str>,
     q: Option<&str>,
+    dec: Option<bool>,
 ) -> RawJavaScript<String> {
     if script_name.contains("..") || script_name.contains('/') {
         return RawJavaScript(String::new());
@@ -177,6 +178,7 @@ pub fn script(
                 "t": t.unwrap_or_default(),
                 "lang": lang.unwrap_or_default(),
                 "loc": loc.unwrap_or_default(),
+                "dec": dec.unwrap_or(true),
             }),
         )
         .unwrap_or_else(|_| format!("console.error('Failed to render {}');", script_name)),

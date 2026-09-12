@@ -56,13 +56,14 @@ use prieco_core::{
 ///
 /// Input: API key, language, location, query
 /// Output: JSON
-#[get("/api?<a>&<lang>&<loc>&<q>&<goggles>")]
+#[get("/api?<a>&<lang>&<loc>&<q>&<goggles>&<dec>")]
 pub async fn api(
     a: &str,
     lang: &str,
     loc: &str,
     q: &str,
     goggles: Option<&str>,
+    dec: Option<bool>,
 
     embedding_service: &State<EmbeddingService>,
 ) -> Json<Vec<RocketValue>> {
@@ -107,10 +108,20 @@ pub async fn api(
 
     ANALYTICS.record_api_request();
 
+    let decentralized = dec.unwrap_or(true);
+
     let active_goggles = load_goggles(&get_goggle_ids(goggles, None));
 
-    let full_results =
-        search_db::run_json(q, lang, loc, embedding_service, active_goggles, false).await;
+    let full_results = search_db::run_json(
+        q,
+        lang,
+        loc,
+        embedding_service,
+        active_goggles,
+        false,
+        decentralized,
+    )
+    .await;
 
     let results: Vec<serde_json::Value> = full_results
         .into_iter()

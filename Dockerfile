@@ -39,7 +39,7 @@ RUN cargo build --release
 # Runtime
 FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04 AS runtime
 
-# Install required system libraries
+# Install libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates libssl3 libzstd1 libstdc++6 \
     && rm -rf /var/lib/apt/lists/*

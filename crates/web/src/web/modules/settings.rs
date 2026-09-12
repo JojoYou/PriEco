@@ -176,6 +176,10 @@ pub fn run(
         context.insert(String::from("check_post"), json!(1));
     }
 
+    if cookie_jar.get("dec").map(|c| c.value()) == Some("0") {
+        context.insert(String::from("check_dec"), json!(1));
+    }
+
     // Goggles
     let active_ids: HashSet<u64> = cookie_jar
         .get("active_goggles")

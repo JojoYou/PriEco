@@ -785,7 +785,7 @@ impl TANTIVY_TOKENIZER for Multilingual {
 /*
   Inserter
 */
-pub const INSERTER_IMPORT_DIR: &str = "/mnt/ssd/results/imp";
+pub const INSERTER_IMPORT_DIR: &str = "/tmp/res_imp";
 pub static CENTROPOIDS_BIN: &[u8] = include_bytes!("../../../data/ivf/centroids.bin");
 
 pub static VECTOR_CENTROPOIDS: Lazy<Arc<CentroidIndex>> =

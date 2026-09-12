@@ -46,7 +46,8 @@ pub async fn run(
     embedding_service: &State<EmbeddingService>,
     goggles: Vec<Arc<GoggleRules>>,
     user_qt_prefs: &UserQtPrefs,
-    user_is_mobile: bool,
+    mobile: bool,
+    decentralize: bool,
 ) -> HashMap<String, Value> {
     // Don't perform a search on bang
     if q.contains("!") {
@@ -93,7 +94,8 @@ pub async fn run(
                 embedding_service,
                 goggles,
                 &user_qt_prefs,
-                user_is_mobile,
+                mobile,
+                decentralize,
             )
             .await;
         }
@@ -180,7 +182,8 @@ async fn all_search(
     embedding_service: &State<EmbeddingService>,
     mut goggles: Vec<Arc<GoggleRules>>,
     user_qt_prefs: &UserQtPrefs,
-    user_is_mobile: bool,
+    mobile: bool,
+    decentralize: bool,
 ) {
     // Spell check
     if let Some(suggestion) = spell_check_query(q) {
@@ -201,7 +204,8 @@ async fn all_search(
         loc,
         &embedding_service,
         goggles,
-        user_is_mobile,
+        mobile,
+        decentralize,
     )
     .await; // Search database: Modify results + return confidence score
 

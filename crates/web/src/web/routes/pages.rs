@@ -311,6 +311,7 @@ pub async fn search(
         .unwrap_or("{}");
 
     let active_goggle_ids = get_goggle_ids(None, Some(cookie_jar));
+    let decentralize = cookie_jar.get("dec").map(|c| c.value()) != Some("0");
 
     let mut context: HashMap<String, Value> = HashMap::from([
         // File versions
@@ -348,6 +349,7 @@ pub async fn search(
             String::from("active_goggle_count"),
             json!(active_goggle_ids.len()),
         ),
+        (String::from("dec"), json!(decentralize)),
     ]);
 
     // Search type
@@ -395,7 +397,7 @@ pub async fn search(
 
         // Is user mobile
         let ua = user_agent.0.to_lowercase();
-        let user_is_mobile = ua.contains("mobi") || ua.contains("android") || ua.contains("iphone");
+        let mobile = ua.contains("mobi") || ua.contains("android") || ua.contains("iphone");
 
         // Results
         let results_ctx = search_endpoint::run(
@@ -406,7 +408,8 @@ pub async fn search(
             embedding_service,
             active_goggles,
             &user_qt_prefs,
-            user_is_mobile,
+            mobile,
+            decentralize,
         )
         .await;
 
@@ -503,12 +506,13 @@ fn multibangs(query: &str) -> Option<(String, Vec<BangRedirect>)> {
   Input: Search type, Search query, Location, Language
   Output: Results html
 */
-#[get("/results_html?<t>&<q>&<loc>&<lang>")]
+#[get("/results_html?<t>&<q>&<loc>&<lang>&<dec>")]
 pub async fn results_htmls(
     t: &str,
     q: &str,
     lang: &str,
     loc: &str,
+    dec: bool,
     embedding_service: &State<EmbeddingService>,
     cookie_jar: &CookieJar<'_>,
     user_agent: UserAgent<'_>,
@@ -520,7 +524,7 @@ pub async fn results_htmls(
 
     // Is user mobile
     let ua = user_agent.0.to_lowercase();
-    let user_is_mobile = ua.contains("mobi") || ua.contains("android") || ua.contains("iphone");
+    let mobile = ua.contains("mobi") || ua.contains("android") || ua.contains("iphone");
 
     let mut ctx = search_endpoint::run(
         t,
@@ -530,7 +534,8 @@ pub async fn results_htmls(
         embedding_service,
         active_goggles,
         &user_qt_prefs,
-        user_is_mobile,
+        mobile,
+        dec,
     )
     .await;
 

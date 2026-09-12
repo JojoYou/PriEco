@@ -14,7 +14,7 @@
   Import system libraries
 */
 use std::{
-    fs::{OpenOptions, create_dir_all, read_to_string},
+    fs::{OpenOptions, create_dir_all, read_dir, read_to_string},
     hash::Hasher,
     io::{BufWriter, Write},
     path::Path,
@@ -161,4 +161,20 @@ pub fn normalize_url(raw: &str) -> String {
             normalized
         })
         .unwrap_or_else(|| raw.to_string())
+}
+
+pub fn get_dir_size(path: impl AsRef<Path>) -> u64 {
+    let mut size = 0;
+    if let Ok(entries) = read_dir(path) {
+        for entry in entries.flatten() {
+            if let Ok(metadata) = entry.metadata() {
+                if metadata.is_dir() {
+                    size += get_dir_size(entry.path());
+                } else {
+                    size += metadata.len();
+                }
+            }
+        }
+    }
+    size
 }
