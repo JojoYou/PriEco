@@ -25,6 +25,7 @@ use std::{
     cmp::Reverse,
     collections::{HashMap, HashSet},
     sync::Arc,
+    time::Duration,
 };
 
 /*
@@ -423,8 +424,7 @@ pub async fn run_json(
                 decentralized_results
             };
 
-            match tokio::time::timeout(std::time::Duration::from_millis(2500), search_future).await
-            {
+            match tokio::time::timeout(Duration::from_secs(10), search_future).await {
                 Ok(results) => results,
                 Err(_) => {
                     println!("Decentralized search timed out!");

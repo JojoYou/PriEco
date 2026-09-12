@@ -26,6 +26,7 @@ services:
       - vectors:/app/data/vectors
       - ./models:/app/models:ro,z
       - ./data/bge/model.onnx:/app/data/model.onnx:ro,z
+
     environment:
       - PRIECO_IP=0.0.0.0
       - PRIECO_PORT=8000
@@ -36,17 +37,40 @@ services:
       - PRIECO_TICKET=
       - PRIECO_WORKERS=0
       - PRIECO_MAX_STORAGE=0 # In GB; 0 or empty is unlimited
+
     labels:
       # Podman auto-update
       - "io.containers.autoupdate=registry"
       # Watchtower track
       - "com.centurylinklabs.watchtower.enable=true"
+
     ulimits:
       nofile:
         soft: 65535
         hard: 65535
     tty: true
     restart: unless-stopped
+
+  bandwidth-limiter:
+    image: alpine:latest
+    network_mode: "service:prieco"
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - NETWORK_RATE=unlimited # Or 100kbit, 5mbit...
+    command: >
+      sh -c "
+      apk add --no-cache iproute2 &&
+      if [ \"$$NETWORK_RATE\" = \"unlimited\" ]; then
+        tc qdisc del dev eth0 root 2>/dev/null || true;
+      else
+        tc qdisc add dev eth0 root tbf rate $$NETWORK_RATE burst 128kbit latency 400ms;
+      fi &&
+      sleep infinity
+      "
+    restart: unless-stopped
+    depends_on:
+      - prieco
 
 volumes:
   tantivy:
