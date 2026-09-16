@@ -5370,9 +5370,11 @@ dependencies = [
  "memmap2",
  "prieco_core",
  "rayon",
+ "serde",
  "serde_json",
  "tantivy",
  "tokio",
+ "url",
  "zip 8.6.0",
  "zstd",
 ]

@@ -18,12 +18,13 @@ rayon = { workspace = true }
 tantivy = { workspace = true }
 zip = { workspace = true }
 zstd = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 bytemuck = { workspace = true }
 tokio = {workspace =true}
 fjall = { workspace = true }
 half = { workspace = true }
-
+url = { workspace = true }
 memmap2 = { workspace = true }
 
 [features]

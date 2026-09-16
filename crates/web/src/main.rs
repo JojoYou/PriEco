@@ -45,6 +45,8 @@ use std::{
 */
 use env_logger::Env;
 use fjall::PersistMode;
+#[cfg(feature = "cuda")]
+use ort::ExecutionProvider;
 use ort::{Environment, GraphOptimizationLevel, LoggingLevel, Session, SessionBuilder};
 use rocket::{
     Request, Response,
@@ -72,7 +74,7 @@ use prieco_core::{
     ANALYTICS, EmbeddingService, META_DECODER, PAGERANK, PRIECO_BLOBS, PRIECO_CONFIG, PRIECO_META,
     TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_TOKENIZER, colors, icons,
 };
-use prieco_insert::db_insert;
+use prieco_insert::{db_insert, update::UpdateEngine, updates::ping::PruneDeadLinks};
 use prieco_mini_crawler::mini_crawler;
 use prieco_pagerank as pagerank;
 
@@ -423,12 +425,29 @@ fn thread_manager() {
             }))
         };
 
+    // Index updater
+    let updater_thread = {
+        spawn(move || {
+            let mut engine = UpdateEngine::new();
+
+            engine.add(Box::new(PruneDeadLinks::new()));
+
+            while !stop_requested() {
+                break;
+                engine.run();
+
+                sleep(Duration::from_secs(3600));
+            }
+        })
+    };
+
     let _ = blob_thread.join();
     let _ = insert_thread.join();
     let _ = pagerank_thread.join();
     if let Some(thread) = mini_crawler_thread {
         let _ = thread.join();
     }
+    let _ = updater_thread.join();
 
     println!("{}Threads finished!{}", colors::GREEN, colors::RESET);
 }
@@ -459,62 +478,56 @@ fn create_tokenizer() -> Tokenizer {
 
     tokenizer
 }
+
 fn create_embeder() -> Session {
     let environment: Arc<Environment> = match Environment::builder()
         .with_name("embedder")
-        .with_log_level(LoggingLevel::Warning)
+        .with_log_level(ort::LoggingLevel::Warning)
         .build()
     {
         Ok(env) => Arc::new(env),
         Err(e) => {
             println!(
-                "{}Main: Failed to create vector embedding environment: {}{}",
+                "{}Main: Failed to create env: {}{}",
                 colors::RED,
                 e,
                 colors::RESET
             );
-            exit(1);
+            std::process::exit(1);
         }
     };
 
-    let mut session_builder = match SessionBuilder::new(&environment) {
-        Ok(builder) => builder,
-        Err(e) => {
-            println!(
-                "{}Main: Failed to create vector embedding session builder: {}{}",
-                colors::RED,
-                e,
-                colors::RESET
-            );
-            exit(1);
-        }
+    let create_base_builder = || {
+        let mut builder = SessionBuilder::new(&environment).unwrap();
+        builder = builder
+            .with_optimization_level(GraphOptimizationLevel::Level3)
+            .unwrap();
+        builder = builder.with_parallel_execution(true).unwrap();
+        builder
     };
-    session_builder = match session_builder.with_optimization_level(GraphOptimizationLevel::Level3)
+
+    let mut session_builder = create_base_builder();
+
+    #[cfg(feature = "cuda")]
     {
-        Ok(builder) => builder,
-        Err(e) => {
-            println!(
-                "{}Main: Failed to create vector embedding session builder: {}{}",
-                colors::RED,
-                e,
-                colors::RESET
-            );
-            exit(1);
-        }
-    };
-
-    session_builder = match session_builder.with_parallel_execution(true) {
-        Ok(builder) => builder,
-        Err(e) => {
-            println!(
-                "{}Main: Failed to create vector embedding session builder: {}{}",
-                colors::RED,
-                e,
-                colors::RESET
-            );
-            exit(1);
-        }
-    };
+        session_builder = match session_builder
+            .with_execution_providers([ExecutionProvider::CUDA(Default::default())])
+        {
+            Ok(builder) => {
+                println!("CUDA Execution Provider registered for embeddings.");
+                builder
+            }
+            Err(e) => {
+                println!(
+                    "{}Main: Failed to register CUDA for embeddings: {}{}\nFalling back to CPU.",
+                    colors::RED,
+                    e,
+                    colors::RESET
+                );
+                create_base_builder()
+            }
+        };
+    }
 
     match session_builder.with_model_from_file("data/paraphrase-multilingual-MiniLM-L12-v2_O3.onnx")
     {

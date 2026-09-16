@@ -58,4 +58,4 @@ n0-future = { workspace = true }
 
 [features]
 default = []
-cuda = ["prieco_insert/cuda", "prieco_pagerank/cuda"]  # Compile:  RUSTFLAGS='-C target-cpu=native' cargo build --release --features cuda
+cuda = ["prieco_insert/cuda", "prieco_pagerank/cuda", "ort/cuda"]  # Compile:  RUSTFLAGS='-C target-cpu=native' cargo build --release --features cuda

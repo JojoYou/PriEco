@@ -279,6 +279,15 @@ pub static PROXY_CLIENT: Lazy<PIMP_CLIENT> = Lazy::new(|| {
         .expect("Failed to create primp proxy client")
 });
 
+pub static PING_CLIENT: Lazy<PIMP_CLIENT> = Lazy::new(|| {
+    println!("Created simple primp ping client!");
+
+    PIMP_CLIENT::builder()
+        .timeout(stdDuration::from_secs(5))
+        .build()
+        .expect("Failed to build ping client")
+});
+
 /*
  Vector embeder
 */
