@@ -120,6 +120,7 @@ pub mod icons {
     pub const DB_INSERT: &str = "💾";
     pub const PAGERANK_ICON: &str = "📋";
     pub const MINI_CRAWLER_ICON: &str = "👾";
+    pub const INDEX_UPDATER: &str = "📚";
 }
 
 /*

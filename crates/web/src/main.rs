@@ -71,10 +71,11 @@ use crate::web::{
 };
 use prieco_blob as blob;
 use prieco_core::{
-    ANALYTICS, EmbeddingService, META_DECODER, PAGERANK, PRIECO_BLOBS, PRIECO_CONFIG, PRIECO_META,
-    TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_TOKENIZER, colors, icons,
+    ANALYTICS, EmbeddingService, META_DECODER, PAGERANK, PING_CLIENT, PRIECO_BLOBS, PRIECO_CONFIG,
+    PRIECO_META, TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_TOKENIZER,
+    colors, icons,
 };
-use prieco_insert::{db_insert, update::UpdateEngine, updates::ping::PruneDeadLinks};
+use prieco_insert::{db_insert, update::UpdateEngine, updates::ping::PingDeadLinksUpdate};
 use prieco_mini_crawler::mini_crawler;
 use prieco_pagerank as pagerank;
 
@@ -158,11 +159,12 @@ async fn rocket() -> _ {
     );
     println!("Info:");
     println!(
-        "{}: Blob storage\n{}: Database inserter\n{}: Pagerank\n{}: Mini crawler\n",
+        "{}: Blob storage\n{}: Database inserter\n{}: Pagerank\n{}: Mini crawler\n{}: Updater\n",
         icons::BLOB,
         icons::DB_INSERT,
         icons::PAGERANK_ICON,
-        icons::MINI_CRAWLER_ICON
+        icons::MINI_CRAWLER_ICON,
+        icons::INDEX_UPDATER
     );
 
     // Load config
@@ -430,10 +432,9 @@ fn thread_manager() {
         spawn(move || {
             let mut engine = UpdateEngine::new();
 
-            engine.add(Box::new(PruneDeadLinks::new()));
+            //engine.add(Box::new(PingDeadLinksUpdate::new()));
 
             while !stop_requested() {
-                break;
                 engine.run();
 
                 sleep(Duration::from_secs(3600));

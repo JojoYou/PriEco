@@ -5365,9 +5365,11 @@ version = "3.0.0"
 dependencies = [
  "ahash 0.8.12",
  "bytemuck",
+ "dashmap",
  "fjall",
  "half",
  "memmap2",
+ "once_cell",
  "prieco_core",
  "rayon",
  "serde",
