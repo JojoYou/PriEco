@@ -2,7 +2,7 @@ use std::{thread::sleep, time::Duration};
 
 use dashmap::DashSet;
 use once_cell::sync::Lazy;
-use prieco_core::{PING_CLIENT, WebDocument};
+use prieco_core::{PING_CLIENT, WebDocument, icons};
 use url::Url;
 
 use crate::update::{Update, UpdateAction};
@@ -23,8 +23,13 @@ impl PingDeadLinksUpdate {
 
     fn ping_with_retries(&self, url: &str, retries: u8) -> bool {
         for _ in 0..retries {
-            if let Ok(response) = ASYNC_RUNTIME.block_on(PING_CLIENT.get(url).send()) {
-                if response.status().is_success() {
+            if let Ok(response) =
+                ASYNC_RUNTIME.block_on(async { PING_CLIENT.get(url).send().await })
+            {
+                if response.status().is_success()
+                    || response.status().as_u16() == 403
+                    || response.status().as_u16() == 401
+                {
                     return true;
                 }
             }
@@ -63,7 +68,7 @@ impl Update for PingDeadLinksUpdate {
         // Check domain
         let alive_domain = self.ping_with_retries(&format!("https://{}", domain), 2);
         if !alive_domain {
-            println!("Dead Domain: {}", domain);
+            println!("{}: Dead Domain: {}", icons::INDEX_UPDATER, domain);
             self.dead_domains.insert(domain);
         }
 

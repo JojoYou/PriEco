@@ -295,12 +295,6 @@ impl UpdateEngine {
                 }
 
                 if let Some(mut document) = final_document {
-                    println!(
-                        "{}: Successfully decoded doc_id {}. Checking updates...",
-                        icons::INDEX_UPDATER,
-                        doc_id
-                    );
-
                     // Check update viability
                     let mut save_to_disk = false; // Update changed the item
                     let mut tombstoned = false; // Mark for deletion
@@ -311,14 +305,6 @@ impl UpdateEngine {
                             .copied()
                             .unwrap_or(0);
                         let processed_item: bool = state.processed(update.id(), doc_id);
-
-                        println!(
-                            "   -> Update {}: u_target={}, doc_id={}, processed={}",
-                            update.id(),
-                            update_max_ceiling,
-                            doc_id,
-                            processed_item
-                        );
 
                         // Apply updates
                         if !processed_item && doc_id <= update_max_ceiling {

@@ -71,9 +71,8 @@ use crate::web::{
 };
 use prieco_blob as blob;
 use prieco_core::{
-    ANALYTICS, EmbeddingService, META_DECODER, PAGERANK, PING_CLIENT, PRIECO_BLOBS, PRIECO_CONFIG,
-    PRIECO_META, TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_TOKENIZER,
-    colors, icons,
+    ANALYTICS, EmbeddingService, META_DECODER, PAGERANK, PRIECO_BLOBS, PRIECO_CONFIG, PRIECO_META,
+    TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_TOKENIZER, colors, icons,
 };
 use prieco_insert::{db_insert, update::UpdateEngine, updates::ping::PingDeadLinksUpdate};
 use prieco_mini_crawler::mini_crawler;
@@ -432,7 +431,7 @@ fn thread_manager() {
         spawn(move || {
             let mut engine = UpdateEngine::new();
 
-            //engine.add(Box::new(PingDeadLinksUpdate::new()));
+            engine.add(Box::new(PingDeadLinksUpdate::new()));
 
             while !stop_requested() {
                 engine.run();
