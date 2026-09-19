@@ -403,14 +403,37 @@ impl EmbeddingService {
 */
 pub static IP_TO_LOC: Lazy<Arc<IpGeoDatabase>> =
     Lazy::new(|| Arc::new(IpGeoDatabase::open("kv/ip.redb").unwrap()));
+
 const IP_RANGES: TableDefinition<u128, (u128, String)> = TableDefinition::new("ip_ranges");
 
 pub struct IpGeoDatabase {
     db: Database,
 }
+
 impl IpGeoDatabase {
     pub fn open(db_path: &str) -> Result<Self, redb::Error> {
-        let db = Database::create(db_path)?;
+        if let Some(parent) = std::path::Path::new(db_path).parent() {
+            if !parent.exists() {
+                println!(
+                    "Warning: Directory for {} does not exist, creating it.",
+                    db_path
+                );
+                let _ = std::fs::create_dir_all(parent);
+            }
+        }
+
+        let db = match Database::create(db_path) {
+            Ok(db) => db,
+            Err(e) => {
+                println!(
+                    "Warning: Failed to open {}, {}. Falling back to temp DB.",
+                    db_path, e
+                );
+                let temp_path = std::env::temp_dir().join("ip_fallback.redb");
+                Database::create(temp_path)?
+            }
+        };
+
         Ok(Self { db })
     }
 
@@ -421,18 +444,18 @@ impl IpGeoDatabase {
         let ip_num = self.parse_ip_to_u128(ip_str)?;
 
         let read_txn = self.db.begin_read()?;
-        let table = read_txn.open_table(IP_RANGES)?;
 
-        // Find the range that contains this IP
-        // We need to find the largest start IP that is <= our target IP
+        let table = match read_txn.open_table(IP_RANGES) {
+            Ok(t) => t,
+            Err(_) => return Ok(None),
+        };
+
         let mut range_iter = table.range(..=ip_num)?;
 
-        // Get the last (highest) start IP that's <= our target
         if let Some(result) = range_iter.next_back() {
             let (start_ip, value) = result?;
             let (end_ip, country_code) = value.value();
 
-            // Check if our IP falls within this range
             if ip_num >= start_ip.value() && ip_num <= end_ip {
                 return Ok(Some(country_code.clone()));
             }
@@ -442,8 +465,7 @@ impl IpGeoDatabase {
     }
 
     fn parse_ip_to_u128(&self, ip_str: &str) -> Result<u128, Box<dyn std::error::Error>> {
-        // Try IPv4 first
-        if let Ok(ipv4) = Ipv4Addr::from_str(ip_str) {
+        if let Ok(ipv4) = std::net::Ipv4Addr::from_str(ip_str) {
             let octets = ipv4.octets();
             let ip_u32 = ((octets[0] as u32) << 24)
                 | ((octets[1] as u32) << 16)
@@ -452,8 +474,7 @@ impl IpGeoDatabase {
             return Ok(ip_u32 as u128);
         }
 
-        // Try IPv6
-        if let Ok(ipv6) = Ipv6Addr::from_str(ip_str) {
+        if let Ok(ipv6) = std::net::Ipv6Addr::from_str(ip_str) {
             let segments = ipv6.segments();
             let mut ip_u128 = 0u128;
             for (i, segment) in segments.iter().enumerate() {
