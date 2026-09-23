@@ -1294,7 +1294,7 @@ impl Reranker {
                 },
             )])
             .expect("Failed to attach CUDA provider")
-            .with_model_from_file("data/model.onnx")
+            .with_model_from_file("data/bge/model.onnx")
             .expect("Failed to load BGE model");
 
         let mut tokenizer = Tokenizer::from_bytes(BGE_TOKENIZER).unwrap();

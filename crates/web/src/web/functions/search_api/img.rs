@@ -90,10 +90,7 @@ pub async fn run(query: &str) -> Vec<ImgResult> {
                 }
             }
         }
-        Err(e) => {
-            println!("{}Bing request error: {}{}", colors::RED, e, colors::RESET);
-            Value::Null
-        }
+        Err(_) => Value::Null,
     };
 
     ////
