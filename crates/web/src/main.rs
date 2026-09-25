@@ -53,7 +53,7 @@ use rocket::{
     fairing::{AdHoc, Fairing, Info, Kind},
     fs::FileServer,
     http::{Header, Status},
-    launch, routes,
+    launch, main, routes,
 };
 use rocket_dyn_templates::Template;
 use tokenizers::{PaddingDirection, PaddingParams, PaddingStrategy, Tokenizer};
@@ -132,8 +132,8 @@ impl Fairing for GlobalHeaders {
 ///
 /// Input: None
 /// Output: None
-#[launch]
-async fn rocket() -> _ {
+#[main]
+async fn main() -> Result<(), rocket::Error> {
     // Disable foster parenting warning
     env_logger::Builder::from_env(Env::default().default_filter_or("warn"))
         .filter_module("html5ever", log::LevelFilter::Error)
@@ -176,6 +176,8 @@ async fn rocket() -> _ {
     };
 
     // Decentralization
+    let peer_ticket_env = std::env::var("PRIECO_TICKET").unwrap_or_default();
+
     let iroh_secret_key: SecretKey = get_iroh_secret();
     let iroh_endpoint: Endpoint = Endpoint::builder(N0)
         .secret_key(iroh_secret_key.clone())
@@ -199,8 +201,8 @@ async fn rocket() -> _ {
     let mut iroh_peers: Vec<PublicKey> = vec![];
 
     let mut iroh_topic_id = TopicId::from_bytes([23u8; 32]);
-    if !PRIECO_CONFIG.peer_ticket.is_empty() {
-        if let Ok(peer_ticket) = Ticket::from_str(&PRIECO_CONFIG.peer_ticket) {
+    if !peer_ticket_env.is_empty() {
+        if let Ok(peer_ticket) = Ticket::from_str(&peer_ticket_env) {
             iroh_topic_id = peer_ticket.topic;
 
             for addr in peer_ticket.endpoints {
@@ -241,7 +243,7 @@ async fn rocket() -> _ {
     });
 
     // Spawn Thread Manager
-    spawn(move || {
+    let thread_handle = std::thread::spawn(move || {
         thread_manager();
     });
 
@@ -249,109 +251,173 @@ async fn rocket() -> _ {
     tokio::spawn(async { ANALYTICS.background_purge_task().await });
 
     // Launch Rocket web server
-    let gossip_shutdown = iroh_gossip.clone();
     let topic_shutdown = iroh_topic_id;
     let pub_key_shutdown = pub_key_bytes;
-    rocket::build()
-        .configure(
-            rocket::Config::figment()
-                .merge(("address", &PRIECO_CONFIG.ip))
-                .merge(("port", PRIECO_CONFIG.port))
-                .merge(("workers", num_cpus::get() * 2)),
-        )
-        .manage(embedding_service)
-        .attach(GlobalHeaders)
-        .attach(Template::fairing())
-        .attach(AdHoc::on_shutdown("Flush DBs", move |_| {
-            Box::pin(async move {
-                println!("Broadcasting offline status to peers...");
-                let offline_msg = serde_json::json!({
-                    "offline": pub_key_shutdown
-                });
 
-                if let Ok(payload) = serde_json::to_vec(&offline_msg) {
-                    if let Ok(ticket) = gossip_shutdown.subscribe(topic_shutdown, vec![]).await {
-                        let (sender, _) = ticket.split();
-                        let _ = sender.broadcast(payload.into()).await;
+    if PRIECO_CONFIG.enable_web_server {
+        let gossip_shutdown = iroh_gossip.clone();
+
+        let rocket_web = rocket::build()
+            .configure(
+                rocket::Config::figment()
+                    .merge(("address", &PRIECO_CONFIG.ip))
+                    .merge(("port", PRIECO_CONFIG.port))
+                    .merge(("workers", num_cpus::get() * 2)),
+            )
+            .manage(embedding_service)
+            .attach(GlobalHeaders)
+            .attach(Template::fairing())
+            .attach(AdHoc::on_shutdown("Flush DBs", move |_| {
+                Box::pin(async move {
+                    println!("Broadcasting offline status to peers...");
+                    let offline_msg = serde_json::json!({
+                        "offline": pub_key_shutdown
+                    });
+
+                    if let Ok(payload) = serde_json::to_vec(&offline_msg) {
+                        if let Ok(ticket) = gossip_shutdown.subscribe(topic_shutdown, vec![]).await
+                        {
+                            let (sender, _) = ticket.split();
+                            let _ = sender.broadcast(payload.into()).await;
+                        }
                     }
+
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+                    if let Err(e) = iroh_router.shutdown().await {
+                        eprintln!("Failed to shut down iroh router! {}", e);
+                    };
+
+                    println!("Flushing Fjall to disk...");
+                    let _ = PRIECO_META.meta_db.persist(PersistMode::SyncAll);
+                    if let Some(blobs) = Lazy::get(&PRIECO_BLOBS) {
+                        println!("Flushing Blob DB to disk...");
+                        let _ = blobs.blob_db.persist(PersistMode::SyncAll);
+                    }
+
+                    println!("Flushing Tantivy to disk...");
+                    let _ = TANTIVY_WRITER.lock().commit();
+
+                    println!("{}Shutdown!{}", colors::GREEN, colors::RESET);
+                })
+            }))
+            .mount(
+                "/",
+                routes![
+                    // Assets
+                    set_preferences, // Set cookie preferences
+                    sw_js,           // Service worker (Browser cache + unduck)
+                    unduck_js,
+                    security, // Security.txt
+                    robots,   // Robots.txt
+                    osd,
+                    script,
+                    favicon,
+                    privacy, // Privacy Policy
+                    // Landing page
+                    index,
+                    index_head,
+                    handle_shortcuts,
+                    // Search
+                    search,
+                    search_post,
+                    results_htmls,
+                    api,
+                    stats,
+                    cache_ver,
+                    pageview,
+                    // Settings
+                    settings_htmls,
+                    settings_update,
+                    // Proxy
+                    proxy_get,
+                    proxy_post,
+                    // Extension
+                    ext_privacy,
+                    // Roadmap
+                    roadmap,
+                    submit_roadmap_vote,
+                    // Goggles
+                    goggles,
+                    load_goggle,
+                    apply_goggles,
+                    goggles_tint,
+                    update_qt,
+                    export_quick_tune,
+                    // Thanks page
+                    thanks,
+                    submit,
+                    submit_post,
+                    send_signal,
+                    // Blob storage
+                    view_blob,
+                    // Blog
+                    blog,
+                    blog_post,
+                    rss_feed
+                ],
+            )
+            .mount("/static", FileServer::from("./static"));
+
+        rocket_web.launch().await?;
+    } else {
+        println!(
+            "{}Web server was disabled in config!{}",
+            colors::GREEN,
+            colors::RESET
+        );
+
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {
+                println!("Shutdown triggered by Ctrl+C.");
+            }
+            _ = async {
+                loop {
+                    if stop_requested() {
+                        println!("Shutdown triggered by stop.txt");
+                        break;
+                    }
+
+                    tokio::time::sleep(std::time::Duration::from_millis(3_000)).await;
                 }
+            } => {}
+        }
 
-                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        println!("Broadcasting offline status to peers...");
+        let offline_msg = serde_json::json!({
+            "offline": pub_key_shutdown
+        });
 
-                if let Err(e) = iroh_router.shutdown().await {
-                    eprintln!("Failed to shut down iroh router! {}", e);
-                };
+        if let Ok(payload) = serde_json::to_vec(&offline_msg) {
+            if let Ok(ticket) = iroh_gossip.subscribe(topic_shutdown, vec![]).await {
+                let (sender, _) = ticket.split();
+                let _ = sender.broadcast(payload.into()).await;
+            }
+        }
 
-                println!("Flushing Fjall to disk...");
-                let _ = PRIECO_META.meta_db.persist(PersistMode::SyncAll);
-                if let Some(blobs) = Lazy::get(&PRIECO_BLOBS) {
-                    println!("Flushing Blob DB to disk...");
-                    let _ = blobs.blob_db.persist(PersistMode::SyncAll);
-                }
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
-                println!("Flushing Tantivy to disk...");
-                let _ = TANTIVY_WRITER.lock().commit();
+        if let Err(e) = iroh_router.shutdown().await {
+            eprintln!("Failed to shut down iroh router! {}", e);
+        };
 
-                println!("{}Shutdown!{}", colors::GREEN, colors::RESET);
-            })
-        }))
-        .mount(
-            "/",
-            routes![
-                // Assets
-                set_preferences, // Set cookie preferences
-                sw_js,           // Service worker (Browser cache + unduck)
-                unduck_js,
-                security, // Security.txt
-                robots,   // Robots.txt
-                osd,
-                script,
-                favicon,
-                privacy, // Privacy Policy
-                // Landing page
-                index,
-                index_head,
-                handle_shortcuts,
-                // Search
-                search,
-                search_post,
-                results_htmls,
-                api,
-                stats,
-                cache_ver,
-                pageview,
-                // Settings
-                settings_htmls,
-                settings_update,
-                // Proxy
-                proxy_get,
-                proxy_post,
-                // Extension
-                ext_privacy,
-                // Roadmap
-                roadmap,
-                submit_roadmap_vote,
-                // Goggles
-                goggles,
-                load_goggle,
-                apply_goggles,
-                goggles_tint,
-                update_qt,
-                export_quick_tune,
-                // Thanks page
-                thanks,
-                submit,
-                submit_post,
-                send_signal,
-                // Blob storage
-                view_blob,
-                // Blog
-                blog,
-                blog_post,
-                rss_feed
-            ],
-        )
-        .mount("/static", FileServer::from("./static"))
+        println!("Flushing Fjall to disk...");
+        let _ = PRIECO_META.meta_db.persist(PersistMode::SyncAll);
+        if let Some(blobs) = Lazy::get(&PRIECO_BLOBS) {
+            println!("Flushing Blob DB to disk...");
+            let _ = blobs.blob_db.persist(PersistMode::SyncAll);
+        }
+
+        println!("Flushing Tantivy to disk...");
+        let _ = TANTIVY_WRITER.lock().commit();
+
+        println!("{}Shutdown!{}", colors::GREEN, colors::RESET);
+    }
+
+    println!("Waiting for threads to shut down");
+    let _ = thread_handle.join();
+
+    Ok(())
 }
 
 /// Description: Manages different PriEco threads like blob storage, database insertion and mini crawler
@@ -371,18 +437,20 @@ fn thread_manager() {
     let _ = VECTOR_CENTROPOIDS.search(&vec![0.0; 384], 1, 1);
 
     // Blob storage
-    let blob_thread = {
-        spawn(move || {
+    let blob_thread = if PRIECO_CONFIG.enable_blob_storage {
+        Some(spawn(move || {
             while !stop_requested() {
                 blob::run();
                 sleep(Duration::from_mins(1));
             }
-        })
+        }))
+    } else {
+        None
     };
 
     // Result database inserter
-    let insert_thread = {
-        spawn(move || {
+    let insert_thread = if PRIECO_CONFIG.enable_db_inserter {
+        Some(spawn(move || {
             unsafe {
                 libc::syscall(libc::SYS_ioprio_set, 1, 0, (3 << 13) | 7);
             }
@@ -397,57 +465,71 @@ fn thread_manager() {
                 };
                 sleep(Duration::from_mins(1));
             }
-        })
+        }))
+    } else {
+        None
     };
 
     // Pagerank
-    let pagerank_thread = {
-        spawn(move || {
+    let pagerank_thread = if PRIECO_CONFIG.enable_pagerank {
+        Some(spawn(move || {
             while !stop_requested() {
                 pagerank::compute::run();
                 sleep(Duration::from_hours(3));
             }
-        })
+        }))
+    } else {
+        None
     };
 
     // Mini crawler
-    let mini_crawler_thread =
-        if PRIECO_CONFIG.peer_ticket.is_empty() || PRIECO_CONFIG.worker_concurrent < 1 {
-            None
-        } else {
-            Some(spawn(move || {
-                let rt = Runtime::new().expect("Failed to create Tokio runtime for mini crawler");
-
-                while !stop_requested() {
-                    rt.block_on(async {
-                        crate::mini_crawler::run().await;
-                    });
-                }
-            }))
-        };
+    let peer_ticket_env = std::env::var("PRIECO_TICKET").unwrap_or_default();
+    let mini_crawler_thread = if !PRIECO_CONFIG.enable_mini_crawler
+        || peer_ticket_env.is_empty()
+        || PRIECO_CONFIG.worker_concurrent < 1
+    {
+        None
+    } else {
+        Some(spawn(move || {
+            let rt = Runtime::new().expect("Failed to create Tokio runtime for mini crawler");
+            while !stop_requested() {
+                rt.block_on(async {
+                    crate::mini_crawler::run().await;
+                });
+            }
+        }))
+    };
 
     // Index updater
-    let updater_thread = {
-        spawn(move || {
+    let updater_thread = if PRIECO_CONFIG.enable_index_updater {
+        Some(spawn(move || {
             let mut engine = UpdateEngine::new();
-
             engine.add(Box::new(PingDeadLinksUpdate::new()));
 
             while !stop_requested() {
                 engine.run();
-
                 sleep(Duration::from_secs(3600));
             }
-        })
+        }))
+    } else {
+        None
     };
 
-    let _ = blob_thread.join();
-    let _ = insert_thread.join();
-    let _ = pagerank_thread.join();
+    if let Some(thread) = blob_thread {
+        let _ = thread.join();
+    }
+    if let Some(thread) = insert_thread {
+        let _ = thread.join();
+    }
+    if let Some(thread) = pagerank_thread {
+        let _ = thread.join();
+    }
     if let Some(thread) = mini_crawler_thread {
         let _ = thread.join();
     }
-    let _ = updater_thread.join();
+    if let Some(thread) = updater_thread {
+        let _ = thread.join();
+    }
 
     println!("{}Threads finished!{}", colors::GREEN, colors::RESET);
 }

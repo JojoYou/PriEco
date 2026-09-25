@@ -34,8 +34,14 @@ pub fn set_up_wizard() -> PriEcoConfig {
         vector_path: String::from("idx/vectors"),
         blob_path: String::from("idx/blob"),
 
-        peer_ticket: String::new(),
         worker_concurrent: 1,
+
+        enable_blob_storage: true,
+        enable_db_inserter: true,
+        enable_pagerank: true,
+        enable_mini_crawler: true,
+        enable_index_updater: true,
+        enable_web_server: true,
     };
 
     if file_exists(CONFIG_FILE) {
@@ -107,19 +113,10 @@ pub fn set_up_wizard() -> PriEcoConfig {
         &conf.blob_path,
     );
 
-    conf.peer_ticket = check_env(
-        "PRIECO_TICKET",
-        &format!(
-            "\n🗨 7/{}: Peer ticket, a ticket that lets you connect to the decentralized network (leave empty if you dont have one):",
-            TOTAL_QUESTIONS
-        ),
-        &conf.peer_ticket,
-    );
-
     conf.worker_concurrent = match check_env(
         "PRIECO_WORKERS",
         &format!(
-            "\n🗨 8/{}: Worker Condurent Website downloads (default: 1):",
+            "\n🗨 7/{}: Worker Condurent Website downloads (default: 1):",
             TOTAL_QUESTIONS
         ),
         &conf.worker_concurrent.to_string(),

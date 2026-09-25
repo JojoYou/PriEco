@@ -238,6 +238,9 @@ impl<'r> FromRequest<'r> for UserAgent<'r> {
 PriEco config
 */
 pub static PRIECO_CONFIG: Lazy<PriEcoConfig> = Lazy::new(|| set_up::set_up_wizard());
+fn default_true() -> bool {
+    true
+}
 #[derive(Serialize, Deserialize)]
 pub struct PriEcoConfig {
     pub ip: String,
@@ -248,8 +251,20 @@ pub struct PriEcoConfig {
     pub vector_path: String,
     pub blob_path: String,
 
-    pub peer_ticket: String,
     pub worker_concurrent: u32,
+
+    #[serde(default = "default_true")]
+    pub enable_blob_storage: bool,
+    #[serde(default = "default_true")]
+    pub enable_db_inserter: bool,
+    #[serde(default = "default_true")]
+    pub enable_pagerank: bool,
+    #[serde(default = "default_true")]
+    pub enable_mini_crawler: bool,
+    #[serde(default = "default_true")]
+    pub enable_index_updater: bool,
+    #[serde(default = "default_true")]
+    pub enable_web_server: bool,
 }
 
 /*

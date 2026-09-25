@@ -648,7 +648,11 @@ pub async fn run_core_search(
         )
         .unwrap_or_default();
 
-        println!("Tantivy took {:.3}s", start.elapsed().as_secs_f32());
+        println!(
+            "Tantivy took {:.3}s with {} segments",
+            start.elapsed().as_secs_f32(),
+            TANTIVY_READER.searcher().segment_readers().len()
+        );
         res
     });
 
