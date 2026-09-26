@@ -169,12 +169,6 @@ async fn main() -> Result<(), rocket::Error> {
     // Load config
     let _ = PRIECO_CONFIG;
 
-    // Vector Embeding
-    let embedding_service = EmbeddingService {
-        tokenizer: Arc::new(tokio::sync::Mutex::new(create_tokenizer())),
-        model: Arc::new(tokio::sync::Mutex::new(create_embeder())),
-    };
-
     // Decentralization
     let peer_ticket_env = std::env::var("PRIECO_TICKET").unwrap_or_default();
 
@@ -256,6 +250,12 @@ async fn main() -> Result<(), rocket::Error> {
 
     if PRIECO_CONFIG.enable_web_server {
         let gossip_shutdown = iroh_gossip.clone();
+
+        // Vector Embeding
+        let embedding_service = EmbeddingService {
+            tokenizer: Arc::new(tokio::sync::Mutex::new(create_tokenizer())),
+            model: Arc::new(tokio::sync::Mutex::new(create_embeder())),
+        };
 
         let rocket_web = rocket::build()
             .configure(
@@ -425,16 +425,8 @@ async fn main() -> Result<(), rocket::Error> {
 /// Input: None
 /// Output: None
 fn thread_manager() {
-    // Initialize data
+    // Initialize
     let _ = &*PRIECO_META;
-    let _ = &*META_DECODER;
-
-    let _ = TANTIVY_READER;
-    let _ = TANTIVY_WRITER;
-    let _ = PAGERANK;
-
-    println!("Starting GPU!");
-    let _ = VECTOR_CENTROPOIDS.search(&vec![0.0; 384], 1, 1);
 
     // Blob storage
     let blob_thread = if PRIECO_CONFIG.enable_blob_storage {
