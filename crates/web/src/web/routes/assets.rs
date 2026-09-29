@@ -128,6 +128,7 @@ pub fn osd(host: &Host) -> RawXml<String> {
   <Description>Search Privately, Securely and EcoFriendly</Description>
   <InputEncoding>UTF-8</InputEncoding>
   <Url type="text/html" template="{search}"/>
+  <Url type="application/x-suggestions+json" template="{base}api/om_sug?q={{searchTerms}}"/>
   <SearchForm>{base}</SearchForm>
 </OpenSearchDescription>"#,
         short = short_name,

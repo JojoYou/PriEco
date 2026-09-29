@@ -33,6 +33,7 @@ use rocket::{
     response::Redirect,
     serde::json::{Json, Value as RocketValue},
 };
+use serde::Deserialize;
 use serde_json::json;
 use url::Url;
 
@@ -646,4 +647,31 @@ pub async fn send_signal(feedback: Form<RoadmapFeedback<'_>>) -> Redirect {
     }
 
     Redirect::to(feedback.return_path.to_string())
+}
+
+#[derive(Deserialize)]
+struct DdgSuggestion {
+    phrase: String,
+}
+
+#[get("/api/om_sug?<q>")]
+pub async fn om_sug(q: &str) -> Json<RocketValue> {
+    if q.trim().is_empty() {
+        return Json(json!([q, Vec::<String>::new()]));
+    }
+
+    let mut phrases: Vec<String> = Vec::new();
+
+    if let Ok(response) = reqwest::get(&format!(
+        "https://duckduckgo.com/ac/?q={}&kl=wt-wt",
+        urlencoding::encode(q)
+    ))
+    .await
+    {
+        if let Ok(ddg_results) = response.json::<Vec<DdgSuggestion>>().await {
+            phrases = ddg_results.into_iter().map(|item| item.phrase).collect();
+        }
+    }
+
+    Json(json!([q, phrases]))
 }

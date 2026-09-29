@@ -249,6 +249,7 @@ pub fn handle_shortcuts(form: Form<ShortcutAction<'_>>, cookie_jar: &CookieJar<'
         encode(&items.join(",")).into_owned(),
         true,
         true,
+        true,
     );
     Redirect::to(uri!(index))
 }
@@ -777,7 +778,14 @@ pub fn settings_update(form: Form<SettingsForm<'_>>, cookie_jar: &CookieJar<'_>)
     };
 
     let add_cookie = |name: &str, value: &str| {
-        set_cookie(cookie_jar, name.to_string(), value.to_string(), true, true);
+        set_cookie(
+            cookie_jar,
+            name.to_string(),
+            value.to_string(),
+            true,
+            true,
+            true,
+        );
     };
 
     if form.newtab.is_some() {

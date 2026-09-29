@@ -243,7 +243,9 @@ form.suggestions-active .search_button::before {
 #addShortcutBtn:focus ~ .addShortcut {
     display: flex;
 }
-
+.shortcutForm {
+    z-index: 10;
+}
 .shortcutForm input {
     margin: 5px;
     border: none;
@@ -294,7 +296,7 @@ form.suggestions-active .search_button::before {
 .scroll_down {
     display: flex;
     justify-content: center;
-    margin-bottom: 50px;
+    margin-top: -50px;
 }
 .scroll_down img {
     width: 40px;
@@ -418,4 +420,37 @@ form.suggestions-active .search_button::before {
     height: auto;
     opacity: 1;
     padding: 15px;
+}
+
+.cta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 100px 20px 100px 20px;
+    text-align: center;
+}
+
+.cta div {
+    background: var(--bg-color, rgba(255, 255, 255, 0.2));
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    border-radius: 20px;
+    margin-top: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    width: 60vw;
+    justify-content: space-around;
+}
+
+.cta h2 {
+    font-size: 40px;
+}
+
+.cta div a img {
+    width: 48px;
+    height: 48px;
+    transition: all 0.3s ease;
+}
+.cta div a img:hover {
+    transform: translateY(-3px);
 }

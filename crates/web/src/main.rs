@@ -326,6 +326,7 @@ async fn main() -> Result<(), rocket::Error> {
                     stats,
                     cache_ver,
                     pageview,
+                    om_sug, // Omnibox suggestions
                     // Settings
                     settings_htmls,
                     settings_update,
@@ -413,9 +414,6 @@ async fn main() -> Result<(), rocket::Error> {
 
         println!("{}Shutdown!{}", colors::GREEN, colors::RESET);
     }
-
-    println!("Waiting for threads to shut down");
-    let _ = thread_handle.join();
 
     Ok(())
 }

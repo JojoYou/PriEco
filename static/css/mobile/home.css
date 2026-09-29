@@ -236,6 +236,9 @@ form.suggestions-active .search_button::before {
     display: flex;
 }
 
+.shortcutForm {
+    z-index: 10;
+}
 .shortcutForm input {
     margin: 5px;
     border: none;
@@ -410,4 +413,33 @@ form.suggestions-active .search_button::before {
     height: auto;
     opacity: 1;
     padding: 15px;
+}
+
+.cta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 100px 20px 100px 20px;
+    text-align: center;
+}
+
+.cta div {
+    background: var(--bg-color, rgba(255, 255, 255, 0.2));
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    border-radius: 20px;
+    margin-top: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    width: 60vw;
+    justify-content: space-around;
+}
+
+.cta div a img {
+    width: 48px;
+    height: 48px;
+    transition: all 0.3s ease;
+}
+.cta div a img:hover {
+    transform: translateY(-3px);
 }

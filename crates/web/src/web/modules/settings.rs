@@ -63,6 +63,25 @@ pub fn run(
     if (cookie_jar.get("lang").is_none() || cookie_jar.get("loc").is_none())
         && ip_addr != IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0))
     {
+        if ip_addr.is_loopback() {
+            set_cookie(
+                cookie_jar,
+                String::from("loc"),
+                String::from("all"),
+                false,
+                false,
+                false,
+            );
+            set_cookie(
+                cookie_jar,
+                String::from("lang"),
+                String::from("all"),
+                false,
+                false,
+                false,
+            );
+        }
+
         let loc: String = if !prieco_url.domain().as_str().ends_with(".onion") {
             match IP_TO_LOC.lookup_country(&ip_addr.to_string()) {
                 Ok(Some(country)) => country,
@@ -74,7 +93,14 @@ pub fn run(
         };
 
         if !loc.is_empty() {
-            set_cookie(cookie_jar, String::from("loc"), loc.clone(), false, true);
+            set_cookie(
+                cookie_jar,
+                String::from("loc"),
+                loc.clone(),
+                false,
+                true,
+                true,
+            );
 
             if !prieco_url.domain().as_str().ends_with(".onion") {
                 if let Some(lang) = COUNTRY_TO_LANG.get(loc.as_str()) {
@@ -84,6 +110,7 @@ pub fn run(
                         lang.to_string(),
                         false,
                         true,
+                        true,
                     );
                 } else {
                     set_cookie(
@@ -91,6 +118,7 @@ pub fn run(
                         String::from("lang"),
                         String::from("all"),
                         false,
+                        true,
                         true,
                     );
                 }
@@ -101,6 +129,7 @@ pub fn run(
                     String::from("all"),
                     false,
                     true,
+                    true,
                 );
             }
         } else {
@@ -109,6 +138,7 @@ pub fn run(
                 String::from("loc"),
                 String::from("all"),
                 false,
+                true,
                 true,
             );
         }

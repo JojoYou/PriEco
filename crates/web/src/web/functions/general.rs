@@ -29,7 +29,7 @@ use url::Url;
 use prieco_core::globals::colors;
 
 /// Description: Checks if URL is valid
-/// 
+///
 /// Input: URL
 /// Output: true if valid, false otherwise
 pub fn is_valid_url(input: &str) -> bool {
@@ -82,10 +82,11 @@ pub fn set_cookie(
     cookie_value: String,
     cookie_long_life: bool,
     js: bool,
+    secure: bool,
 ) {
     let mut cookie = Cookie::new(cookie_name, cookie_value);
     cookie.set_same_site(SameSite::Lax);
-    cookie.set_secure(true);
+    cookie.set_secure(secure);
     cookie.set_path("/");
 
     if cookie_long_life {
