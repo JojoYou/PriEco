@@ -32,7 +32,8 @@ td,
 .calculator button,
 .weatherCsetting,
 .sh_txt,
-.cta {
+.cta,
+.testimonials_section {
     color: #fff;
 }
 
@@ -43,4 +44,8 @@ td,
 .shortcutForm form input {
     color: #fff;
     background-color: #000;
+}
+
+.author_img {
+    border-color: #181a1b;
 }
