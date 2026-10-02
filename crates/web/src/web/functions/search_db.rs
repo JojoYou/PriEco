@@ -394,22 +394,30 @@ pub async fn run_json(
                         for pub_key in best_nodes {
                             let ep = endpoint.clone();
                             let pl = payload.clone();
+
                             handles.push(tokio::spawn(async move {
                                 let node_addr = EndpointAddr::from(pub_key);
-                                if let Ok(conn) = ep.connect(node_addr, b"prieco-search/0").await {
-                                    if let Ok((mut send, mut recv)) = conn.open_bi().await {
-                                        let _ = send.write_all(&pl).await;
-                                        let _ = send.finish();
-                                        if let Ok(data) = recv.read_to_end(5 * 1024 * 1024).await {
-                                            if let Ok(res) =
-                                                serde_json::from_slice::<Vec<WebDocument>>(&data)
-                                            {
-                                                return Some(res);
-                                            }
-                                        }
+
+                                let fetch_future = async {
+                                    let conn =
+                                        ep.connect(node_addr, b"prieco-search/0").await.ok()?;
+                                    let (mut send, mut recv) = conn.open_bi().await.ok()?;
+                                    send.write_all(&pl).await.ok()?;
+                                    send.finish().ok()?;
+                                    let data = recv.read_to_end(5 * 1024 * 1024).await.ok()?;
+                                    serde_json::from_slice::<Vec<WebDocument>>(&data).ok()
+                                };
+
+                                match tokio::time::timeout(Duration::from_secs(9), fetch_future)
+                                    .await
+                                {
+                                    Ok(Some(res)) => Some(res),
+                                    _ => {
+                                        let mut cache = PROFILE_CACHE.write();
+                                        cache.remove(&pub_key);
+                                        None
                                     }
                                 }
-                                None
                             }));
                         }
                         for handle in handles {
