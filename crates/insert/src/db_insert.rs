@@ -273,8 +273,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     vector_process(&mut vector_idx_buffer)?;
                     println!("{}: Vector idx commited", icons::DB_INSERT);
                 }
-
-                println!("Inserted: {}", &doc.url);
             }
 
             vector_process(&mut vector_idx_buffer)?;

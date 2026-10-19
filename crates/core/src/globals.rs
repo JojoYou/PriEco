@@ -16,7 +16,7 @@
 #[cfg(feature = "cuda")]
 use std::io::{Cursor, Read};
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     error::Error,
     fs::{File, write},
     hash::{Hash, Hasher},
@@ -24,7 +24,10 @@ use std::{
     ops::Range,
     path::Path,
     str::{FromStr, from_utf8},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicI64, Ordering},
+    },
     time::Duration as stdDuration,
 };
 
@@ -2145,7 +2148,8 @@ pub static SPELL_CHECKER: Lazy<Arc<SymSpell<UnicodeStringStrategy>>> = Lazy::new
 });
 
 /*
-  Analytics
+  Analytics (only PriEco purely vibe coded part)
+  They don't matter enough, and AI can do a good job in this
 */
 pub static ANALYTICS: Lazy<AnalyticsDb> = Lazy::new(|| {
     let date = Utc::now().date_naive();
@@ -2155,13 +2159,148 @@ pub static ANALYTICS: Lazy<AnalyticsDb> = Lazy::new(|| {
         ks: PRIECO_META.analytics_ks.clone(),
 
         salt: RwLock::new((date, generate_analytics_salt(date))),
+
+        pending: Mutex::new(HashMap::new()),
+        flush_lock: Mutex::new(()),
+        last_flush: AtomicI64::new(Utc::now().timestamp()),
     }
 });
+
+/*
+  Latency stages
+*/
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Stage {
+    /// Whole run_core_search (concurrent engines + fetch + sort)
+    Core,
+    /// Tantivy full text search
+    Fts,
+    /// Vector / IVF search
+    Vector,
+    /// Direct domain lookup
+    Dir,
+    /// Document fetch from the KV store
+    Fetch,
+    /// Handling an inbound federated query from a peer
+    PeerServe,
+    /// Round trip of an outbound federated query
+    PeerRtt,
+}
+
+impl Stage {
+    pub const ALL: [Stage; 7] = [
+        Stage::Core,
+        Stage::Fts,
+        Stage::Vector,
+        Stage::Dir,
+        Stage::Fetch,
+        Stage::PeerServe,
+        Stage::PeerRtt,
+    ];
+
+    pub fn key(self) -> &'static str {
+        match self {
+            Stage::Core => "core",
+            Stage::Fts => "fts",
+            Stage::Vector => "ivf",
+            Stage::Dir => "dir",
+            Stage::Fetch => "fetch",
+            Stage::PeerServe => "peer_serve",
+            Stage::PeerRtt => "peer_rtt",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Stage::Core => "End to end",
+            Stage::Fts => "Full text",
+            Stage::Vector => "Vector",
+            Stage::Dir => "Direct lookup",
+            Stage::Fetch => "Doc fetch",
+            Stage::PeerServe => "Peer serve",
+            Stage::PeerRtt => "Peer round trip",
+        }
+    }
+
+    pub fn desc(self) -> &'static str {
+        match self {
+            Stage::Core => "All engines, fetch and sort",
+            Stage::Fts => "Tantivy search",
+            Stage::Vector => "IVF centroid search",
+            Stage::Dir => "Domain guess lookup",
+            Stage::Fetch => "Metadata read from storage",
+            Stage::PeerServe => "Answering other nodes",
+            Stage::PeerRtt => "Asking other nodes",
+        }
+    }
+}
+
+/*
+  Log-scale histogram: 16 buckets per e-fold -> ~6.5% relative error on every percentile.
+  Bucket b covers [e^(b/16), e^((b+1)/16)) microseconds.
+*/
+const LAT_RES: f64 = 16.0;
+const LAT_MAX_BUCKET: u16 = 400;
+
+fn lat_bucket(micros: u64) -> u16 {
+    ((micros.max(1) as f64).ln() * LAT_RES)
+        .floor()
+        .min(LAT_MAX_BUCKET as f64) as u16
+}
+
+/// Geometric middle of a bucket, in milliseconds
+pub fn lat_bucket_ms(bucket: u16) -> f64 {
+    (((bucket as f64) + 0.5) / LAT_RES).exp() / 1000.0
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct LatencySummary {
+    pub count: u64,
+    pub p50: f64,
+    pub p95: f64,
+    pub p99: f64,
+}
+
+pub fn percentile(hist: &BTreeMap<u16, u64>, q: f64) -> f64 {
+    let total: u64 = hist.values().sum();
+    if total == 0 {
+        return 0.0;
+    }
+
+    // Nearest-rank method
+    let rank = ((q * total as f64).ceil() as u64).clamp(1, total);
+    let mut cumulative = 0u64;
+
+    for (bucket, count) in hist {
+        cumulative += count;
+        if cumulative >= rank {
+            return lat_bucket_ms(*bucket);
+        }
+    }
+
+    hist.keys()
+        .next_back()
+        .map(|b| lat_bucket_ms(*b))
+        .unwrap_or(0.0)
+}
+
+pub fn summarize(hist: &BTreeMap<u16, u64>) -> LatencySummary {
+    LatencySummary {
+        count: hist.values().sum(),
+        p50: percentile(hist, 0.50),
+        p95: percentile(hist, 0.95),
+        p99: percentile(hist, 0.99),
+    }
+}
 
 pub struct AnalyticsDb {
     db: FJALL_DATABASE,
     ks: Keyspace,
     salt: RwLock<(NaiveDate, [u8; 32])>,
+
+    pending: Mutex<HashMap<String, u64>>,
+    flush_lock: Mutex<()>,
+    last_flush: AtomicI64,
 }
 
 impl AnalyticsDb {
@@ -2230,6 +2369,54 @@ impl AnalyticsDb {
         batch.commit().expect("API request tracking write failed");
     }
 
+    /// Record one latency sample. Cheap: one mutex + hashmap increment.
+    pub fn record_latency(&self, stage: Stage, elapsed: std::time::Duration) {
+        let key = format!(
+            "lat:{}:{}:{:03}",
+            self.today(),
+            stage.key(),
+            lat_bucket(elapsed.as_micros() as u64)
+        );
+        *self.pending.lock().entry(key).or_insert(0) += 1;
+        self.maybe_flush();
+    }
+
+    /// Generic daily counter, e.g. count("p2p_served")
+    pub fn count(&self, name: &str) {
+        self.count_by(name, 1);
+    }
+
+    pub fn count_by(&self, name: &str, n: u64) {
+        if n == 0 {
+            return;
+        }
+        let key = format!("ctr:{}:{}", self.today(), name);
+        *self.pending.lock().entry(key).or_insert(0) += n;
+        self.maybe_flush();
+    }
+
+    /// One mini crawler batch was accepted by the main crawler.
+    /// Unique contributors are counted with the same daily-salted fingerprint as visitors.
+    pub fn record_worker_batch(&self, ip: &str, pages: u64, bytes: u64) {
+        let date = self.today();
+
+        self.count("worker_batches");
+        self.count_by("worker_pages", pages);
+        self.count_by("worker_bytes", bytes);
+
+        let seen_key = format!(
+            "wseen:{}:{}",
+            date,
+            self.fingerprint(ip, "mini-crawler", "worker", date)
+        );
+
+        if self.ks.get(seen_key.as_bytes()).ok().flatten().is_none() {
+            if self.ks.insert(seen_key.as_bytes(), [1u8]).is_ok() {
+                self.count("workers");
+            }
+        }
+    }
+
     // Read
     pub fn daily_queries(&self, days: u32) -> Vec<(String, u64)> {
         let today = self.today();
@@ -2238,6 +2425,20 @@ impl AnalyticsDb {
             .map(|i| {
                 let date = today - Duration::days(i as i64);
                 (date.to_string(), self.get_u64(&format!("queries:{}", date)))
+            })
+            .collect()
+    }
+
+    pub fn daily_visitors(&self, days: u32) -> Vec<(String, u64)> {
+        let today = self.today();
+        (0..days)
+            .rev()
+            .map(|i| {
+                let date = today - Duration::days(i as i64);
+                (
+                    date.to_string(),
+                    self.get_u64(&format!("visitors:{}", date)),
+                )
             })
             .collect()
     }
@@ -2302,6 +2503,55 @@ impl AnalyticsDb {
         )
     }
 
+    /// Daily values of a generic counter, oldest first (last item = today)
+    pub fn counter_series(&self, name: &str, days: u32) -> Vec<(String, u64)> {
+        self.flush();
+        let today = self.today();
+        (0..days)
+            .rev()
+            .map(|i| {
+                let date = today - Duration::days(i as i64);
+                (
+                    date.to_string(),
+                    self.get_u64(&format!("ctr:{}:{}", date, name)),
+                )
+            })
+            .collect()
+    }
+
+    /// Merged histogram of the last `days` days (1 = today only)
+    pub fn latency_hist(&self, stage: Stage, days: u32) -> BTreeMap<u16, u64> {
+        self.flush();
+        let today = self.today();
+        let mut merged: BTreeMap<u16, u64> = BTreeMap::new();
+
+        for i in 0..days {
+            let date = today - Duration::days(i as i64);
+            for (bucket, count) in self.day_hist(date, stage) {
+                *merged.entry(bucket).or_insert(0) += count;
+            }
+        }
+
+        merged
+    }
+
+    pub fn latency_summary(&self, stage: Stage, days: u32) -> LatencySummary {
+        summarize(&self.latency_hist(stage, days))
+    }
+
+    /// Per-day percentiles, oldest first
+    pub fn latency_daily(&self, stage: Stage, days: u32) -> Vec<(String, LatencySummary)> {
+        self.flush();
+        let today = self.today();
+        (0..days)
+            .rev()
+            .map(|i| {
+                let date = today - Duration::days(i as i64);
+                (date.to_string(), summarize(&self.day_hist(date, stage)))
+            })
+            .collect()
+    }
+
     // Purge
     pub fn purge_expired(&self) {
         let cutoff = self.today() - Duration::days(30);
@@ -2313,6 +2563,9 @@ impl AnalyticsDb {
             "country:",
             "seen:",
             "api:",
+            "lat:",
+            "ctr:",
+            "wseen:",
         ] {
             for item in self.ks.prefix(prefix.as_bytes()) {
                 let k = match item.key() {
@@ -2323,8 +2576,13 @@ impl AnalyticsDb {
                     continue;
                 };
 
-                let date_part = key_str[prefix.len()..].splitn(2, ':').next().unwrap_or("");
-                if let Ok(date) = NaiveDate::parse_from_str(date_part, "%Y-%m-%d") {
+                // The date is not always the first segment ("api:total:2026-01-01"),
+                // so take the first segment that parses as a date.
+                let date = key_str[prefix.len()..]
+                    .split(':')
+                    .find_map(|part| NaiveDate::parse_from_str(part, "%Y-%m-%d").ok());
+
+                if let Some(date) = date {
                     if date < cutoff {
                         batch.remove(&self.ks, k);
                     }
@@ -2348,6 +2606,69 @@ impl AnalyticsDb {
             tokio::time::sleep(tokio::time::Duration::from_secs(secs_until_midnight)).await;
             self.purge_expired();
         }
+    }
+
+    // Buffered writes
+    /// Write all buffered increments to the database. Safe to call from anywhere, any time.
+    pub fn flush(&self) {
+        let _guard = self.flush_lock.lock();
+
+        let drained: HashMap<String, u64> = std::mem::take(&mut *self.pending.lock());
+        self.last_flush
+            .store(Utc::now().timestamp(), Ordering::Relaxed);
+
+        if drained.is_empty() {
+            return;
+        }
+
+        let mut batch = self.db.batch();
+        for (key, delta) in drained {
+            batch.insert(
+                &self.ks,
+                key.as_bytes(),
+                (self.get_u64(&key) + delta).to_le_bytes(),
+            );
+        }
+
+        if let Err(e) = batch.commit() {
+            eprintln!("Analytics flush failed: {}", e);
+        }
+    }
+
+    fn maybe_flush(&self) {
+        let now = Utc::now().timestamp();
+        let last = self.last_flush.load(Ordering::Relaxed);
+
+        if now - last >= 30
+            && self
+                .last_flush
+                .compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+        {
+            self.flush();
+        }
+    }
+
+    fn day_hist(&self, date: NaiveDate, stage: Stage) -> BTreeMap<u16, u64> {
+        let prefix = format!("lat:{}:{}:", date, stage.key());
+        let mut hist = BTreeMap::new();
+
+        for item in self.ks.prefix(prefix.as_bytes()) {
+            let Ok((k, v)) = item.into_inner() else {
+                continue;
+            };
+            let Some(bucket) = std::str::from_utf8(&k)
+                .ok()
+                .and_then(|s| s.rsplit(':').next())
+                .and_then(|s| s.parse::<u16>().ok())
+            else {
+                continue;
+            };
+            let count = u64::from_le_bytes((&v[..]).try_into().unwrap_or([0; 8]));
+            hist.insert(bucket, count);
+        }
+
+        hist
     }
 
     // Helpers

@@ -10,9 +10,6 @@
 //!  Usage: Run PriEco and complete set up questions
 //!  TODO:
 
-use iroh::{Endpoint, PublicKey, SecretKey, endpoint::presets::N0, protocol::Router};
-use iroh_gossip::{ALPN, Gossip, TopicId};
-use once_cell::sync::Lazy;
 /*
   Set global allovator
   Reason: Default was insufficient for deallocating RAM from crawler HTTP connections
@@ -45,6 +42,9 @@ use std::{
 */
 use env_logger::Env;
 use fjall::PersistMode;
+use iroh::{Endpoint, PublicKey, SecretKey, endpoint::presets::N0, protocol::Router};
+use iroh_gossip::{ALPN, Gossip, TopicId};
+use once_cell::sync::Lazy;
 #[cfg(feature = "cuda")]
 use ort::ExecutionProvider;
 use ort::{Environment, GraphOptimizationLevel, LoggingLevel, Session, SessionBuilder};

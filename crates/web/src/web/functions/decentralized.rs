@@ -24,7 +24,8 @@ use n0_future::StreamExt;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use prieco_core::{
-    PRIECO_CONFIG, TANTIVY_INDEX, TANTIVY_READER, WebDocument, file_exists, url_to_id, write_file,
+    ANALYTICS, PRIECO_CONFIG, Stage, TANTIVY_INDEX, TANTIVY_READER, WebDocument, file_exists,
+    url_to_id, write_file,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -278,7 +279,8 @@ pub async fn gossip_sync(
                                 if let Ok(pub_key) = PublicKey::from_bytes(&node_id_bytes) {
                                     let mut c = cache.write();
                                     if c.remove(&pub_key).is_some() {
-                                        println!("👋 Peer {} went offline and was removed from cache.", pub_key);
+                                        println!("👋 Peer {} went offline and was removed from cache.", pub_key);ANALYTICS.count("p2p_peer_left");
+
                                     }
                                 }
                             }
@@ -298,7 +300,8 @@ pub async fn gossip_sync(
                                     let mut c = cache.write();
                                     if !c.contains_key(&pub_key) {
                                         println!("🤝 Discovered peer {} via Gossip!", pub_key);
-                                        c.insert(pub_key, profile);
+                                        c.insert(pub_key, profile);ANALYTICS.count("p2p_peer_joined");
+
                                         is_new_peer = true;
                                     }
                                 }
@@ -316,7 +319,8 @@ pub async fn gossip_sync(
                                     let mut c = cache.write();
                                     if !c.contains_key(&pub_key) {
                                         println!("🤝 Discovered peer {} via Gossip!", pub_key);
-                                        c.insert(pub_key, profile);
+                                        c.insert(pub_key, profile);ANALYTICS.count("p2p_peer_joined");
+
                                         is_new_peer = true;
                                     }
                                 }
@@ -340,11 +344,14 @@ pub struct SearchProtocol {
 
 impl ProtocolHandler for SearchProtocol {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
+        let started = std::time::Instant::now(); // first line of the function
+
         let (mut send, mut recv) = connection.accept_bi().await?;
 
         if let Ok(data) = recv.read_to_end(1024 * 1024).await {
             if let Ok(fed_query) = serde_json::from_slice::<FedQuery>(&data) {
                 println!("📞 Received peer query!",);
+                ANALYTICS.count("p2p_served");
 
                 let mut results: Vec<WebDocument> = Vec::new();
 
@@ -388,6 +395,7 @@ impl ProtocolHandler for SearchProtocol {
                 if let Ok(response_bytes) = serde_json::to_vec(&results) {
                     let _ = send.write_all(&response_bytes).await;
                 }
+                ANALYTICS.record_latency(Stage::PeerServe, started.elapsed());
             }
         }
 

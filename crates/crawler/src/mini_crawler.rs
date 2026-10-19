@@ -1,6 +1,6 @@
 use ahash::AHashMap;
 use once_cell::sync::Lazy;
-use prieco_core::{CLIENT, PRIECO_CONFIG, icons};
+use prieco_core::{ANALYTICS, CLIENT, PRIECO_CONFIG, icons};
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -77,6 +77,11 @@ pub async fn run() {
 
                 match upload_res {
                     Ok(res) if res.status().is_success() => {
+                        ANALYTICS.record_worker_batch(
+                            "worker",
+                            task.successful as u64,
+                            task.compressed_buffer.len() as u64,
+                        );
                         println!(
                             "{}: Batch {} accepted by main crawler!",
                             icons::MINI_CRAWLER_ICON,
@@ -158,6 +163,8 @@ pub async fn run() {
             icons::MINI_CRAWLER_ICON,
             total_urls
         );
+
+        ANALYTICS.count_by("worker_urls_issued", total_urls as u64);
 
         let mut results_batch: Vec<HTMLResultData> = Vec::with_capacity(total_urls);
         let mut join_handles = Vec::with_capacity(total_urls);

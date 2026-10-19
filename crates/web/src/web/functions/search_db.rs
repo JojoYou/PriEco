@@ -25,7 +25,7 @@ use std::{
     cmp::Reverse,
     collections::{HashMap, HashSet},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 /*
@@ -58,7 +58,7 @@ use crate::web::functions::{
     ranking::{self, goggles::GoggleRules},
 };
 use prieco_core::{
-    META_DECODER, PRIECO_META, QueryIntent, TANTIVY_QUERY_PARSER,
+    ANALYTICS, META_DECODER, PRIECO_META, QueryIntent, Stage, TANTIVY_QUERY_PARSER,
     globals::{
         EmbeddingService, PAGERANK, RERANKER, SearchResult, TANTIVY_INDEX, TANTIVY_READER,
         VECTOR_CENTROPOIDS, WebDocument, colors,
@@ -354,6 +354,8 @@ pub async fn run_json(
             }
 
             let search_future = async {
+                let t = Instant::now();
+
                 let mut decentralized_results = Vec::new();
                 let query_words: Vec<u64> = q_clone2
                     .split_whitespace()
@@ -387,6 +389,8 @@ pub async fn run_json(
                     depth: 1,
                     embed: embed.clone(),
                 };
+
+                ANALYTICS.count("p2p_sent");
 
                 if let Ok(payload) = serde_json::to_vec(&fed_query) {
                     if let Some(endpoint) = IROH_ENDPOINT.get() {
@@ -429,6 +433,10 @@ pub async fn run_json(
                 }
                 decentralized_results
                     .sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+
+                ANALYTICS.count("p2p_sent_ok");
+                ANALYTICS.record_latency(Stage::PeerRtt, t.elapsed());
+
                 decentralized_results
             };
 
@@ -615,6 +623,8 @@ pub async fn run_core_search(
                 id_score_vec.push((url_to_id(&format!("{}{}/", prefix, domain)), 0.0));
             }
             println!("DIR lookup took {:.3}s", start.elapsed().as_secs_f32());
+            ANALYTICS.record_latency(Stage::Dir, start.elapsed());
+
             return id_score_vec;
         }
 
@@ -632,6 +642,8 @@ pub async fn run_core_search(
         }
 
         println!("DIR lookup took {:.3}s", start.elapsed().as_secs_f32());
+        ANALYTICS.record_latency(Stage::Dir, start.elapsed());
+
         id_score_vec
     });
 
@@ -661,6 +673,8 @@ pub async fn run_core_search(
             start.elapsed().as_secs_f32(),
             TANTIVY_READER.searcher().segment_readers().len()
         );
+        ANALYTICS.record_latency(Stage::Fts, start.elapsed());
+
         res
     });
 
@@ -680,6 +694,8 @@ pub async fn run_core_search(
 
         let final_res: Vec<(u64, f32)> = res.into_iter().take(MAX_IVF).collect();
         println!("Vector search took {:.3}s", start.elapsed().as_secs_f32());
+        ANALYTICS.record_latency(Stage::Vector, start.elapsed());
+
         final_res
     });
 
@@ -707,6 +723,7 @@ pub async fn run_core_search(
     let fetch_start = std::time::Instant::now();
     let mut fetched_results = fetch_documents(engines_map);
     println!("Fetch took {:.3}s", fetch_start.elapsed().as_secs_f32());
+    ANALYTICS.record_latency(Stage::Fetch, fetch_start.elapsed());
 
     let mut dir_results: Vec<WebDocument> = fetched_results.remove("DIR").unwrap_or_default();
     let mut tantivy_results: Vec<WebDocument> = fetched_results.remove("FTS").unwrap_or_default();
@@ -722,6 +739,8 @@ pub async fn run_core_search(
     println!("Tantivy: {}", tantivy_results.len());
     println!("IVF: {}", vector_results.len());
     println!("DIS: {}", dis_results.len());
+
+    ANALYTICS.record_latency(Stage::Core, total_start.elapsed());
 
     (dir_results, tantivy_results, vector_results, dis_results)
 }

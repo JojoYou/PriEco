@@ -7,77 +7,464 @@
 <link rel="stylesheet" href="{{css_path}}analytics.css">
 </head>
 <body>
-<header>
-  <div class="dot"></div>
-  <h1>Search Analytics</h1>
-  <span class="ts">{{generated_at}}</span>
-</header>
-<div class="grid">
-  <div class="cell cell-chart">
-    <div class="chart-header">
-      <div>
-        <div class="cell-label">Queries</div>
-        <div class="cell-title">Daily search queries over the last 30 days</div>
-      </div>
-      <div class="right">
-        <div class="cell-value">{{search_today}}<span class="unit">queries</span></div>
-        <div class="cell-sub">today</div>
-      </div>
+<main class="page">
+
+  <header class="masthead">
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>Search Analytics</h1>
     </div>
-    <div class="bars">
-      {{#each search_days}}
-      <div class="bar-wrap">
-        <div class="bar-tooltip">{{this.date}} · {{this.count}}</div>
-        <div class="bar" style="height:{{this.height_pct}}%"></div>
-      </div>
-      {{/each}}
+    <span class="ts">{{generated_at}}</span>
+  </header>
+
+  <nav class="jump">
+    <a href="#search">Search</a>
+    <a href="#performance">Performance</a>
+    <a href="#audience">Audience</a>
+    <a href="#network">Decentralization</a>
+    <a href="#crawler">Mini crawler</a>
+  </nav>
+
+  <section class="kpis">
+    <article class="kpi">
+      <div class="label">Index size</div>
+      <div class="kpi-value">{{index_size_display}}<span class="unit">{{index_size_unit}}</span></div>
+    </article>
+    <article class="kpi kpi--blue">
+      <div class="label">Queries today</div>
+      <div class="kpi-value">{{search_today}}</div>
+    </article>
+    <article class="kpi kpi--violet">
+      <div class="label">Search p95</div>
+      <div class="kpi-value">{{lat_p95}}</div>
+    </article>
+    <article class="kpi">
+      <div class="label">Visitors 24h</div>
+      <div class="kpi-value">{{visitors_24h}}</div>
+    </article>
+    <article class="kpi kpi--warn">
+      <div class="label">Peers online</div>
+      <div class="kpi-value">{{p2p.peers_online}}</div>
+    </article>
+    <article class="kpi">
+      <div class="label">Crawled today</div>
+      <div class="kpi-value">{{crawler.pages_today}}<span class="unit">pages</span></div>
+    </article>
+  </section>
+
+  <section class="section" id="search">
+    <div class="section-head">
+      <h2>Search</h2>
+      <p>Query volume and API usage</p>
     </div>
-    <div class="chart-x-labels">
-      {{#each search_x_labels}}<span>{{this}}</span>{{/each}}
+
+    <div class="grid grid-21">
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="label">Queries</div>
+            <div class="title">Daily search queries over the last 30 days</div>
+          </div>
+          <div class="right">
+            <div class="value value--accent">{{search_today}}<span class="unit">today</span></div>
+            <div class="sub">
+              {{#if search_up}}<span class="delta-up">↑ {{search_delta}}%</span>{{else}}<span class="delta-down">↓ {{search_delta}}%</span>{{/if}}
+              vs yesterday
+            </div>
+          </div>
+        </div>
+        <svg class="chart" viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label="Daily search queries">
+          <line class="gridline" x1="0" x2="300" y1="25" y2="25"/>
+          <line class="gridline" x1="0" x2="300" y1="50" y2="50"/>
+          <line class="gridline" x1="0" x2="300" y1="75" y2="75"/>
+          {{#each search_bars}}
+          <rect class="bar{{#if this.last}} is-now{{/if}}" x="{{this.x}}" y="{{this.y}}" width="{{this.w}}" height="{{this.h}}"><title>{{this.label}} · {{this.count}}</title></rect>
+          {{/each}}
+        </svg>
+        <div class="xlabels">
+          {{#each search_x_labels}}<span>{{this}}</span>{{/each}}
+        </div>
+        <div class="sub">{{search_total}} queries in the last 30 days</div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="label">API requests</div>
+            <div class="title">Public API, 30 days</div>
+          </div>
+        </div>
+        <div class="value value--blue">{{api_today}}<span class="unit">today</span></div>
+        <div class="sub">
+          {{#if api_up}}<span class="delta-up">↑ {{api_delta}}%</span>{{else}}<span class="delta-down">↓ {{api_delta}}%</span>{{/if}}
+          vs yesterday
+        </div>
+        <svg class="chart chart--short" viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label="Daily API requests">
+          {{#each api_bars}}
+          <rect class="bar{{#if this.last}} is-now{{/if}}" x="{{this.x}}" y="{{this.y}}" width="{{this.w}}" height="{{this.h}}"><title>{{this.label}} · {{this.count}}</title></rect>
+          {{/each}}
+        </svg>
+      </article>
     </div>
-  </div>
-  <div class="row-2">
-    <div class="cell">
-      <div class="cell-label">Web Traffic</div>
-      <div class="cell-title">Unique visitors in the last 24 hours</div>
-      <div class="cell-value">{{visitors_24h}}<span class="unit">visitors</span></div>
-      <div class="cell-sub">
-        {{#if visitors_up}}<span class="delta-up">↑ {{visitors_delta}}%</span>{{else}}<span class="delta-down">↓ {{visitors_delta}}%</span>{{/if}}
-        vs yesterday &nbsp;·&nbsp; {{pageviews_24h}} pageviews
-      </div>
+  </section>
+
+  <section class="section" id="performance">
+    <div class="section-head">
+      <h2>Performance</h2>
+      <p>Search latency percentiles, last 7 days</p>
     </div>
-    <div class="cell">
-      <div class="cell-label">Geographic Reach</div>
-      <div class="cell-title">Based on location cookie</div>
-      {{#each countries}}
-      <div class="country-row">
-        <span class="country-flag">{{this.flag}}</span>
-        <span class="country-name">{{this.name}}</span>
-        <div class="country-bar-wrap"><div class="country-bar-fill" style="width:{{this.pct}}%"></div></div>
-        <span class="country-pct">{{this.pct}}%</span>
-      </div>
-      {{/each}}
+
+    {{#if lat_has_data}}
+    <div class="grid grid-21">
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="label">End to end</div>
+            <div class="title">Time spent inside the search core: all engines, fetch and sort · {{lat_samples}} samples</div>
+          </div>
+          <div class="right">
+            <span class="pill">p95 today {{lat_p95_today}}</span>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat stat--p50">
+            <div class="label">p50 · median</div>
+            <div class="num">{{lat_p50}}</div>
+          </div>
+          <div class="stat stat--p95">
+            <div class="label">p95</div>
+            <div class="num">{{lat_p95}}</div>
+          </div>
+          <div class="stat stat--p99">
+            <div class="label">p99</div>
+            <div class="num">{{lat_p99}}</div>
+          </div>
+        </div>
+
+        <div class="sub">Daily percentiles, last 30 days</div>
+        <div class="ylabels"><span>{{lat_trend.max}}</span><span>{{lat_trend.mid}}</span><span>0</span></div>
+        <svg class="chart" viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label="Daily latency percentiles">
+          <line class="gridline" x1="0" x2="300" y1="4" y2="4"/>
+          <line class="gridline" x1="0" x2="300" y1="50" y2="50"/>
+          <line class="gridline" x1="0" x2="300" y1="96" y2="96"/>
+          <polyline class="line line-p99" points="{{lat_trend.p99}}"/>
+          <polyline class="line line-p95" points="{{lat_trend.p95}}"/>
+          <polyline class="line line-p50" points="{{lat_trend.p50}}"/>
+        </svg>
+        <div class="xlabels">
+          {{#each lat_x_labels}}<span>{{this}}</span>{{/each}}
+        </div>
+        <div class="legend">
+          <span class="l-p50">p50</span><span class="l-p95">p95</span><span class="l-p99">p99</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="label">Distribution</div>
+            <div class="title">Searches per time range (upper bound in ms)</div>
+          </div>
+        </div>
+        <svg class="chart chart--violet" viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label="Latency distribution">
+          <line class="gridline" x1="0" x2="300" y1="25" y2="25"/>
+          <line class="gridline" x1="0" x2="300" y1="50" y2="50"/>
+          <line class="gridline" x1="0" x2="300" y1="75" y2="75"/>
+          {{#each lat_dist}}
+          <rect class="bar" x="{{this.x}}" y="{{this.y}}" width="{{this.w}}" height="{{this.h}}"><title>{{this.label}} · {{this.count}}</title></rect>
+          {{/each}}
+        </svg>
+        <div class="xlabels xlabels--even">
+          {{#each lat_dist_labels}}<span>{{this}}</span>{{/each}}
+        </div>
+      </article>
     </div>
-  </div>
-</div>
-<div class="separator">
-  <div class="separator-line"></div>
-  <div class="separator-label">index storage</div>
-  <div class="separator-line"></div>
-</div>
-<div class="row-2">
-    <div class="cell">
-    <div class="cell-label">Index Size</div>
-    <div class="index-value">{{index_size_display}}<span class="unit">{{index_size_unit}}</span></div>
+
+    <div class="grid">
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="label">By stage</div>
+            <div class="title">Where the time goes, last 7 days</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="lat-table">
+            <thead>
+              <tr>
+                <th>Stage</th>
+                <th>Samples</th>
+                <th>p50</th>
+                <th>p95</th>
+                <th>p99</th>
+                <th>p95 share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{#each lat_rows}}
+              <tr>
+                <td class="name">{{this.name}}<small>{{this.desc}}</small></td>
+                <td>{{this.count}}</td>
+                <td>{{this.p50}}</td>
+                <td class="p95">{{this.p95}}</td>
+                <td class="p99">{{this.p99}}</td>
+                <td class="bar-cell">
+                  <svg class="hbar" viewBox="0 0 100 4" preserveAspectRatio="none" aria-hidden="true">
+                    <rect class="hbar-track" x="0" y="0" width="100" height="4"/>
+                    <rect class="hbar-fill" x="0" y="0" width="{{this.bar}}" height="4"/>
+                  </svg>
+                </td>
+              </tr>
+              {{/each}}
+            </tbody>
+          </table>
+        </div>
+      </article>
     </div>
-    <div class="cell">
-    <div class="cell-label">API Requests</div>
-    <div class="index-value">{{api_today}}<span class="unit">requests</span></div>
-    <div class="cell-sub">
-        {{#if api_up}}<span class="delta-up">↑ {{api_delta}}%</span>{{else}}<span class="delta-down">↓ {{api_delta}}%</span>{{/if}}
-        vs yesterday
+    {{else}}
+    <div class="empty">No latency samples yet. They show up after the first searches are served.</div>
+    {{/if}}
+  </section>
+
+  <section class="section" id="audience">
+    <div class="section-head">
+      <h2>Audience</h2>
+      <p>Anonymous, no cookies, no stored IPs</p>
     </div>
-</div>
-</div>
+
+    <div class="grid grid-2">
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="label">Web traffic</div>
+            <div class="title">Unique visitors per day</div>
+          </div>
+          <div class="right">
+            <div class="value">{{visitors_24h}}<span class="unit">visitors</span></div>
+            <div class="sub">
+              {{#if visitors_up}}<span class="delta-up">↑ {{visitors_delta}}%</span>{{else}}<span class="delta-down">↓ {{visitors_delta}}%</span>{{/if}}
+              vs yesterday · {{pageviews_24h}} pageviews
+            </div>
+          </div>
+        </div>
+        <svg class="chart chart--accent" viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label="Daily unique visitors">
+          <line class="gridline" x1="0" x2="300" y1="25" y2="25"/>
+          <line class="gridline" x1="0" x2="300" y1="50" y2="50"/>
+          <line class="gridline" x1="0" x2="300" y1="75" y2="75"/>
+          {{#each visitor_bars}}
+          <rect class="bar{{#if this.last}} is-now{{/if}}" x="{{this.x}}" y="{{this.y}}" width="{{this.w}}" height="{{this.h}}"><title>{{this.label}} · {{this.count}}</title></rect>
+          {{/each}}
+        </svg>
+        <div class="xlabels">
+          {{#each visitor_x_labels}}<span>{{this}}</span>{{/each}}
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="label">Geographic reach</div>
+            <div class="title">Today, based on location cookie</div>
+          </div>
+        </div>
+        {{#each countries}}
+        <div class="row country-row">
+          <span class="country-flag">{{this.flag}}</span>
+          <span class="country-name">{{this.name}}</span>
+          <svg class="hbar" viewBox="0 0 100 4" preserveAspectRatio="none" aria-hidden="true">
+            <rect class="hbar-track" x="0" y="0" width="100" height="4"/>
+            <rect class="hbar-fill" x="0" y="0" width="{{this.pct}}" height="4"/>
+          </svg>
+          <span class="country-pct">{{this.pct}}%</span>
+        </div>
+        {{else}}
+        <div class="empty">No location data yet today.</div>
+        {{/each}}
+      </article>
+    </div>
+  </section>
+
+  <section class="section" id="network">
+    <div class="section-head">
+      <h2>Decentralization</h2>
+      <p>Peer to peer search network</p>
+    </div>
+
+    <div class="grid grid-21">
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="label">Federation</div>
+            <div class="title">Queries answered for other nodes, last 30 days</div>
+          </div>
+          <div class="right">
+            <div class="value value--violet">{{p2p.served_today}}<span class="unit">served today</span></div>
+            <div class="sub">
+              {{#if p2p.served_up}}<span class="delta-up">↑ {{p2p.served_delta}}%</span>{{else}}<span class="delta-down">↓ {{p2p.served_delta}}%</span>{{/if}}
+              vs yesterday
+            </div>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="label">Peers online</div>
+            <div class="num">{{p2p.peers_online}}</div>
+          </div>
+          <div class="stat">
+            <div class="label">Joined / left today</div>
+            <div class="num">+{{p2p.joined_today}}<small>/ −{{p2p.left_today}}</small></div>
+          </div>
+          <div class="stat">
+            <div class="label">Asked peers today</div>
+            <div class="num">{{p2p.sent_today}}</div>
+          </div>
+          <div class="stat">
+            <div class="label">Peer success</div>
+            <div class="num">{{p2p.success}}</div>
+          </div>
+          <div class="stat">
+            <div class="label">Peer RTT p95</div>
+            <div class="num">{{p2p.rtt_p95}}</div>
+          </div>
+        </div>
+
+        <svg class="chart chart--violet" viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label="Daily federated queries served">
+          <line class="gridline" x1="0" x2="300" y1="25" y2="25"/>
+          <line class="gridline" x1="0" x2="300" y1="50" y2="50"/>
+          <line class="gridline" x1="0" x2="300" y1="75" y2="75"/>
+          {{#each p2p.bars}}
+          <rect class="bar{{#if this.last}} is-now{{/if}}" x="{{this.x}}" y="{{this.y}}" width="{{this.w}}" height="{{this.h}}"><title>{{this.label}} · {{this.count}}</title></rect>
+          {{/each}}
+        </svg>
+        <div class="xlabels">
+          {{#each p2p.x_labels}}<span>{{this}}</span>{{/each}}
+        </div>
+        <div class="sub">{{p2p.served_total}} queries served to the network in 30 days</div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="label">Network coverage</div>
+            <div class="title">What the known peers hold</div>
+          </div>
+        </div>
+
+        <div class="value value--accent">{{p2p.shards}}<span class="unit">unique vector shards</span></div>
+        <div class="sub">union of every peer's top shards</div>
+
+        <div class="peer-head">Avg keyword filter fill · {{p2p.avg_fill}}%</div>
+        <svg class="hbar" viewBox="0 0 100 4" preserveAspectRatio="none" aria-hidden="true">
+          <rect class="hbar-track" x="0" y="0" width="100" height="4"/>
+          <rect class="hbar-fill hbar-fill--warn" x="0" y="0" width="{{p2p.avg_fill_bar}}" height="4"/>
+        </svg>
+        {{#if p2p.bloom_saturated}}
+        <div class="note">Peer keyword filters are almost full, so they match nearly every query and can't route it to the right node anymore.</div>
+        {{/if}}
+
+        <div class="peer-head">Peers</div>
+        {{#if p2p.has_peers}}
+        {{#each p2p.peers}}
+        <div class="row peer-row">
+          <span class="peer-id">{{this.id}}</span>
+          <span class="peer-shards">{{this.shards}} shards</span>
+          <svg class="hbar" viewBox="0 0 100 4" preserveAspectRatio="none" aria-hidden="true">
+            <rect class="hbar-track" x="0" y="0" width="100" height="4"/>
+            <rect class="hbar-fill hbar-fill--violet" x="0" y="0" width="{{this.fill_bar}}" height="4"/>
+          </svg>
+          <span class="peer-fill">{{this.fill}}%</span>
+        </div>
+        {{/each}}
+        {{else}}
+        <div class="empty">No peers discovered yet.</div>
+        {{/if}}
+      </article>
+    </div>
+  </section>
+
+  <section class="section" id="crawler">
+    <div class="section-head">
+      <h2>Mini crawler</h2>
+      <p>Community workers feeding the index</p>
+    </div>
+
+    {{#if crawler.has_data}}
+    <div class="grid grid-21">
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="label">Pages contributed</div>
+            <div class="title">Pages accepted from workers per day, last 30 days</div>
+          </div>
+          <div class="right">
+            <div class="value value--accent">{{crawler.pages_today}}<span class="unit">today</span></div>
+            <div class="sub">
+              {{#if crawler.pages_up}}<span class="delta-up">↑ {{crawler.pages_delta}}%</span>{{else}}<span class="delta-down">↓ {{crawler.pages_delta}}%</span>{{/if}}
+              vs yesterday
+            </div>
+          </div>
+        </div>
+        <svg class="chart chart--accent" viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label="Pages contributed by workers per day">
+          <line class="gridline" x1="0" x2="300" y1="25" y2="25"/>
+          <line class="gridline" x1="0" x2="300" y1="50" y2="50"/>
+          <line class="gridline" x1="0" x2="300" y1="75" y2="75"/>
+          {{#each crawler.bars}}
+          <rect class="bar{{#if this.last}} is-now{{/if}}" x="{{this.x}}" y="{{this.y}}" width="{{this.w}}" height="{{this.h}}"><title>{{this.label}} · {{this.count}}</title></rect>
+          {{/each}}
+        </svg>
+        <div class="xlabels">
+          {{#each crawler.x_labels}}<span>{{this}}</span>{{/each}}
+        </div>
+        <div class="sub">{{crawler.pages_total}} pages in the last 30 days</div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="label">Today</div>
+            <div class="title">Worker activity</div>
+          </div>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <div class="label">Active workers</div>
+            <div class="num">{{crawler.workers_today}}</div>
+          </div>
+          <div class="stat">
+            <div class="label">Batches</div>
+            <div class="num">{{crawler.batches_today}}</div>
+          </div>
+          <div class="stat">
+            <div class="label">URLs handed out</div>
+            <div class="num">{{crawler.issued_today}}</div>
+          </div>
+          <div class="stat">
+            <div class="label">Success rate</div>
+            <div class="num">{{crawler.yield}}</div>
+          </div>
+          <div class="stat">
+            <div class="label">Pages per batch</div>
+            <div class="num">{{crawler.avg_batch}}</div>
+          </div>
+          <div class="stat">
+            <div class="label">Data received</div>
+            <div class="num">{{crawler.data_today}}</div>
+          </div>
+        </div>
+      </article>
+    </div>
+    {{else}}
+    <div class="empty">No worker batches received yet.</div>
+    {{/if}}
+  </section>
+
+  <footer class="footer">
+    <span>No cookies for analytics · visitors are counted with a daily rotating salted hash</span>
+    <span>Data kept for 30 days · percentiles are accurate to about ±7%</span>
+  </footer>
+
+</main>
 </body>
 </html>

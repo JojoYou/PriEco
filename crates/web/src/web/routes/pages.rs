@@ -14,7 +14,7 @@
   Import system libraries
 */
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::{read_dir, read_to_string},
     io::Cursor,
     net::IpAddr,
@@ -50,6 +50,7 @@ use urlencoding::{decode, encode};
 */
 use crate::web::{
     functions::{
+        decentralized::PROFILE_CACHE,
         general::{get_domain, set_cookie},
         ranking::goggles::{fetch_and_store, get_goggle_ids, load_goggles, refresh_stale_goggles},
         search_endpoint::{self, UserQtPrefs, get_user_qt_prefs},
@@ -57,8 +58,9 @@ use crate::web::{
     modules::settings,
 };
 use prieco_core::{
-    BANGS, CLIENT, PRIECO_BLOBS, TANTIVY_INDEX,
+    BANGS, CLIENT, LatencySummary, PRIECO_BLOBS, Stage, TANTIVY_INDEX,
     globals::{ANALYTICS, CSS_VERSION, EmbeddingService, JS_VERSION, UserAgent},
+    lat_bucket_ms,
 };
 
 /*
@@ -583,14 +585,149 @@ pub async fn view_blob(id: u64) -> Option<RawHtml<String>> {
 }
 
 /*
-  Description: PriEco Analytics
+    Analytics (only PriEco purely vibe coded part)
+    They don't matter enough, and AI can do a good job in this
+*/
+fn fmt_num(n: u64) -> String {
+    let s = n.to_string();
+    let mut out = String::with_capacity(s.len() + s.len() / 3);
+    for (i, ch) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            out.push(',');
+        }
+        out.push(ch);
+    }
+    out.chars().rev().collect()
+}
 
+fn fmt_ms(ms: f64) -> String {
+    if ms <= 0.0 {
+        "–".to_string()
+    } else if ms < 1.0 {
+        "<1 ms".to_string()
+    } else if ms < 100.0 {
+        format!("{:.1} ms", ms)
+    } else if ms < 1000.0 {
+        format!("{:.0} ms", ms)
+    } else {
+        format!("{:.2} s", ms / 1000.0)
+    }
+}
+
+fn fmt_bytes(b: u64) -> String {
+    const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
+    let mut v = b as f64;
+    let mut i = 0;
+    while v >= 1024.0 && i < UNITS.len() - 1 {
+        v /= 1024.0;
+        i += 1;
+    }
+    if i == 0 {
+        format!("{} B", b)
+    } else {
+        format!("{:.1} {}", v, UNITS[i])
+    }
+}
+
+/// (abs percent change as string, is_up)
+fn delta(today: u64, yesterday: u64) -> (String, bool) {
+    let d = if yesterday == 0 {
+        0.0
+    } else {
+        (today as f64 - yesterday as f64) / yesterday as f64 * 100.0
+    };
+    (format!("{:.1}", d.abs()), d >= 0.0)
+}
+
+/// (today, yesterday) from a series that ends with today
+fn today_yesterday(series: &[(String, u64)]) -> (u64, u64) {
+    let n = series.len();
+    let today = series.last().map(|(_, c)| *c).unwrap_or(0);
+    let yesterday = if n >= 2 { series[n - 2].1 } else { 0 };
+    (today, yesterday)
+}
+
+// ---------- chart geometry (all SVG attributes, so no inline CSS / CSP trouble) ----------
+// Every chart uses viewBox="0 0 300 100" with preserveAspectRatio="none".
+
+fn bar_series(data: &[(String, u64)]) -> Vec<Value> {
+    let n = data.len().max(1) as f64;
+    let max = data.iter().map(|(_, c)| *c).max().unwrap_or(0).max(1) as f64;
+    let slot = 300.0 / n;
+
+    data.iter()
+        .enumerate()
+        .map(|(i, (label, c))| {
+            let h = (*c as f64 / max * 96.0).max(if *c > 0 { 2.0 } else { 0.6 });
+            json!({
+                "label": label,
+                "count": fmt_num(*c),
+                "x": format!("{:.2}", i as f64 * slot + slot * 0.15),
+                "w": format!("{:.2}", slot * 0.70),
+                "y": format!("{:.2}", 100.0 - h),
+                "h": format!("{:.2}", h),
+                "last": i + 1 == data.len(),
+            })
+        })
+        .collect()
+}
+
+fn x_labels(dates: &[String]) -> Vec<String> {
+    let len = dates.len();
+    let step = (len / 5).max(1);
+    dates
+        .iter()
+        .enumerate()
+        .filter_map(|(i, date)| {
+            if i % step == 0 || i == len - 1 {
+                Some(date.get(5..).unwrap_or(date).to_string())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn dates_of(data: &[(String, u64)]) -> Vec<String> {
+    data.iter().map(|(d, _)| d.clone()).collect()
+}
+
+fn line_points(
+    daily: &[(String, LatencySummary)],
+    max: f64,
+    pick: impl Fn(&LatencySummary) -> f64,
+) -> String {
+    let n = daily.len();
+    let step = if n > 1 { 300.0 / (n as f64 - 1.0) } else { 0.0 };
+
+    daily
+        .iter()
+        .enumerate()
+        .filter(|(_, d)| d.1.count > 0)
+        .map(|(i, d)| {
+            let y = 96.0 - pick(&d.1) / max * 92.0;
+            format!("{:.1},{:.1}", i as f64 * step, y)
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+// Latency distribution bins (ms)
+const DIST_EDGES: [f64; 9] = [5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0];
+const DIST_LABELS: [&str; 10] = [
+    "5", "10", "25", "50", "100", "250", "500", "1k", "2.5k", ">2.5k",
+]; // upper bound of each bin in ms
+
+/*
   Input:
   Output: Analytics page html
 */
 #[get("/stats")]
 pub async fn stats(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host<'_>) -> Template {
-    // Index
+    // Make sure buffered counters / latency samples are visible
+    ANALYTICS.flush();
+
+    // ---------------- Index ----------------
     let index_size_raw: u64 = match TANTIVY_INDEX.reader() {
         Ok(reader) => {
             let searcher = reader.searcher();
@@ -622,95 +759,296 @@ pub async fn stats(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host<
         (index_size_raw.to_string(), "results")
     };
 
-    // Search volume chart
+    // ---------------- Search volume ----------------
     let raw_days = ANALYTICS.daily_queries(30);
-    let max_count = raw_days.iter().map(|(_, c)| *c).max().unwrap_or(1);
-    let search_days: Vec<Value> = raw_days
-        .iter()
-        .map(|(date, count)| {
-            let height_pct = (*count as f64 / max_count as f64 * 100.0) as u64;
-            json!({ "date": date, "count": count.to_string(), "height_pct": height_pct.max(2) })
-        })
-        .collect();
-    let search_today = raw_days.last().map(|(_, c)| *c).unwrap_or(0);
-    let len = raw_days.len();
-    let search_x_labels: Vec<String> = raw_days
-        .iter()
-        .enumerate()
-        .filter_map(|(i, (date, _))| {
-            let step = (len / 5).max(1);
-            if i % step == 0 || i == len - 1 {
-                Some(date[5..].to_string())
-            } else {
-                None
-            }
-        })
-        .collect();
+    let (search_today, search_yesterday) = today_yesterday(&raw_days);
+    let search_total: u64 = raw_days.iter().map(|(_, c)| *c).sum();
+    let (search_delta, search_up) = delta(search_today, search_yesterday);
+    let search_bars = bar_series(&raw_days);
+    let search_x_labels = x_labels(&dates_of(&raw_days));
 
-    // Visitors + pageviews
+    // ---------------- Visitors + pageviews ----------------
     let (visitors_today, visitors_yesterday, pageviews_today, _) = ANALYTICS.visitor_stats();
-    let visitors_delta = if visitors_yesterday == 0 {
-        0.0
-    } else {
-        (visitors_today as f64 - visitors_yesterday as f64) / visitors_yesterday as f64 * 100.0
-    };
+    let (visitors_delta, visitors_up) = delta(visitors_today, visitors_yesterday);
+    let visitor_days = ANALYTICS.daily_visitors(30);
+    let visitor_bars = bar_series(&visitor_days);
+    let visitor_x_labels = x_labels(&dates_of(&visitor_days));
 
-    // Countries
+    // ---------------- Countries ----------------
     let countries: Vec<Value> = ANALYTICS
         .top_countries()
         .into_iter()
+        .take(10)
         .map(|(cc, count)| {
             let (name, flag) = country_info(&cc);
             let pct = if visitors_today == 0 {
                 0.0
             } else {
-                count as f64 / visitors_today as f64 * 100.0
+                (count as f64 / visitors_today as f64 * 100.0).min(100.0)
             };
             json!({ "flag": flag, "name": name, "pct": format!("{:.1}", pct) })
         })
         .collect();
 
-    // API
+    // ---------------- API ----------------
     let (api_today, api_yesterday) = ANALYTICS.api_stats_today_yesterday();
-    let api_delta = if api_yesterday == 0 {
-        0.0
-    } else {
-        (api_today as f64 - api_yesterday as f64) / api_yesterday as f64 * 100.0
+    let (api_delta, api_up) = delta(api_today, api_yesterday);
+    let api_days = ANALYTICS.daily_api_requests(30);
+    let api_bars = bar_series(&api_days);
+
+    // ---------------- Latency (p50 / p95 / p99) ----------------
+    let lat_core_7d = ANALYTICS.latency_summary(Stage::Core, 7);
+    let lat_core_today = ANALYTICS.latency_summary(Stage::Core, 1);
+
+    // Stage table (7 days)
+    let stage_summaries: Vec<(Stage, LatencySummary)> = Stage::ALL
+        .iter()
+        .map(|s| (*s, ANALYTICS.latency_summary(*s, 7)))
+        .filter(|(_, sum)| sum.count > 0)
+        .collect();
+    let max_p95 = stage_summaries
+        .iter()
+        .map(|(_, s)| s.p95)
+        .fold(0.0_f64, f64::max)
+        .max(0.001);
+
+    let lat_rows: Vec<Value> = stage_summaries
+        .iter()
+        .map(|(stage, s)| {
+            json!({
+                "name": stage.label(),
+                "desc": stage.desc(),
+                "count": fmt_num(s.count),
+                "p50": fmt_ms(s.p50),
+                "p95": fmt_ms(s.p95),
+                "p99": fmt_ms(s.p99),
+                "bar": format!("{:.1}", (s.p95 / max_p95 * 100.0).clamp(1.0, 100.0)),
+            })
+        })
+        .collect();
+
+    // 30 day trend of end-to-end percentiles
+    let lat_daily = ANALYTICS.latency_daily(Stage::Core, 30);
+    let lat_trend_max = lat_daily
+        .iter()
+        .map(|(_, s)| s.p99)
+        .fold(0.0_f64, f64::max)
+        .max(0.001);
+    let lat_trend = json!({
+        "p50": line_points(&lat_daily, lat_trend_max, |s| s.p50),
+        "p95": line_points(&lat_daily, lat_trend_max, |s| s.p95),
+        "p99": line_points(&lat_daily, lat_trend_max, |s| s.p99),
+        "max": fmt_ms(lat_trend_max),
+        "mid": fmt_ms(lat_trend_max / 2.0),
+    });
+    let lat_x_labels = x_labels(
+        &lat_daily
+            .iter()
+            .map(|(d, _)| d.clone())
+            .collect::<Vec<String>>(),
+    );
+
+    // Distribution of end-to-end latency (7 days)
+    let mut bins = [0u64; 10];
+    for (bucket, count) in ANALYTICS.latency_hist(Stage::Core, 7) {
+        let ms = lat_bucket_ms(bucket);
+        let idx = DIST_EDGES
+            .iter()
+            .position(|edge| ms < *edge)
+            .unwrap_or(DIST_EDGES.len());
+        bins[idx] += count;
+    }
+    let lat_dist_data: Vec<(String, u64)> = DIST_LABELS
+        .iter()
+        .zip(bins.iter())
+        .map(|(l, c)| (l.to_string(), *c))
+        .collect();
+    let lat_dist = bar_series(&lat_dist_data);
+    let lat_dist_labels: Vec<String> = DIST_LABELS.iter().map(|s| s.to_string()).collect();
+
+    // ---------------- Decentralization (gossip network) ----------------
+    let (peers_online, shards_union, avg_fill, peer_rows) = {
+        let cache = PROFILE_CACHE.read();
+        let mut shards: HashSet<usize> = HashSet::new();
+        let mut fill_sum = 0.0_f64;
+        let mut rows: Vec<(String, usize, f64)> = Vec::with_capacity(cache.len());
+
+        for (key, profile) in cache.iter() {
+            shards.extend(profile.top_centroids.iter().copied());
+
+            let ones: u32 = profile.keyword.bits.iter().map(|b| b.count_ones()).sum();
+            let total_bits = (profile.keyword.bits.len().max(1) * 8) as f64;
+            let fill = ones as f64 / total_bits * 100.0;
+            fill_sum += fill;
+
+            let short: String = key.to_string().chars().take(8).collect();
+            rows.push((short, profile.top_centroids.len(), fill));
+        }
+
+        let n = cache.len();
+        let avg = if n == 0 { 0.0 } else { fill_sum / n as f64 };
+
+        rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        let rows: Vec<Value> = rows
+            .into_iter()
+            .take(8)
+            .map(|(id, shards, fill)| {
+                json!({
+                    "id": id,
+                    "shards": shards,
+                    "fill": format!("{:.0}", fill),
+                    "fill_bar": format!("{:.1}", fill.clamp(0.0, 100.0)),
+                })
+            })
+            .collect();
+
+        (n, shards.len(), avg, rows)
     };
 
+    let served = ANALYTICS.counter_series("p2p_served", 30);
+    let (served_today, served_yesterday) = today_yesterday(&served);
+    let (served_delta, served_up) = delta(served_today, served_yesterday);
+    let served_total: u64 = served.iter().map(|(_, c)| *c).sum();
+
+    let sent = ANALYTICS.counter_series("p2p_sent", 30);
+    let sent_ok = ANALYTICS.counter_series("p2p_sent_ok", 30);
+    let sent_today = sent.last().map(|(_, c)| *c).unwrap_or(0);
+    let sent_ok_today = sent_ok.last().map(|(_, c)| *c).unwrap_or(0);
+    let fed_success = if sent_today == 0 {
+        "–".to_string()
+    } else {
+        format!("{:.1}%", sent_ok_today as f64 / sent_today as f64 * 100.0)
+    };
+
+    let joined_today = ANALYTICS
+        .counter_series("p2p_peer_joined", 1)
+        .last()
+        .map(|(_, c)| *c)
+        .unwrap_or(0);
+    let left_today = ANALYTICS
+        .counter_series("p2p_peer_left", 1)
+        .last()
+        .map(|(_, c)| *c)
+        .unwrap_or(0);
+
+    let peer_rtt = ANALYTICS.latency_summary(Stage::PeerRtt, 7);
+
+    let p2p = json!({
+        "peers_online": peers_online,
+        "shards": shards_union,
+        "avg_fill": format!("{:.0}", avg_fill),
+        "avg_fill_bar": format!("{:.1}", avg_fill.clamp(0.0, 100.0)),
+        // A nearly full Bloom filter says "yes" to everything and stops routing queries
+        "bloom_saturated": peers_online > 0 && avg_fill > 90.0,
+        "served_today": fmt_num(served_today),
+        "served_delta": served_delta,
+        "served_up": served_up,
+        "served_total": fmt_num(served_total),
+        "sent_today": fmt_num(sent_today),
+        "success": fed_success,
+        "joined_today": joined_today,
+        "left_today": left_today,
+        "rtt_p95": fmt_ms(peer_rtt.p95),
+        "bars": bar_series(&served),
+        "x_labels": x_labels(&dates_of(&served)),
+        "peers": peer_rows,
+        "has_peers": peers_online > 0,
+    });
+
+    // ---------------- Mini crawler network ----------------
+    let w_pages = ANALYTICS.counter_series("worker_pages", 30);
+    let (w_pages_today, w_pages_yesterday) = today_yesterday(&w_pages);
+    let (w_pages_delta, w_pages_up) = delta(w_pages_today, w_pages_yesterday);
+    let w_pages_total: u64 = w_pages.iter().map(|(_, c)| *c).sum();
+
+    let w_batches_today = today_yesterday(&ANALYTICS.counter_series("worker_batches", 1)).0;
+    let w_workers_today = today_yesterday(&ANALYTICS.counter_series("workers", 1)).0;
+    let w_bytes_today = today_yesterday(&ANALYTICS.counter_series("worker_bytes", 1)).0;
+    let w_issued_today = today_yesterday(&ANALYTICS.counter_series("worker_urls_issued", 1)).0;
+
+    let w_yield = if w_issued_today == 0 {
+        "–".to_string()
+    } else {
+        format!(
+            "{:.1}%",
+            (w_pages_today as f64 / w_issued_today as f64 * 100.0).min(100.0)
+        )
+    };
+    let w_avg_batch = if w_batches_today == 0 {
+        "–".to_string()
+    } else {
+        fmt_num(w_pages_today / w_batches_today)
+    };
+
+    let crawler = json!({
+        "pages_today": fmt_num(w_pages_today),
+        "pages_delta": w_pages_delta,
+        "pages_up": w_pages_up,
+        "pages_total": fmt_num(w_pages_total),
+        "batches_today": fmt_num(w_batches_today),
+        "workers_today": fmt_num(w_workers_today),
+        "data_today": fmt_bytes(w_bytes_today),
+        "issued_today": fmt_num(w_issued_today),
+        "yield": w_yield,
+        "avg_batch": w_avg_batch,
+        "bars": bar_series(&w_pages),
+        "x_labels": x_labels(&dates_of(&w_pages)),
+        "has_data": w_pages_total > 0 || w_issued_today > 0,
+    });
+
+    // ---------------- Context ----------------
     let mut context: HashMap<String, Value> = HashMap::from([
         (
             String::from("generated_at"),
             json!(Utc::now().format("updated %H:%M UTC").to_string()),
         ),
+        // index
         (String::from("index_size_display"), json!(index_display.0)),
         (String::from("index_size_unit"), json!(index_display.1)),
-        (String::from("search_days"), json!(search_days)),
-        (
-            String::from("search_today"),
-            json!(search_today.to_string()),
-        ),
+        // search
+        (String::from("search_bars"), json!(search_bars)),
         (String::from("search_x_labels"), json!(search_x_labels)),
-        (
-            String::from("visitors_24h"),
-            json!(visitors_today.to_string()),
-        ),
-        (
-            String::from("visitors_delta"),
-            json!(format!("{:.1}", visitors_delta.abs())),
-        ),
-        (String::from("visitors_up"), json!(visitors_delta >= 0.0)),
+        (String::from("search_today"), json!(fmt_num(search_today))),
+        (String::from("search_total"), json!(fmt_num(search_total))),
+        (String::from("search_delta"), json!(search_delta)),
+        (String::from("search_up"), json!(search_up)),
+        // visitors
+        (String::from("visitors_24h"), json!(fmt_num(visitors_today))),
+        (String::from("visitors_delta"), json!(visitors_delta)),
+        (String::from("visitors_up"), json!(visitors_up)),
         (
             String::from("pageviews_24h"),
-            json!(pageviews_today.to_string()),
+            json!(fmt_num(pageviews_today)),
         ),
+        (String::from("visitor_bars"), json!(visitor_bars)),
+        (String::from("visitor_x_labels"), json!(visitor_x_labels)),
         (String::from("countries"), json!(countries)),
-        (String::from("api_today"), json!(api_today.to_string())),
+        // api
+        (String::from("api_today"), json!(fmt_num(api_today))),
+        (String::from("api_delta"), json!(api_delta)),
+        (String::from("api_up"), json!(api_up)),
+        (String::from("api_bars"), json!(api_bars)),
+        // latency
+        (String::from("lat_has_data"), json!(lat_core_7d.count > 0)),
         (
-            String::from("api_delta"),
-            json!(format!("{:.1}", api_delta.abs())),
+            String::from("lat_samples"),
+            json!(fmt_num(lat_core_7d.count)),
         ),
-        (String::from("api_up"), json!(api_delta >= 0.0)),
+        (String::from("lat_p50"), json!(fmt_ms(lat_core_7d.p50))),
+        (String::from("lat_p95"), json!(fmt_ms(lat_core_7d.p95))),
+        (String::from("lat_p99"), json!(fmt_ms(lat_core_7d.p99))),
+        (
+            String::from("lat_p95_today"),
+            json!(fmt_ms(lat_core_today.p95)),
+        ),
+        (String::from("lat_rows"), json!(lat_rows)),
+        (String::from("lat_trend"), lat_trend),
+        (String::from("lat_x_labels"), json!(lat_x_labels)),
+        (String::from("lat_dist"), json!(lat_dist)),
+        (String::from("lat_dist_labels"), json!(lat_dist_labels)),
+        // decentralization + mini crawler
+        (String::from("p2p"), p2p),
+        (String::from("crawler"), crawler),
     ]);
 
     settings::run(&mut context, &Some(client_ip.0), cookie_jar, host);
