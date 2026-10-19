@@ -59,90 +59,41 @@ pub fn run(
 
     // Language & Location
     let ip_addr = maybe_ip.unwrap_or_else(|| IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)));
+    let (need_lang, need_loc) = (
+        cookie_jar.get("lang").is_none(),
+        cookie_jar.get("loc").is_none(),
+    );
 
-    if (cookie_jar.get("lang").is_none() || cookie_jar.get("loc").is_none())
-        && ip_addr != IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0))
-    {
-        if ip_addr.is_loopback() {
-            set_cookie(
-                cookie_jar,
-                String::from("loc"),
-                String::from("all"),
-                false,
-                false,
-                false,
-            );
-            set_cookie(
-                cookie_jar,
-                String::from("lang"),
-                String::from("all"),
-                false,
-                false,
-                false,
-            );
-        }
+    if (need_lang || need_loc) && ip_addr != IpAddr::V4(Ipv4Addr::UNSPECIFIED) {
+        let onion = prieco_url.domain().as_str().ends_with(".onion");
 
-        let loc: String = if !prieco_url.domain().as_str().ends_with(".onion") {
-            match IP_TO_LOC.lookup_country(&ip_addr.to_string()) {
-                Ok(Some(country)) => country,
-                Ok(None) => String::new(),
-                Err(_) => String::new(),
-            }
-        } else {
-            String::from("all")
-        };
-
-        if !loc.is_empty() {
-            set_cookie(
-                cookie_jar,
-                String::from("loc"),
-                loc.clone(),
-                false,
-                true,
-                true,
-            );
-
-            if !prieco_url.domain().as_str().ends_with(".onion") {
-                if let Some(lang) = COUNTRY_TO_LANG.get(loc.as_str()) {
-                    set_cookie(
-                        cookie_jar,
-                        String::from("lang"),
-                        lang.to_string(),
-                        false,
-                        true,
-                        true,
-                    );
+        let loc = cookie_jar
+            .get("loc")
+            .map(|c| c.value().to_string())
+            .unwrap_or_else(|| {
+                let l = if onion {
+                    "all".to_string()
                 } else {
-                    set_cookie(
-                        cookie_jar,
-                        String::from("lang"),
-                        String::from("all"),
-                        false,
-                        true,
-                        true,
-                    );
-                }
-            } else {
-                set_cookie(
-                    cookie_jar,
-                    String::from("lang"),
-                    String::from("all"),
-                    false,
-                    true,
-                    true,
-                );
-            }
-        } else {
-            set_cookie(
-                cookie_jar,
-                String::from("loc"),
-                String::from("all"),
-                false,
-                true,
-                true,
-            );
+                    IP_TO_LOC
+                        .lookup_country(&ip_addr.to_string())
+                        .ok()
+                        .flatten()
+                        .filter(|c| !c.is_empty())
+                        .unwrap_or_else(|| "all".into())
+                };
+                set_cookie(cookie_jar, "loc".into(), l.clone(), false, true, true);
+                l
+            });
+
+        if need_lang {
+            let lang = COUNTRY_TO_LANG
+                .get(loc.as_str())
+                .filter(|_| !onion)
+                .map_or("all".to_string(), |l| l.to_string());
+            set_cookie(cookie_jar, "lang".into(), lang, false, true, true);
         }
     }
+
     context.insert(
         String::from("selected_loc"),
         json!(

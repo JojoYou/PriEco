@@ -49,7 +49,7 @@ use once_cell::sync::Lazy;
 use ort::ExecutionProvider;
 use ort::{Environment, GraphOptimizationLevel, LoggingLevel, Session, SessionBuilder};
 use rocket::{
-    Request, Response,
+    Data, Request, Response,
     fairing::{AdHoc, Fairing, Info, Kind},
     fs::FileServer,
     http::{Header, Status},
@@ -63,16 +63,20 @@ use tokenizers::{PaddingDirection, PaddingParams, PaddingStrategy, Tokenizer};
 */
 pub mod web;
 use crate::web::{
-    functions::decentralized::{
-        IROH_ENDPOINT, PROFILE_CACHE, SearchProtocol, Ticket, build_node_profile, get_iroh_secret,
-        gossip_sync,
+    functions::{
+        decentralized::{
+            IROH_ENDPOINT, PROFILE_CACHE, SearchProtocol, Ticket, build_node_profile,
+            get_iroh_secret, gossip_sync,
+        },
+        general::set_cookie,
     },
     routes::{apis::*, assets::*, pages::*},
 };
 use prieco_blob as blob;
 use prieco_core::{
-    ANALYTICS, EmbeddingService, META_DECODER, PAGERANK, PRIECO_BLOBS, PRIECO_CONFIG, PRIECO_META,
-    TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_EMBEDDING_TOKENIZER, colors, icons,
+    ANALYTICS, COUNTRY_TO_LANG, EmbeddingService, META_DECODER, PAGERANK, PRIECO_BLOBS,
+    PRIECO_CONFIG, PRIECO_META, TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS,
+    VECTOR_EMBEDDING_TOKENIZER, colors, icons,
 };
 use prieco_insert::{db_insert, update::UpdateEngine, updates::ping::PingDeadLinksUpdate};
 use prieco_mini_crawler::mini_crawler;
@@ -86,12 +90,43 @@ pub struct GlobalHeaders;
 impl Fairing for GlobalHeaders {
     fn info(&self) -> Info {
         Info {
-            name: "CORS + Security Headers + Block Bots",
+            name: "CORS + Security Headers + Block Bots + Browser Locale",
             kind: Kind::Response | Kind::Request,
         }
     }
+
+    async fn on_request(&self, req: &mut Request<'_>, _: &mut Data<'_>) {
+        if req
+            .host()
+            .map_or(false, |h| h.domain().as_str().ends_with(".onion"))
+        {
+            return;
+        }
+
+        let jar = req.cookies();
+        let Some(tag) = req
+            .headers()
+            .get_one("Accept-Language")
+            .and_then(|h| h.split([',', ';']).next())
+        else {
+            return;
+        };
+
+        let mut p = tag.split('-');
+        let lang = p.next().unwrap_or("").to_ascii_lowercase();
+
+        if jar.get("lang").is_none() && COUNTRY_TO_LANG.values().any(|l| *l == lang) {
+            set_cookie(jar, "lang".into(), lang, false, true, true);
+        }
+        if jar.get("loc").is_none() {
+            if let Some(r) = p.next().filter(|r| r.len() == 2) {
+                set_cookie(jar, "loc".into(), r.to_ascii_uppercase(), false, true, true);
+            }
+        }
+    }
+
     async fn on_response<'r>(&self, req: &'r Request<'_>, res: &mut Response<'r>) {
-        // --- Block curl/wget ---
+        // Block curl/wget
         if let Some(agent) = req.headers().get_one("User-Agent") {
             let agent_lower = agent.to_ascii_lowercase();
             if agent_lower.starts_with("wget") || agent_lower.starts_with("curl") {
