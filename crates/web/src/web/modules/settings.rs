@@ -59,33 +59,26 @@ pub fn run(
 
     // Language & Location
     let ip_addr = maybe_ip.unwrap_or_else(|| IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)));
-    let (need_lang, need_loc) = (
-        cookie_jar.get("lang").is_none(),
-        cookie_jar.get("loc").is_none(),
-    );
+    let onion = prieco_url.domain().as_str().ends_with(".onion");
 
-    if (need_lang || need_loc) && ip_addr != IpAddr::V4(Ipv4Addr::UNSPECIFIED) {
-        let onion = prieco_url.domain().as_str().ends_with(".onion");
+    // Location
+    if cookie_jar.get("loc").is_none() && ip_addr != IpAddr::V4(Ipv4Addr::UNSPECIFIED) {
+        let loc = if onion {
+            "all".to_string()
+        } else {
+            IP_TO_LOC
+                .lookup_country(&ip_addr.to_string())
+                .ok()
+                .flatten()
+                .filter(|c| !c.is_empty())
+                .map_or("all".to_string(), |c| c.to_ascii_lowercase())
+        };
+        set_cookie(cookie_jar, "loc".into(), loc, false, true, true);
+    }
 
-        let loc = cookie_jar
-            .get("loc")
-            .map(|c| c.value().to_string())
-            .unwrap_or_else(|| {
-                let l = if onion {
-                    "all".to_string()
-                } else {
-                    IP_TO_LOC
-                        .lookup_country(&ip_addr.to_string())
-                        .ok()
-                        .flatten()
-                        .filter(|c| !c.is_empty())
-                        .unwrap_or_else(|| "all".into())
-                };
-                set_cookie(cookie_jar, "loc".into(), l.clone(), false, true, true);
-                l
-            });
-
-        if need_lang {
+    // Language
+    if cookie_jar.get("lang").is_none() {
+        if let Some(loc) = cookie_jar.get("loc").map(|c| c.value().to_string()) {
             let lang = COUNTRY_TO_LANG
                 .get(loc.as_str())
                 .filter(|_| !onion)

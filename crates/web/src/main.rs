@@ -120,7 +120,7 @@ impl Fairing for GlobalHeaders {
         }
         if jar.get("loc").is_none() {
             if let Some(r) = p.next().filter(|r| r.len() == 2) {
-                set_cookie(jar, "loc".into(), r.to_ascii_uppercase(), false, true, true);
+                set_cookie(jar, "loc".into(), r.to_ascii_lowercase(), false, true, true);
             }
         }
     }
