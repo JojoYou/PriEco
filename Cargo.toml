@@ -5,20 +5,28 @@ members = [
     "crates/pagerank",
     "crates/insert",
     "crates/web",
-    "crates/crawler"
+    "crates/crawler",
+]
+default-members = [
+    "crates/core",
+    "crates/blob",
+    "crates/pagerank",
+    "crates/insert",
+    "crates/web",
+    "crates/crawler",
 ]
 resolver = "2"
 
 [profile.release]
 # Performance
-opt-level = 3            # Compiler optimization
-codegen-units = 1         # Optimizes whole crate
-lto = "fat"               # Link-time optimization
+opt-level = 3     # Compiler optimization
+codegen-units = 1 # Optimizes whole crate
+lto = "fat"       # Link-time optimization
 
 # Binary size
-strip = true              # Removes debug symbols
-debug = 0                 # Disables debug information
-debug-assertions = false  # Removes debug assertions
+strip = true             # Removes debug symbols
+debug = 0                # Disables debug information
+debug-assertions = false # Removes debug assertions
 
 [profile.release-dev]
 inherits = "release"
@@ -45,8 +53,20 @@ dotenvy = "0.15.7" # .env file
 num_cpus = "1.17.0" # Number of CPU cores
 once_cell = "1.20.3" # Global variables
 parking_lot = "0.12.5" # Global variables mutexes
-reqwest = { version = "0.12.23", default-features = false, features = ["json", "gzip", "brotli", "deflate", "blocking", "cookies", "rustls-tls", "http2"] } # Out HTTP reqvest client
-rand = { version = "0.9.0", features = ["std", "std_rng"] } # Random number generator
+reqwest = { version = "0.12.23", default-features = false, features = [
+    "json",
+    "gzip",
+    "brotli",
+    "deflate",
+    "blocking",
+    "cookies",
+    "rustls-tls",
+    "http2",
+] } # Out HTTP reqvest client
+rand = { version = "0.9.0", features = [
+    "std",
+    "std_rng",
+] } # Random number generator
 dashmap = "6.1.0" # Multi threaded hashmap
 rayon = "1.11.0" # Paralel code execution
 memmap2 = "0.9.10"
@@ -54,7 +74,9 @@ libc = "0.2.186"
 
 # Web server
 rocket = { version = "0.5.1", features = ["json"] } # Web server
-rocket_dyn_templates = { version = "0.1.0", features = ["handlebars"] } # Template engine
+rocket_dyn_templates = { version = "0.1.0", features = [
+    "handlebars",
+] } # Template engine
 socket2 = "0.6.0" # Sockets (Run old and new instance on same port for smooth update)
 tokio = { version = "1.37.0", features = ["full"] }
 serde = "1.0.219"
@@ -70,12 +92,12 @@ n0-future = "0.3.2"
 # Database
 fjall = "3.1.5"
 tantivy = "0.25.0" # Full-text index
-zip = "8.6.0" # Stream zip results files to index
-redb = "3.0.1"            # Key-Value
+zip = "8.6.0"      # Stream zip results files to index
+redb = "3.0.1"     # Key-Value
 
 # Blob storage
 flate2 = "1.1.9" # Streamed file compression and decompression (RAM)
-tar = "0.4.44" # Tar archive
+tar = "0.4.44"   # Tar archive
 
 # Search
 symspell = "0.5.2" # Spell checker
@@ -84,37 +106,39 @@ symspell = "0.5.2" # Spell checker
 charabia = "0.9.9" # Lang detection tokenizer
 fst = "0.4.7" # Synonyms
 aho-corasick = "1.1.4" # Match intent keywords fast
-rkyv = { version = "0.7.44", features = ["validation"] }  # 0 copy deserialization; Used for places
+rkyv = { version = "0.7.44", features = [
+    "validation",
+] } # 0 copy deserialization; Used for places
 
 # Vector embedding
 ort = { path = "vendor/ort-1.16.3" } # Query to vector
-tokenizers = "0.21.1" # Ort model tokenizer
-cudarc = { version = "0.19.2" } # Nvidia GPU, used for comparing cosine distance between vectors
+tokenizers = "0.21.1"                # Ort model tokenizer
+cudarc = { version = "0.19.2" }      # Nvidia GPU, used for comparing cosine distance between vectors
 ndarray = "0.15.1"
 bytemuck = "1.25.0"
-half = "2.7.1" # F16 embeds
+half = "2.7.1"                       # F16 embeds
 
 # Mini crawler
 bincode-next = { version = "2.1.0", features = ["serde"] }
-scraper = "0.23.1" # HTML management
-regex = "1.11.1" # Regular expressions
-whatlang = "0.16.4"  # Language detection from text
-maxminddb = "0.24.0" # Reading Maxmind DB for IP to country
-env_logger = "0.11.8" # Logger: Used to disable Foster parenting not implemented
-log = "0.4.28"# Logger: Used to disable Foster parenting not implemented
-primp = "1.3.1" # Look like Human
+scraper = "0.23.1"                                         # HTML management
+regex = "1.11.1"                                           # Regular expressions
+whatlang = "0.16.4"                                        # Language detection from text
+maxminddb = "0.24.0"                                       # Reading Maxmind DB for IP to country
+env_logger = "0.11.8"                                      # Logger: Used to disable Foster parenting not implemented
+log = "0.4.28"                                             # Logger: Used to disable Foster parenting not implemented
+primp = "1.3.1"                                            # Look like Human
 
 # Tools
 ahash = "0.8.12"      # Faster single threaded hashmap
-twox-hash = "2.1.0" # Predictable hash
-aes-gcm = "0.11.0" # Encryption
+twox-hash = "2.1.0"   # Predictable hash
+aes-gcm = "0.11.0"    # Encryption
 url = "2.5.2"         # URL manager
 urlencoding = "2.1.3" # URL encoder/decoder
-brotli = "8.0.2" # Google compression for html, css, js
-zstd = "0.13.3" # Zstandard compression
+brotli = "8.0.2"      # Google compression for html, css, js
+zstd = "0.13.3"       # Zstandard compression
 mime_guess = "2.0.5"
-chrono = "0.4.43" # Datetime
-image = "0.25.8" # Image manipulation
+chrono = "0.4.43"     # Datetime
+image = "0.25.8"      # Image manipulation
 
 
 # ARM build command

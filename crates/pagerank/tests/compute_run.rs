@@ -21,16 +21,27 @@ fn scores() -> Vec<f32> {
 }
 
 fn total_nodes() -> u64 {
-    fs::read_to_string(TOTAL_NODES).unwrap().trim().parse().unwrap()
+    fs::read_to_string(TOTAL_NODES)
+        .unwrap()
+        .trim()
+        .parse()
+        .unwrap()
 }
 
 fn connections(name: &str, links: &[(&str, &str)]) {
-    let text: String = links.iter().map(|(a, b)| format!("{}->{}\n", a, b)).collect();
+    let text: String = links
+        .iter()
+        .map(|(a, b)| format!("{}->{}\n", a, b))
+        .collect();
     fs::write(format!("{}/{}", CONNECTIONS_DIR, name), text).unwrap();
 }
 
 fn score(url: &str) -> f32 {
-    PAGERANK.read().as_ref().expect("PAGERANK not loaded").get_score(url)
+    PAGERANK
+        .read()
+        .as_ref()
+        .expect("PAGERANK not loaded")
+        .get_score(url)
 }
 
 #[test]
@@ -63,14 +74,25 @@ fn run_full_incremental_import_only_and_rebuild_cycle() {
     prieco_pagerank::run();
     assert_eq!(total_nodes(), 4);
     assert_eq!(IdMap::open(ID_MAP_FILE).unwrap().pairs().len(), 4);
-    for f in [EDGES_SORTED, CSR_EDGES, CSR_OFFSETS, OUT_DEGREE, SCORES_A, FINAL_SCORES] {
+    for f in [
+        EDGES_SORTED,
+        CSR_EDGES,
+        CSR_OFFSETS,
+        OUT_DEGREE,
+        SCORES_A,
+        FINAL_SCORES,
+    ] {
         assert!(Path::new(f).exists(), "{} missing", f);
     }
     let s = scores();
     assert_eq!(s.len(), 4);
     let sum: f32 = s.iter().sum();
     assert!((sum - 1.0).abs() < 1e-3, "sum {}", sum);
-    assert_eq!(fs::read_dir(CONNECTIONS_DIR).unwrap().count(), 0, "connections consumed");
+    assert_eq!(
+        fs::read_dir(CONNECTIONS_DIR).unwrap().count(),
+        0,
+        "connections consumed"
+    );
 
     // the global reader was reloaded and answers lookups
     assert!(score("https://a.com") > score("https://d.com"));
@@ -86,7 +108,10 @@ fn run_full_incremental_import_only_and_rebuild_cycle() {
     /* 3: incremental batch adds nodes and recomputes */
     connections(
         "batch2.txt",
-        &[("https://e.com", "https://a.com"), ("https://a.com", "https://e.com")],
+        &[
+            ("https://e.com", "https://a.com"),
+            ("https://a.com", "https://e.com"),
+        ],
     );
     prieco_pagerank::run();
     assert_eq!(total_nodes(), 5);
@@ -97,7 +122,7 @@ fn run_full_incremental_import_only_and_rebuild_cycle() {
     // ids of existing nodes are stable
     let m = IdMap::open(ID_MAP_FILE).unwrap();
     let ids: std::collections::HashSet<u64> = m.pairs().iter().map(|p| p.1).collect();
-    assert_eq!(ids, (0..5).collect());
+    assert_eq!(ids, (0..5).collect::<std::collections::HashSet<u64>>());
 
     /* 4: import-only mode imports but does not recompute */
     fs::write(IMPORT_ONLY_FILE, "").unwrap();
@@ -105,8 +130,15 @@ fn run_full_incremental_import_only_and_rebuild_cycle() {
     connections("batch3.txt", &[("https://f.com", "https://a.com")]);
     prieco_pagerank::run();
     assert_eq!(total_nodes(), 6);
-    assert_eq!(fs::read(FINAL_SCORES).unwrap(), scores_before, "scores must not be recomputed");
-    assert!(!Path::new(CSR_EDGES).exists(), "stale CSR must be invalidated");
+    assert_eq!(
+        fs::read(FINAL_SCORES).unwrap(),
+        scores_before,
+        "scores must not be recomputed"
+    );
+    assert!(
+        !Path::new(CSR_EDGES).exists(),
+        "stale CSR must be invalidated"
+    );
 
     /* 5: REBUILD_CSR recomputes from the imported graph */
     fs::remove_file(IMPORT_ONLY_FILE).unwrap();

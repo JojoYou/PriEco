@@ -167,7 +167,8 @@ fn ip_client() -> Client {
 
 #[test]
 fn client_ip_prefers_cloudflare_header() {
-    let r = ip_client()
+    let c = ip_client();
+    let r = c
         .get("/ip")
         .header(Header::new("CF-Connecting-IP", "1.2.3.4"))
         .header(Header::new("X-Forwarded-For", "5.6.7.8"))
@@ -178,7 +179,8 @@ fn client_ip_prefers_cloudflare_header() {
 
 #[test]
 fn client_ip_uses_first_forwarded_for_entry() {
-    let r = ip_client()
+    let c = ip_client();
+    let r = c
         .get("/ip")
         .header(Header::new("X-Forwarded-For", " 5.6.7.8 , 10.0.0.1"))
         .dispatch();
@@ -187,13 +189,15 @@ fn client_ip_uses_first_forwarded_for_entry() {
 
 #[test]
 fn client_ip_real_ip_header() {
-    let r = ip_client().get("/ip").header(Header::new("X-Real-IP", "9.9.9.9")).dispatch();
+    let c = ip_client();
+    let r = c.get("/ip").header(Header::new("X-Real-IP", "9.9.9.9")).dispatch();
     assert_eq!(r.into_string().unwrap(), "9.9.9.9");
 }
 
 #[test]
 fn client_ip_ipv6() {
-    let r = ip_client()
+    let c = ip_client();
+    let r = c
         .get("/ip")
         .header(Header::new("CF-Connecting-IP", "2001:db8::1"))
         .dispatch();
@@ -202,7 +206,8 @@ fn client_ip_ipv6() {
 
 #[test]
 fn client_ip_invalid_headers_fall_through() {
-    let r = ip_client()
+    let c = ip_client();
+    let r = c
         .get("/ip")
         .header(Header::new("CF-Connecting-IP", "not-an-ip"))
         .header(Header::new("X-Forwarded-For", "garbage, 1.1.1.1"))
@@ -213,7 +218,8 @@ fn client_ip_invalid_headers_fall_through() {
 
 #[test]
 fn client_ip_falls_back_to_socket_address() {
-    let r = ip_client()
+    let c = ip_client();
+    let r = c
         .get("/ip")
         .remote("7.7.7.7:1234".parse().unwrap())
         .dispatch();
@@ -222,7 +228,8 @@ fn client_ip_falls_back_to_socket_address() {
 
 #[test]
 fn client_ip_without_any_source_is_bad_request() {
-    let r = ip_client().get("/ip").dispatch();
+    let c = ip_client();
+    let r = c.get("/ip").dispatch();
     assert_eq!(r.status(), Status::BadRequest);
 }
 

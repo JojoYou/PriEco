@@ -202,7 +202,7 @@ async fn yadore_without_api_key_is_an_error() {
 #[tokio::test]
 async fn yadore_error_names_the_right_variable() {
     init();
-    let err = yadore::run("shoes", "de").await.unwrap_err();
+    let err = yadore::run("shoes", "de").await.err().expect("expected an error");
     assert!(err.to_string().contains("YADORE_API_KEY"), "{}", err);
 }
 
