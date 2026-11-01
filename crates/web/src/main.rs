@@ -71,7 +71,12 @@ use crate::web::{
         },
         general::set_cookie,
     },
-    routes::{apis::*, assets::*, pages::*},
+    routes::{
+        apis::*,
+        assets::*,
+        mcp::{mcp, mcp_get},
+        pages::*,
+    },
 };
 use prieco_blob as blob;
 use prieco_core::{
@@ -126,15 +131,6 @@ impl Fairing for GlobalHeaders {
     }
 
     async fn on_response<'r>(&self, req: &'r Request<'_>, res: &mut Response<'r>) {
-        // Block curl/wget
-        if let Some(agent) = req.headers().get_one("User-Agent") {
-            let agent_lower = agent.to_ascii_lowercase();
-            if agent_lower.starts_with("wget") || agent_lower.starts_with("curl") {
-                res.set_status(Status::Forbidden);
-                res.set_sized_body(0, std::io::Cursor::new("")); // empty body
-                return; // skip adding headers
-            }
-        }
         // --- CORS headers ---
         res.set_header(Header::new("Access-Control-Allow-Origin", "*"));
         res.set_header(Header::new("Access-Control-Allow-Methods", "GET"));
@@ -364,6 +360,9 @@ async fn main() -> Result<(), rocket::Error> {
                     cache_ver,
                     pageview,
                     om_sug, // Omnibox suggestions
+                    // MCP
+                    mcp,
+                    mcp_get,
                     // Settings
                     settings_htmls,
                     settings_update,

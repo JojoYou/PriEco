@@ -1,6 +1,7 @@
 pub mod routes {
     pub mod apis;
     pub mod assets;
+    pub mod mcp;
     pub mod pages;
 }
 
