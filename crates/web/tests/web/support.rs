@@ -56,6 +56,9 @@ pub fn init() -> PathBuf {
             std::env::remove_var("YADORE_API_KEY");
             std::env::remove_var("SIGNAL_BOT_NUMBER");
             std::env::remove_var("SIGNAL_RECIPIENT_NUMBER");
+            // Never bill or validate against the real Polar.sh
+            std::env::remove_var("POLAR_API_KEY");
+            std::env::remove_var("POLAR_ORG_ID");
         }
 
         fs::create_dir_all("kv").unwrap();

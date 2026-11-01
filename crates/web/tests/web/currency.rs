@@ -9,7 +9,7 @@ use prieco_core::PRIECO_META;
 use serde_json::json;
 
 use crate::support::init;
-use crate::web::functions::search_api::currency::{FxWidget, get_fx_widget};
+use crate::web::functions::remote_api::currency::{FxWidget, get_fx_widget};
 
 fn widget(from: &str, to: &str, amount: f64, rate: f64) -> serde_json::Value {
     json!({
@@ -24,7 +24,10 @@ fn widget(from: &str, to: &str, amount: f64, rate: f64) -> serde_json::Value {
 /// Pre-fills the widget cache so get_fx_widget answers without a network call
 fn cache(from: &str, to: &str, amount: f64, rate: f64) {
     init();
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
     let key = format!("fx:{}:{}:{}", from, to, amount);
     let v = json!({ "timestamp": now, "data": widget(from, to, amount, rate) });
     PRIECO_META
@@ -66,14 +69,28 @@ async fn non_currency_queries_are_none() {
 
 #[tokio::test]
 async fn unknown_currencies_are_none() {
-    for q in ["10 abc to eur", "10 usd to xyz", "10 btc to usd", "10 usdt to eur", "10 dollarz to eur", "10 e to usd"] {
+    for q in [
+        "10 abc to eur",
+        "10 usd to xyz",
+        "10 btc to usd",
+        "10 usdt to eur",
+        "10 dollarz to eur",
+        "10 e to usd",
+    ] {
         assert!(fx(q).await.is_none(), "{:?}", q);
     }
 }
 
 #[tokio::test]
 async fn same_currency_is_none() {
-    for q in ["10 usd to usd", "10 dollars to $", "5 € to euro", "1 EUR = eur", "3 yuan to rmb", "2 pounds to gbp"] {
+    for q in [
+        "10 usd to usd",
+        "10 dollars to $",
+        "5 € to euro",
+        "1 EUR = eur",
+        "3 yuan to rmb",
+        "2 pounds to gbp",
+    ] {
         assert!(fx(q).await.is_none(), "{:?}", q);
     }
 }
@@ -138,7 +155,11 @@ async fn currency_aliases() {
 
 #[tokio::test]
 async fn iso_codes_without_alias_are_accepted() {
-    for (q, from, to) in [("14 czk to huf", "CZK", "HUF"), ("14 xau to aed", "XAU", "AED"), ("14 sek to nok", "SEK", "NOK")] {
+    for (q, from, to) in [
+        ("14 czk to huf", "CZK", "HUF"),
+        ("14 xau to aed", "XAU", "AED"),
+        ("14 sek to nok", "SEK", "NOK"),
+    ] {
         cache(from, to, 14.0, 3.0);
         let w = fx(q).await.unwrap_or_else(|| panic!("{:?}", q));
         assert_eq!(w.from, from);

@@ -47,7 +47,6 @@ struct UploadTask {
     batch_id: String,
     compressed_buffer: Vec<u8>,
     successful: usize,
-    total: usize,
 }
 
 pub async fn run() {
@@ -275,7 +274,6 @@ pub async fn run() {
                     batch_id: response_data.batch_id,
                     compressed_buffer,
                     successful,
-                    total: total_urls,
                 })
                 .await
                 .is_err()

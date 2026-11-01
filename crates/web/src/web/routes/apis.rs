@@ -42,6 +42,7 @@ use url::Url;
 */
 use crate::web::{
     functions::{
+        api::manage::{API_BILLING_QUEUE, free, paid},
         general::is_valid_url,
         ranking::goggles::{get_goggle_ids, load_goggles},
         search_db,
@@ -53,60 +54,86 @@ use prieco_core::{
     globals::{ANALYTICS, EmbeddingService, UserAgent},
 };
 
+const POLAR_URL: &str = "https://buy.polar.sh/polar_cl_oj0yTj0z4isxyAzUEg33xBjerkhrJpIhclrHU484jSE";
+
 /// Description: Opens up API that calls PriEco index and returns results in JSON
 ///
 /// Input: API key, language, location, query
 /// Output: JSON
 #[get("/api?<a>&<lang>&<loc>&<q>&<goggles>&<dec>")]
 pub async fn api(
-    a: &str,
+    a: Option<&str>,
     lang: &str,
     loc: &str,
     q: &str,
     goggles: Option<&str>,
     dec: Option<bool>,
-
+    client_ip: ClientIp,
     embedding_service: &State<EmbeddingService>,
-) -> Json<Vec<RocketValue>> {
-    let resulti_api_key = match std::env::var("RESULTI_API_KEY") {
-        Ok(key) => key,
-        Err(_) => {
-            eprintln!("Warning: RESULTI_API_KEY is missing!");
-
-            return Json(vec![]);
-        }
-    };
-
+) -> Result<Json<Vec<RocketValue>>, (Status, Json<RocketValue>)> {
+    // Get env data
     let polar_api_key = match std::env::var("POLAR_API_KEY") {
         Ok(key) => key,
         Err(_) => {
             eprintln!("Warning: POLAR_API_KEY is missing!");
-
-            return Json(vec![]);
+            return Ok(Json(vec![]));
         }
     };
-    // Uruky
+    let resulti_api_key = match std::env::var("RESULTI_API_KEY") {
+        Ok(key) => key,
+        Err(_) => {
+            eprintln!("Warning: RESULTI_API_KEY is missing!");
+            return Ok(Json(vec![]));
+        }
+    };
     let uruky_api_key = match std::env::var("URUKY_API_KEY") {
         Ok(key) => key,
         Err(_) => {
             eprintln!("Warning: URUKY_API_KEY is missing!");
-
-            return Json(vec![]);
+            return Ok(Json(vec![]));
         }
     };
     let uruky_id = match std::env::var("URUKY_ID") {
         Ok(key) => key,
         Err(_) => {
             eprintln!("Warning: URUKY_ID is missing!");
-
-            return Json(vec![]);
+            return Ok(Json(vec![]));
         }
     };
 
-    if ![&resulti_api_key, &uruky_api_key].contains(&&a.to_string()) {
-        return Json(vec![]);
-    }
+    // Check legibility of the request
+    let polar_id: Option<String> = match a {
+        // Resulti is unlimited AND Uruky is old (upcomming update)
+        Some(key) if key == resulti_api_key || key == uruky_api_key => None,
+        // Request doesn't have an API key, it's a free request
+        // Check legibility
+        None | Some("") => {
+            if !free(client_ip.0) {
+                return Err((
+                    Status::TooManyRequests,
+                    Json(json!({
+                        "error": "Free limit of 25 searches a day reached",
+                        "buy": POLAR_URL
+                    })),
+                ));
+            }
 
+            None
+        }
+        // Request has other API key
+        Some(key) => match paid(key).await {
+            Some(id) => Some(id),
+            None => {
+                return Err((
+                    Status::PaymentRequired,
+                    Json(json!({
+                        "error": "Invalid API key or no credits left",
+                        "buy": POLAR_URL
+                    })),
+                ));
+            }
+        },
+    };
     ANALYTICS.record_api_request();
 
     let decentralized = dec.unwrap_or(true);
@@ -139,7 +166,7 @@ pub async fn api(
         })
         .collect();
 
-    if !results.is_empty() && a == uruky_api_key {
+    if !results.is_empty() && a == Some(uruky_api_key.as_str()) {
         if let Err(e) = CLIENT
             .post("https://api.polar.sh/v1/events/ingest")
             .header("Authorization", format!("Bearer {}", polar_api_key))
@@ -159,7 +186,12 @@ pub async fn api(
         }
     }
 
-    Json(results)
+    // Bill customer
+    if let Some(id) = polar_id.filter(|_| !results.is_empty()) {
+        API_BILLING_QUEUE.lock().push(id);
+    }
+
+    Ok(Json(results))
 }
 
 /*

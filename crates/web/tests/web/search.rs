@@ -2,12 +2,16 @@
 //! search_endpoint::UserQtPrefs, discover, news and yadore API guards.
 
 use prieco_core::url_to_domain_id;
-use rocket::{get, http::{Cookie, CookieJar}, routes};
+use rocket::{
+    get,
+    http::{Cookie, CookieJar},
+    routes,
+};
 
 use crate::support::{client, doc, init};
 use crate::web::functions::{
     additional::discover::discover_and_ping_domains,
-    search_api::{news, yadore},
+    remote_api::{news, yadore},
     search_db::{QUERY_CACHE, path_matches},
     search_endpoint::{UserQtPrefs, get_user_qt_prefs},
 };
@@ -25,7 +29,10 @@ fn path_matches_contains_by_default() {
 fn path_matches_anchored_start() {
     assert!(path_matches("https://a.com/x", "^https://a.com"));
     assert!(!path_matches("http://a.com/x", "^https://a.com"));
-    assert!(!path_matches("https://b.com/https://a.com", "^https://a.com"));
+    assert!(!path_matches(
+        "https://b.com/https://a.com",
+        "^https://a.com"
+    ));
 }
 
 #[test]
@@ -71,8 +78,13 @@ fn path_matches_unicode() {
 #[test]
 fn query_cache_is_shared_and_writable() {
     let key = format!("unit_test_query_{}_all_all", std::process::id());
-    QUERY_CACHE.write().insert(key.clone(), vec![doc("https://cached.example")]);
-    assert_eq!(QUERY_CACHE.read().get(&key).unwrap()[0].url, "https://cached.example");
+    QUERY_CACHE
+        .write()
+        .insert(key.clone(), vec![doc("https://cached.example")]);
+    assert_eq!(
+        QUERY_CACHE.read().get(&key).unwrap()[0].url,
+        "https://cached.example"
+    );
     QUERY_CACHE.write().remove(&key);
     assert!(QUERY_CACHE.read().get(&key).is_none());
 }
@@ -139,7 +151,14 @@ fn qt_serde_defaults() {
     assert_eq!(p.boost, vec!["a.com"]);
     let s = serde_json::to_string(&prefs(&["a"], &["b"], &["c"])).unwrap();
     let back: UserQtPrefs = serde_json::from_str(&s).unwrap();
-    assert_eq!((back.boost, back.downrank, back.discard), (vec!["a".to_string()], vec!["b".to_string()], vec!["c".to_string()]));
+    assert_eq!(
+        (back.boost, back.downrank, back.discard),
+        (
+            vec!["a".to_string()],
+            vec!["b".to_string()],
+            vec!["c".to_string()]
+        )
+    );
 }
 
 #[get("/qt")]
@@ -154,12 +173,18 @@ fn qt_prefs_from_cookie() {
     let json = r#"{"boost":["a.com"],"downrank":["b.com"],"discard":["c.com"]}"#;
 
     // raw json cookie (as written by /quick_tune_update)
-    let r = c.get("/qt").cookie(Cookie::new("prieco_qt_prefs", json)).dispatch();
+    let r = c
+        .get("/qt")
+        .cookie(Cookie::new("prieco_qt_prefs", json))
+        .dispatch();
     assert_eq!(r.into_string().unwrap(), r#"["a.com"]|["b.com"]|["c.com"]"#);
 
     // url encoded json cookie
     let enc = urlencoding::encode(json).into_owned();
-    let r = c.get("/qt").cookie(Cookie::new("prieco_qt_prefs", enc)).dispatch();
+    let r = c
+        .get("/qt")
+        .cookie(Cookie::new("prieco_qt_prefs", enc))
+        .dispatch();
     assert_eq!(r.into_string().unwrap(), r#"["a.com"]|["b.com"]|["c.com"]"#);
 }
 
@@ -168,7 +193,10 @@ fn qt_prefs_missing_or_invalid_cookie_is_default() {
     let c = client(routes![qt_route]);
     assert_eq!(c.get("/qt").dispatch().into_string().unwrap(), "[]|[]|[]");
     for bad in ["garbage", "%ZZ", "%FF%FE", "[1,2]", r#"{"boost":"x"}"#] {
-        let r = c.get("/qt").cookie(Cookie::new("prieco_qt_prefs", bad)).dispatch();
+        let r = c
+            .get("/qt")
+            .cookie(Cookie::new("prieco_qt_prefs", bad))
+            .dispatch();
         assert_eq!(r.into_string().unwrap(), "[]|[]|[]", "{:?}", bad);
     }
 }
@@ -202,7 +230,10 @@ async fn yadore_without_api_key_is_an_error() {
 #[tokio::test]
 async fn yadore_error_names_the_right_variable() {
     init();
-    let err = yadore::run("shoes", "de").await.err().expect("expected an error");
+    let err = yadore::run("shoes", "de")
+        .await
+        .err()
+        .expect("expected an error");
     assert!(err.to_string().contains("YADORE_API_KEY"), "{}", err);
 }
 
@@ -214,8 +245,7 @@ fn news_article_serde() {
     )
     .unwrap();
     assert_eq!(a.category, vec!["tech"]);
-    let r: news::NewsResponse =
-        serde_json::from_str(r#"{"status":"ok","news":[]}"#).unwrap();
+    let r: news::NewsResponse = serde_json::from_str(r#"{"status":"ok","news":[]}"#).unwrap();
     assert_eq!(r.status, "ok");
     assert!(r.page.is_none());
     assert!(serde_json::from_str::<news::NewsResponse>(r#"{"status":"ok"}"#).is_err());

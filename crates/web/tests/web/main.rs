@@ -13,6 +13,7 @@ pub mod web;
 
 mod support;
 
+mod api_manage;
 mod apis;
 mod assets;
 mod currency;

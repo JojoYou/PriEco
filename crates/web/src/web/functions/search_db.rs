@@ -312,8 +312,7 @@ pub async fn run_json(
     };
 
     let mut fts_query = normalize_search_operators(query);
-    let (intent, coords) = ranking::meaning::call::process_query(&mut fts_query, lang, loc);
-    fts_query = normalize_search_operators(&fts_query);
+    let (intent, _) = ranking::meaning::call::process_query(&mut fts_query, lang, loc);
 
     let mut results = if let Some(cached) = cached_data {
         cached

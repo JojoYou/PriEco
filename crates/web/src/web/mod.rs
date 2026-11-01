@@ -34,11 +34,15 @@ pub mod functions {
         pub mod spell_check;
     }
 
-    pub mod search_api {
+    pub mod remote_api {
         pub mod currency;
         pub mod img;
         pub mod news;
         pub mod video;
         pub mod yadore;
+    }
+
+    pub mod api {
+        pub mod manage;
     }
 }

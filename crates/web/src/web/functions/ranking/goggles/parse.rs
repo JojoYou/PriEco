@@ -61,7 +61,7 @@ fn parse_meta_line(line: &str, meta: &mut GoggleMeta) {
 }
 
 fn parse_rule_line(line: &str, rules: &mut GoggleRules) {
-    let Some((pattern, modifiers)) = line.split_once('$') else {
+    let Some((_, modifiers)) = line.split_once('$') else {
         return;
     };
 

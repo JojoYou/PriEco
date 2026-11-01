@@ -47,13 +47,13 @@ use iroh_gossip::{ALPN, Gossip, TopicId};
 use once_cell::sync::Lazy;
 #[cfg(feature = "cuda")]
 use ort::ExecutionProvider;
-use ort::{Environment, GraphOptimizationLevel, LoggingLevel, Session, SessionBuilder};
+use ort::{Environment, GraphOptimizationLevel, Session, SessionBuilder};
 use rocket::{
     Data, Request, Response,
     fairing::{AdHoc, Fairing, Info, Kind},
     fs::FileServer,
     http::{Header, Status},
-    launch, main, routes,
+    main, routes,
 };
 use rocket_dyn_templates::Template;
 use tokenizers::{PaddingDirection, PaddingParams, PaddingStrategy, Tokenizer};
@@ -64,6 +64,7 @@ use tokenizers::{PaddingDirection, PaddingParams, PaddingStrategy, Tokenizer};
 pub mod web;
 use crate::web::{
     functions::{
+        api::manage::{flush, flush_loop},
         decentralized::{
             IROH_ENDPOINT, PROFILE_CACHE, SearchProtocol, Ticket, build_node_profile,
             get_iroh_secret, gossip_sync,
@@ -74,9 +75,8 @@ use crate::web::{
 };
 use prieco_blob as blob;
 use prieco_core::{
-    ANALYTICS, COUNTRY_TO_LANG, EmbeddingService, META_DECODER, PAGERANK, PRIECO_BLOBS,
-    PRIECO_CONFIG, PRIECO_META, TANTIVY_READER, TANTIVY_WRITER, VECTOR_CENTROPOIDS,
-    VECTOR_EMBEDDING_TOKENIZER, colors, icons,
+    ANALYTICS, COUNTRY_TO_LANG, EmbeddingService, PRIECO_BLOBS, PRIECO_CONFIG, PRIECO_META,
+    TANTIVY_WRITER, VECTOR_EMBEDDING_TOKENIZER, colors, icons,
 };
 use prieco_insert::{db_insert, update::UpdateEngine, updates::ping::PingDeadLinksUpdate};
 use prieco_mini_crawler::mini_crawler;
@@ -257,6 +257,7 @@ async fn main() -> Result<(), rocket::Error> {
     let cache_clone = PROFILE_CACHE.clone();
     let topic_clone = iroh_topic_id;
 
+    // Background tasks
     tokio::spawn(async move {
         if let Err(e) = gossip_sync(
             gossip_clone,
@@ -270,9 +271,10 @@ async fn main() -> Result<(), rocket::Error> {
             println!("Gossip sync failed: {}", e);
         }
     });
+    tokio::spawn(flush_loop());
 
     // Spawn Thread Manager
-    let thread_handle = std::thread::spawn(move || {
+    let _thread_handle = std::thread::spawn(move || {
         thread_manager();
     });
 
@@ -396,6 +398,8 @@ async fn main() -> Result<(), rocket::Error> {
             .mount("/static", FileServer::from("./static"));
 
         rocket_web.launch().await?;
+        println!("Flushing Polar billing events...");
+        flush().await;
     } else {
         println!(
             "{}Web server was disabled in config!{}",
@@ -613,7 +617,7 @@ fn create_embeder() -> Session {
         builder
     };
 
-    let mut session_builder = create_base_builder();
+    let session_builder = create_base_builder();
 
     #[cfg(feature = "cuda")]
     {

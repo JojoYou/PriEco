@@ -30,7 +30,7 @@ use crate::web::functions::{
     additional::spell_check::spell_check_query,
     general::get_domain,
     ranking::goggles::GoggleRules,
-    search_api::{currency::get_fx_widget, img, news},
+    remote_api::{currency::get_fx_widget, img, news},
     search_db,
 };
 use prieco_core::{EmbeddingService, SearchResult, url_to_domain_id};

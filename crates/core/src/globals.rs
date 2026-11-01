@@ -20,7 +20,6 @@ use std::{
     error::Error,
     fs::{File, write},
     hash::{Hash, Hasher},
-    net::{Ipv4Addr, Ipv6Addr},
     ops::Range,
     path::Path,
     str::{FromStr, from_utf8},
@@ -630,6 +629,9 @@ pub struct PriecoMetaStorage {
 
     // Analytics
     pub analytics_ks: Keyspace,
+
+    // API
+    pub api_ks: Keyspace,
 }
 
 pub struct PriecoBlobStorage {
@@ -665,6 +667,11 @@ pub static PRIECO_META: Lazy<Arc<PriecoMetaStorage>> = Lazy::new(|| {
         .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
     let analytics_ks = meta_db.keyspace("analytics", || analytics_opts).unwrap();
 
+    let api_opts = KeyspaceCreateOptions::default()
+        .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
+        .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
+    let api_ks = meta_db.keyspace("api", || api_opts).unwrap();
+
     Arc::new(PriecoMetaStorage {
         meta_db,
         meta_ks,
@@ -674,6 +681,8 @@ pub static PRIECO_META: Lazy<Arc<PriecoMetaStorage>> = Lazy::new(|| {
         widgets_ks,
 
         analytics_ks,
+
+        api_ks,
     })
 });
 
