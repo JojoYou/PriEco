@@ -617,7 +617,7 @@ fn create_embeder() -> Session {
         builder
     };
 
-    let session_builder = create_base_builder();
+    let mut session_builder = create_base_builder();
 
     #[cfg(feature = "cuda")]
     {
