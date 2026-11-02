@@ -60,7 +60,7 @@ const POLAR_URL: &str = "https://buy.polar.sh/polar_cl_oj0yTj0z4isxyAzUEg33xBjer
 ///
 /// Input: API key, language, location, query
 /// Output: JSON
-#[get("/api?<a>&<lang>&<loc>&<q>&<goggles>&<dec>")]
+#[get("/api?<a>&<lang>&<loc>&<q>&<goggles>&<dec>&<content>")]
 pub async fn api(
     a: Option<&str>,
     lang: &str,
@@ -68,6 +68,7 @@ pub async fn api(
     q: &str,
     goggles: Option<&str>,
     dec: Option<bool>,
+    content: Option<bool>,
     client_ip: ClientIp,
     embedding_service: &State<EmbeddingService>,
 ) -> Result<Json<Vec<RocketValue>>, (Status, Json<RocketValue>)> {
@@ -151,10 +152,11 @@ pub async fn api(
     )
     .await;
 
+    let content_bool = content.unwrap_or(false);
     let results: Vec<serde_json::Value> = full_results
         .into_iter()
         .map(|res| {
-            json!({
+            let mut r = json!({
                 "url": res["url"],
                 "title": res["title"],
                 "description": res["description"],
@@ -162,7 +164,11 @@ pub async fn api(
                 "loc": res["loc"],
                 "safe_s": res["safe_s"],
                 "image": res["image"]
-            })
+            });
+            if content_bool {
+                r["content"] = res["content"].clone();
+            }
+            r
         })
         .collect();
 

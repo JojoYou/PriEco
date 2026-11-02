@@ -42,7 +42,7 @@ pub async fn mcp(
         Some("tools/list") => json!({
             "tools": [{
                 "name": "web_search",
-                "description": "Search the web with PriEco. It's an independent, EU, privacy-focused search engine. Returns url, title, description. lang: language code like \"en\" or \"all\"; loc: lowercase country code like \"us\" or \"all\", safe search and image URL.",
+                "description": "Search the web with PriEco. It's an independent, EU, privacy-focused search engine. Returns url, title, description. lang: language code like \"en\" or \"all\"; loc: lowercase country code like \"us\" or \"all\", page content (first 500 chars), safe search and image URL.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -66,6 +66,7 @@ pub async fn mcp(
                 args["query"].as_str().unwrap_or(""),
                 None,
                 None,
+                Some(true),
                 ClientIp(client_ip.0),
                 embedding_service,
             )
