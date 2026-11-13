@@ -42,13 +42,29 @@ pub fn run(
         for (rank, mut doc) in results.into_iter().enumerate() {
             let mut rrf_score = weight * (1.0 / (k + rank as f32 + 1.0));
 
-            // Enforce Vector index lang
-            if lang != "all" && !lang.is_empty() && doc.lang != lang && source_name == "IVF" {
+            if lang != "all"
+                && !lang.is_empty()
+                && doc.lang != lang
+                && (source_name == "IVF" || source_name == "FTS")
+            {
                 if intent == &QueryIntent::Navigational {
                     rrf_score *= 0.7;
                 } else {
                     rrf_score *= 0.1;
                 }
+            }
+
+            let inte = match intent {
+                QueryIntent::Informational => 0,
+                QueryIntent::Transactional => 1,
+                QueryIntent::CommercialInvestigation => 2,
+                QueryIntent::Navigational => 3,
+                QueryIntent::Local => 4,
+                QueryIntent::Unknown => 5,
+            };
+
+            if intent != &QueryIntent::Unknown && doc.intent == inte {
+                rrf_score *= 1.3;
             }
 
             scores

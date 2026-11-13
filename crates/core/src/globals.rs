@@ -71,7 +71,7 @@ use serde::{Deserialize, Serialize};
 use symspell::{SymSpell, UnicodeStringStrategy};
 use tantivy::{
     Index, IndexReader, IndexWriter, ReloadPolicy,
-    directory::MmapDirectory,
+    directory::{Advice, MmapDirectory},
     query::QueryParser,
     schema::{
         FAST, INDEXED, IndexRecordOption, STORED, STRING, Schema, TextFieldIndexing, TextOptions,
@@ -741,9 +741,14 @@ pub static TANTIVY_INDEX: Lazy<Arc<Index>> = Lazy::new(|| {
     let schema = builder.build();
 
     // Open index
-    let dir = MmapDirectory::open(Path::new(&PRIECO_CONFIG.tantivy_path))
-        .expect("Failed to open Tantivy V2 directory");
-    let index = Index::open_or_create(dir, schema.clone()).expect("Failed to open Tantivy index");
+    let dir =
+        MmapDirectory::open_with_madvice(Path::new(&PRIECO_CONFIG.tantivy_path), Advice::Random)
+            .expect("Failed to open Tantivy V2 directory");
+    let mut index =
+        Index::open_or_create(dir, schema.clone()).expect("Failed to open Tantivy index");
+    index
+        .set_multithread_executor(6)
+        .expect("Failed to set Tantivy executor");
 
     index
         .tokenizers()

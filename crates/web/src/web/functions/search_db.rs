@@ -69,7 +69,7 @@ use prieco_core::{
 /*
   Constants
 */
-const MAX_FTS: usize = 80;
+const MAX_FTS: usize = 160;
 const MAX_IVF: usize = 200;
 const NPROBS: usize = 4;
 const PAGERANK_CUTOFF: usize = 100;
@@ -825,33 +825,6 @@ fn search_tantivy(
             .map(|id| Term::from_field_u64(domain_id_field, id))
             .collect();
         clauses.push((Occur::Must, Box::new(TermSetQuery::new(terms))));
-    }
-
-    let intent_val: u64 = match intent {
-        QueryIntent::Informational => 0,
-        QueryIntent::Transactional => 1,
-        QueryIntent::CommercialInvestigation => 2,
-        QueryIntent::Navigational => 3,
-        QueryIntent::Local => 4,
-        QueryIntent::Unknown => 5,
-    };
-    if intent != &QueryIntent::Unknown {
-        let intent_term = Term::from_field_u64(intent_field, intent_val);
-        let intent_term_query = Box::new(TermQuery::new(intent_term, IndexRecordOption::Basic));
-        let boosted_intent_query = Box::new(BoostQuery::new(intent_term_query, 2.0));
-        clauses.push((Occur::Should, boosted_intent_query));
-    }
-
-    if lang != "all" && !lang.is_empty() {
-        let lang_term = Term::from_field_text(lang_field, lang);
-        let lang_query = Box::new(TermQuery::new(lang_term, IndexRecordOption::Basic));
-
-        if intent == &QueryIntent::Navigational {
-            let boosted_lang = Box::new(BoostQuery::new(lang_query, 2.0));
-            clauses.push((Occur::Should, boosted_lang));
-        } else {
-            clauses.push((Occur::Must, lang_query));
-        }
     }
 
     if intent == &QueryIntent::Local && loc != "all" && !loc.is_empty() {
