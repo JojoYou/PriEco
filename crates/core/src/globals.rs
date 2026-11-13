@@ -713,7 +713,8 @@ pub static PRIECO_BLOBS: Lazy<Arc<PriecoBlobStorage>> = Lazy::new(|| {
 /*
   Index
 */
-pub const TANTIVY_HEAP_SIZE: usize = 1_240_000_000;
+pub const TANTIVY_HEAP_SIZE: usize = 512_000_000;
+pub const TANTIVY_WRITER_THREADS: usize = 2;
 pub static TANTIVY_INDEX: Lazy<Arc<Index>> = Lazy::new(|| {
     // Build schema
     let mut builder = Schema::builder();
@@ -770,7 +771,7 @@ pub static TANTIVY_READER: Lazy<Arc<IndexReader>> = Lazy::new(|| {
 pub static TANTIVY_WRITER: Lazy<Arc<Mutex<IndexWriter>>> = Lazy::new(|| {
     Arc::new(Mutex::new(
         TANTIVY_INDEX
-            .writer(TANTIVY_HEAP_SIZE)
+            .writer_with_num_threads(TANTIVY_WRITER_THREADS, TANTIVY_HEAP_SIZE)
             .expect("Failed to create Tantivy V2 writer"),
     ))
 });

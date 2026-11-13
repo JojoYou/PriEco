@@ -14,7 +14,7 @@ use std::{
 
 use common::sandbox;
 use prieco_core::{ID_SIZE, PRIECO_CONFIG, RECORD_SIZE, VECTOR_DIM};
-use prieco_insert::db_insert::{MAX_VECTORS_IN_VRAM, merge_bucket, vector_process};
+use prieco_insert::db_insert::{MAX_VECTORS_IN_RAM, merge_bucket, vector_process};
 
 fn record(id: u64, fill: f32) -> Vec<u8> {
     let mut r = Vec::with_capacity(RECORD_SIZE);
@@ -68,7 +68,7 @@ fn no_tmp_files(bucket: usize) -> bool {
 
 #[test]
 fn constants() {
-    assert_eq!(MAX_VECTORS_IN_VRAM, 1_500_000);
+    assert_eq!(MAX_VECTORS_IN_RAM, 250_000);
     assert_eq!(record(1, 0.0).len(), RECORD_SIZE);
 }
 

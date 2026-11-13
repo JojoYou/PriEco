@@ -5368,6 +5368,7 @@ dependencies = [
  "dashmap",
  "fjall",
  "half",
+ "libc",
  "memmap2",
  "once_cell",
  "prieco_core",

@@ -6,6 +6,7 @@ use std::{
     error::Error,
     fs::{File, OpenOptions, create_dir_all, metadata, read_dir, remove_file},
     io::{BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write},
+    os::fd::AsRawFd,
     path::{Path, PathBuf},
     sync::atomic::{AtomicUsize, Ordering},
 };
@@ -30,8 +31,9 @@ use prieco_core::{
   Constants
 */
 const SKIP_MERGE_FILE: &str = "dont_merge.txt";
-pub const MAX_VECTORS_IN_VRAM: usize = 1_500_000;
+pub const MAX_VECTORS_IN_RAM: usize = 250_000;
 const BATCH_SIZE_FOR_GPU: usize = 1_500;
+const MERGE_THREADS: usize = 2;
 const ZSTD_LEVEL: i32 = 3;
 
 /*
@@ -263,7 +265,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     );
                 }
 
-                if vector_idx_buffer.len() >= MAX_VECTORS_IN_VRAM {
+                if vector_idx_buffer.len() >= MAX_VECTORS_IN_RAM {
                     println!(
                         "{}: Commiting {} vectors",
                         icons::DB_INSERT,
@@ -278,6 +280,8 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
             vector_process(&mut vector_idx_buffer)?;
             println!("{}: Vector idx commited", icons::DB_INSERT);
         }
+
+        TANTIVY_WRITER.lock().commit()?;
 
         drop(archive);
         remove_file(file_name)?;
@@ -313,22 +317,27 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
         let total_buckets = staging_files.len();
         let merged_count = AtomicUsize::new(0);
 
-        staging_files.par_iter().for_each(|bucket_id| {
-            if let Err(e) = merge_bucket(*bucket_id) {
-                println!("Failed to merge bucket {}! {}", bucket_id, e);
-            } else {
-                let current = merged_count.fetch_add(1, Ordering::Relaxed) + 1;
+        let merge_pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(MERGE_THREADS)
+            .build()?;
+        merge_pool.install(|| {
+            staging_files.par_iter().for_each(|bucket_id| {
+                if let Err(e) = merge_bucket(*bucket_id) {
+                    println!("Failed to merge bucket {}! {}", bucket_id, e);
+                } else {
+                    let current = merged_count.fetch_add(1, Ordering::Relaxed) + 1;
 
-                if current % 100 == 0 || current == total_buckets {
-                    println!(
-                        "{}: Merge progress: {}/{} ({:.1}%)",
-                        icons::DB_INSERT,
-                        current,
-                        total_buckets,
-                        current as f64 / total_buckets as f64 * 100.0
-                    );
+                    if current % 100 == 0 || current == total_buckets {
+                        println!(
+                            "{}: Merge progress: {}/{} ({:.1}%)",
+                            icons::DB_INSERT,
+                            current,
+                            total_buckets,
+                            current as f64 / total_buckets as f64 * 100.0
+                        );
+                    }
                 }
-            }
+            });
         });
 
         println!("{}: Merge complete", icons::DB_INSERT);
@@ -340,37 +349,30 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
 pub fn vector_process(
     chunk_buffer: &mut HashMap<u64, Vec<f32>>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let ids: Vec<u64> = chunk_buffer.keys().copied().collect();
-    let mut bucket_data: HashMap<usize, Vec<(u64, Vec<f32>)>> =
-        HashMap::with_capacity(chunk_buffer.len() + 1_000);
+    let entries: Vec<(u64, Vec<f32>)> = chunk_buffer.drain().collect();
+    let mut bucket_data: HashMap<usize, Vec<(u64, Vec<f32>)>> = HashMap::new();
 
     println!("{}: GPU assigning!", icons::DB_INSERT);
-    let mut inserted_counter = 0;
-    for chunk in ids.chunks(BATCH_SIZE_FOR_GPU) {
-        let vectors: Vec<Vec<f32>> = chunk
-            .iter()
-            .map(|id| chunk_buffer.get(id).unwrap().clone())
-            .collect();
-
-        let bucket_ids = VECTOR_CENTROPOIDS.assign_batch(&vectors)?;
-
-        for (i, &id) in chunk.iter().enumerate() {
-            let bucket_id = bucket_ids[i];
-            let vector = chunk_buffer.get(&id).unwrap().clone();
-            bucket_data
-                .entry(bucket_id)
-                .or_insert_with(Vec::new)
-                .push((id, vector));
+    let mut entries = entries.into_iter();
+    loop {
+        let batch: Vec<(u64, Vec<f32>)> = entries.by_ref().take(BATCH_SIZE_FOR_GPU).collect();
+        if batch.is_empty() {
+            break;
         }
 
-        inserted_counter += 1;
-        if inserted_counter % 200_000 == 0 {
-            println!(
-                "{}: Assigned: {}/{}",
-                icons::DB_INSERT,
-                inserted_counter,
-                bucket_data.len()
-            );
+        let (ids, vectors): (Vec<u64>, Vec<Vec<f32>>) = batch.into_iter().unzip();
+        let bucket_ids = VECTOR_CENTROPOIDS.assign_batch(&vectors)?;
+        if bucket_ids.len() != vectors.len() {
+            return Err(format!(
+                "GPU assigned {} buckets for {} vectors",
+                bucket_ids.len(),
+                vectors.len()
+            )
+            .into());
+        }
+
+        for ((id, vector), bucket_id) in ids.into_iter().zip(vectors).zip(bucket_ids) {
+            bucket_data.entry(bucket_id).or_default().push((id, vector));
         }
     }
 
@@ -384,7 +386,6 @@ pub fn vector_process(
             .map_err(|e| format!("Failed on bucket {}: {}", bucket_id, e))?;
     }
 
-    chunk_buffer.clear();
     Ok(())
 }
 
@@ -407,7 +408,11 @@ fn append_to_bucket(
         let bytes: &[u8] = bytemuck::cast_slice(vector.as_slice());
         writer.write_all(bytes)?;
     }
-    writer.flush()?;
+    let file = writer.into_inner()?;
+    file.sync_data()?;
+    unsafe {
+        libc::posix_fadvise(file.as_raw_fd(), 0, 0, libc::POSIX_FADV_DONTNEED);
+    }
     Ok(())
 }
 
