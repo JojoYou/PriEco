@@ -191,13 +191,13 @@ fn extract_title(
     document: &Html,
     og_selector: &Selector,
     title_selector: &Selector,
-    h_selectors: &Vec<Selector>,
+    h_selectors: &[Selector],
 ) -> String {
     // Site specified title
-    if let Some(og_site_name_element) = document.select(og_selector).next() {
-        if let Some(content) = og_site_name_element.value().attr("content") {
-            return content.to_string();
-        }
+    if let Some(og_site_name_element) = document.select(og_selector).next()
+        && let Some(content) = og_site_name_element.value().attr("content")
+    {
+        return content.to_string();
     }
 
     // <title> tag
@@ -212,15 +212,15 @@ fn extract_title(
 
     // <h1..6> tags
     for i in 1..6 {
-        if let Some(h_selector) = h_selectors.get(i) {
-            if let Some(h_element) = document.select(h_selector).next() {
-                return h_element
-                    .text()
-                    .collect::<Vec<_>>()
-                    .join(" ")
-                    .trim()
-                    .to_string();
-            }
+        if let Some(h_selector) = h_selectors.get(i)
+            && let Some(h_element) = document.select(h_selector).next()
+        {
+            return h_element
+                .text()
+                .collect::<Vec<_>>()
+                .join(" ")
+                .trim()
+                .to_string();
         }
     }
 
@@ -241,24 +241,22 @@ fn extract_description(
     title: &str,
 ) -> String {
     // Site specified description
-    if let Some(og_description_element) = document.select(og_selector).next() {
-        if let Some(content) = og_description_element.value().attr("content") {
-            if content != title {
-                return content.to_string();
-            }
-        }
+    if let Some(og_description_element) = document.select(og_selector).next()
+        && let Some(content) = og_description_element.value().attr("content")
+        && content != title
+    {
+        return content.to_string();
     }
 
-    if let Some(description_element) = document.select(meta_selector).next() {
-        if let Some(content) = description_element.value().attr("content") {
-            if content != title {
-                return content.to_string();
-            }
-        }
+    if let Some(description_element) = document.select(meta_selector).next()
+        && let Some(content) = description_element.value().attr("content")
+        && content != title
+    {
+        return content.to_string();
     }
 
     // Get description from <p> tag
-    if let Some(p_element) = document.select(&p_selector).next() {
+    if let Some(p_element) = document.select(p_selector).next() {
         let content = p_element
             .text()
             .collect::<Vec<_>>()
@@ -294,11 +292,11 @@ fn get_website_country(url: &str) -> String {
     // Domain to IP address
     let mut ip = None;
     for port in [443, 80] {
-        if let Ok(addrs) = format!("{}:{}", domain, port).to_socket_addrs() {
-            if let Some(addr) = addrs.into_iter().next() {
-                ip = Some(addr.ip());
-                break;
-            }
+        if let Ok(addrs) = format!("{}:{}", domain, port).to_socket_addrs()
+            && let Some(addr) = addrs.into_iter().next()
+        {
+            ip = Some(addr.ip());
+            break;
         }
     }
     let ip = match ip {
@@ -315,14 +313,11 @@ fn get_website_country(url: &str) -> String {
     };
 
     // Extract country name
-    let country_code = match record
+    let country_code = record
         .country
         .and_then(|c| c.iso_code)
         .map(|s| s.to_lowercase())
-    {
-        Some(country_code) => country_code,
-        None => String::new(),
-    };
+        .unwrap_or_default();
     if country_code.is_empty() {
         return String::new();
     }
@@ -337,7 +332,7 @@ fn get_website_country(url: &str) -> String {
         DOMAIN_COUNTRY_CACHE.insert(domain, country_code.clone());
     }
 
-    return country_code;
+    country_code
 }
 
 fn get_language_code(lang_info: Option<Lang>) -> String {

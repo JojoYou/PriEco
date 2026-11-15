@@ -43,7 +43,7 @@ use serde_json::Value as Json_Value;
 use tantivy::{
     Term,
     collector::TopDocs,
-    query::{BooleanQuery, BoostQuery, Occur, Query, TermQuery, TermSetQuery},
+    query::{BooleanQuery, Occur, Query, TermQuery, TermSetQuery},
     schema::{IndexRecordOption, Value},
 };
 use zstd::bulk::Decompressor;
@@ -55,7 +55,7 @@ use crate::web::functions::{
     additional::discover::discover_and_ping_domains,
     decentralized::{FedQuery, IROH_ENDPOINT, PROFILE_CACHE},
     general::get_domain,
-    ranking::{self, goggles::GoggleRules},
+    ranking::{self, goggles::GoggleRules, rrf::RRFParams},
 };
 use prieco_core::{
     ANALYTICS, META_DECODER, PRIECO_META, QueryIntent, Stage, TANTIVY_QUERY_PARSER,
@@ -105,24 +105,25 @@ pub static QUERY_CACHE: Lazy<RwLock<HashMap<String, Vec<WebDocument>>>> =
 /// # Panics
 ///
 /// Only if system runs out of memory.
-pub async fn run(
-    results: &mut Vec<SearchResult>,
-    query: &str,
-    lang: &str,
-    loc: &str,
-    embedding_service: &State<EmbeddingService>,
-    goggles: Vec<Arc<GoggleRules>>,
-    mobile: bool,
-    decentralize: bool,
-) {
+pub struct SearchDBParams<'r> {
+    pub results: &'r mut Vec<SearchResult>,
+    pub query: &'r str,
+    pub lang: &'r str,
+    pub loc: &'r str,
+    pub embedding_service: &'r State<EmbeddingService>,
+    pub goggles: Vec<Arc<GoggleRules>>,
+    pub mobile: bool,
+    pub decentralize: bool,
+}
+pub async fn run(params: SearchDBParams<'_>) {
     let local_results = run_json(
-        query,
-        lang,
-        loc,
-        embedding_service,
-        goggles,
-        mobile,
-        decentralize,
+        params.query,
+        params.lang,
+        params.loc,
+        params.embedding_service,
+        params.goggles,
+        params.mobile,
+        params.decentralize,
     )
     .await;
 
@@ -189,7 +190,7 @@ pub async fn run(
 
             let content = item.get("content").and_then(|v| v.as_str()).unwrap_or("");
 
-            results.push(SearchResult {
+            params.results.push(SearchResult {
                 url: url.clone(),
                 display_url: url
                     .replace("https://", "")
@@ -336,7 +337,7 @@ pub async fn run_json(
         let lang_clone = lang.to_string();
         let loc_clone = loc.to_string();
         let loc_clone2 = loc.to_string();
-        let int_clone = intent.clone();
+        let int_clone = intent;
         let emb_clone = embed.clone();
         let g_clone = goggles.clone();
 
@@ -391,42 +392,39 @@ pub async fn run_json(
 
                 ANALYTICS.count("p2p_sent");
 
-                if let Ok(payload) = serde_json::to_vec(&fed_query) {
-                    if let Some(endpoint) = IROH_ENDPOINT.get() {
-                        let mut handles = Vec::new();
-                        for pub_key in best_nodes {
-                            let ep = endpoint.clone();
-                            let pl = payload.clone();
+                if let Ok(payload) = serde_json::to_vec(&fed_query)
+                    && let Some(endpoint) = IROH_ENDPOINT.get()
+                {
+                    let mut handles = Vec::new();
+                    for pub_key in best_nodes {
+                        let ep = endpoint.clone();
+                        let pl = payload.clone();
 
-                            handles.push(tokio::spawn(async move {
-                                let node_addr = EndpointAddr::from(pub_key);
+                        handles.push(tokio::spawn(async move {
+                            let node_addr = EndpointAddr::from(pub_key);
 
-                                let fetch_future = async {
-                                    let conn =
-                                        ep.connect(node_addr, b"prieco-search/0").await.ok()?;
-                                    let (mut send, mut recv) = conn.open_bi().await.ok()?;
-                                    send.write_all(&pl).await.ok()?;
-                                    send.finish().ok()?;
-                                    let data = recv.read_to_end(5 * 1024 * 1024).await.ok()?;
-                                    serde_json::from_slice::<Vec<WebDocument>>(&data).ok()
-                                };
+                            let fetch_future = async {
+                                let conn = ep.connect(node_addr, b"prieco-search/0").await.ok()?;
+                                let (mut send, mut recv) = conn.open_bi().await.ok()?;
+                                send.write_all(&pl).await.ok()?;
+                                send.finish().ok()?;
+                                let data = recv.read_to_end(5 * 1024 * 1024).await.ok()?;
+                                serde_json::from_slice::<Vec<WebDocument>>(&data).ok()
+                            };
 
-                                match tokio::time::timeout(Duration::from_secs(9), fetch_future)
-                                    .await
-                                {
-                                    Ok(Some(res)) => Some(res),
-                                    _ => {
-                                        let mut cache = PROFILE_CACHE.write();
-                                        cache.remove(&pub_key);
-                                        None
-                                    }
+                            match tokio::time::timeout(Duration::from_secs(9), fetch_future).await {
+                                Ok(Some(res)) => Some(res),
+                                _ => {
+                                    let mut cache = PROFILE_CACHE.write();
+                                    cache.remove(&pub_key);
+                                    None
                                 }
-                            }));
-                        }
-                        for handle in handles {
-                            if let Ok(Some(res)) = handle.await {
-                                decentralized_results.extend(res);
                             }
+                        }));
+                    }
+                    for handle in handles {
+                        if let Ok(Some(res)) = handle.await {
+                            decentralized_results.extend(res);
                         }
                     }
                 }
@@ -461,17 +459,17 @@ pub async fn run_json(
             });
         }
 
-        let mut rrf_results: Vec<WebDocument> = ranking::rrf::run(
+        let mut rrf_results: Vec<WebDocument> = ranking::rrf::run(RRFParams {
             query,
             lang,
-            &intent,
+            intent: &intent,
             dir_results,
-            tantivy_results,
-            vector_results,
-            discovery_results,
-            decentralized_results,
-            60.0,
-        );
+            fts_results: tantivy_results,
+            ivf_results: vector_results,
+            dis_results: discovery_results,
+            dec_results: decentralized_results,
+            k: 60.0,
+        });
 
         // Temp remove blocked terms
         let blocked_terms: &[&str] = &["porn", "sex", "dick", "fap"];
@@ -646,7 +644,7 @@ pub async fn run_core_search(
         id_score_vec
     });
 
-    let intent_clone = intent.clone();
+    let intent_clone = *intent;
     let goggles_clone = goggles.clone();
     let tantivy_task = tokio::task::spawn_blocking(move || {
         let start = std::time::Instant::now();
@@ -772,7 +770,7 @@ static SITE_EXTRACT_RE: Lazy<Regex> =
 
 fn search_tantivy(
     query_text: &str,
-    lang: &str,
+    _lang: &str,
     loc: &str,
     intent: &QueryIntent,
     limit: usize,
@@ -781,9 +779,9 @@ fn search_tantivy(
     let schema = TANTIVY_INDEX.schema();
     let doc_id = schema.get_field("doc_id").ok()?;
     let domain_id_field = schema.get_field("domain_id").ok()?;
-    let lang_field = schema.get_field("lang").ok()?;
+    let _lang_field = schema.get_field("lang").ok()?;
     let loc_field = schema.get_field("loc").ok()?;
-    let intent_field = schema.get_field("intent").ok()?;
+    let _intent_field = schema.get_field("intent").ok()?;
 
     let mut clean_query_text = query_text.to_string();
     let mut site_hashes = Vec::new();
@@ -879,10 +877,10 @@ fn search_tantivy(
             }
         };
 
-        if let Some(doc_id_value) = retrieved_doc.get_first(doc_id) {
-            if let Some(id) = doc_id_value.as_u64() {
-                id_score_vec.push((id, score));
-            }
+        if let Some(doc_id_value) = retrieved_doc.get_first(doc_id)
+            && let Some(id) = doc_id_value.as_u64()
+        {
+            id_score_vec.push((id, score));
         }
     }
 
@@ -938,7 +936,7 @@ fn fetch_documents(
                     let key = id.to_be_bytes();
 
                     // Get data
-                    let compressed_data = match PRIECO_META.meta_ks.get(&key) {
+                    let compressed_data = match PRIECO_META.meta_ks.get(key) {
                         Ok(Some(data)) => data,
                         _ => {
                             continue;
@@ -1001,7 +999,7 @@ fn fetch_documents(
 }
 
 fn sanitize_string(s: &str) -> String {
-    s.replace('"', "").replace('\'', "")
+    s.replace(['"', '\''], "")
 }
 
 /// Helper function for discarting results whose path matches discard Goggle filter

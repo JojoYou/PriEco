@@ -11,7 +11,7 @@ pub async fn fetch_and_store(url: String) -> Goggle {
             "{}We got passed unsafe goggle!{} {}",
             colors::RED,
             colors::RESET,
-            &url
+            url
         );
         return Goggle::default();
     }
@@ -22,7 +22,7 @@ pub async fn fetch_and_store(url: String) -> Goggle {
             "{}Network error fetching Goggle!{} {}",
             colors::RED,
             colors::RESET,
-            &url
+            url
         );
         return Goggle::default();
     };
@@ -32,7 +32,7 @@ pub async fn fetch_and_store(url: String) -> Goggle {
             "{}Failed to read Goggle response body!{} {}",
             colors::RED,
             colors::RESET,
-            &url
+            url
         );
         return Goggle::default();
     };
@@ -41,7 +41,7 @@ pub async fn fetch_and_store(url: String) -> Goggle {
             "{}Goggle text is empty!{} {}",
             colors::RED,
             colors::RESET,
-            &url
+            url
         );
         return Goggle::default();
     }

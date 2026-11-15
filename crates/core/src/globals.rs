@@ -16,6 +16,7 @@
 #[cfg(feature = "cuda")]
 use std::io::{Cursor, Read};
 use std::{
+    cmp::Reverse,
     collections::{BTreeMap, HashMap},
     error::Error,
     fs::{File, write},
@@ -239,7 +240,7 @@ impl<'r> FromRequest<'r> for UserAgent<'r> {
 /*
 PriEco config
 */
-pub static PRIECO_CONFIG: Lazy<PriEcoConfig> = Lazy::new(|| set_up::set_up_wizard());
+pub static PRIECO_CONFIG: Lazy<PriEcoConfig> = Lazy::new(set_up::set_up_wizard);
 fn default_true() -> bool {
     true
 }
@@ -324,7 +325,7 @@ impl EmbeddingService {
         let tokenizer = self.tokenizer.clone();
         let model = self.model.clone();
 
-        let embeddings = task::spawn_blocking(
+        task::spawn_blocking(
             move || -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
                 let tokenizer_guard = tokio::runtime::Handle::current().block_on(tokenizer.lock());
 
@@ -401,17 +402,15 @@ impl EmbeddingService {
 
                 // Average
                 if token_count > 0.0 {
-                    for k in 0..hidden_size {
-                        sum_vec[k] /= token_count;
+                    for val in &mut sum_vec[..hidden_size] {
+                        *val /= token_count;
                     }
                 }
 
                 Ok(sum_vec)
             },
         )
-        .await?;
-
-        embeddings
+        .await?
     }
 }
 
@@ -429,14 +428,14 @@ pub struct IpGeoDatabase {
 
 impl IpGeoDatabase {
     pub fn open(db_path: &str) -> Result<Self, redb::Error> {
-        if let Some(parent) = std::path::Path::new(db_path).parent() {
-            if !parent.exists() {
-                println!(
-                    "Warning: Directory for {} does not exist, creating it.",
-                    db_path
-                );
-                let _ = std::fs::create_dir_all(parent);
-            }
+        if let Some(parent) = std::path::Path::new(db_path).parent()
+            && !parent.exists()
+        {
+            println!(
+                "Warning: Directory for {} does not exist, creating it.",
+                db_path
+            );
+            let _ = std::fs::create_dir_all(parent);
         }
 
         let db = match Database::create(db_path) {
@@ -689,7 +688,7 @@ pub static PRIECO_META: Lazy<Arc<PriecoMetaStorage>> = Lazy::new(|| {
 pub static PRIECO_BLOBS: Lazy<Arc<PriecoBlobStorage>> = Lazy::new(|| {
     let blob_db = FJALL_DATABASE::builder(Path::new(&PRIECO_CONFIG.blob_path))
         .worker_threads(2)
-        .cache_size(1 * 1024 * 1024 * 1024)
+        .cache_size(1024 * 1024 * 1024)
         .open()
         .expect("Failed to open Blob Fjall DB");
 
@@ -810,6 +809,12 @@ impl Multilingual {
     }
 }
 
+impl Default for Multilingual {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct MultiStream(std::vec::IntoIter<Token>, Option<Token>);
 
 impl TokenStream for MultiStream {
@@ -828,7 +833,7 @@ impl TokenStream for MultiStream {
 impl TANTIVY_TOKENIZER for Multilingual {
     type TokenStream<'a> = MultiStream;
 
-    fn token_stream<'a>(&mut self, text: &'a str) -> MultiStream {
+    fn token_stream(&mut self, text: &str) -> MultiStream {
         let tokens: Vec<Token> = self
             .0
             .tokenize(text)
@@ -1430,6 +1435,12 @@ impl Reranker {
     }
 }
 
+impl Default for Reranker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /*
   Synonyms
 */
@@ -1896,7 +1907,7 @@ pub static MATCHERS: Lazy<AHashMap<String, LangMatcher>> = Lazy::new(|| {
     let mut matchers = AHashMap::new();
 
     let json_data = include_str!("../../../data/intent.json");
-    let config: IntentConfig = serde_json::from_str(&json_data)
+    let config: IntentConfig = serde_json::from_str(json_data)
         .expect("Error: intents.json format does not match required schema.");
 
     for (lang_code, keywords_struct) in config.languages {
@@ -2348,7 +2359,7 @@ impl AnalyticsDb {
         );
 
         if self.ks.get(seen_key.as_bytes()).ok().flatten().is_none() {
-            batch.insert(&self.ks, seen_key.as_bytes(), &[1u8]);
+            batch.insert(&self.ks, seen_key.as_bytes(), [1u8]);
 
             let vk = format!("visitors:{}", date);
             batch.insert(
@@ -2357,15 +2368,15 @@ impl AnalyticsDb {
                 (self.get_u64(&vk) + 1).to_le_bytes(),
             );
 
-            if let Some(cc) = country_code {
-                if cc != "all" {
-                    let ck = format!("country:{}:{}", date, cc.to_lowercase());
-                    batch.insert(
-                        &self.ks,
-                        ck.as_bytes(),
-                        (self.get_u64(&ck) + 1).to_le_bytes(),
-                    );
-                }
+            if let Some(cc) = country_code
+                && cc != "all"
+            {
+                let ck = format!("country:{}:{}", date, cc.to_lowercase());
+                batch.insert(
+                    &self.ks,
+                    ck.as_bytes(),
+                    (self.get_u64(&ck) + 1).to_le_bytes(),
+                );
             }
         }
 
@@ -2425,10 +2436,10 @@ impl AnalyticsDb {
             self.fingerprint(ip, "mini-crawler", "worker", date)
         );
 
-        if self.ks.get(seen_key.as_bytes()).ok().flatten().is_none() {
-            if self.ks.insert(seen_key.as_bytes(), [1u8]).is_ok() {
-                self.count("workers");
-            }
+        if self.ks.get(seen_key.as_bytes()).ok().flatten().is_none()
+            && self.ks.insert(seen_key.as_bytes(), [1u8]).is_ok()
+        {
+            self.count("workers");
         }
     }
 
@@ -2491,7 +2502,7 @@ impl AnalyticsDb {
                 Some((cc, count))
             })
             .collect();
-        results.sort_by(|a, b| b.1.cmp(&a.1));
+        results.sort_by_key(|a| Reverse(a.1));
         results
     }
 
@@ -2597,10 +2608,10 @@ impl AnalyticsDb {
                     .split(':')
                     .find_map(|part| NaiveDate::parse_from_str(part, "%Y-%m-%d").ok());
 
-                if let Some(date) = date {
-                    if date < cutoff {
-                        batch.remove(&self.ks, k);
-                    }
+                if let Some(date) = date
+                    && date < cutoff
+                {
+                    batch.remove(&self.ks, k);
                 }
             }
         }

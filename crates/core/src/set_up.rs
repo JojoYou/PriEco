@@ -44,11 +44,10 @@ pub fn set_up_wizard() -> PriEcoConfig {
         enable_web_server: true,
     };
 
-    if file_exists(CONFIG_FILE) {
-        match load_config() {
-            Some(config) => return config,
-            None => {}
-        }
+    if file_exists(CONFIG_FILE)
+        && let Some(config) = load_config()
+    {
+        return config;
     }
 
     println!("Hi beautiful human being 👋");
@@ -81,7 +80,7 @@ pub fn set_up_wizard() -> PriEcoConfig {
         "PRIECO_TANTIVY",
         &format!(
             "\n🗨 3/{}: Path for Tantivy index (default {}):",
-            TOTAL_QUESTIONS, &conf.tantivy_path
+            TOTAL_QUESTIONS, conf.tantivy_path
         ),
         &conf.tantivy_path,
     );
@@ -90,7 +89,7 @@ pub fn set_up_wizard() -> PriEcoConfig {
         "PRIECO_META",
         &format!(
             "\n🗨 4/{}: Path for LMDB database (default {}):",
-            TOTAL_QUESTIONS, &conf.meta_path
+            TOTAL_QUESTIONS, conf.meta_path
         ),
         &conf.meta_path,
     );
@@ -99,7 +98,7 @@ pub fn set_up_wizard() -> PriEcoConfig {
         "PRIECO_VECTOR",
         &format!(
             "\n🗨 5/{}: Path for Vector index (default {}):",
-            TOTAL_QUESTIONS, &conf.vector_path
+            TOTAL_QUESTIONS, conf.vector_path
         ),
         &conf.vector_path,
     );
@@ -108,7 +107,7 @@ pub fn set_up_wizard() -> PriEcoConfig {
         "PRIECO_BLOB",
         &format!(
             "\n🗨 6/{}: Path for Blob storage (default {}):",
-            TOTAL_QUESTIONS, &conf.blob_path
+            TOTAL_QUESTIONS, conf.blob_path
         ),
         &conf.blob_path,
     );
@@ -197,10 +196,10 @@ fn create_dirs(conf: &PriEcoConfig) {
         std::path::Path::new(&conf.blob_path),
     ];
 
-    if let Some(parent) = std::path::Path::new(CONFIG_FILE).parent() {
-        if !parent.as_os_str().is_empty() {
-            paths.push(parent);
-        }
+    if let Some(parent) = std::path::Path::new(CONFIG_FILE).parent()
+        && !parent.as_os_str().is_empty()
+    {
+        paths.push(parent);
     }
 
     for path in paths {

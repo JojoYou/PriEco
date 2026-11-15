@@ -60,15 +60,19 @@ const POLAR_URL: &str = "https://buy.polar.sh/polar_cl_oj0yTj0z4isxyAzUEg33xBjer
 ///
 /// Input: API key, language, location, query
 /// Output: JSON
-#[get("/api?<a>&<lang>&<loc>&<q>&<goggles>&<dec>&<content>")]
+#[derive(FromForm)]
+pub struct APIParams<'r> {
+    pub a: Option<&'r str>,
+    pub lang: &'r str,
+    pub loc: &'r str,
+    pub q: &'r str,
+    pub goggles: Option<&'r str>,
+    pub dec: Option<bool>,
+    pub content: Option<bool>,
+}
+#[get("/api?<params..>")]
 pub async fn api(
-    a: Option<&str>,
-    lang: &str,
-    loc: &str,
-    q: &str,
-    goggles: Option<&str>,
-    dec: Option<bool>,
-    content: Option<bool>,
+    params: APIParams<'_>,
     client_ip: ClientIp,
     embedding_service: &State<EmbeddingService>,
 ) -> Result<Json<Vec<RocketValue>>, (Status, Json<RocketValue>)> {
@@ -103,7 +107,7 @@ pub async fn api(
     };
 
     // Check legibility of the request
-    let polar_id: Option<String> = match a {
+    let polar_id: Option<String> = match params.a {
         // Resulti is unlimited AND Uruky is old (upcomming update)
         Some(key) if key == resulti_api_key || key == uruky_api_key => None,
         // Request doesn't have an API key, it's a free request
@@ -137,14 +141,14 @@ pub async fn api(
     };
     ANALYTICS.record_api_request();
 
-    let decentralized = dec.unwrap_or(true);
+    let decentralized = params.dec.unwrap_or(true);
 
-    let active_goggles = load_goggles(&get_goggle_ids(goggles, None));
+    let active_goggles = load_goggles(&get_goggle_ids(params.goggles, None));
 
     let full_results = search_db::run_json(
-        q,
-        lang,
-        loc,
+        params.q,
+        params.lang,
+        params.loc,
         embedding_service,
         active_goggles,
         false,
@@ -152,7 +156,7 @@ pub async fn api(
     )
     .await;
 
-    let content_bool = content.unwrap_or(false);
+    let content_bool = params.content.unwrap_or(false);
     let results: Vec<serde_json::Value> = full_results
         .into_iter()
         .map(|res| {
@@ -172,8 +176,9 @@ pub async fn api(
         })
         .collect();
 
-    if !results.is_empty() && a == Some(uruky_api_key.as_str()) {
-        if let Err(e) = CLIENT
+    if !results.is_empty()
+        && params.a == Some(uruky_api_key.as_str())
+        && let Err(e) = CLIENT
             .post("https://api.polar.sh/v1/events/ingest")
             .header("Authorization", format!("Bearer {}", polar_api_key))
             .header("Content-Type", "application/json")
@@ -187,9 +192,8 @@ pub async fn api(
             }))
             .send()
             .await
-        {
-            println!("{}API charging failed!{} {}", colors::RED, colors::RESET, e);
-        }
+    {
+        println!("{}API charging failed!{} {}", colors::RED, colors::RESET, e);
     }
 
     // Bill customer
@@ -356,11 +360,8 @@ fn allowed_type(url: &Url, content_type: &ContentType) -> bool {
     };
 
     // Images are allowed
-    if top == "image" {
-        true
-    }
     // CSS and JS only Search Expander
-    else if allowed_data && allowed_domain {
+    if top == "image" && allowed_data && allowed_domain {
         true
     }
     // Reject the rest
@@ -385,7 +386,7 @@ async fn proxy_request(
     let mut target_url = url.clone();
     if target_url
         .domain()
-        .map_or(false, |d| d.contains("searchexpander.com"))
+        .is_some_and(|d| d.contains("searchexpander.com"))
     {
         target_url.query_pairs_mut().clear().extend_pairs(
             url.query_pairs()
@@ -431,29 +432,28 @@ async fn proxy_request(
             if redirects_left == 0 {
                 return Err(Status::BadGateway);
             }
-            if let Some(loc) = response.headers().get("location") {
-                if let Ok(loc_str) = loc.to_str() {
-                    current_url = match current_url.join(loc_str) {
-                        Ok(u) => u,
-                        Err(_) => return Err(Status::BadGateway),
-                    };
+            if let Some(loc) = response.headers().get("location")
+                && let Ok(loc_str) = loc.to_str()
+            {
+                current_url = match current_url.join(loc_str) {
+                    Ok(u) => u,
+                    Err(_) => return Err(Status::BadGateway),
+                };
 
-                    if bad_url(&current_url) {
-                        return Err(Status::Forbidden);
-                    }
-
-                    if response.status().as_u16() == 303
-                        || ((response.status().as_u16() == 301
-                            || response.status().as_u16() == 302)
-                            && current_method == "POST")
-                    {
-                        current_method = "GET".to_string();
-                        current_body = None;
-                    }
-
-                    redirects_left -= 1;
-                    continue;
+                if bad_url(&current_url) {
+                    return Err(Status::Forbidden);
                 }
+
+                if response.status().as_u16() == 303
+                    || ((response.status().as_u16() == 301 || response.status().as_u16() == 302)
+                        && current_method == "POST")
+                {
+                    current_method = "GET".to_string();
+                    current_body = None;
+                }
+
+                redirects_left -= 1;
+                continue;
             }
 
             // Broken redirect
@@ -705,10 +705,9 @@ pub async fn om_sug(q: &str) -> Json<RocketValue> {
         urlencoding::encode(q)
     ))
     .await
+        && let Ok(ddg_results) = response.json::<Vec<DdgSuggestion>>().await
     {
-        if let Ok(ddg_results) = response.json::<Vec<DdgSuggestion>>().await {
-            phrases = ddg_results.into_iter().map(|item| item.phrase).collect();
-        }
+        phrases = ddg_results.into_iter().map(|item| item.phrase).collect();
     }
 
     Json(json!([q, phrases]))

@@ -4,8 +4,7 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
     let trimmed = query.trim();
 
     let possible_domain = trimmed
-        .replace('"', "")
-        .replace('\'', "")
+        .replace(['"', '\''], "")
         .chars()
         .filter(|c| !c.is_whitespace())
         .collect::<String>()
@@ -90,7 +89,7 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
             .iter()
             .any(|url| {
                 matches!(
-                    PRIECO_META.meta_ks.get(&url_to_id(url).to_be_bytes()),
+                    PRIECO_META.meta_ks.get(url_to_id(url).to_be_bytes()),
                     Ok(Some(_))
                 )
             });
@@ -109,10 +108,9 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
                 .timeout(std::time::Duration::from_millis(400))
                 .send()
                 .await
+                && res.status().is_success()
             {
-                if res.status().is_success() {
-                    return Some((canonical_url, domain_clone));
-                }
+                return Some((canonical_url, domain_clone));
             }
             None
         });
@@ -130,7 +128,7 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
                         "/proxy?u={}",
                         urlencoding::encode(&format!(
                             "https://fav.prieco.net/icon?url={}&size=32",
-                            &domain
+                            domain
                         ))
                     ),
                     image: String::new(),

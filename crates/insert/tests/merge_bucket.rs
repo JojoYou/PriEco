@@ -52,7 +52,9 @@ fn read_bucket(bucket: usize) -> Vec<(u64, f32)> {
         0,
         "bucket contains a partial record"
     );
-    raw.chunks_exact(RECORD_SIZE)
+    raw.as_chunks::<RECORD_SIZE>()
+        .0
+        .iter()
         .map(|r| {
             (
                 u64::from_le_bytes(r[..ID_SIZE].try_into().unwrap()),
@@ -108,7 +110,7 @@ fn merge_creates_bucket_from_staging() {
 fn merge_preserves_full_vectors_bit_exact() {
     sandbox();
     let rec = record(77, -12.5);
-    write_staging(4, &[rec.clone()]);
+    write_staging(4, std::slice::from_ref(&rec));
     merge_bucket(4).unwrap();
     let mut dec = zstd::stream::Decoder::new(fs::File::open(bucket_path(4)).unwrap()).unwrap();
     let mut raw = Vec::new();

@@ -254,18 +254,22 @@ fn active_goggle_ids_are_parsed() {
 
 #[test]
 fn public_goggles_are_listed_and_marked_checked() {
-    let mut g = Goggle::default();
-    g.id = unique_u64();
-    g.name = "Listed".into();
-    g.author = "Tester".into();
-    g.public = true;
-    g.avatar = "#00ff00".into();
-    g.url = "https://example.com/x.goggle".into();
+    let g = Goggle {
+        id: unique_u64(),
+        name: "Listed".into(),
+        author: "Tester".into(),
+        public: true,
+        avatar: "#00ff00".into(),
+        url: "https://example.com/x.goggle".into(),
+        ..Default::default()
+    };
     put(&g);
 
-    let mut hidden = Goggle::default();
-    hidden.id = unique_u64();
-    hidden.public = false;
+    let hidden = Goggle {
+        id: unique_u64(),
+        public: false,
+        ..Default::default()
+    };
     put(&hidden);
 
     let p = run("", &[("active_goggles", &g.id.to_string())]);

@@ -49,9 +49,13 @@ fn import_dirs_are_absolute() {
 #[test]
 fn tantivy_heap_is_above_tantivy_minimum() {
     // Tantivy refuses budgets below 15MB per indexing thread
-    assert!(TANTIVY_HEAP_SIZE >= 15_000_000);
+    const {
+        assert!(TANTIVY_HEAP_SIZE >= 15_000_000);
+    }
     // ... and above 4GB per thread
-    assert!(TANTIVY_HEAP_SIZE < 4_000_000_000);
+    const {
+        assert!(TANTIVY_HEAP_SIZE < 4_000_000_000);
+    }
 }
 
 #[test]

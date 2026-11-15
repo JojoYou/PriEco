@@ -75,7 +75,7 @@ async fn ok_response_returns_body_status_time_and_url() {
     let (body, status, time, final_url) = download(&client(), &url).await;
     assert_eq!(body, "<p>hello</p>");
     assert_eq!(status, 200);
-    assert!(time >= 0.0 && time < 10.0);
+    assert!((0.0..10.0).contains(&time));
     assert_eq!(final_url, url);
 }
 

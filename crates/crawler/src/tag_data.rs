@@ -121,18 +121,18 @@ fn extract_data(
                 .map(|text| text.split_whitespace().collect::<Vec<_>>().join(" "))
                 .filter(|cleaned| !cleaned.is_empty()), // Extract inner text from element
             "meta_name" => {
-                if let Some(content) = element.value().attr("content") {
-                    if let Some(name) = element.value().attr("name") {
-                        return Some(format!("{}={}", name, content));
-                    }
+                if let Some(content) = element.value().attr("content")
+                    && let Some(name) = element.value().attr("name")
+                {
+                    return Some(format!("{}={}", name, content));
                 }
                 None
             } // Extract content from meta tags
             "meta_property" => {
-                if let Some(content) = element.value().attr("content") {
-                    if let Some(property) = element.value().attr("property") {
-                        return Some(format!("{}={}", property, content));
-                    }
+                if let Some(content) = element.value().attr("content")
+                    && let Some(property) = element.value().attr("property")
+                {
+                    return Some(format!("{}={}", property, content));
                 }
                 None
             } // Extract property from meta tags
@@ -140,17 +140,16 @@ fn extract_data(
                 .value()
                 .attr(keyword)
                 .map(|attr| {
-                    if !is_valid_url(&attr) {
+                    if !is_valid_url(attr) {
                         return String::new();
                     }
+
                     // Find the position of http:// or https://
-                    let start_pos = if let Some(pos) = attr.find("http://") {
-                        pos
-                    } else if let Some(pos) = attr.find("https://") {
-                        pos
-                    } else {
-                        0
-                    };
+                    let start_pos = attr
+                        .find("http://")
+                        .or_else(|| attr.find("https://"))
+                        .unwrap_or_default();
+
                     // Get the substring from the protocol onwards
                     let cleaned_url = &attr[start_pos..];
 

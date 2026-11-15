@@ -8,6 +8,16 @@
 
 #![allow(dead_code, unused_imports, unused_variables)]
 
+// Lints inside src/ are reported by the binary target; don't fail them twice here.
+#[allow(
+    deprecated,
+    clippy::too_many_arguments,
+    clippy::ptr_arg,
+    clippy::result_large_err,
+    clippy::match_like_matches_macro,
+    clippy::if_same_then_else,
+    clippy::manual_checked_ops
+)]
 #[path = "../../src/web/mod.rs"]
 pub mod web;
 

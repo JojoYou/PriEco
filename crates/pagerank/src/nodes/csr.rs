@@ -101,13 +101,14 @@ pub fn run_with(
             let t_deg = Instant::now();
             let mut f = BufReader::with_capacity(1 << 23, File::open(&degrees_cache)?);
             let mut buf4 = [0u8; 4];
-            for i in 0..total_nodes_usize {
+            for out_deg in &mut out_degree[..total_nodes_usize] {
                 f.read_exact(&mut buf4)?;
-                out_degree[i] = u32::from_le_bytes(buf4);
+                *out_deg = u32::from_le_bytes(buf4);
             }
-            for i in 0..total_nodes_usize {
+
+            for in_deg in &mut in_degree[..total_nodes_usize] {
                 f.read_exact(&mut buf4)?;
-                in_degree[i] = u32::from_le_bytes(buf4);
+                *in_deg = u32::from_le_bytes(buf4);
             }
             println!(
                 "{}: REUSE_SHARDS: degree arrays loaded in {:.1}s",

@@ -4,57 +4,58 @@ use std::collections::{HashMap, HashSet};
 use crate::web::functions::general::get_domain;
 use prieco_core::{QueryIntent, WebDocument};
 
-pub fn run(
-    query: &str,
-    lang: &str,
-    intent: &QueryIntent,
-    dir_results: Vec<WebDocument>,
-    fts_results: Vec<WebDocument>,
-    ivf_results: Vec<WebDocument>,
-    dis_results: Vec<WebDocument>,
-    dec_results: Vec<WebDocument>,
-    k: f32,
-) -> Vec<WebDocument> {
+pub struct RRFParams<'r> {
+    pub query: &'r str,
+    pub lang: &'r str,
+    pub intent: &'r QueryIntent,
+    pub dir_results: Vec<WebDocument>,
+    pub fts_results: Vec<WebDocument>,
+    pub ivf_results: Vec<WebDocument>,
+    pub dis_results: Vec<WebDocument>,
+    pub dec_results: Vec<WebDocument>,
+    pub k: f32,
+}
+pub fn run(params: RRFParams<'_>) -> Vec<WebDocument> {
     // Custom searching WEIGHTs
     const DIR_WEIGHT: f32 = 3.0;
     const DIS_WEIGHT: f32 = 0.5;
     const FED_WEIGHT: f32 = 0.9;
 
-    let (fts_weight, ivf_weight) = adjust_weights(query);
+    let (fts_weight, ivf_weight) = adjust_weights(params.query);
 
     let mut scores: HashMap<String, (f32, WebDocument)> = HashMap::with_capacity(
-        dir_results.len()
-            + fts_results.len()
-            + ivf_results.len()
-            + dis_results.len()
-            + dec_results.len(),
+        params.dir_results.len()
+            + params.fts_results.len()
+            + params.ivf_results.len()
+            + params.dis_results.len()
+            + params.dec_results.len(),
     );
 
     let sources = [
-        (dir_results, DIR_WEIGHT, "DIR"),
-        (fts_results, fts_weight, "FTS"),
-        (ivf_results, ivf_weight, "IVF"),
-        (dis_results, DIS_WEIGHT, "DIS"),
-        (dec_results, FED_WEIGHT, "DEC"),
+        (params.dir_results, DIR_WEIGHT, "DIR"),
+        (params.fts_results, fts_weight, "FTS"),
+        (params.ivf_results, ivf_weight, "IVF"),
+        (params.dis_results, DIS_WEIGHT, "DIS"),
+        (params.dec_results, FED_WEIGHT, "DEC"),
     ];
 
     for (results, weight, source_name) in sources {
         for (rank, mut doc) in results.into_iter().enumerate() {
-            let mut rrf_score = weight * (1.0 / (k + rank as f32 + 1.0));
+            let mut rrf_score = weight * (1.0 / (params.k + rank as f32 + 1.0));
 
-            if lang != "all"
-                && !lang.is_empty()
-                && doc.lang != lang
+            if params.lang != "all"
+                && !params.lang.is_empty()
+                && doc.lang != params.lang
                 && (source_name == "IVF" || source_name == "FTS")
             {
-                if intent == &QueryIntent::Navigational {
+                if params.intent == &QueryIntent::Navigational {
                     rrf_score *= 0.7;
                 } else {
                     rrf_score *= 0.1;
                 }
             }
 
-            let inte = match intent {
+            let inte = match params.intent {
                 QueryIntent::Informational => 0,
                 QueryIntent::Transactional => 1,
                 QueryIntent::CommercialInvestigation => 2,
@@ -63,7 +64,7 @@ pub fn run(
                 QueryIntent::Unknown => 5,
             };
 
-            if intent != &QueryIntent::Unknown && doc.intent == inte {
+            if params.intent != &QueryIntent::Unknown && doc.intent == inte {
                 rrf_score *= 1.3;
             }
 
@@ -99,7 +100,7 @@ pub fn run(
     });
 
     let mut target_domains = Vec::new();
-    for caps in RRF_DOMAIN_RE.captures_iter(query) {
+    for caps in RRF_DOMAIN_RE.captures_iter(params.query) {
         let mut target = caps[2].to_lowercase();
         target = target.replace("https://", "").replace("http://", "");
         target = target

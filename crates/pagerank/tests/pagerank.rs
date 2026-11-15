@@ -69,11 +69,8 @@ fn write_pairs_zstd(path: &str, pairs: &[(u64, u64)]) {
 fn read_pairs_zstd(path: &str) -> Vec<(u64, u64)> {
     let mut out = Vec::new();
     let mut dec = zstd_reader(path).unwrap();
-    loop {
-        match read_u64_pair_zstd(&mut dec).unwrap() {
-            Some(p) => out.push(p),
-            None => break,
-        }
+    while let Some(p) = read_u64_pair_zstd(&mut dec).unwrap() {
+        out.push(p);
     }
     out
 }
@@ -294,8 +291,8 @@ fn reference_pagerank(edges: &[(&str, &str)]) -> HashMap<String, f64> {
         inc.dedup();
     }
     let mut od = vec![0usize; n];
-    for dst in 0..n {
-        for &src in &incoming[dst] {
+    for inc in &incoming {
+        for &src in inc {
             od[src] += 1;
         }
     }

@@ -79,10 +79,10 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
         let entry = entry?;
         if entry.file_type()?.is_file() {
             let path = entry.path();
-            if let Some(s) = path.to_str() {
-                if s.contains(".zip") {
-                    files.push(s.to_string());
-                }
+            if let Some(s) = path.to_str()
+                && s.contains(".zip")
+            {
+                files.push(s.to_string());
             }
         }
     }
@@ -167,13 +167,8 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                 let id = url_to_id(&url);
 
                 // Preserve uniqness
-                if PRIECO_META
-                    .meta_ks
-                    .get(&id.to_be_bytes())
-                    .unwrap()
-                    .is_some()
-                {
-                    println!("Uniqnuess: {}", &url);
+                if PRIECO_META.meta_ks.get(id.to_be_bytes()).unwrap().is_some() {
+                    println!("Uniqnuess: {}", url);
                     continue;
                 }
 
@@ -203,7 +198,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     favicon: sanitize_string(parts[4]),
                     image: sanitize_string(parts[5]),
                     keywords: sanitize_string(parts[6]),
-                    safe_s: if parts[7] == "true" { true } else { false },
+                    safe_s: parts[7] == "true",
                     html: parts[8].to_string(),
                     lang: parts[9].to_string(),
                     loc: parts[10].to_string(),
@@ -229,7 +224,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                 let compressed_doc = compressor.compress(&doc_bytes)?;
                 PRIECO_META
                     .meta_ks
-                    .insert(&id.to_be_bytes(), &compressed_doc)?;
+                    .insert(id.to_be_bytes(), &compressed_doc)?;
 
                 /* Tantivy */
                 TANTIVY_WRITER.lock().add_document(tantivy::doc!(
@@ -327,7 +322,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                 } else {
                     let current = merged_count.fetch_add(1, Ordering::Relaxed) + 1;
 
-                    if current % 100 == 0 || current == total_buckets {
+                    if current.is_multiple_of(100) || current == total_buckets {
                         println!(
                             "{}: Merge progress: {}/{} ({:.1}%)",
                             icons::DB_INSERT,
@@ -393,10 +388,7 @@ fn append_to_bucket(
     bucket_id: usize,
     items: &[(u64, Vec<f32>)],
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let staging_path = format!(
-        "{}/staging_{:06}.bin",
-        &PRIECO_CONFIG.vector_path, bucket_id
-    );
+    let staging_path = format!("{}/staging_{:06}.bin", PRIECO_CONFIG.vector_path, bucket_id);
     let file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -439,13 +431,10 @@ pub fn merge_tantivy() {
 }
 
 pub fn merge_bucket(bucket_id: usize) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let staging_path = format!(
-        "{}/staging_{:06}.bin",
-        &PRIECO_CONFIG.vector_path, bucket_id
-    );
+    let staging_path = format!("{}/staging_{:06}.bin", PRIECO_CONFIG.vector_path, bucket_id);
     let zst_path = format!(
         "{}/bucket_{:06}.bin.zst",
-        &PRIECO_CONFIG.vector_path, bucket_id
+        PRIECO_CONFIG.vector_path, bucket_id
     );
 
     if !Path::new(&staging_path).exists() {
@@ -527,7 +516,7 @@ pub fn merge_bucket(bucket_id: usize) -> Result<(), Box<dyn Error + Send + Sync>
 
 /* Helper functions */
 fn sanitize_string(s: &str) -> String {
-    s.replace('"', "").replace('\'', "")
+    s.replace(['"', '\''], "")
 }
 
 /* Insert Decentralized results */

@@ -485,7 +485,7 @@ fn html_result_bincode_roundtrip() {
         "<p>Body</p>",
     ));
     let bytes =
-        bincode_next::serde::encode_to_vec(&vec![m], bincode_next::config::standard()).unwrap();
+        bincode_next::serde::encode_to_vec(vec![m], bincode_next::config::standard()).unwrap();
     let (back, _): (Vec<HTMLResultData>, usize) =
         bincode_next::serde::decode_from_slice(&bytes, bincode_next::config::standard()).unwrap();
     assert_eq!(back.len(), 1);

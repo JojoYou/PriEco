@@ -250,10 +250,10 @@ fn detect_image_type(data: &[u8]) -> ContentType {
         [0x47, 0x49, 0x46, 0x38, 0x39, 0x61, ..] => ContentType::GIF,
         // SVG: Check if it starts with < and contains "svg"
         [0x3C, ..] => {
-            if let Ok(text) = std::str::from_utf8(&data[0..100.min(data.len())]) {
-                if text.to_lowercase().contains("svg") {
-                    return ContentType::SVG;
-                }
+            if let Ok(text) = std::str::from_utf8(&data[0..100.min(data.len())])
+                && text.to_lowercase().contains("svg")
+            {
+                return ContentType::SVG;
             }
             ContentType::Binary
         }

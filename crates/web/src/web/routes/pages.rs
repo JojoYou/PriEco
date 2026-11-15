@@ -53,7 +53,7 @@ use crate::web::{
         decentralized::PROFILE_CACHE,
         general::{get_domain, set_cookie},
         ranking::goggles::{fetch_and_store, get_goggle_ids, load_goggles, refresh_stale_goggles},
-        search_endpoint::{self, UserQtPrefs, get_user_qt_prefs},
+        search_endpoint::{self, EndParams, UserQtPrefs, get_user_qt_prefs},
     },
     modules::settings,
 };
@@ -72,22 +72,21 @@ pub struct ClientIp(pub IpAddr);
 impl<'r> FromRequest<'r> for ClientIp {
     type Error = ();
     async fn from_request(req: &'r Request<'_>) -> Outcome<Self, Self::Error> {
-        if let Some(cf_ip) = req.headers().get_one("CF-Connecting-IP") {
-            if let Ok(ip) = cf_ip.parse::<IpAddr>() {
-                return Outcome::Success(ClientIp(ip));
-            }
+        if let Some(cf_ip) = req.headers().get_one("CF-Connecting-IP")
+            && let Ok(ip) = cf_ip.parse::<IpAddr>()
+        {
+            return Outcome::Success(ClientIp(ip));
         }
-        if let Some(xff) = req.headers().get_one("X-Forwarded-For") {
-            if let Some(ip_str) = xff.split(',').next() {
-                if let Ok(ip) = ip_str.trim().parse::<IpAddr>() {
-                    return Outcome::Success(ClientIp(ip));
-                }
-            }
+        if let Some(xff) = req.headers().get_one("X-Forwarded-For")
+            && let Some(ip_str) = xff.split(',').next()
+            && let Ok(ip) = ip_str.trim().parse::<IpAddr>()
+        {
+            return Outcome::Success(ClientIp(ip));
         }
-        if let Some(real_ip) = req.headers().get_one("X-Real-IP") {
-            if let Ok(ip) = real_ip.parse::<IpAddr>() {
-                return Outcome::Success(ClientIp(ip));
-            }
+        if let Some(real_ip) = req.headers().get_one("X-Real-IP")
+            && let Ok(ip) = real_ip.parse::<IpAddr>()
+        {
+            return Outcome::Success(ClientIp(ip));
         }
         if let Some(socket_addr) = req.remote() {
             return Outcome::Success(ClientIp(socket_addr.ip()));
@@ -223,23 +222,22 @@ pub fn handle_shortcuts(form: Form<ShortcutAction<'_>>, cookie_jar: &CookieJar<'
         "edit" => {
             if let (Some(id), Some(name), Some(url)) =
                 (form.shortcut_id, form.shortcut_name, form.shortcut_url)
+                && id < items.len()
             {
-                if id < items.len() {
-                    let final_url = if url.starts_with("http://") || url.starts_with("https://") {
-                        url.to_string()
-                    } else {
-                        format!("https://{}", url)
-                    };
+                let final_url = if url.starts_with("http://") || url.starts_with("https://") {
+                    url.to_string()
+                } else {
+                    format!("https://{}", url)
+                };
 
-                    items[id] = format!("{}={}", name, final_url);
-                }
+                items[id] = format!("{}={}", name, final_url);
             }
         }
         "delete" => {
-            if let Some(id) = form.shortcut_id {
-                if id < items.len() {
-                    items.remove(id);
-                }
+            if let Some(id) = form.shortcut_id
+                && id < items.len()
+            {
+                items.remove(id);
             }
         }
         _ => {}
@@ -270,6 +268,7 @@ pub struct SearchForm<'r> {
     sxprmedia: Option<&'r str>,
     sxprsearchsugg: Option<&'r str>,
 }
+#[allow(clippy::result_large_err)]
 #[post("/search", data = "<form>")]
 pub async fn search_post(
     form: Form<SearchForm<'_>>,
@@ -281,10 +280,12 @@ pub async fn search_post(
     embedding_service: &State<EmbeddingService>,
 ) -> Result<(ContentType, Template), Redirect> {
     search(
-        form.t,
-        form.q,
-        form.sxprmedia,
-        form.sxprsearchsugg,
+        SearchParams {
+            t: form.t,
+            q: form.q,
+            sxprmedia: form.sxprmedia,
+            sxprsearchsugg: form.sxprsearchsugg,
+        },
         client_ip,
         user_agent,
         cookie_jar,
@@ -295,12 +296,19 @@ pub async fn search_post(
     .await
 }
 
-#[get("/search?<t>&<q>&<sxprmedia>&<sxprsearchsugg>")]
+#[derive(FromForm)]
+pub struct SearchParams<'r> {
+    pub t: &'r str,
+    pub q: &'r str,
+    #[allow(unused_variables)]
+    pub sxprmedia: Option<&'r str>, // Search Expander data, route needs to accept it
+    #[allow(unused_variables)]
+    pub sxprsearchsugg: Option<&'r str>, // Search Expander data, route needs to accept it
+}
+#[allow(clippy::result_large_err)]
+#[get("/search?<params..>")]
 pub async fn search(
-    t: &str,
-    q: &str,
-    #[allow(unused_variables)] sxprmedia: Option<&str>, // Search Expander data, route needs to accept it
-    #[allow(unused_variables)] sxprsearchsugg: Option<&str>, // Search Expander data, route needs to accept it
+    params: SearchParams<'_>,
     client_ip: ClientIp,
     user_agent: UserAgent<'_>,
     cookie_jar: &CookieJar<'_>,
@@ -321,11 +329,17 @@ pub async fn search(
         (String::from("css_version"), json!(CSS_VERSION)),
         (String::from("js_version"), json!(JS_VERSION)),
         // Page title
-        (String::from("title_query"), json!(format!("{} | ", q))),
+        (
+            String::from("title_query"),
+            json!(format!("{} | ", params.q)),
+        ),
         // Search data
-        (String::from("query"), json!(q)),
-        (String::from("query_enc"), json!(encode(q).into_owned())),
-        (String::from("type"), json!(t)),
+        (String::from("query"), json!(params.q)),
+        (
+            String::from("query_enc"),
+            json!(encode(params.q).into_owned()),
+        ),
+        (String::from("type"), json!(params.t)),
         (
             String::from("current_path"),
             json!(encode(&uri.to_string()).into_owned()),
@@ -356,7 +370,7 @@ pub async fn search(
     ]);
 
     // Search type
-    if let Some(key) = match t {
+    if let Some(key) = match params.t {
         "all" => Some("all_active"),
         "img" => Some("img_active"),
         "vid" => Some("vid_active"),
@@ -369,19 +383,19 @@ pub async fn search(
     }
 
     // Detect bang query
-    context.insert("bang".to_string(), json!(q.contains('!')));
+    context.insert("bang".to_string(), json!(params.q.contains('!')));
 
     // No JS enabled
     let no_js = cookie_jar.get("js").is_some();
     context.insert(String::from("no_js"), json!(no_js));
 
     if no_js {
-        if let Some((_clean_query, redirects)) = multibangs(q) {
+        if let Some((_clean_query, redirects)) = multibangs(params.q) {
             if redirects.len() == 1 {
                 return Err(Redirect::to(redirects[0].url.clone()));
             } else if redirects.len() > 1 {
                 let mut multibang_ctx = HashMap::new();
-                multibang_ctx.insert("query", json!(q));
+                multibang_ctx.insert("query", json!(params.q));
                 multibang_ctx.insert("redirects", json!(redirects));
                 multibang_ctx.insert("css_version", json!(CSS_VERSION));
 
@@ -403,17 +417,17 @@ pub async fn search(
         let mobile = ua.contains("mobi") || ua.contains("android") || ua.contains("iphone");
 
         // Results
-        let results_ctx = search_endpoint::run(
-            t,
-            q,
+        let results_ctx = search_endpoint::run(EndParams {
+            t: params.t,
+            q: params.q,
             lang,
             loc,
             embedding_service,
-            active_goggles,
-            &user_qt_prefs,
+            goggles: active_goggles,
+            user_qt_prefs: &user_qt_prefs,
             mobile,
             decentralize,
-        )
+        })
         .await;
 
         context.insert(String::from("search_results"), json!(results_ctx));
@@ -509,13 +523,17 @@ fn multibangs(query: &str) -> Option<(String, Vec<BangRedirect>)> {
   Input: Search type, Search query, Location, Language
   Output: Results html
 */
-#[get("/results_html?<t>&<q>&<loc>&<lang>&<dec>")]
+#[derive(FromForm)]
+pub struct ResultsParams<'r> {
+    pub t: &'r str,
+    pub q: &'r str,
+    pub lang: &'r str,
+    pub loc: &'r str,
+    pub dec: bool,
+}
+#[get("/results_html?<params..>")]
 pub async fn results_htmls(
-    t: &str,
-    q: &str,
-    lang: &str,
-    loc: &str,
-    dec: bool,
+    params: ResultsParams<'_>,
     embedding_service: &State<EmbeddingService>,
     cookie_jar: &CookieJar<'_>,
     user_agent: UserAgent<'_>,
@@ -529,28 +547,28 @@ pub async fn results_htmls(
     let ua = user_agent.0.to_lowercase();
     let mobile = ua.contains("mobi") || ua.contains("android") || ua.contains("iphone");
 
-    let mut ctx = search_endpoint::run(
-        t,
-        q,
-        lang,
-        loc,
+    let mut ctx = search_endpoint::run(EndParams {
+        t: params.t,
+        q: params.q,
+        lang: params.lang,
+        loc: params.loc,
         embedding_service,
-        active_goggles,
-        &user_qt_prefs,
+        goggles: active_goggles,
+        user_qt_prefs: &user_qt_prefs,
         mobile,
-        dec,
-    )
+        decentralize: params.dec,
+    })
     .await;
 
     let goggle_count = get_goggle_ids(None, Some(cookie_jar)).len();
     ctx.insert(String::from("active_goggle_count"), json!(goggle_count));
     ctx.insert(
         String::from("query_enc"),
-        json!(urlencoding::encode(q).into_owned()),
+        json!(urlencoding::encode(params.q).into_owned()),
     );
-    ctx.insert(String::from("type"), json!(t));
-    ctx.insert(String::from("lang"), json!(lang));
-    ctx.insert(String::from("loc"), json!(loc));
+    ctx.insert(String::from("type"), json!(params.t));
+    ctx.insert(String::from("lang"), json!(params.lang));
+    ctx.insert(String::from("loc"), json!(params.loc));
     ctx.insert(String::from("no_js"), json!(false));
 
     Template::render("search/results", ctx)
@@ -558,7 +576,7 @@ pub async fn results_htmls(
 
 #[get("/archive/<id>")]
 pub async fn view_blob(id: u64) -> Option<RawHtml<String>> {
-    let raw_blob = match PRIECO_BLOBS.blobs_ks.get(&id.to_le_bytes()) {
+    let raw_blob = match PRIECO_BLOBS.blobs_ks.get(id.to_le_bytes()) {
         Ok(Some(blob)) => blob,
         _ => return None,
     };
@@ -974,11 +992,9 @@ pub async fn stats(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host<
             (w_pages_today as f64 / w_issued_today as f64 * 100.0).min(100.0)
         )
     };
-    let w_avg_batch = if w_batches_today == 0 {
-        "–".to_string()
-    } else {
-        fmt_num(w_pages_today / w_batches_today)
-    };
+    let w_avg_batch = w_pages_today
+        .checked_div(w_batches_today)
+        .map_or_else(|| "–".to_string(), fmt_num);
 
     let crawler = json!({
         "pages_today": fmt_num(w_pages_today),
@@ -1169,18 +1185,19 @@ pub fn settings_update(form: Form<SettingsForm<'_>>, cookie_jar: &CookieJar<'_>)
     Redirect::to(uri!("/"))
 }
 
-#[get("/set?<lang>&<loc>&<theme>&<newtab>&<js>&<index>&<post>&<return_to>")]
-pub fn set_preferences(
-    lang: Option<String>,
-    loc: Option<String>,
-    theme: Option<String>,
-    newtab: Option<u8>,
-    js: Option<u8>,
-    index: Option<u8>,
-    post: Option<u8>,
-    return_to: Option<String>,
-    cookie_jar: &CookieJar<'_>,
-) -> Redirect {
+#[derive(FromForm)]
+pub struct SetPrefParams {
+    pub lang: Option<String>,
+    pub loc: Option<String>,
+    pub theme: Option<String>,
+    pub newtab: Option<u8>,
+    pub js: Option<u8>,
+    pub index: Option<u8>,
+    pub post: Option<u8>,
+    pub return_to: Option<String>,
+}
+#[get("/set?<params..>")]
+pub fn set_preferences(params: SetPrefParams, cookie_jar: &CookieJar<'_>) -> Redirect {
     let apply_cookie = |name: &str, value: String| {
         cookie_jar.add(
             Cookie::build((name.to_string(), value))
@@ -1197,17 +1214,17 @@ pub fn set_preferences(
         cookie_jar.remove(cookie);
     };
 
-    if let Some(v) = lang {
+    if let Some(v) = params.lang {
         apply_cookie("lang", v);
     }
-    if let Some(v) = loc {
+    if let Some(v) = params.loc {
         apply_cookie("loc", v);
     }
-    if let Some(v) = theme {
+    if let Some(v) = params.theme {
         apply_cookie("theme", v);
     }
 
-    if let Some(v) = newtab {
+    if let Some(v) = params.newtab {
         if v == 1 {
             apply_cookie("newtab", "1".to_string());
         } else {
@@ -1215,7 +1232,7 @@ pub fn set_preferences(
         }
     }
 
-    if let Some(v) = js {
+    if let Some(v) = params.js {
         if v == 1 {
             apply_cookie("js", "1".to_string());
         } else {
@@ -1223,7 +1240,7 @@ pub fn set_preferences(
         }
     }
 
-    if let Some(v) = index {
+    if let Some(v) = params.index {
         if v == 1 {
             apply_cookie("index", "1".to_string());
         } else {
@@ -1231,7 +1248,7 @@ pub fn set_preferences(
         }
     }
 
-    if let Some(v) = post {
+    if let Some(v) = params.post {
         if v == 1 {
             apply_cookie("post", "1".to_string());
         } else {
@@ -1239,7 +1256,7 @@ pub fn set_preferences(
         }
     }
 
-    let redirect_url = match return_to {
+    let redirect_url = match params.return_to {
         Some(url) if url.starts_with('/') => url,
         _ => String::from("/"),
     };
@@ -2054,18 +2071,18 @@ fn extract_metadata(content: &str) -> (String, String, String) {
 }
 
 fn extract_main_content(content: &str) -> String {
-    if let Some(start_idx) = content.find(r#"<div class="content-main">"#) {
-        if let Some(end_idx) = content[start_idx..].find(r#"<div class="content-sidebar">"#) {
-            let chunk = &content[start_idx..start_idx + end_idx];
+    if let Some(start_idx) = content.find(r#"<div class="content-main">"#)
+        && let Some(end_idx) = content[start_idx..].find(r#"<div class="content-sidebar">"#)
+    {
+        let chunk = &content[start_idx..start_idx + end_idx];
 
-            let inner_start = r#"<div class="content-main">"#.len();
-            let inner_content = &chunk[inner_start..];
+        let inner_start = r#"<div class="content-main">"#.len();
+        let inner_content = &chunk[inner_start..];
 
-            if let Some(last_div) = inner_content.rfind("</div>") {
-                return inner_content[..last_div].trim().to_string();
-            }
-            return inner_content.trim().to_string();
+        if let Some(last_div) = inner_content.rfind("</div>") {
+            return inner_content[..last_div].trim().to_string();
         }
+        return inner_content.trim().to_string();
     }
     String::new()
 }

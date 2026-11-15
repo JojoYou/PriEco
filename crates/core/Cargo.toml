@@ -25,13 +25,11 @@ tokenizers = { workspace = true }
 rayon = { workspace = true }
 dashmap = { workspace = true }
 zstd = { workspace = true }
-bytemuck = { workspace = true }
 tokio = { workspace = true }
 chrono = { workspace = true }
 ndarray = { workspace = true }
 rocket = { workspace = true }
 memmap2 = { workspace = true }
-reqwest = { workspace = true }
 symspell = { workspace = true }
 fjall = { workspace = true }
 charabia = { workspace = true }
@@ -40,7 +38,6 @@ fst = { workspace = true }
 bincode-next = { workspace = true }
 rkyv = { workspace = true }
 primp = { workspace = true }
-dotenvy = { workspace = true }
 rand = { workspace = true }
 
 [features]
@@ -49,7 +46,11 @@ cuda = ["dep:cudarc", "ort/cuda"]
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 ort = { workspace = true, features = ["load-dynamic"] }
-cudarc = { workspace = true, optional = true, features = ["cublas", "nvrtc", "cuda-version-from-build-system"] }
+cudarc = { workspace = true, optional = true, features = [
+    "cublas",
+    "nvrtc",
+    "cuda-version-from-build-system",
+] }
 
 [target.'cfg(not(target_arch = "x86_64"))'.dependencies]
 ort = { workspace = true, features = ["load-dynamic"] }

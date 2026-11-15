@@ -54,22 +54,17 @@ pub struct CPUExecutionProviderOptions {
 }
 
 /// The strategy for extending the device memory arena.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum ArenaExtendStrategy {
     /// (Default) Subsequent extensions extend by larger amounts (multiplied by powers of two)
+    #[default]
     NextPowerOfTwo,
     /// Memory extends by the requested amount.
     SameAsRequested,
 }
 
-impl Default for ArenaExtendStrategy {
-    fn default() -> Self {
-        Self::NextPowerOfTwo
-    }
-}
-
 /// The type of search done for cuDNN convolution algorithms.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum CUDAExecutionProviderCuDNNConvAlgoSearch {
     /// Expensive exhaustive benchmarking using [`cudnnFindConvolutionForwardAlgorithmEx`][exhaustive].
     /// This function will attempt all possible algorithms for `cudnnConvolutionForward` to find the fastest algorithm.
@@ -77,6 +72,7 @@ pub enum CUDAExecutionProviderCuDNNConvAlgoSearch {
     /// possible convolution algorithms are tested.
     ///
     /// [exhaustive]: https://docs.nvidia.com/deeplearning/cudnn/api/index.html#cudnnFindConvolutionForwardAlgorithmEx
+    #[default]
     Exhaustive,
     /// Lightweight heuristic-based search using [`cudnnGetConvolutionForwardAlgorithm_v7`][heuristic].
     /// Heuristic search sorts available convolution algorithms by expected (based on internal heuristic) relative
@@ -96,12 +92,6 @@ pub enum CUDAExecutionProviderCuDNNConvAlgoSearch {
     /// [`Exhaustive`]: CUDAExecutionProviderCuDNNConvAlgoSearch::Exhaustive
     /// [`Heuristic`]: CUDAExecutionProviderCuDNNConvAlgoSearch::Heuristic
     Default,
-}
-
-impl Default for CUDAExecutionProviderCuDNNConvAlgoSearch {
-    fn default() -> Self {
-        Self::Exhaustive
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -503,7 +493,7 @@ impl Default for CANNExecutionProviderOptions {
 }
 
 macro_rules! get_ep_register {
-	($symbol:ident($($id:ident: $type:ty),*) -> $rt:ty) => {
+	($symbol:ident($($id:ident: $type:ty),* $(,)?) -> $rt:ty) => {
 		#[cfg(feature = "load-dynamic")]
 		#[allow(non_snake_case)]
 		let $symbol = unsafe {
@@ -554,7 +544,7 @@ macro_rules! map_keys {
 			let mut values = Vec::<CString>::new();
 			$(
 				let str_value = CString::new(($ex).to_string().as_str()).unwrap();
-				if !str_value.is_empty() {
+				if !str_value.as_bytes().is_empty() {
 					keys.push(CString::new(stringify!($fn_name)).unwrap());
 					values.push(str_value);
 				}

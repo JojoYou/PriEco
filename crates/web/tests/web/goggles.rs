@@ -248,9 +248,11 @@ fn goggle_default_and_serde_roundtrip() {
     assert_eq!(d.id, 0);
     assert!(d.url.is_empty());
 
-    let mut g = Goggle::default();
-    g.id = 7;
-    g.name = "n".into();
+    let mut g = Goggle {
+        id: 7,
+        name: "n".into(),
+        ..Default::default()
+    };
     g.rules.boost.insert(1, 2.0);
     g.rules.path.push(("/x".into(), 1.5));
     g.rules.discard_by_default = true;
@@ -366,9 +368,11 @@ fn storage_corrupt_entries_are_skipped() {
 fn storage_extreme_ids() {
     init();
     for id in [0u64, u64::MAX] {
-        let mut g = Goggle::default();
-        g.id = id;
-        g.name = format!("extreme {}", id);
+        let g = Goggle {
+            id,
+            name: format!("extreme {}", id),
+            ..Default::default()
+        };
         put(&g);
         assert_eq!(get(id).unwrap().name, g.name);
         delete(id);

@@ -172,7 +172,7 @@ fn synonym_lookup_common_english_words_have_synonyms() {
         "car", "big", "happy", "house", "fast", "good", "small", "buy",
     ]
     .iter()
-    .filter(|w| store.lookup(w).map_or(false, |s| !s.is_empty()))
+    .filter(|w| store.lookup(w).is_some_and(|s| !s.is_empty()))
     .count();
     assert!(found > 0, "no synonyms for any common English word");
 }
@@ -468,8 +468,8 @@ fn centroids_file_header_matches_vector_dim() {
 
 #[test]
 fn centroids_contain_only_finite_values() {
-    for chunk in CENTROPOIDS_BIN[8..].chunks_exact(4).step_by(9973) {
-        let v = f32::from_le_bytes(chunk.try_into().unwrap());
+    for chunk in CENTROPOIDS_BIN[8..].as_chunks::<4>().0.iter().step_by(9973) {
+        let v = f32::from_le_bytes(*chunk);
         assert!(v.is_finite());
     }
 }

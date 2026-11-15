@@ -68,7 +68,7 @@ static ACTIVE_WEIGHTS: Lazy<RwLock<RankingWeights>> =
     Lazy::new(|| RwLock::new(RankingWeights::default()));
 
 pub fn run(
-    results: &mut Vec<WebDocument>,
+    results: &mut [WebDocument],
     query: &str,
     lang: &str,
     loc: &str,
@@ -158,8 +158,8 @@ pub fn run(
         let tld_matches_loc = clean_url
             .split("://")
             .nth(1)
-            .and_then(|s| s.trim_end_matches('/').split('.').last())
-            .map_or(false, |tld| tld.eq_ignore_ascii_case(loc));
+            .and_then(|s| s.trim_end_matches('/').split('.').next_back())
+            .is_some_and(|tld| tld.eq_ignore_ascii_case(loc));
         if tld_matches_loc {
             boost *= weights.tld_loc_boost;
         }
@@ -357,8 +357,8 @@ fn check_for_updated_weights() {
 /* Helper functions */
 fn strip_url_noise(url: &str) -> &str {
     let url = url.split('?').next().unwrap_or(url);
-    let url = url.split('#').next().unwrap_or(url);
-    url
+
+    (url.split('#').next().unwrap_or(url)) as _
 }
 fn is_effectively_homepage(url: &str) -> bool {
     let path = url
@@ -366,8 +366,8 @@ fn is_effectively_homepage(url: &str) -> bool {
         .nth(1)
         .unwrap_or("")
         .trim_end_matches('/')
-        .splitn(2, '/')
-        .nth(1) // everything after the domain
+        .split_once('/')
+        .map(|x| x.1) // everything after the domain
         .unwrap_or("");
 
     if path.is_empty() {

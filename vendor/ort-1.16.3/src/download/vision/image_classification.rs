@@ -58,7 +58,7 @@ pub enum ImageClassification {
     /// Image classification model that achieves state-of-the-art accuracy.
     ///
     /// > It is designed to run on mobile CPU, GPU, and EdgeTPU devices, allowing for applications on mobile and loT,
-    /// where computational resources are limited.
+    /// > where computational resources are limited.
     EfficientNetLite4,
 }
 

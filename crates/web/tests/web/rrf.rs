@@ -3,7 +3,7 @@
 use prieco_core::{QueryIntent, WebDocument};
 
 use crate::support::{doc, init};
-use crate::web::functions::ranking::rrf;
+use crate::web::functions::ranking::rrf::{self, RRFParams};
 
 const K: f32 = 60.0;
 
@@ -26,17 +26,17 @@ fn run(
     dec: Vec<WebDocument>,
 ) -> Vec<WebDocument> {
     init();
-    rrf::run(
+    rrf::run(RRFParams {
         query,
-        "all",
-        &QueryIntent::Unknown,
-        dir,
-        fts,
-        ivf,
-        dis,
-        dec,
-        K,
-    )
+        lang: "all",
+        intent: &QueryIntent::Unknown,
+        dir_results: dir,
+        fts_results: fts,
+        ivf_results: ivf,
+        dis_results: dis,
+        dec_results: dec,
+        k: K,
+    })
 }
 
 fn urls(v: &[WebDocument]) -> Vec<&str> {
@@ -184,17 +184,18 @@ fn duplicate_inside_one_source_adds_score_but_not_source() {
 #[test]
 fn k_zero_gives_inverse_rank() {
     init();
-    let out = rrf::run(
-        NEUTRAL,
-        "all",
-        &QueryIntent::Unknown,
-        vec![],
-        docs(&["https://1.com", "https://2.com", "https://3.com"]),
-        vec![],
-        vec![],
-        vec![],
-        0.0,
-    );
+    let out = rrf::run(RRFParams {
+        query: NEUTRAL,
+        lang: "all",
+        intent: &QueryIntent::Unknown,
+        dir_results: vec![],
+        fts_results: docs(&["https://1.com", "https://2.com", "https://3.com"]),
+        ivf_results: vec![],
+        dis_results: vec![],
+        dec_results: vec![],
+        k: K,
+    });
+
     assert!(close(out[0].search_score, 1.0));
     assert!(close(out[1].search_score, 0.5));
     assert!(close(out[2].search_score, 1.0 / 3.0));
@@ -312,7 +313,18 @@ fn ivf_score(lang: &str, doc_lang: &str, intent: QueryIntent, source: &str) -> f
     } else {
         (d, vec![])
     };
-    let out = rrf::run(NEUTRAL, lang, &intent, vec![], fts, ivf, vec![], vec![], K);
+
+    let out = rrf::run(RRFParams {
+        query: NEUTRAL,
+        lang,
+        intent: &intent,
+        dir_results: vec![],
+        fts_results: fts,
+        ivf_results: ivf,
+        dis_results: vec![],
+        dec_results: vec![],
+        k: K,
+    });
     out[0].search_score * (K + 1.0)
 }
 

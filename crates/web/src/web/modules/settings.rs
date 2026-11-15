@@ -77,14 +77,14 @@ pub fn run(
     }
 
     // Language
-    if cookie_jar.get("lang").is_none() {
-        if let Some(loc) = cookie_jar.get("loc").map(|c| c.value().to_string()) {
-            let lang = COUNTRY_TO_LANG
-                .get(loc.as_str())
-                .filter(|_| !onion)
-                .map_or("all".to_string(), |l| l.to_string());
-            set_cookie(cookie_jar, "lang".into(), lang, false, true, true);
-        }
+    if cookie_jar.get("lang").is_none()
+        && let Some(loc) = cookie_jar.get("loc").map(|c| c.value().to_string())
+    {
+        let lang = COUNTRY_TO_LANG
+            .get(loc.as_str())
+            .filter(|_| !onion)
+            .map_or("all".to_string(), |l| l.to_string());
+        set_cookie(cookie_jar, "lang".into(), lang, false, true, true);
     }
 
     context.insert(

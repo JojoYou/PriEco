@@ -90,8 +90,10 @@ fn read_pairs_zstd(path: &str) -> Vec<(u64, u64)> {
 fn read_u64s(path: &str) -> Vec<u64> {
     fs::read(path)
         .unwrap()
-        .chunks_exact(8)
-        .map(|c| u64::from_le_bytes(c.try_into().unwrap()))
+        .as_chunks::<8>()
+        .0
+        .iter()
+        .map(|c| u64::from_le_bytes(*c))
         .collect()
 }
 
@@ -99,16 +101,20 @@ fn read_u32s_zstd(path: &str) -> Vec<u32> {
     let mut dec = zstd_reader(path).unwrap();
     let mut buf = Vec::new();
     dec.read_to_end(&mut buf).unwrap();
-    buf.chunks_exact(4)
-        .map(|c| u32::from_le_bytes(c.try_into().unwrap()))
+    buf.as_chunks::<4>()
+        .0
+        .iter()
+        .map(|c| u32::from_le_bytes(*c))
         .collect()
 }
 
 fn read_f32s(path: &str) -> Vec<f32> {
     fs::read(path)
         .unwrap()
-        .chunks_exact(4)
-        .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|c| f32::from_le_bytes(*c))
         .collect()
 }
 
@@ -171,7 +177,7 @@ fn score_files_are_distinct() {
 
 #[test]
 fn buffer_size_is_positive() {
-    assert!(compute::BUFFER_SIZE > 0);
+    const { assert!(compute::BUFFER_SIZE > 0) };
 }
 
 /* ───────────────────────────── read_u64_pair ───────────────────────────── */
@@ -659,7 +665,7 @@ fn merge_corrupt_total_nodes_must_not_reuse_existing_ids() {
     let s = t.p("s.bin");
     write_pairs_raw(&s, &[(8, 9)]);
     let result = merge::run_with(&[s], &id_map, &nodes, &merged, &total);
-    if let Ok(_) = result {
+    if result.is_ok() {
         let ids: Vec<u64> = IdMap::open(&id_map)
             .unwrap()
             .pairs()
@@ -795,8 +801,10 @@ fn build_csr(t: &Tmp, n: usize, edges: &[(u64, u64)]) -> Csr {
     Csr {
         offsets: read_u64s(&off),
         edges: raw
-            .chunks_exact(8)
-            .map(|c| u64::from_le_bytes(c.try_into().unwrap()))
+            .as_chunks::<8>()
+            .0
+            .iter()
+            .map(|c| u64::from_le_bytes(*c))
             .collect(),
         out_degree: read_u32s_zstd(&od),
     }
@@ -873,8 +881,10 @@ fn csr_writes_degree_cache_for_reuse() {
     build_csr(&t, 3, &[(0, 1), (0, 2), (2, 1)]);
     let cache = fs::read(format!("{}/csr_degrees.bin", t.p("csr_scratch"))).unwrap();
     let vals: Vec<u32> = cache
-        .chunks_exact(4)
-        .map(|c| u32::from_le_bytes(c.try_into().unwrap()))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|c| u32::from_le_bytes(*c))
         .collect();
     // out degrees then in degrees
     assert_eq!(vals, vec![2, 0, 1, 0, 2, 1]);

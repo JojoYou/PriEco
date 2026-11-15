@@ -337,14 +337,14 @@ fn process_file(tar_path: &Path, single_blob_buffer: &mut Vec<u8>) -> io::Result
             );
 
             // Simple data integrity check
-            let missing = match PRIECO_META.meta_ks.get(&name.to_le_bytes()) {
+            let missing = match PRIECO_META.meta_ks.get(name.to_le_bytes()) {
                 Ok(Some(_)) => false,
                 Ok(None) => true,
                 Err(e) => {
-                    return Err(Error::new(
-                        ErrorKind::Other,
-                        format!("Database error during integrity check: {}", e),
-                    ));
+                    return Err(Error::other(format!(
+                        "Database error during integrity check: {}",
+                        e
+                    )));
                 }
             };
             if missing {
@@ -392,7 +392,7 @@ fn process_file(tar_path: &Path, single_blob_buffer: &mut Vec<u8>) -> io::Result
         colors::RESET
     );
 
-    remove_file(&tar_path)?;
+    remove_file(tar_path)?;
 
     println!(
         "{}: {}Completed {:?}: {} files inserted{}",

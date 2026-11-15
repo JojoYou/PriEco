@@ -38,7 +38,7 @@ pub async fn run(
         }
     };
     let yadore_option = call_api_future_json(        client
-    .get(&format!(
+    .get(format!(
         "https://api.yadore.com/v2/offer?market={}&keyword={}&precision=fuzzy&sort=rel_desc&limit=20",
         loc, query
     ))   .header("API-Key", api_key))

@@ -14,22 +14,21 @@ pub async fn download(client: &Client, url: &str) -> (String, u16, f64, String) 
     let mut response_result = client.get(&current_url).send().await;
 
     // Try adding www.
-    if response_result.is_err() {
-        if let Ok(mut parsed_url) = Url::parse(&current_url) {
-            if let Some(host) = parsed_url.host_str() {
-                if !host.starts_with("www.") && host.matches('.').count() == 1 {
-                    let new_host = format!("www.{}", host);
-                    if parsed_url.set_host(Some(&new_host)).is_ok() {
-                        current_url = parsed_url.to_string();
-                        println!(
-                            "🚀 Connection dropped! Retrying with apex fallback: {}",
-                            current_url
-                        );
+    if response_result.is_err()
+        && let Ok(mut parsed_url) = Url::parse(&current_url)
+        && let Some(host) = parsed_url.host_str()
+        && !host.starts_with("www.")
+        && host.matches('.').count() == 1
+    {
+        let new_host = format!("www.{}", host);
+        if parsed_url.set_host(Some(&new_host)).is_ok() {
+            current_url = parsed_url.to_string();
+            println!(
+                "🚀 Connection dropped! Retrying with apex fallback: {}",
+                current_url
+            );
 
-                        response_result = client.get(&current_url).send().await;
-                    }
-                }
-            }
+            response_result = client.get(&current_url).send().await;
         }
     }
 

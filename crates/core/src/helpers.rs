@@ -40,10 +40,7 @@ pub fn file_exists<P: AsRef<Path>>(file_path: P) -> bool {
   Output: file contents as a string
 */
 pub fn read_file(file_path: &str) -> String {
-    match read_to_string(file_path) {
-        Ok(contents) => contents,
-        Err(_) => String::new(),
-    }
+    read_to_string(file_path).unwrap_or_default()
 }
 
 /*

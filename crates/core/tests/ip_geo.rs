@@ -267,12 +267,12 @@ fn many_ranges_lookup_is_consistent() {
         .collect();
     let db = geo_db(&tmp, &refs);
     for i in (0..200u32).step_by(17) {
-        let ip = Ipv4Addr::from(((i as u32) << 16) + 0x10);
+        let ip = Ipv4Addr::from((i << 16) + 0x10);
         assert_eq!(
             db.lookup_country(&ip.to_string()).unwrap(),
             Some(format!("c{}", i))
         );
-        let gap = Ipv4Addr::from(((i as u32) << 16) + 0x1000);
+        let gap = Ipv4Addr::from((i << 16) + 0x1000);
         assert_eq!(db.lookup_country(&gap.to_string()).unwrap(), None);
     }
 }

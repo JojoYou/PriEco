@@ -64,9 +64,9 @@ pub fn run_with(
         let mut v = vec![0u32; total_nodes_usize];
         let mut dec = zstd_reader(out_degree_path)?;
         let mut buf = [0u8; 4];
-        for i in 0..total_nodes_usize {
+        for val in &mut v[..total_nodes_usize] {
             dec.read_exact(&mut buf).unwrap();
-            v[i] = u32::from_le_bytes(buf);
+            *val = u32::from_le_bytes(buf);
         }
         v
     };
@@ -104,11 +104,14 @@ pub fn run_with(
             let mut f = BufReader::with_capacity(1 << 24, File::open(&read_file).unwrap());
             let mut buf = [0u8; 4];
             println!("{}: Reading scores a", icons::PAGERANK_ICON);
-            for i in 0..total_nodes_usize {
+            for (score, &out_deg) in scores_old[..total_nodes_usize]
+                .iter_mut()
+                .zip(&out_degree[..total_nodes_usize])
+            {
                 f.read_exact(&mut buf).unwrap();
                 let sc = f32::from_le_bytes(buf);
-                scores_old[i] = sc;
-                if out_degree[i] == 0 {
+                *score = sc;
+                if out_deg == 0 {
                     dangling_sum += sc as f64;
                 }
             }

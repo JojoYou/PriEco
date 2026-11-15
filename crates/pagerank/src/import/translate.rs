@@ -254,9 +254,8 @@ pub fn run_with(
         let _ = remove_file(p);
     }
 
-    rename(&merged_edges, edges_sorted).map_err(|e| {
+    rename(&merged_edges, edges_sorted).inspect_err(|_e| {
         let _ = remove_file(&merged_edges);
-        e
     })?;
 
     Ok(())
@@ -388,7 +387,7 @@ fn merge_sort_edges(shards: &[String], out_path: &str) -> Result<(), Box<dyn std
         if let Some(next) = read_u64_pair_raw(&mut *readers[idx])? {
             heap.push((Reverse(next), idx));
         }
-        if edges_written % 5_000_000 == 0 && last_report.elapsed().as_secs_f64() > 5.0 {
+        if edges_written.is_multiple_of(5_000_000) && last_report.elapsed().as_secs_f64() > 5.0 {
             let elapsed = t_loop.elapsed().as_secs_f64();
             let rate = edges_written as f64 / elapsed / 1_000_000.0;
             println!(

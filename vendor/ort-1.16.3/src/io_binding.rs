@@ -89,8 +89,7 @@ impl<'s> IoBinding<'s> {
 
             ortsys![unsafe AllocatorFree(self.session.allocator(), names_ptr as *mut c_void) -> OrtError::CreateIoBinding];
 
-            let mut output_values_ptr: *mut *mut sys::OrtValue =
-                vec![ptr::null_mut(); count as _].as_mut_ptr();
+            let mut output_values_ptr: *mut *mut sys::OrtValue = ptr::null_mut();
             ortsys![unsafe GetBoundOutputValues(self.ptr, self.session.allocator(), &mut output_values_ptr, &mut count) -> OrtError::CreateIoBinding; nonNull(output_values_ptr)];
 
             let output_values_ptr =

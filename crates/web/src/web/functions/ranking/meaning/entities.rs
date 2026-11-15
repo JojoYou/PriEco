@@ -1,7 +1,7 @@
 use prieco_core::{EntityType, QU_PIPELINE, QueryIntent, TaggedEntity};
 
 pub fn scan_entities(
-    query: &mut String,
+    query: &mut str,
     mut final_intent: QueryIntent,
     loc: &str,
 ) -> (QueryIntent, Option<(f32, f32)>, Vec<TaggedEntity>) {

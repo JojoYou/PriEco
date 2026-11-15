@@ -35,7 +35,7 @@ use tokio::time::interval;
   Import own libraries
 */
 use crate::web::functions::{
-    ranking::{self},
+    ranking::{self, rrf::RRFParams},
     search_db::run_core_search,
 };
 
@@ -88,14 +88,14 @@ pub fn get_iroh_secret() -> SecretKey {
         return gen_iroh_secret();
     }
 
-    if let Ok(bytes) = std::fs::read(IROH_SECRET_FILE) {
-        if bytes.len() == 32 {
-            let mut array = [0u8; 32];
+    if let Ok(bytes) = std::fs::read(IROH_SECRET_FILE)
+        && bytes.len() == 32
+    {
+        let mut array = [0u8; 32];
 
-            array.copy_from_slice(&bytes);
+        array.copy_from_slice(&bytes);
 
-            return SecretKey::from_bytes(&array);
-        }
+        return SecretKey::from_bytes(&array);
     }
 
     gen_iroh_secret()
@@ -148,6 +148,12 @@ impl KeywordBloom {
     }
 }
 
+impl Default for KeywordBloom {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeProfile {
     pub node_id: [u8; 32],
@@ -187,27 +193,27 @@ pub fn build_node_profile(node_id: [u8; 32]) -> NodeProfile {
     let mut keyword = KeywordBloom::new();
     let schema = TANTIVY_INDEX.schema();
 
-    if let Ok(content_field) = schema.get_field("content") {
-        if let Some(reader) = TANTIVY_READER.searcher().segment_readers().first() {
-            if let Ok(inv) = reader.inverted_index(content_field) {
-                let mut terms: Vec<(String, u64)> = Vec::new();
+    if let Ok(content_field) = schema.get_field("content")
+        && let Some(reader) = TANTIVY_READER.searcher().segment_readers().first()
+        && let Ok(inv) = reader.inverted_index(content_field)
+    {
+        let mut terms: Vec<(String, u64)> = Vec::new();
 
-                if let Ok(mut stream) = inv.terms().stream() {
-                    while let Some((bytes, info)) = stream.next() {
-                        if let Ok(s) = from_utf8(bytes) {
-                            if info.doc_freq >= 5 && info.doc_freq <= 50 {
-                                terms.push((s.to_string(), info.doc_freq as u64));
-                            }
-                        }
-                    }
-                }
-
-                terms.sort_by_key(|(_, df)| *df);
-
-                for (t, _) in terms.into_iter().take(5000) {
-                    keyword.insert(url_to_id(&t));
+        if let Ok(mut stream) = inv.terms().stream() {
+            while let Some((bytes, info)) = stream.next() {
+                if let Ok(s) = from_utf8(bytes)
+                    && info.doc_freq >= 5
+                    && info.doc_freq <= 50
+                {
+                    terms.push((s.to_string(), info.doc_freq as u64));
                 }
             }
+        }
+
+        terms.sort_by_key(|(_, df)| *df);
+
+        for (t, _) in terms.into_iter().take(5000) {
+            keyword.insert(url_to_id(&t));
         }
     }
 
@@ -275,15 +281,14 @@ pub async fn gossip_sync(
                     if let Ok(parsed) = serde_json::from_slice::<Value>(&msg.content) {
 
                         if let Some(offline_node_id) = parsed.get("offline") {
-                            if let Ok(node_id_bytes) = serde_json::from_value::<[u8; 32]>(offline_node_id.clone()) {
-                                if let Ok(pub_key) = PublicKey::from_bytes(&node_id_bytes) {
+                            if let Ok(node_id_bytes) = serde_json::from_value::<[u8; 32]>(offline_node_id.clone())
+                                && let Ok(pub_key) = PublicKey::from_bytes(&node_id_bytes) {
                                     let mut c = cache.write();
                                     if c.remove(&pub_key).is_some() {
                                         println!("👋 Peer {} went offline and was removed from cache.", pub_key);ANALYTICS.count("p2p_peer_left");
 
                                     }
                                 }
-                            }
                             continue;
                         }
 
@@ -293,14 +298,14 @@ pub async fn gossip_sync(
                             serde_json::from_slice::<NodeProfile>(&msg.content).ok()
                         };
 
-                        if let Some(profile) = profile_opt {
-                            if let Ok(pub_key) = PublicKey::from_bytes(&profile.node_id) {
+                        if let Some(profile) = profile_opt
+                            && let Ok(pub_key) = PublicKey::from_bytes(&profile.node_id) {
                                 let mut is_new_peer = false;
                                 {
                                     let mut c = cache.write();
-                                    if !c.contains_key(&pub_key) {
+                                    if let std::collections::hash_map::Entry::Vacant(e) = c.entry(pub_key) {
                                         println!("🤝 Discovered peer {} via Gossip!", pub_key);
-                                        c.insert(pub_key, profile);ANALYTICS.count("p2p_peer_joined");
+                                        e.insert(profile);ANALYTICS.count("p2p_peer_joined");
 
                                         is_new_peer = true;
                                     }
@@ -310,16 +315,15 @@ pub async fn gossip_sync(
                                     let _ = sender.broadcast(make_msg().into()).await;
                                 }
                             }
-                        }
                     } else {
-                        if let Ok(profile) = serde_json::from_slice::<NodeProfile>(&msg.content) {
-                            if let Ok(pub_key) = PublicKey::from_bytes(&profile.node_id) {
+                        if let Ok(profile) = serde_json::from_slice::<NodeProfile>(&msg.content)
+                            && let Ok(pub_key) = PublicKey::from_bytes(&profile.node_id) {
                                 let mut is_new_peer = false;
                                 {
                                     let mut c = cache.write();
-                                    if !c.contains_key(&pub_key) {
+                                    if let std::collections::hash_map::Entry::Vacant(e) = c.entry(pub_key) {
                                         println!("🤝 Discovered peer {} via Gossip!", pub_key);
-                                        c.insert(pub_key, profile);ANALYTICS.count("p2p_peer_joined");
+                                        e.insert(profile);ANALYTICS.count("p2p_peer_joined");
 
                                         is_new_peer = true;
                                     }
@@ -328,7 +332,6 @@ pub async fn gossip_sync(
                                     let _ = sender.broadcast(make_msg().into()).await;
                                 }
                             }
-                        }
                     }
                 }
             }
@@ -348,55 +351,54 @@ impl ProtocolHandler for SearchProtocol {
 
         let (mut send, mut recv) = connection.accept_bi().await?;
 
-        if let Ok(data) = recv.read_to_end(1024 * 1024).await {
-            if let Ok(fed_query) = serde_json::from_slice::<FedQuery>(&data) {
-                println!("📞 Received peer query!",);
-                ANALYTICS.count("p2p_served");
+        if let Ok(data) = recv.read_to_end(1024 * 1024).await
+            && let Ok(fed_query) = serde_json::from_slice::<FedQuery>(&data)
+        {
+            println!("📞 Received peer query!",);
+            ANALYTICS.count("p2p_served");
 
-                let mut results: Vec<WebDocument> = Vec::new();
+            let mut results: Vec<WebDocument> = Vec::new();
 
-                if fed_query.depth > 0 {
-                    let mut fts_query = fed_query.query.clone();
-                    let (intent, _) = ranking::meaning::call::process_query(
-                        &mut fts_query,
-                        &fed_query.lang,
-                        &fed_query.loc,
-                    );
+            if fed_query.depth > 0 {
+                let mut fts_query = fed_query.query.clone();
+                let (intent, _) = ranking::meaning::call::process_query(
+                    &mut fts_query,
+                    &fed_query.lang,
+                    &fed_query.loc,
+                );
 
-                    let embed = fed_query.embed.clone();
+                let embed = fed_query.embed.clone();
 
-                    let (dir_results, tantivy_results, vector_results, dis_results) =
-                        run_core_search(
-                            &fed_query.query,
-                            &fed_query.lang,
-                            &fed_query.loc,
-                            &intent,
-                            embed,
-                            false,
-                            Vec::new(),
-                        )
-                        .await;
+                let (dir_results, tantivy_results, vector_results, dis_results) = run_core_search(
+                    &fed_query.query,
+                    &fed_query.lang,
+                    &fed_query.loc,
+                    &intent,
+                    embed,
+                    false,
+                    Vec::new(),
+                )
+                .await;
 
-                    results = ranking::rrf::run(
-                        &fed_query.query,
-                        &fed_query.lang,
-                        &intent,
-                        dir_results,
-                        tantivy_results,
-                        vector_results,
-                        dis_results,
-                        Vec::new(),
-                        60.0,
-                    );
+                results = ranking::rrf::run(RRFParams {
+                    query: &fed_query.query,
+                    lang: &fed_query.lang,
+                    intent: &intent,
+                    dir_results,
+                    fts_results: tantivy_results,
+                    ivf_results: vector_results,
+                    dis_results,
+                    dec_results: Vec::new(),
+                    k: 60.0,
+                });
 
-                    results.truncate(20);
-                }
-
-                if let Ok(response_bytes) = serde_json::to_vec(&results) {
-                    let _ = send.write_all(&response_bytes).await;
-                }
-                ANALYTICS.record_latency(Stage::PeerServe, started.elapsed());
+                results.truncate(20);
             }
+
+            if let Ok(response_bytes) = serde_json::to_vec(&results) {
+                let _ = send.write_all(&response_bytes).await;
+            }
+            ANALYTICS.record_latency(Stage::PeerServe, started.elapsed());
         }
 
         let _ = send.finish();

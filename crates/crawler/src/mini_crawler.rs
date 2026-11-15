@@ -178,11 +178,11 @@ pub async fn run() {
                 let dl_permit = dl_sem_clone.acquire_owned().await.unwrap();
 
                 let current_count = counter_clone.fetch_add(1, Ordering::SeqCst);
-                if current_count % 100 == 0 {
+                if current_count.is_multiple_of(100) {
                     println!("Downloaded {}/{}", current_count, total_urls);
                 }
 
-                let response = download(&*CLIENT, &url).await;
+                let response = download(&CLIENT, &url).await;
 
                 drop(dl_permit);
 
@@ -295,10 +295,7 @@ pub async fn run() {
 /// Output: true if valid, false otherwise
 pub fn is_valid_url(input: &str) -> bool {
     match Url::parse(input) {
-        Ok(url) => match url.scheme() {
-            "http" | "https" => true,
-            _ => false,
-        },
+        Ok(url) => matches!(url.scheme(), "http" | "https"),
         Err(_) => false,
     }
 }
@@ -355,5 +352,11 @@ impl CompiledSelectors {
             link_shortcut_selector: Selector::parse("link[rel='shortcut icon']").unwrap(),
             link_apple_selector: Selector::parse("link[rel='apple-touch-icon']").unwrap(),
         }
+    }
+}
+
+impl Default for CompiledSelectors {
+    fn default() -> Self {
+        Self::new()
     }
 }

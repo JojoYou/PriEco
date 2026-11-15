@@ -22,12 +22,12 @@ fn location(r: &LocalResponse<'_>) -> String {
         .to_string()
 }
 
-fn cookie<'a>(r: &'a LocalResponse<'_>, name: &str) -> Option<Cookie<'static>> {
+fn cookie(r: &LocalResponse<'_>, name: &str) -> Option<Cookie<'static>> {
     r.cookies().get(name).cloned()
 }
 
 fn is_removal(c: &Cookie<'_>) -> bool {
-    c.value().is_empty() && c.max_age().map_or(true, |a| a.is_zero() || a.is_negative())
+    c.value().is_empty() && c.max_age().is_none_or(|a| a.is_zero() || a.is_negative())
 }
 
 /* ───────────────────────────── country_info ───────────────────────────── */
@@ -272,7 +272,7 @@ fn shortcuts_client() -> Client {
 }
 
 fn post_shortcut(c: &Client, form: &str, existing: Option<&str>) -> (Status, String, Vec<String>) {
-    let mut req = c.post("/").header(ContentType::Form).body(form.to_string());
+    let mut req = c.post("/").header(ContentType::Form).body(form);
     if let Some(v) = existing {
         req = req.cookie(Cookie::new(
             "shortcuts",
@@ -430,7 +430,7 @@ fn post_settings(form: &str, cookies: &[(&str, &str)]) -> LocalResponse<'static>
     let mut req = c
         .post("/settings_update")
         .header(ContentType::Form)
-        .body(form.to_string());
+        .body(form);
     for (k, v) in cookies {
         req = req.cookie(Cookie::new(k.to_string(), v.to_string()));
     }
@@ -607,7 +607,7 @@ fn apply_goggles_without_ids_removes_cookie() {
 #[test]
 fn apply_goggles_rejects_non_numeric_ids() {
     let r = apply("?ids=abc", &[]);
-    assert!(cookie(&r, "active_goggles").map_or(true, |c| c.value() != "abc"));
+    assert!(cookie(&r, "active_goggles").is_none_or(|c| c.value() != "abc"));
 }
 
 /* ───────────────────────────── quick tune ───────────────────────────── */
@@ -617,7 +617,7 @@ fn qt_post(form: &str, existing: Option<&str>) -> LocalResponse<'static> {
     let mut req = c
         .post("/quick_tune_update")
         .header(ContentType::Form)
-        .body(form.to_string());
+        .body(form);
     if let Some(v) = existing {
         req = req.cookie(Cookie::new("prieco_qt_prefs", v.to_string()));
     }

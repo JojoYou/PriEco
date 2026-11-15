@@ -11,7 +11,7 @@ pub fn process_query(
 ) -> (QueryIntent, Option<(f32, f32)>) {
     // Clasifies intent of the query
     // It's also used to decide if we want to show map, products...
-    let possible_intent = intent(&query, lang);
+    let possible_intent = intent(query, lang);
 
     // Entities scan
     // Clarifies intent

@@ -53,7 +53,7 @@ pub async fn run(query: &str) -> Vec<ImgResult> {
     println!("Call!");
 
     let bing_result = CLIENT
-        .get(&format!(
+        .get(format!(
             "https://proxy.prieco.net/images/search?q={}",
             query,
         ))
@@ -167,15 +167,15 @@ fn replace_resulti(url: &str) -> String {
 
 fn encrypt_cache(query: &str, plaintext: &str) -> Result<Vec<u8>, aes_gcm::Error> {
     let key_bytes = derive_key(query);
-    let key = Key::<Aes256Gcm>::from_slice(&key_bytes);
-    let cipher = Aes256Gcm::new(key);
+    let key = Key::<Aes256Gcm>::try_from(&key_bytes[..]).unwrap();
+    let cipher = Aes256Gcm::new(&key);
 
     let mut nonce_bytes = [0u8; 12];
     rand::rng().fill(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    let nonce = Nonce::from(nonce_bytes);
 
     // Encrypt
-    let ciphertext = cipher.encrypt(nonce, plaintext.as_bytes())?;
+    let ciphertext = cipher.encrypt(&nonce, plaintext.as_bytes())?;
 
     let mut final_data = nonce.to_vec();
     final_data.extend_from_slice(&ciphertext);
@@ -189,13 +189,14 @@ fn decrypt_cache(query: &str, encrypted_data: &[u8]) -> Result<String, aes_gcm::
     }
 
     let key_bytes = derive_key(query);
-    let key = Key::<Aes256Gcm>::from_slice(&key_bytes);
-    let cipher = Aes256Gcm::new(key);
+    let key = Key::<Aes256Gcm>::try_from(&key_bytes[..]).unwrap();
+    let cipher = Aes256Gcm::new(&key);
 
     let (nonce_bytes, ciphertext) = encrypted_data.split_at(12);
-    let nonce = Nonce::from_slice(nonce_bytes);
 
-    let plaintext_bytes = cipher.decrypt(nonce, ciphertext)?;
+    let nonce = Nonce::try_from(nonce_bytes).unwrap();
+
+    let plaintext_bytes = cipher.decrypt(&nonce, ciphertext)?;
 
     Ok(String::from_utf8_lossy(&plaintext_bytes).into_owned())
 }

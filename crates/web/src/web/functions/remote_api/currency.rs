@@ -74,12 +74,11 @@ pub async fn get_fx_widget(q: &str) -> Option<FxWidget> {
         .unwrap()
         .as_secs();
 
-    if let Ok(Some(bytes)) = PRIECO_META.widgets_ks.get(cache_key.as_bytes()) {
-        if let Ok(c) = serde_json::from_slice::<CachedFx>(&bytes) {
-            if now.saturating_sub(c.timestamp) < 21600 {
-                return Some(c.data);
-            }
-        }
+    if let Ok(Some(bytes)) = PRIECO_META.widgets_ks.get(cache_key.as_bytes())
+        && let Ok(c) = serde_json::from_slice::<CachedFx>(&bytes)
+        && now.saturating_sub(c.timestamp) < 21600
+    {
+        return Some(c.data);
     }
 
     let start = (Utc::now() - Duration::days(30))
@@ -173,10 +172,10 @@ fn normalize_fx(s: &str) -> Option<&'static str> {
         return Some(code);
     }
 
-    if upper.len() == 3 {
-        if let Some(&code) = VALID_ISO_CODES.get(upper.as_str()) {
-            return Some(code);
-        }
+    if upper.len() == 3
+        && let Some(&code) = VALID_ISO_CODES.get(upper.as_str())
+    {
+        return Some(code);
     }
 
     None

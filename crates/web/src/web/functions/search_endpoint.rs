@@ -31,51 +31,52 @@ use crate::web::functions::{
     general::get_domain,
     ranking::goggles::GoggleRules,
     remote_api::{currency::get_fx_widget, img, news},
-    search_db,
+    search_db::{self, SearchDBParams},
 };
 use prieco_core::{EmbeddingService, SearchResult, url_to_domain_id};
 
 /// Description: Decides what kind of search to perform
 /// Input: Search type, Search query, Language, Location, Embedding service, Cookie jar
 /// Output: Search results in Rocket template format
-pub async fn run(
-    t: &str,
-    q: &str,
-    lang: &str,
-    loc: &str,
-    embedding_service: &State<EmbeddingService>,
-    goggles: Vec<Arc<GoggleRules>>,
-    user_qt_prefs: &UserQtPrefs,
-    mobile: bool,
-    decentralize: bool,
-) -> HashMap<String, Value> {
+pub struct EndParams<'r> {
+    pub t: &'r str,
+    pub q: &'r str,
+    pub lang: &'r str,
+    pub loc: &'r str,
+    pub embedding_service: &'r State<EmbeddingService>,
+    pub goggles: Vec<Arc<GoggleRules>>,
+    pub user_qt_prefs: &'r UserQtPrefs,
+    pub mobile: bool,
+    pub decentralize: bool,
+}
+pub async fn run(params: EndParams<'_>) -> HashMap<String, Value> {
     // Don't perform a search on bang
-    if q.contains("!") {
+    if params.q.contains("!") {
         return HashMap::new();
     }
 
     let mut context: HashMap<String, Value> = HashMap::with_capacity(100);
 
-    println!("Type: {}", t);
-    context.insert(String::from("type"), json!(t));
+    println!("Type: {}", params.t);
+    context.insert(String::from("type"), json!(params.t));
 
-    match t {
+    match params.t {
         "img" => {
             context.insert(String::from("img_results"), json!(true));
             context.insert(
                 String::from("images"),
-                json!(&img::run(&q.to_lowercase().replace(" ", "+")).await),
+                json!(&img::run(&params.q.to_lowercase().replace(" ", "+")).await),
             );
         }
         "new" => {
             context.insert(String::from("new_results"), json!(true));
-            match news::run(q, lang, loc, 50).await {
+            match news::run(params.q, params.lang, params.loc, 50).await {
                 Ok(n) => context.insert(String::from("news"), json!(&n)),
                 Err(_) => context.insert(
                     String::from("news"),
                     json!([{
                         "title": "No news found",
-                        "description":format!("We know nothing new about {}",q),
+                        "description":format!("We know nothing new about {}",params. q),
                         "url": "",
                         "domain": "PriEco",
                         "favicon": "",
@@ -86,17 +87,17 @@ pub async fn run(
         }
         "map" => {}
         _ => {
-            all_search(
-                &mut context,
-                q,
-                lang,
-                loc,
-                embedding_service,
-                goggles,
-                &user_qt_prefs,
-                mobile,
-                decentralize,
-            )
+            all_search(AllParams {
+                context: &mut context,
+                q: params.q,
+                lang: params.lang,
+                loc: params.loc,
+                embedding_service: params.embedding_service,
+                goggles: params.goggles,
+                user_qt_prefs: params.user_qt_prefs,
+                mobile: params.mobile,
+                decentralize: params.decentralize,
+            })
             .await;
         }
     }
@@ -174,39 +175,44 @@ pub fn get_user_qt_prefs(cookie_jar: &CookieJar<'_>) -> UserQtPrefs {
         .unwrap_or_default()
 }
 
-async fn all_search(
-    context: &mut HashMap<String, Value>,
-    q: &str,
-    lang: &str,
-    loc: &str,
-    embedding_service: &State<EmbeddingService>,
-    mut goggles: Vec<Arc<GoggleRules>>,
-    user_qt_prefs: &UserQtPrefs,
-    mobile: bool,
-    decentralize: bool,
-) {
+pub struct AllParams<'r> {
+    pub context: &'r mut HashMap<String, Value>,
+    pub q: &'r str,
+    pub lang: &'r str,
+    pub loc: &'r str,
+    pub embedding_service: &'r State<EmbeddingService>,
+    pub goggles: Vec<Arc<GoggleRules>>,
+    pub user_qt_prefs: &'r UserQtPrefs,
+    pub mobile: bool,
+    pub decentralize: bool,
+}
+async fn all_search(mut params: AllParams<'_>) {
     // Spell check
-    if let Some(suggestion) = spell_check_query(q) {
-        context.insert(String::from("did_you_mean"), json!(suggestion));
+    if let Some(suggestion) = spell_check_query(params.q) {
+        params
+            .context
+            .insert(String::from("did_you_mean"), json!(suggestion));
     }
 
-    context.insert(String::from("all_results"), json!(true)); // Set btn search type
+    params
+        .context
+        .insert(String::from("all_results"), json!(true)); // Set btn search type
 
     let mut results_vec: Vec<SearchResult> = Vec::with_capacity(100);
 
-    let user_rules = user_qt_prefs.into_goggle_rules();
-    goggles.push(Arc::new(user_rules));
+    let user_rules = params.user_qt_prefs.into_goggle_rules();
+    params.goggles.push(Arc::new(user_rules));
 
-    let _ = search_db::run(
-        &mut results_vec,
-        q,
-        lang,
-        loc,
-        &embedding_service,
-        goggles,
-        mobile,
-        decentralize,
-    )
+    let _ = search_db::run(SearchDBParams {
+        results: &mut results_vec,
+        query: params.q,
+        lang: params.lang,
+        loc: params.loc,
+        embedding_service: params.embedding_service,
+        goggles: params.goggles,
+        mobile: params.mobile,
+        decentralize: params.decentralize,
+    })
     .await; // Search database: Modify results + return confidence score
 
     // QUICK TUNE DOMAIN EXTRACTION
@@ -219,9 +225,9 @@ async fn all_search(
         if unique_domains.insert(domain.clone()) {
             qt_domains.push(QtDomainDisplay {
                 domain: domain.clone(),
-                is_boost: user_qt_prefs.boost.contains(&domain),
-                is_downrank: user_qt_prefs.downrank.contains(&domain),
-                is_discard: user_qt_prefs.discard.contains(&domain),
+                is_boost: params.user_qt_prefs.boost.contains(&domain),
+                is_downrank: params.user_qt_prefs.downrank.contains(&domain),
+                is_discard: params.user_qt_prefs.discard.contains(&domain),
             });
         }
     }
@@ -240,22 +246,30 @@ async fn all_search(
         }
     };
 
-    for d in &user_qt_prefs.boost {
+    for d in &params.user_qt_prefs.boost {
         add_saved(d, true, false, false);
     }
-    for d in &user_qt_prefs.downrank {
+    for d in &params.user_qt_prefs.downrank {
         add_saved(d, false, true, false);
     }
-    for d in &user_qt_prefs.discard {
+    for d in &params.user_qt_prefs.discard {
         add_saved(d, false, false, true);
     }
 
-    context.insert(String::from("qt_domains_count"), json!(qt_domains.len()));
-    context.insert(String::from("qt_domains"), json!(qt_domains));
-    context.insert(String::from("saved_qt_domains"), json!(saved_qt_domains));
+    params
+        .context
+        .insert(String::from("qt_domains_count"), json!(qt_domains.len()));
+    params
+        .context
+        .insert(String::from("qt_domains"), json!(qt_domains));
+    params
+        .context
+        .insert(String::from("saved_qt_domains"), json!(saved_qt_domains));
 
-    if let Some(fx_widget) = get_fx_widget(q).await {
-        context.insert(String::from("currency_widget"), json!(fx_widget));
+    if let Some(fx_widget) = get_fx_widget(params.q).await {
+        params
+            .context
+            .insert(String::from("currency_widget"), json!(fx_widget));
     }
 
     // If PriEco confidence is too low, use other indexes too
@@ -336,7 +350,9 @@ async fn all_search(
         );
     }*/
 
-    context.insert(String::from("results"), json!(&results_vec));
+    params
+        .context
+        .insert(String::from("results"), json!(&results_vec));
 
     /*
       External APIs

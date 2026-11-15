@@ -34,10 +34,7 @@ use prieco_core::globals::colors;
 /// Output: true if valid, false otherwise
 pub fn is_valid_url(input: &str) -> bool {
     match Url::parse(input) {
-        Ok(url) => match url.scheme() {
-            "http" | "https" => true,
-            _ => false,
-        },
+        Ok(url) => matches!(url.scheme(), "http" | "https"),
         Err(_) => false,
     }
 }

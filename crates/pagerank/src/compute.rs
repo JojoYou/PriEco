@@ -151,7 +151,7 @@ pub fn run() {
         let _ = remove_file(SCORES_A);
         let _ = remove_file(SCORES_B);
 
-        write_file(TOTAL_NODES, &total_nodes.to_string(), false);
+        write_file(TOTAL_NODES, total_nodes.to_string(), false);
     } else if has_new_connections && !has_existing_edges {
         total_nodes = match import() {
             Ok(c) => c,
@@ -160,7 +160,7 @@ pub fn run() {
                 return;
             }
         };
-        write_file(TOTAL_NODES, &total_nodes.to_string(), false);
+        write_file(TOTAL_NODES, total_nodes.to_string(), false);
     } else if std::env::var("REBUILD_CSR").is_ok() {
         total_nodes = match read_file(TOTAL_NODES).trim().parse() {
             Ok(t) => t,

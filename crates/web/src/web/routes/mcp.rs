@@ -19,7 +19,10 @@ use serde_json::{Value, json};
 /*
   Import own libraries
 */
-use crate::web::routes::{apis::api, pages::ClientIp};
+use crate::web::routes::{
+    apis::{APIParams, api},
+    pages::ClientIp,
+};
 use prieco_core::globals::EmbeddingService;
 
 #[post("/mcp?<a>", data = "<body>")]
@@ -60,13 +63,15 @@ pub async fn mcp(
 
             // Call API
             let response = api(
-                a,
-                args["lang"].as_str().unwrap_or("en"),
-                args["loc"].as_str().unwrap_or("us"),
-                args["query"].as_str().unwrap_or(""),
-                None,
-                None,
-                Some(true),
+                APIParams {
+                    a,
+                    lang: args["lang"].as_str().unwrap_or("en"),
+                    loc: args["loc"].as_str().unwrap_or("us"),
+                    q: args["query"].as_str().unwrap_or(""),
+                    goggles: None,
+                    dec: None,
+                    content: Some(true),
+                },
                 ClientIp(client_ip.0),
                 embedding_service,
             )

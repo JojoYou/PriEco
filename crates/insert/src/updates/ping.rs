@@ -25,18 +25,22 @@ impl PingDeadLinksUpdate {
         for _ in 0..retries {
             if let Ok(response) =
                 ASYNC_RUNTIME.block_on(async { PING_CLIENT.get(url).send().await })
-            {
-                if response.status().is_success()
+                && (response.status().is_success()
                     || response.status().as_u16() == 403
-                    || response.status().as_u16() == 401
-                {
-                    return true;
-                }
+                    || response.status().as_u16() == 401)
+            {
+                return true;
             }
 
             sleep(Duration::from_millis(500));
         }
         false
+    }
+}
+
+impl Default for PingDeadLinksUpdate {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

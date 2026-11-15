@@ -270,7 +270,7 @@ fn favicon_type_detection() {
 #[test]
 fn favicon_svg_marker_must_be_in_first_100_bytes() {
     let mut late = b"<?xml version=\"1.0\"?><!--".to_vec();
-    late.extend(std::iter::repeat(b'x').take(200));
+    late.extend(std::iter::repeat_n(b'x', 200));
     late.extend_from_slice(b"--><svg></svg>");
     let (_, ct, _) = fetch_favicon(&favicon_file(&late));
     assert_eq!(ct, Some(ContentType::Binary));
@@ -280,7 +280,7 @@ fn favicon_svg_marker_must_be_in_first_100_bytes() {
 fn favicon_svg_with_multibyte_char_at_byte_100_is_not_misdetected() {
     // byte 100 cuts a 2-byte char -> from_utf8 fails -> Binary (not a panic)
     let mut data = b"<svg".to_vec();
-    data.extend(std::iter::repeat(b'a').take(95));
+    data.extend(std::iter::repeat_n(b'a', 95));
     data.extend("ž".as_bytes());
     let (s, _, _) = fetch_favicon(&favicon_file(&data));
     assert_eq!(s, Status::Ok);

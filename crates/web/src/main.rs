@@ -52,7 +52,7 @@ use rocket::{
     Data, Request, Response,
     fairing::{AdHoc, Fairing, Info, Kind},
     fs::FileServer,
-    http::{Header, Status},
+    http::Header,
     main, routes,
 };
 use rocket_dyn_templates::Template;
@@ -103,7 +103,7 @@ impl Fairing for GlobalHeaders {
     async fn on_request(&self, req: &mut Request<'_>, _: &mut Data<'_>) {
         if req
             .host()
-            .map_or(false, |h| h.domain().as_str().ends_with(".onion"))
+            .is_some_and(|h| h.domain().as_str().ends_with(".onion"))
         {
             return;
         }
@@ -123,14 +123,14 @@ impl Fairing for GlobalHeaders {
         if jar.get("lang").is_none() && COUNTRY_TO_LANG.values().any(|l| *l == lang) {
             set_cookie(jar, "lang".into(), lang, false, true, true);
         }
-        if jar.get("loc").is_none() {
-            if let Some(r) = p.next().filter(|r| r.len() == 2) {
-                set_cookie(jar, "loc".into(), r.to_ascii_lowercase(), false, true, true);
-            }
+        if jar.get("loc").is_none()
+            && let Some(r) = p.next().filter(|r| r.len() == 2)
+        {
+            set_cookie(jar, "loc".into(), r.to_ascii_lowercase(), false, true, true);
         }
     }
 
-    async fn on_response<'r>(&self, req: &'r Request<'_>, res: &mut Response<'r>) {
+    async fn on_response<'r>(&self, _req: &'r Request<'_>, res: &mut Response<'r>) {
         // --- CORS headers ---
         res.set_header(Header::new("Access-Control-Allow-Origin", "*"));
         res.set_header(Header::new("Access-Control-Allow-Methods", "GET"));
@@ -164,6 +164,7 @@ impl Fairing for GlobalHeaders {
 /// Input: None
 /// Output: None
 #[main]
+#[allow(clippy::result_large_err)]
 async fn main() -> Result<(), rocket::Error> {
     // Disable foster parenting warning
     env_logger::Builder::from_env(Env::default().default_filter_or("warn"))
@@ -176,15 +177,14 @@ async fn main() -> Result<(), rocket::Error> {
 
     // Print banner
     println!(
-        "{}{}{}",
-        colors::GREEN,
-        r#"
+        "{}
      ____  ____  _  _____ ____ ____
-    /  __\/  __\/ \/  __//   _Y  _ \
-    |  \/||  \/|| ||  \  |  / | / \|
-    |  __/|    /| ||  /_ |  \_| \_/|
-    \_/   \_/\_\\_/\____\\____|____/
-    "#,
+    /  __\\/  __\\/ \\/  __//   _Y  _ \\
+    |  \\/||  \\/|| ||  \\  |  / | / \\|
+    |  __/|    /| ||  /_ |  \\_| \\_/|
+    \\_/   \\_/\\_\\\\_/\\____\\\\____|____/
+    {}",
+        colors::GREEN,
         colors::RESET
     );
     println!("Info:");
@@ -307,12 +307,11 @@ async fn main() -> Result<(), rocket::Error> {
                         "offline": pub_key_shutdown
                     });
 
-                    if let Ok(payload) = serde_json::to_vec(&offline_msg) {
-                        if let Ok(ticket) = gossip_shutdown.subscribe(topic_shutdown, vec![]).await
-                        {
-                            let (sender, _) = ticket.split();
-                            let _ = sender.broadcast(payload.into()).await;
-                        }
+                    if let Ok(payload) = serde_json::to_vec(&offline_msg)
+                        && let Ok(ticket) = gossip_shutdown.subscribe(topic_shutdown, vec![]).await
+                    {
+                        let (sender, _) = ticket.split();
+                        let _ = sender.broadcast(payload.into()).await;
                     }
 
                     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
@@ -427,11 +426,11 @@ async fn main() -> Result<(), rocket::Error> {
             "offline": pub_key_shutdown
         });
 
-        if let Ok(payload) = serde_json::to_vec(&offline_msg) {
-            if let Ok(ticket) = iroh_gossip.subscribe(topic_shutdown, vec![]).await {
-                let (sender, _) = ticket.split();
-                let _ = sender.broadcast(payload.into()).await;
-            }
+        if let Ok(payload) = serde_json::to_vec(&offline_msg)
+            && let Ok(ticket) = iroh_gossip.subscribe(topic_shutdown, vec![]).await
+        {
+            let (sender, _) = ticket.split();
+            let _ = sender.broadcast(payload.into()).await;
         }
 
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
@@ -616,7 +615,7 @@ fn create_embeder() -> Session {
         builder
     };
 
-    let mut session_builder = create_base_builder();
+    let session_builder = create_base_builder();
 
     #[cfg(feature = "cuda")]
     {

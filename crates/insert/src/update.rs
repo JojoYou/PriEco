@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     fs::{read_to_string, write},
-    hash::{BuildHasher, Hash, Hasher},
     io::{Read, Write},
     path::{Path, PathBuf},
 };
@@ -49,11 +48,11 @@ impl UpdateState {
 
         let mut merged: Vec<Range> = Vec::new();
         for current in ranges.drain(..) {
-            if let Some(last) = merged.last_mut() {
-                if current.start <= last.end + 1 {
-                    last.end = last.end.max(current.end);
-                    continue;
-                }
+            if let Some(last) = merged.last_mut()
+                && current.start <= last.end + 1
+            {
+                last.end = last.end.max(current.end);
+                continue;
             }
             merged.push(current);
         }
@@ -62,9 +61,9 @@ impl UpdateState {
     }
 
     pub fn processed(&self, id: &str, doc_id: u64) -> bool {
-        self.finished_ranges.get(id).map_or(false, |ranges| {
-            ranges.iter().any(|r| doc_id >= r.start && doc_id <= r.end)
-        })
+        self.finished_ranges
+            .get(id)
+            .is_some_and(|ranges| ranges.iter().any(|r| doc_id >= r.start && doc_id <= r.end))
     }
 
     pub fn finished(&self, id: &str) -> bool {
@@ -73,21 +72,20 @@ impl UpdateState {
             None => return false,
         };
 
-        if let Some(ranges) = self.finished_ranges.get(id) {
-            if let Some(first_range) = ranges.first() {
-                return first_range.start == 0 && first_range.end >= target;
-            }
+        if let Some(ranges) = self.finished_ranges.get(id)
+            && let Some(first_range) = ranges.first()
+        {
+            return first_range.start == 0 && first_range.end >= target;
         }
         false
     }
 
     pub fn unprocessed_id(&self, update_id: &str) -> u64 {
-        if let Some(ranges) = self.finished_ranges.get(update_id) {
-            if let Some(first_range) = ranges.first() {
-                if first_range.start == 0 {
-                    return first_range.end + 1;
-                }
-            }
+        if let Some(ranges) = self.finished_ranges.get(update_id)
+            && let Some(first_range) = ranges.first()
+            && first_range.start == 0
+        {
+            return first_range.end + 1;
         }
 
         0
@@ -216,9 +214,9 @@ impl UpdateEngine {
             }
 
             // Get items
-            let mut iter = meta_ks.range(current_item.to_be_bytes()..);
+            let iter = meta_ks.range(current_item.to_be_bytes()..);
             let mut processed_in_iter = 0;
-            while let Some(guard) = iter.next() {
+            for guard in iter {
                 let (key, value) = match guard.into_inner() {
                     Ok(kv) => kv,
                     Err(e) => {
@@ -389,7 +387,7 @@ impl UpdateEngine {
             };
 
             // Meta
-            let _ = PRIECO_META.meta_ks.insert(&id.to_be_bytes(), &compressed);
+            let _ = PRIECO_META.meta_ks.insert(id.to_be_bytes(), &compressed);
 
             // Tantivy
             tantivy_writer.delete_term(Term::from_field_u64(doc_id_field, *id));
@@ -410,17 +408,22 @@ impl UpdateEngine {
 
         for (id, url) in deleted {
             let meta_key = id.to_be_bytes();
-            let _ = PRIECO_META.meta_ks.remove(&meta_key);
+            let _ = PRIECO_META.meta_ks.remove(meta_key);
 
             let build_hasher = RandomState::with_seeds(SEARCHED_K1, SEARCHED_K2, 0, 0);
-            let mut hasher = build_hasher.build_hasher();
-            url.hash(&mut hasher);
-            let blob_id: u64 = hasher.finish();
+
+            let blob_id: u64 = build_hasher.hash_one(url);
 
             let blob_key = blob_id.to_le_bytes();
-            let _ = PRIECO_BLOBS.blobs_ks.remove(&blob_key);
+            let _ = PRIECO_BLOBS.blobs_ks.remove(blob_key);
 
             tantivy_writer.delete_term(Term::from_field_u64(doc_id_field, *id));
         }
+    }
+}
+
+impl Default for UpdateEngine {
+    fn default() -> Self {
+        Self::new()
     }
 }

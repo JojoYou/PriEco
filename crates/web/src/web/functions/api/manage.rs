@@ -50,10 +50,11 @@ pub fn free(ip: IpAddr) -> bool {
     // Get value
     let value = PRIECO_META.api_ks.get(&key).unwrap_or(None);
     let mut count: u8 = 0;
-    if let Some(v) = value {
-        if v.len() == 5 && v[0..4] == today {
-            count = v[4];
-        }
+    if let Some(v) = value
+        && v.len() == 5
+        && v[0..4] == today
+    {
+        count = v[4];
     }
 
     // Don't allow more
@@ -84,14 +85,13 @@ static CACHE: Lazy<Mutex<HashMap<String, Customer>>> = Lazy::new(|| Mutex::new(H
 // If POLAR is down, keep serving Cached keys
 fn stale(key: &str) -> Option<String> {
     let mut cache = CACHE.lock();
-    if let Some(customer) = cache.get_mut(key) {
-        if let Some(id) = &customer.id {
-            if customer.subscribed || customer.balance > 0 {
-                customer.balance -= 1;
-                customer.checked = Utc::now().timestamp() - CACHE_EXPIRE + 60;
-                return Some(id.clone());
-            }
-        }
+    if let Some(customer) = cache.get_mut(key)
+        && let Some(id) = &customer.id
+        && (customer.subscribed || customer.balance > 0)
+    {
+        customer.balance -= 1;
+        customer.checked = Utc::now().timestamp() - CACHE_EXPIRE + 60;
+        return Some(id.clone());
     }
     None
 }
@@ -104,12 +104,12 @@ pub async fn paid(key: &str) -> Option<String> {
         if let Some(customer) = cache.get_mut(key) {
             // Invalidate key after 5 min to recheck with POLAR.sh
             if now - customer.checked < CACHE_EXPIRE {
-                if let Some(id) = &customer.id {
-                    if customer.subscribed || customer.balance > 0 {
-                        // Changed and given access
-                        customer.balance -= 1;
-                        return Some(id.clone());
-                    }
+                if let Some(id) = &customer.id
+                    && (customer.subscribed || customer.balance > 0)
+                {
+                    // Changed and given access
+                    customer.balance -= 1;
+                    return Some(id.clone());
                 }
 
                 return None; // Not given access
@@ -142,7 +142,7 @@ pub async fn paid(key: &str) -> Option<String> {
     let status = result.status().as_u16();
 
     // Invalid key: Cache to stop calling POLAR.sh
-    if status >= 400 && status <= 499 && status != 429 {
+    if (400..=499).contains(&status) && status != 429 {
         let mut cache = CACHE.lock();
         if cache.len() > 100_000 {
             cache.clear();
@@ -162,7 +162,7 @@ pub async fn paid(key: &str) -> Option<String> {
         return None;
     }
     // Something else went wrong
-    else if status < 200 || status >= 300 {
+    else if !(200..300).contains(&status) {
         return stale(key);
     }
 

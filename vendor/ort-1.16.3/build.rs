@@ -273,7 +273,7 @@ fn extract_archive(filename: &Path, output: &Path) {
 
 #[cfg(all(feature = "download-binaries", not(target_os = "windows")))]
 fn extract_tgz(filename: &Path, output: &Path) {
-    let file = fs::File::open(&filename).unwrap();
+    let file = fs::File::open(filename).unwrap();
     let buf = io::BufReader::new(file);
     let tar = flate2::read::GzDecoder::new(buf);
     let mut archive = tar::Archive::new(tar);
@@ -319,8 +319,8 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 
     let lib_files = fs::read_dir(lib_dir).unwrap();
     for lib_file in lib_files.filter(|e| {
-        e.as_ref().ok().map_or(false, |e| {
-            e.file_type().map_or(false, |e| !e.is_dir())
+        e.as_ref().ok().is_some_and(|e| {
+            e.file_type().is_ok_and(|e| !e.is_dir())
                 && [".dll", ".so", ".dylib"]
                     .into_iter()
                     .any(|v| e.path().into_os_string().into_string().unwrap().contains(v))
@@ -396,7 +396,9 @@ fn system_strategy() -> (PathBuf, bool) {
         println!("cargo:rustc-link-lib=static=onnxruntime");
         needs_link = false;
     } else {
-        let static_configs: Vec<(PathBuf, PathBuf, Box<dyn Fn(PathBuf, &String) -> PathBuf>)> = vec![
+        type PathResolver = Box<dyn Fn(PathBuf, &String) -> PathBuf>;
+
+        let static_configs: Vec<(PathBuf, PathBuf, PathResolver)> = vec![
             (
                 lib_dir.join(&profile),
                 lib_dir.join("_deps"),
@@ -689,7 +691,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 
             let mut command = Command::new(python);
             command
-                .current_dir(&out_dir.join(ORT_GIT_DIR))
+                .current_dir(out_dir.join(ORT_GIT_DIR))
                 .stdout(Stdio::null())
                 .stderr(Stdio::inherit());
 
