@@ -48,7 +48,10 @@ fn date_of_crawling_is_today_yymmdd() {
     let m = meta(&page("<title>T</title>", ""));
     assert_eq!(m.date_of_crawling.len(), 6);
     assert!(m.date_of_crawling.chars().all(|c| c.is_ascii_digit()));
-    assert_eq!(m.date_of_crawling, chrono::Local::now().format("%y%m%d").to_string());
+    assert_eq!(
+        m.date_of_crawling,
+        chrono::Local::now().format("%y%m%d").to_string()
+    );
 }
 
 #[test]
@@ -71,7 +74,10 @@ fn title_prefers_og_site_name() {
 
 #[test]
 fn title_og_site_name_without_content_falls_back() {
-    let m = meta(&page("<meta property='og:site_name'><title>Page Title</title>", ""));
+    let m = meta(&page(
+        "<meta property='og:site_name'><title>Page Title</title>",
+        "",
+    ));
     assert_eq!(m.title, "Page Title");
 }
 
@@ -151,13 +157,19 @@ fn description_prefers_og_description() {
 
 #[test]
 fn description_from_meta_description() {
-    let m = meta(&page("<meta name='description' content='Meta desc'>", "<p>Para</p>"));
+    let m = meta(&page(
+        "<meta name='description' content='Meta desc'>",
+        "<p>Para</p>",
+    ));
     assert_eq!(m.description, "Meta desc");
 }
 
 #[test]
 fn description_falls_back_to_first_paragraph() {
-    let m = meta(&page("<title>T</title>", "<p>  First para  </p><p>Second</p>"));
+    let m = meta(&page(
+        "<title>T</title>",
+        "<p>  First para  </p><p>Second</p>",
+    ));
     assert_eq!(m.description, "First para");
 }
 
@@ -179,14 +191,20 @@ fn description_empty_when_only_title_like_paragraph() {
 #[test]
 fn description_longer_than_160_is_truncated() {
     let d = "d".repeat(200);
-    let m = meta(&page(&format!("<meta name='description' content='{}'>", d), ""));
+    let m = meta(&page(
+        &format!("<meta name='description' content='{}'>", d),
+        "",
+    ));
     assert_eq!(m.description, format!("{}...", "d".repeat(157)));
 }
 
 #[test]
 fn description_of_exactly_160_is_kept() {
     let d = "d".repeat(160);
-    let m = meta(&page(&format!("<meta name='description' content='{}'>", d), ""));
+    let m = meta(&page(
+        &format!("<meta name='description' content='{}'>", d),
+        "",
+    ));
     assert_eq!(m.description, d);
 }
 
@@ -217,7 +235,10 @@ fn description_found_after_charset_meta() {
 
 #[test]
 fn text_comes_from_headings_and_paragraphs() {
-    let m = meta(&page("", "<h2>Head</h2><p>Body text</p><span>not content</span>"));
+    let m = meta(&page(
+        "",
+        "<h2>Head</h2><p>Body text</p><span>not content</span>",
+    ));
     assert!(m.text.contains("Head"));
     assert!(m.text.contains("Body text"));
     assert!(!m.text.contains("not content"));
@@ -254,7 +275,10 @@ fn text_limit_is_char_based_for_multibyte() {
 
 #[test]
 fn keywords_from_meta_keywords() {
-    let m = meta(&page("<meta name='keywords' content='rust, search, privacy'>", ""));
+    let m = meta(&page(
+        "<meta name='keywords' content='rust, search, privacy'>",
+        "",
+    ));
     assert_eq!(m.keywords, "rust, search, privacy");
 }
 
@@ -293,7 +317,11 @@ fn image_is_first_absolute_image() {
         "",
         "<img src='/relative.png'><img src='https://cdn.example.com/first.png'><img src='https://cdn.example.com/second.png'>",
     ));
-    assert!(m.img.starts_with("https://cdn.example.com/first.png"), "{}", m.img);
+    assert!(
+        m.img.starts_with("https://cdn.example.com/first.png"),
+        "{}",
+        m.img
+    );
 }
 
 #[test]
@@ -378,7 +406,10 @@ fn geoip_database_is_embedded_and_parses() {
 
 #[test]
 fn clean_page_is_safe() {
-    let m = meta(&page("<title>Cooking</title>", "<p>How to bake bread at home</p>"));
+    let m = meta(&page(
+        "<title>Cooking</title>",
+        "<p>How to bake bread at home</p>",
+    ));
     assert!(!m.safe_search);
 }
 
@@ -449,8 +480,12 @@ fn uppercase_entries_in_bad_word_list_can_match() {
 
 #[test]
 fn html_result_bincode_roundtrip() {
-    let m = meta(&page("<title>T</title><meta name='keywords' content='k'>", "<p>Body</p>"));
-    let bytes = bincode_next::serde::encode_to_vec(&vec![m], bincode_next::config::standard()).unwrap();
+    let m = meta(&page(
+        "<title>T</title><meta name='keywords' content='k'>",
+        "<p>Body</p>",
+    ));
+    let bytes =
+        bincode_next::serde::encode_to_vec(&vec![m], bincode_next::config::standard()).unwrap();
     let (back, _): (Vec<HTMLResultData>, usize) =
         bincode_next::serde::decode_from_slice(&bytes, bincode_next::config::standard()).unwrap();
     assert_eq!(back.len(), 1);
@@ -477,7 +512,9 @@ fn worker_batch_response_bincode_roundtrip() {
 fn html_result_bincode_rejects_truncated_input() {
     let m = meta(&page("<title>T</title>", "<p>Body</p>"));
     let bytes = bincode_next::serde::encode_to_vec(&m, bincode_next::config::standard()).unwrap();
-    let r: Result<(HTMLResultData, usize), _> =
-        bincode_next::serde::decode_from_slice(&bytes[..bytes.len() / 2], bincode_next::config::standard());
+    let r: Result<(HTMLResultData, usize), _> = bincode_next::serde::decode_from_slice(
+        &bytes[..bytes.len() / 2],
+        bincode_next::config::standard(),
+    );
     assert!(r.is_err());
 }

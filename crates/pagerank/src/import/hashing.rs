@@ -28,7 +28,7 @@ use prieco_core::{
 };
 
 /// Description: Classical call, split like this so that the tests could call it with custom paths
-/// 
+///
 /// Input: None
 /// Output: Result shards paths
 pub fn run() -> Result<Vec<String>, Box<dyn std::error::Error>> {

@@ -67,7 +67,12 @@ fn tokenizer_positions_are_sequential_over_words_only() {
 
 #[test]
 fn tokenizer_offsets_are_valid_for_multibyte_text() {
-    for text in ["Žltý kôň úpel ďábelské ódy", "日本語のテキストです", "مرحبا بالعالم", "🐴 horse 🐴"] {
+    for text in [
+        "Žltý kôň úpel ďábelské ódy",
+        "日本語のテキストです",
+        "مرحبا بالعالم",
+        "🐴 horse 🐴",
+    ] {
         let t = tokens(text);
         assert!(!t.is_empty(), "{}", text);
         for tok in &t {
@@ -82,7 +87,11 @@ fn tokenizer_offsets_are_valid_for_multibyte_text() {
 #[test]
 fn tokenizer_segments_chinese_without_spaces() {
     let t = tokens("我喜欢搜索引擎");
-    assert!(t.len() >= 2, "expected word segmentation, got {} tokens", t.len());
+    assert!(
+        t.len() >= 2,
+        "expected word segmentation, got {} tokens",
+        t.len()
+    );
 }
 
 #[test]
@@ -107,7 +116,11 @@ const SYNONYM_LANGS: &[&str] = &[
 #[test]
 fn synonym_store_loads_for_every_embedded_language() {
     for lang in SYNONYM_LANGS {
-        assert!(get_store(lang).is_some(), "synonyms for {} failed to decode", lang);
+        assert!(
+            get_store(lang).is_some(),
+            "synonyms for {} failed to decode",
+            lang
+        );
     }
 }
 
@@ -136,7 +149,9 @@ fn synonym_store_is_cached() {
 #[test]
 fn synonym_store_cache_is_safe_across_threads() {
     let handles: Vec<_> = (0..8)
-        .map(|i| std::thread::spawn(move || get_store(SYNONYM_LANGS[i % SYNONYM_LANGS.len()]).is_some()))
+        .map(|i| {
+            std::thread::spawn(move || get_store(SYNONYM_LANGS[i % SYNONYM_LANGS.len()]).is_some())
+        })
         .collect();
     for h in handles {
         assert!(h.join().unwrap());
@@ -153,17 +168,21 @@ fn synonym_lookup_unknown_term_is_none() {
 #[test]
 fn synonym_lookup_common_english_words_have_synonyms() {
     let store = get_store("en").unwrap();
-    let found = ["car", "big", "happy", "house", "fast", "good", "small", "buy"]
-        .iter()
-        .filter(|w| store.lookup(w).map_or(false, |s| !s.is_empty()))
-        .count();
+    let found = [
+        "car", "big", "happy", "house", "fast", "good", "small", "buy",
+    ]
+    .iter()
+    .filter(|w| store.lookup(w).map_or(false, |s| !s.is_empty()))
+    .count();
     assert!(found > 0, "no synonyms for any common English word");
 }
 
 #[test]
 fn synonym_lookup_never_returns_empty_strings() {
     let store = get_store("en").unwrap();
-    for w in ["car", "big", "happy", "house", "fast", "good", "small", "buy", "run", "go"] {
+    for w in [
+        "car", "big", "happy", "house", "fast", "good", "small", "buy", "run", "go",
+    ] {
         if let Some(syns) = store.lookup(w) {
             for s in syns {
                 assert!(!s.is_empty(), "empty synonym for {}", w);
@@ -215,9 +234,15 @@ fn en_intent(q: &str) -> Option<QueryIntent> {
 
 #[test]
 fn matchers_english_keywords_map_to_their_intent() {
-    assert_eq!(en_intent("how to cook rice"), Some(QueryIntent::Informational));
+    assert_eq!(
+        en_intent("how to cook rice"),
+        Some(QueryIntent::Informational)
+    );
     assert_eq!(en_intent("buy shoes"), Some(QueryIntent::Transactional));
-    assert_eq!(en_intent("cheap flights"), Some(QueryIntent::CommercialInvestigation));
+    assert_eq!(
+        en_intent("cheap flights"),
+        Some(QueryIntent::CommercialInvestigation)
+    );
     assert_eq!(en_intent("pizza near me"), Some(QueryIntent::Local));
     assert_eq!(en_intent("gmail login"), Some(QueryIntent::Navigational));
 }
@@ -327,7 +352,11 @@ fn entity_places_registry_contains_capitalised_keys() {
         .get("Trnava pri Laborci")
         .expect("place missing in registry");
     assert!(!coords.is_empty());
-    assert!(coords.iter().any(|c| c.country.as_str().eq_ignore_ascii_case("sk")));
+    assert!(
+        coords
+            .iter()
+            .any(|c| c.country.as_str().eq_ignore_ascii_case("sk"))
+    );
 }
 
 /// BUG (data): the NAME list contains plain English words ("the", "how", "to",
@@ -335,7 +364,9 @@ fn entity_places_registry_contains_capitalised_keys() {
 /// as a person, which flips intents and blocks spell checking.
 #[test]
 fn common_words_are_not_person_names() {
-    for w in ["the", "how", "to", "show", "car", "cat", "red", "tomorrow", "bake"] {
+    for w in [
+        "the", "how", "to", "show", "car", "cat", "red", "tomorrow", "bake",
+    ] {
         let tags = QU_PIPELINE.get_tags(w);
         assert!(
             !tags.iter().any(|t| t.entity_type == EntityType::PersonName),
@@ -401,7 +432,11 @@ fn spell_checker_corrects_common_typos() {
 
 #[test]
 fn spell_checker_unknown_word_with_zero_distance_has_no_suggestion() {
-    assert!(SPELL_CHECKER.lookup("zzqqxxyy", Verbosity::Top, 0).is_empty());
+    assert!(
+        SPELL_CHECKER
+            .lookup("zzqqxxyy", Verbosity::Top, 0)
+            .is_empty()
+    );
 }
 
 /* ───────────────────────────── Embedded model files ───────────────────────────── */

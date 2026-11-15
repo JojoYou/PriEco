@@ -461,16 +461,28 @@ fn ping_update_deletes_unparsable_urls_without_network() {
     let u = PingDeadLinksUpdate::new();
     for url in ["", "not a url", "example.com", "/relative"] {
         let mut d = doc(url);
-        assert!(matches!(u.apply(&mut d), UpdateAction::Deleted), "{:?}", url);
+        assert!(
+            matches!(u.apply(&mut d), UpdateAction::Deleted),
+            "{:?}",
+            url
+        );
     }
 }
 
 #[test]
 fn ping_update_deletes_urls_without_host_without_network() {
     let u = PingDeadLinksUpdate::new();
-    for url in ["mailto:someone@example.com", "data:text/plain,hi", "file:///etc/hosts"] {
+    for url in [
+        "mailto:someone@example.com",
+        "data:text/plain,hi",
+        "file:///etc/hosts",
+    ] {
         let mut d = doc(url);
-        assert!(matches!(u.apply(&mut d), UpdateAction::Deleted), "{:?}", url);
+        assert!(
+            matches!(u.apply(&mut d), UpdateAction::Deleted),
+            "{:?}",
+            url
+        );
     }
 }
 

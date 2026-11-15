@@ -43,11 +43,7 @@ fn key(ip: IpAddr) -> Vec<u8> {
 }
 
 fn stored(ip: IpAddr) -> Option<Vec<u8>> {
-    PRIECO_META
-        .api_ks
-        .get(key(ip))
-        .unwrap()
-        .map(|v| v.to_vec())
+    PRIECO_META.api_ks.get(key(ip)).unwrap().map(|v| v.to_vec())
 }
 
 fn use_up(ip: IpAddr) {
@@ -215,6 +211,10 @@ async fn flush_keeps_duplicates() {
     flush().await;
 
     // Every call is one billed event, duplicates must stay
-    let count = API_BILLING_QUEUE.lock().iter().filter(|q| **q == id).count();
+    let count = API_BILLING_QUEUE
+        .lock()
+        .iter()
+        .filter(|q| **q == id)
+        .count();
     assert_eq!(count, 3);
 }

@@ -5,7 +5,7 @@ use std::fs;
 
 use rocket::http::{ContentType, Status};
 
-use crate::support::{client, init, serve, http};
+use crate::support::{client, http, init, serve};
 use crate::web::routes::apis::{self, cache_ver, om_sug, proxy_get, proxy_post};
 
 async fn get_status(u: &str) -> Result<(ContentType, Vec<u8>), Status> {
@@ -22,9 +22,26 @@ async fn post_status(u: &str) -> Result<(ContentType, Vec<u8>), Status> {
 
 #[tokio::test]
 async fn proxy_unparsable_urls_are_bad_request() {
-    for u in ["", "not a url", "/relative.png", "//example.com/a.png", "http://", "http://exa mple.com/"] {
-        assert_eq!(get_status(u).await.unwrap_err(), Status::BadRequest, "{:?}", u);
-        assert_eq!(post_status(u).await.unwrap_err(), Status::BadRequest, "{:?}", u);
+    for u in [
+        "",
+        "not a url",
+        "/relative.png",
+        "//example.com/a.png",
+        "http://",
+        "http://exa mple.com/",
+    ] {
+        assert_eq!(
+            get_status(u).await.unwrap_err(),
+            Status::BadRequest,
+            "{:?}",
+            u
+        );
+        assert_eq!(
+            post_status(u).await.unwrap_err(),
+            Status::BadRequest,
+            "{:?}",
+            u
+        );
     }
 }
 
@@ -38,7 +55,9 @@ async fn proxy_invalid_percent_encoding_is_bad_request() {
 async fn proxy_accepts_percent_encoded_target() {
     // encoded loopback url is decoded first and then rejected by the SSRF guard
     assert_eq!(
-        get_status("http%3A%2F%2F127.0.0.1%2Fa.png").await.unwrap_err(),
+        get_status("http%3A%2F%2F127.0.0.1%2Fa.png")
+            .await
+            .unwrap_err(),
         Status::Forbidden
     );
 }
@@ -47,14 +66,24 @@ async fn proxy_accepts_percent_encoded_target() {
 
 #[tokio::test]
 async fn proxy_rejects_non_http_schemes() {
-    for u in ["ftp://example.com/a.png", "file:///etc/passwd", "gopher://example.com/", "javascript:alert(1)", "data:image/png;base64,AAAA"] {
+    for u in [
+        "ftp://example.com/a.png",
+        "file:///etc/passwd",
+        "gopher://example.com/",
+        "javascript:alert(1)",
+        "data:image/png;base64,AAAA",
+    ] {
         assert_eq!(get_status(u).await.unwrap_err(), Status::Forbidden, "{}", u);
     }
 }
 
 #[tokio::test]
 async fn proxy_rejects_credentials_in_url() {
-    for u in ["http://user:pw@example.com/a.png", "https://user@example.com/a.png", "https://:pw@example.com/"] {
+    for u in [
+        "http://user:pw@example.com/a.png",
+        "https://user@example.com/a.png",
+        "https://:pw@example.com/",
+    ] {
         assert_eq!(get_status(u).await.unwrap_err(), Status::Forbidden, "{}", u);
     }
 }
@@ -79,7 +108,12 @@ async fn proxy_rejects_internal_ipv4() {
         "http://203.0.113.1/",
     ] {
         assert_eq!(get_status(u).await.unwrap_err(), Status::Forbidden, "{}", u);
-        assert_eq!(post_status(u).await.unwrap_err(), Status::Forbidden, "{}", u);
+        assert_eq!(
+            post_status(u).await.unwrap_err(),
+            Status::Forbidden,
+            "{}",
+            u
+        );
     }
 }
 
@@ -101,15 +135,25 @@ async fn proxy_rejects_internal_ipv6() {
 
 #[tokio::test]
 async fn proxy_rejects_localhost_names() {
-    for u in ["http://localhost/", "http://LOCALHOST:8080/x.png", "http://localhost./"] {
+    for u in [
+        "http://localhost/",
+        "http://LOCALHOST:8080/x.png",
+        "http://localhost./",
+    ] {
         assert_eq!(get_status(u).await.unwrap_err(), Status::Forbidden, "{}", u);
     }
 }
 
 #[tokio::test]
 async fn proxy_rejects_explicit_port_on_internal_host() {
-    assert_eq!(get_status("http://127.0.0.1:22/").await.unwrap_err(), Status::Forbidden);
-    assert_eq!(get_status("https://10.0.0.5:8443/a.js").await.unwrap_err(), Status::Forbidden);
+    assert_eq!(
+        get_status("http://127.0.0.1:22/").await.unwrap_err(),
+        Status::Forbidden
+    );
+    assert_eq!(
+        get_status("https://10.0.0.5:8443/a.js").await.unwrap_err(),
+        Status::Forbidden
+    );
 }
 
 #[tokio::test]
@@ -117,7 +161,12 @@ async fn proxy_never_reaches_a_local_server() {
     let port = serve(1, |_| http("200 OK", "image/png", b"\x89PNG\r\n\x1a\n"));
     for host in ["127.0.0.1", "localhost", "[::ffff:127.0.0.1]"] {
         let u = format!("http://{}:{}/a.png", host, port);
-        assert_eq!(get_status(&u).await.unwrap_err(), Status::Forbidden, "{}", u);
+        assert_eq!(
+            get_status(&u).await.unwrap_err(),
+            Status::Forbidden,
+            "{}",
+            u
+        );
     }
 }
 
@@ -126,12 +175,17 @@ fn proxy_route_rejects_through_rocket() {
     let c = client(rocket::routes![apis::proxy_get, apis::proxy_post]);
     let r = c.get("/proxy?u=http%3A%2F%2F127.0.0.1%2Fx.png").dispatch();
     assert_eq!(r.status(), Status::Forbidden);
-    let r = c.post("/proxy?u=http%3A%2F%2F10.0.0.1%2F").body("{}").dispatch();
+    let r = c
+        .post("/proxy?u=http%3A%2F%2F10.0.0.1%2F")
+        .body("{}")
+        .dispatch();
     assert_eq!(r.status(), Status::Forbidden);
     let r = c.get("/proxy?u=nonsense").dispatch();
     assert_eq!(r.status(), Status::BadRequest);
     // width/height must be numbers
-    let r = c.get("/proxy?u=http%3A%2F%2F127.0.0.1%2F&width=abc").dispatch();
+    let r = c
+        .get("/proxy?u=http%3A%2F%2F127.0.0.1%2F&width=abc")
+        .dispatch();
     assert_ne!(r.status(), Status::Ok);
     // `u` is mandatory
     let r = c.get("/proxy").dispatch();
@@ -171,9 +225,18 @@ fn feedback(return_path: &str) -> (Status, String) {
     let r = c
         .post("/submit_msg")
         .header(ContentType::Form)
-        .body(format!("message=hello&return_path={}", urlencoding::encode(return_path)))
+        .body(format!(
+            "message=hello&return_path={}",
+            urlencoding::encode(return_path)
+        ))
         .dispatch();
-    (r.status(), r.headers().get_one("Location").unwrap_or_default().to_string())
+    (
+        r.status(),
+        r.headers()
+            .get_one("Location")
+            .unwrap_or_default()
+            .to_string(),
+    )
 }
 
 #[test]
@@ -186,7 +249,11 @@ fn feedback_without_signal_config_redirects_back() {
 #[test]
 fn feedback_requires_both_fields() {
     let c = client(rocket::routes![apis::send_signal]);
-    let r = c.post("/submit_msg").header(ContentType::Form).body("message=hi").dispatch();
+    let r = c
+        .post("/submit_msg")
+        .header(ContentType::Form)
+        .body("message=hi")
+        .dispatch();
     assert_eq!(r.status(), Status::UnprocessableEntity);
 }
 
@@ -195,6 +262,10 @@ fn feedback_requires_both_fields() {
 fn feedback_refuses_off_site_redirects() {
     for target in ["https://evil.example/phish", "//evil.example"] {
         let (_, loc) = feedback(target);
-        assert!(loc.starts_with('/') && !loc.starts_with("//"), "redirected to {}", loc);
+        assert!(
+            loc.starts_with('/') && !loc.starts_with("//"),
+            "redirected to {}",
+            loc
+        );
     }
 }

@@ -46,7 +46,13 @@ fn wizard_env_save_load_and_repair_cycle() {
     assert!(c.enable_mini_crawler && c.enable_index_updater && c.enable_web_server);
 
     // directories are created
-    for d in ["data1/tantivy", "data1/meta", "data1/vectors", "data1/blob", "config"] {
+    for d in [
+        "data1/tantivy",
+        "data1/meta",
+        "data1/vectors",
+        "data1/blob",
+        "config",
+    ] {
         assert!(root.join(d).is_dir(), "{} not created", d);
     }
     // and the config is persisted as JSON
@@ -61,7 +67,10 @@ fn wizard_env_save_load_and_repair_cycle() {
     assert_eq!(c.ip, "127.0.0.1");
     assert_eq!(c.port, 8081);
     assert_eq!(c.tantivy_path, "data1/tantivy");
-    assert!(!root.join("data2").exists(), "loading must not create new dirs");
+    assert!(
+        !root.join("data2").exists(),
+        "loading must not create new dirs"
+    );
 
     /* 3: missing enable_* flags in an old config default to true, explicit false kept */
     fs::write(
@@ -86,7 +95,12 @@ fn wizard_env_save_load_and_repair_cycle() {
 
     /* 5: IP addresses are normalised */
     fs::remove_file("config/settings.conf").unwrap();
-    set_env("0000:0000:0000:0000:0000:0000:0000:0001", "80", "1", "data4");
+    set_env(
+        "0000:0000:0000:0000:0000:0000:0000:0001",
+        "80",
+        "1",
+        "data4",
+    );
     assert_eq!(set_up_wizard().ip, "::1");
 
     fs::remove_file("config/settings.conf").unwrap();

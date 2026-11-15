@@ -18,7 +18,11 @@ use crate::web::functions::ranking::goggles::{Goggle, put};
 use crate::web::modules::settings;
 
 #[get("/probe?<ip>&<host>")]
-fn probe(ip: Option<String>, host: Option<String>, jar: &CookieJar<'_>) -> Json<HashMap<String, Value>> {
+fn probe(
+    ip: Option<String>,
+    host: Option<String>,
+    jar: &CookieJar<'_>,
+) -> Json<HashMap<String, Value>> {
     let mut ctx = HashMap::new();
     let ip: Option<IpAddr> = ip.and_then(|s| s.parse().ok());
     let host = host.unwrap_or_else(|| "prieco.net".to_string());
@@ -69,7 +73,14 @@ fn defaults_without_ip_or_cookies() {
     assert_eq!(p.s("css_theme"), "/static/css/system/");
     assert_eq!(p.s("goggles_ids"), "");
     assert!(p.ctx.get("goggles").unwrap().is_array());
-    for k in ["osd_title", "check_newtab", "newtab", "check_js", "check_post", "check_dec"] {
+    for k in [
+        "osd_title",
+        "check_newtab",
+        "newtab",
+        "check_js",
+        "check_post",
+        "check_dec",
+    ] {
         assert!(!p.ctx.contains_key(k), "{}", k);
     }
     assert!(p.cookie("loc").is_none(), "no ip -> no location cookie");
@@ -88,7 +99,13 @@ fn ip_location_is_detected_and_lowercased() {
 
 #[test]
 fn unknown_or_empty_country_falls_back_to_all() {
-    for ip in ["2.0.0.1", "9.9.9.9", "255.255.255.254", "::1", "2001:db8::1"] {
+    for ip in [
+        "2.0.0.1",
+        "9.9.9.9",
+        "255.255.255.254",
+        "::1",
+        "2001:db8::1",
+    ] {
         let p = run(&format!("ip={}", ip), &[]);
         assert_eq!(p.cookie("loc"), Some("all"), "{}", ip);
     }
@@ -112,7 +129,10 @@ fn location_cookie_attributes() {
 #[test]
 fn existing_location_cookie_is_respected() {
     let p = run("ip=1.0.0.7", &[("loc", "de")]);
-    assert!(p.cookie("loc").is_none(), "must not overwrite the user's choice");
+    assert!(
+        p.cookie("loc").is_none(),
+        "must not overwrite the user's choice"
+    );
     assert_eq!(p.s("selected_loc"), "de");
 }
 
@@ -127,7 +147,14 @@ fn onion_host_never_geolocates() {
 
 #[test]
 fn language_is_derived_from_location_cookie() {
-    for (loc, lang) in [("at", "de"), ("sk", "sk"), ("us", "en"), ("cn", "all"), ("zz", "all"), ("all", "all")] {
+    for (loc, lang) in [
+        ("at", "de"),
+        ("sk", "sk"),
+        ("us", "en"),
+        ("cn", "all"),
+        ("zz", "all"),
+        ("all", "all"),
+    ] {
         let p = run("", &[("loc", loc)]);
         assert_eq!(p.cookie("lang"), Some(lang), "{}", loc);
     }
@@ -154,8 +181,16 @@ fn existing_language_cookie_is_respected() {
 fn first_visit_applies_detected_location_and_language() {
     let p = run("ip=1.0.0.7", &[]);
     assert_eq!(p.cookie("loc"), Some("sk"));
-    assert_eq!(p.s("selected_loc"), "sk", "page rendered with stale location");
-    assert_eq!(p.cookie("lang"), Some("sk"), "language not detected on first visit");
+    assert_eq!(
+        p.s("selected_loc"),
+        "sk",
+        "page rendered with stale location"
+    );
+    assert_eq!(
+        p.cookie("lang"),
+        Some("sk"),
+        "language not detected on first visit"
+    );
 }
 
 /* ───────────────────────────── appearance flags ───────────────────────────── */
@@ -235,7 +270,10 @@ fn public_goggles_are_listed_and_marked_checked() {
 
     let p = run("", &[("active_goggles", &g.id.to_string())]);
     let list = p.ctx["goggles"].as_array().unwrap();
-    let entry = list.iter().find(|e| e["id"] == g.id).expect("public goggle missing");
+    let entry = list
+        .iter()
+        .find(|e| e["id"] == g.id)
+        .expect("public goggle missing");
     assert_eq!(entry["name"], "Listed");
     assert_eq!(entry["author"], "Tester");
     assert_eq!(entry["source_url"], "https://example.com/x.goggle");

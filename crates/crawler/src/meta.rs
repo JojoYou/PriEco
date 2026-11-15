@@ -184,7 +184,7 @@ pub fn extract_metadata(
 }
 
 /// Description: Extract title text from html
-/// 
+///
 /// Input: document
 /// Output: title as String
 fn extract_title(

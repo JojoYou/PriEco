@@ -4,7 +4,7 @@ use scraper::{Html, Selector};
 use crate::mini_crawler::{PARSER_SELECTORS, is_valid_url};
 
 /// Description: extract data from html documnet and format them to tag_data
-/// 
+///
 /// Input: document
 /// Output: tag_data
 pub fn extract_tag_data(document: &Html) -> AHashMap<String, Vec<String>> {

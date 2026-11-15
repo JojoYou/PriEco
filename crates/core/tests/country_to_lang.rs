@@ -185,7 +185,19 @@ fn real_iso_country_codes_are_mapped() {
 /// countries whose official language is NOT what the map returns.
 #[test]
 fn language_codes_used_as_country_codes_map_to_wrong_countries() {
-    assert_ne!(lang("sv"), Some("sv"), "\"sv\" is El Salvador (Spanish), not Sweden");
-    assert_ne!(lang("sr"), Some("sr"), "\"sr\" is Suriname (Dutch), not Serbia");
-    assert_ne!(lang("sl"), Some("sl"), "\"sl\" is Sierra Leone (English), not Slovenia");
+    assert_ne!(
+        lang("sv"),
+        Some("sv"),
+        "\"sv\" is El Salvador (Spanish), not Sweden"
+    );
+    assert_ne!(
+        lang("sr"),
+        Some("sr"),
+        "\"sr\" is Suriname (Dutch), not Serbia"
+    );
+    assert_ne!(
+        lang("sl"),
+        Some("sl"),
+        "\"sl\" is Sierra Leone (English), not Slovenia"
+    );
 }

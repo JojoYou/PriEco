@@ -18,24 +18,24 @@ use crate::{ortsys, sys};
 #[derive(Debug)]
 pub struct OrtOwnedTensor<'t, T, D>
 where
-	T: TensorDataToType,
-	D: ndarray::Dimension
+    T: TensorDataToType,
+    D: ndarray::Dimension,
 {
-	pub(crate) data: TensorData<'t, T, D>
+    pub(crate) data: TensorData<'t, T, D>,
 }
 
 impl<'t, T, D> OrtOwnedTensor<'t, T, D>
 where
-	T: TensorDataToType,
-	D: ndarray::Dimension + 't
+    T: TensorDataToType,
+    D: ndarray::Dimension + 't,
 {
-	/// Produce a [`ViewHolder`] for the underlying data.
-	pub fn view<'s>(&'s self) -> ViewHolder<'s, T, D>
-	where
-		't: 's // tensor ptr can outlive the TensorData
-	{
-		ViewHolder::new(&self.data)
-	}
+    /// Produce a [`ViewHolder`] for the underlying data.
+    pub fn view<'s>(&'s self) -> ViewHolder<'s, T, D>
+    where
+        't: 's, // tensor ptr can outlive the TensorData
+    {
+        ViewHolder::new(&self.data)
+    }
 }
 
 /// An intermediate step on the way to an [`ArrayView`].
@@ -45,46 +45,46 @@ where
 // pointer, since in the case of strings the data is the Array in the TensorData, not the pointer.
 pub struct ViewHolder<'s, T, D>
 where
-	T: TensorDataToType,
-	D: ndarray::Dimension
+    T: TensorDataToType,
+    D: ndarray::Dimension,
 {
-	array_view: ndarray::ArrayView<'s, T, D>
+    array_view: ndarray::ArrayView<'s, T, D>,
 }
 
 impl<'s, T, D> ViewHolder<'s, T, D>
 where
-	T: TensorDataToType,
-	D: ndarray::Dimension
+    T: TensorDataToType,
+    D: ndarray::Dimension,
 {
-	fn new<'t>(data: &'s TensorData<'t, T, D>) -> ViewHolder<'s, T, D>
-	where
-		't: 's // underlying tensor ptr lives at least as long as TensorData
-	{
-		match data {
-			TensorData::TensorPtr { array_view, .. } => ViewHolder {
-				// we already have a view, but creating a view from a view is cheap
-				array_view: array_view.view()
-			},
-			TensorData::Strings { strings } => ViewHolder {
-				// This view creation has to happen here, not at new()'s callsite, because
-				// a field can't be a reference to another field in the same struct. Thus, we have
-				// this separate struct to hold the view that refers to the `Array`.
-				array_view: strings.view()
-			}
-		}
-	}
+    fn new<'t>(data: &'s TensorData<'t, T, D>) -> ViewHolder<'s, T, D>
+    where
+        't: 's, // underlying tensor ptr lives at least as long as TensorData
+    {
+        match data {
+            TensorData::TensorPtr { array_view, .. } => ViewHolder {
+                // we already have a view, but creating a view from a view is cheap
+                array_view: array_view.view(),
+            },
+            TensorData::Strings { strings } => ViewHolder {
+                // This view creation has to happen here, not at new()'s callsite, because
+                // a field can't be a reference to another field in the same struct. Thus, we have
+                // this separate struct to hold the view that refers to the `Array`.
+                array_view: strings.view(),
+            },
+        }
+    }
 }
 
 impl<'t, T, D> Deref for ViewHolder<'t, T, D>
 where
-	T: TensorDataToType,
-	D: ndarray::Dimension
+    T: TensorDataToType,
+    D: ndarray::Dimension,
 {
-	type Target = ArrayView<'t, T, D>;
+    type Target = ArrayView<'t, T, D>;
 
-	fn deref(&self) -> &Self::Target {
-		&self.array_view
-	}
+    fn deref(&self) -> &Self::Target {
+        &self.array_view
+    }
 }
 
 /// Holds on to a tensor pointer until dropped.
@@ -94,14 +94,14 @@ where
 /// to keep a reference to `DynOrtTensor`, which would be inconvenient.
 #[derive(Debug)]
 pub struct TensorPointerHolder {
-	pub(crate) tensor_ptr: *mut sys::OrtValue
+    pub(crate) tensor_ptr: *mut sys::OrtValue,
 }
 
 impl Drop for TensorPointerHolder {
-	#[tracing::instrument]
-	fn drop(&mut self) {
-		ortsys![unsafe ReleaseValue(self.tensor_ptr)];
+    #[tracing::instrument]
+    fn drop(&mut self) {
+        ortsys![unsafe ReleaseValue(self.tensor_ptr)];
 
-		self.tensor_ptr = ptr::null_mut();
-	}
+        self.tensor_ptr = ptr::null_mut();
+    }
 }

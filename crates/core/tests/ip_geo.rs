@@ -53,7 +53,10 @@ fn ipv4_inside_range() {
     let tmp = TmpDir::new("geo1");
     let db = sample(&tmp);
     assert_eq!(db.lookup_country("1.0.0.5").unwrap().as_deref(), Some("au"));
-    assert_eq!(db.lookup_country("10.20.30.40").unwrap().as_deref(), Some("zz"));
+    assert_eq!(
+        db.lookup_country("10.20.30.40").unwrap().as_deref(),
+        Some("zz")
+    );
 }
 
 #[test]
@@ -61,9 +64,18 @@ fn ipv4_range_boundaries_are_inclusive() {
     let tmp = TmpDir::new("geo2");
     let db = sample(&tmp);
     assert_eq!(db.lookup_country("1.0.0.0").unwrap().as_deref(), Some("au"));
-    assert_eq!(db.lookup_country("1.0.0.255").unwrap().as_deref(), Some("au"));
-    assert_eq!(db.lookup_country("10.0.0.0").unwrap().as_deref(), Some("zz"));
-    assert_eq!(db.lookup_country("10.255.255.255").unwrap().as_deref(), Some("zz"));
+    assert_eq!(
+        db.lookup_country("1.0.0.255").unwrap().as_deref(),
+        Some("au")
+    );
+    assert_eq!(
+        db.lookup_country("10.0.0.0").unwrap().as_deref(),
+        Some("zz")
+    );
+    assert_eq!(
+        db.lookup_country("10.255.255.255").unwrap().as_deref(),
+        Some("zz")
+    );
 }
 
 #[test]
@@ -80,7 +92,10 @@ fn ipv4_just_outside_range_is_none() {
 fn single_address_range() {
     let tmp = TmpDir::new("geo4");
     let db = sample(&tmp);
-    assert_eq!(db.lookup_country("100.0.0.0").unwrap().as_deref(), Some("one"));
+    assert_eq!(
+        db.lookup_country("100.0.0.0").unwrap().as_deref(),
+        Some("one")
+    );
     assert_eq!(db.lookup_country("100.0.0.1").unwrap(), None);
 }
 
@@ -95,7 +110,10 @@ fn lowest_and_highest_ipv4() {
         ],
     );
     assert_eq!(db.lookup_country("0.0.0.0").unwrap().as_deref(), Some("lo"));
-    assert_eq!(db.lookup_country("255.255.255.255").unwrap().as_deref(), Some("hi"));
+    assert_eq!(
+        db.lookup_country("255.255.255.255").unwrap().as_deref(),
+        Some("hi")
+    );
     assert_eq!(db.lookup_country("128.0.0.0").unwrap(), None);
 }
 
@@ -103,8 +121,14 @@ fn lowest_and_highest_ipv4() {
 fn ipv6_inside_and_outside_range() {
     let tmp = TmpDir::new("geo6");
     let db = sample(&tmp);
-    assert_eq!(db.lookup_country("2001:db8::1").unwrap().as_deref(), Some("v6"));
-    assert_eq!(db.lookup_country("2001:db8::ffff").unwrap().as_deref(), Some("v6"));
+    assert_eq!(
+        db.lookup_country("2001:db8::1").unwrap().as_deref(),
+        Some("v6")
+    );
+    assert_eq!(
+        db.lookup_country("2001:db8::ffff").unwrap().as_deref(),
+        Some("v6")
+    );
     assert_eq!(db.lookup_country("2001:db8::1:0").unwrap(), None);
     assert_eq!(db.lookup_country("::1").unwrap(), None);
 }
@@ -114,7 +138,8 @@ fn ipv6_compressed_and_expanded_forms_are_equal() {
     let tmp = TmpDir::new("geo7");
     let db = sample(&tmp);
     assert_eq!(
-        db.lookup_country("2001:0db8:0000:0000:0000:0000:0000:0001").unwrap(),
+        db.lookup_country("2001:0db8:0000:0000:0000:0000:0000:0001")
+            .unwrap(),
         db.lookup_country("2001:db8::1").unwrap()
     );
 }
@@ -144,7 +169,11 @@ fn invalid_ip_strings_are_errors() {
         "2001:db8::g",
         "localhost",
     ] {
-        assert!(db.lookup_country(bad).is_err(), "{:?} should be an error", bad);
+        assert!(
+            db.lookup_country(bad).is_err(),
+            "{:?} should be an error",
+            bad
+        );
     }
 }
 
@@ -177,7 +206,10 @@ fn open_existing_database_keeps_data() {
     let tmp = TmpDir::new("geo13");
     drop(sample(&tmp));
     let reopened = IpGeoDatabase::open(&tmp.join_str("ip.redb")).unwrap();
-    assert_eq!(reopened.lookup_country("1.0.0.1").unwrap().as_deref(), Some("au"));
+    assert_eq!(
+        reopened.lookup_country("1.0.0.1").unwrap().as_deref(),
+        Some("au")
+    );
 }
 
 #[test]
@@ -197,8 +229,14 @@ fn adjacent_ranges_pick_the_right_one() {
             (v4("20.0.0.128"), v4("20.0.0.255"), "b"),
         ],
     );
-    assert_eq!(db.lookup_country("20.0.0.127").unwrap().as_deref(), Some("a"));
-    assert_eq!(db.lookup_country("20.0.0.128").unwrap().as_deref(), Some("b"));
+    assert_eq!(
+        db.lookup_country("20.0.0.127").unwrap().as_deref(),
+        Some("a")
+    );
+    assert_eq!(
+        db.lookup_country("20.0.0.128").unwrap().as_deref(),
+        Some("b")
+    );
 }
 
 #[test]
@@ -223,7 +261,10 @@ fn many_ranges_lookup_is_consistent() {
             (start, start + 0xFF, format!("c{}", i))
         })
         .collect();
-    let refs: Vec<(u128, u128, &str)> = ranges.iter().map(|(a, b, c)| (*a, *b, c.as_str())).collect();
+    let refs: Vec<(u128, u128, &str)> = ranges
+        .iter()
+        .map(|(a, b, c)| (*a, *b, c.as_str()))
+        .collect();
     let db = geo_db(&tmp, &refs);
     for i in (0..200u32).step_by(17) {
         let ip = Ipv4Addr::from(((i as u32) << 16) + 0x10);

@@ -60,7 +60,10 @@ fn invalid_or_non_http_urls() {
 
 #[test]
 fn get_domain_keeps_www_when_not_removing() {
-    assert_eq!(get_domain("https://www.example.com/a", false), "www.example.com");
+    assert_eq!(
+        get_domain("https://www.example.com/a", false),
+        "www.example.com"
+    );
 }
 
 #[test]
@@ -71,13 +74,22 @@ fn get_domain_removes_www() {
 #[test]
 fn get_domain_only_removes_leading_www_label() {
     assert_eq!(get_domain("https://wwwexample.com", true), "wwwexample.com");
-    assert_eq!(get_domain("https://a.www.example.com", true), "a.www.example.com");
-    assert_eq!(get_domain("https://www.www.example.com", true), "www.example.com");
+    assert_eq!(
+        get_domain("https://a.www.example.com", true),
+        "a.www.example.com"
+    );
+    assert_eq!(
+        get_domain("https://www.www.example.com", true),
+        "www.example.com"
+    );
 }
 
 #[test]
 fn get_domain_lowercases_and_drops_port_and_path() {
-    assert_eq!(get_domain("https://WWW.Example.COM:8080/x?y#z", true), "example.com");
+    assert_eq!(
+        get_domain("https://WWW.Example.COM:8080/x?y#z", true),
+        "example.com"
+    );
 }
 
 #[test]
@@ -87,7 +99,14 @@ fn get_domain_idn_is_punycode() {
 
 #[test]
 fn get_domain_ip_and_invalid_inputs_are_empty() {
-    for u in ["", "not a url", "http://127.0.0.1/", "http://[::1]/", "mailto:a@b.c", "example.com"] {
+    for u in [
+        "",
+        "not a url",
+        "http://127.0.0.1/",
+        "http://[::1]/",
+        "mailto:a@b.c",
+        "example.com",
+    ] {
         assert_eq!(get_domain(u, true), "", "{:?}", u);
         assert_eq!(get_domain(u, false), "", "{:?}", u);
     }
@@ -277,7 +296,11 @@ fn link_urls_are_limited_to_20() {
         .map(|i| format!("<a href='https://s{0}.com/'>t{0}</a>", i))
         .collect();
     let t = tags(&html);
-    assert!(get(&t, "a_href").len() <= 20, "got {}", get(&t, "a_href").len());
+    assert!(
+        get(&t, "a_href").len() <= 20,
+        "got {}",
+        get(&t, "a_href").len()
+    );
 }
 
 #[test]

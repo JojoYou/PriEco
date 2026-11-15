@@ -5,8 +5,7 @@
 //! Tokens of 1..=3 "plain" bytes are inline text, everything else is a dictionary id.
 
 use prieco_blob::decode::{
-    DecodeMode, ResolvedToken, decode_blob_to_html_rendered, decode_blob_to_text,
-    search_word_by_id,
+    DecodeMode, ResolvedToken, decode_blob_to_html_rendered, decode_blob_to_text, search_word_by_id,
 };
 
 const END: [u8; 4] = [255, 255, 255, 255];
@@ -79,7 +78,10 @@ fn any_non_one_flag_means_raw() {
 
 #[test]
 fn text_single_tag_single_word() {
-    assert_eq!(decode_blob_to_text(&raw_blob(&[(b'p', &[b"hi"])])), "<p>hi </p>\n");
+    assert_eq!(
+        decode_blob_to_text(&raw_blob(&[(b'p', &[b"hi"])])),
+        "<p>hi </p>\n"
+    );
 }
 
 #[test]
@@ -106,7 +108,10 @@ fn text_empty_tag_is_still_emitted() {
 #[test]
 fn text_tag_without_terminator_at_end_of_data() {
     assert_eq!(decode_blob_to_text(&[0, b'p']), "<p></p>\n");
-    assert_eq!(decode_blob_to_text(&[0, b'p', 2, b'o', b'k']), "<p>ok </p>\n");
+    assert_eq!(
+        decode_blob_to_text(&[0, b'p', 2, b'o', b'k']),
+        "<p>ok </p>\n"
+    );
 }
 
 #[test]
@@ -183,7 +188,10 @@ fn text_compressed_and_raw_decode_identically() {
         (b'h', &[b"x.y"]),
         (b'm', &[b"k=v"]),
     ];
-    assert_eq!(decode_blob_to_text(&raw_blob(tags)), decode_blob_to_text(&zstd_blob(tags)));
+    assert_eq!(
+        decode_blob_to_text(&raw_blob(tags)),
+        decode_blob_to_text(&zstd_blob(tags))
+    );
     assert_eq!(
         decode_blob_to_html_rendered(&raw_blob(tags), "/x?u="),
         decode_blob_to_html_rendered(&zstd_blob(tags), "/x?u=")
@@ -205,7 +213,10 @@ fn text_large_document() {
 fn truncated_token_does_not_panic_and_rest_is_parsed_as_tags() {
     // len 5 but only 1 byte left: the token is abandoned and the remaining byte
     // is re-read as a new tag byte ('a' -> <a>)
-    assert_eq!(decode_blob_to_text(&[0, b'p', 5, b'a']), "<p></p>\n<a></a>\n");
+    assert_eq!(
+        decode_blob_to_text(&[0, b'p', 5, b'a']),
+        "<p></p>\n<a></a>\n"
+    );
 }
 
 #[test]
@@ -242,7 +253,9 @@ fn random_garbage_never_panics() {
     for len in 0..300usize {
         let mut b = Vec::with_capacity(len);
         for _ in 0..len {
-            x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            x = x
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             b.push((x >> 56) as u8);
         }
         let _ = decode_blob_to_text(&b);

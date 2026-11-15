@@ -111,7 +111,10 @@ fn bloom_serde_roundtrip() {
 fn bloom_from_peer_with_short_bits_does_not_panic() {
     let b: KeywordBloom = serde_json::from_str(r#"{"bits":[1,2,3]}"#).unwrap();
     let r = std::panic::catch_unwind(|| b.contains(u64::MAX));
-    assert!(r.is_ok(), "peer controlled bloom size caused an out of bounds panic");
+    assert!(
+        r.is_ok(),
+        "peer controlled bloom size caused an out of bounds panic"
+    );
 }
 
 /* ───────────────────────────── Ticket ───────────────────────────── */
@@ -129,7 +132,12 @@ fn ticket(seed: u8, endpoints: usize) -> Ticket {
 fn ticket_display_is_lowercase_base32() {
     let s = ticket(1, 0).to_string();
     assert!(!s.is_empty());
-    assert!(s.chars().all(|c| c.is_ascii_lowercase() || ('2'..='7').contains(&c)), "{}", s);
+    assert!(
+        s.chars()
+            .all(|c| c.is_ascii_lowercase() || ('2'..='7').contains(&c)),
+        "{}",
+        s
+    );
     assert!(!s.contains('='), "no padding");
 }
 
@@ -242,7 +250,11 @@ fn iroh_secret_is_generated_persisted_reused_and_repaired() {
     assert_eq!(fs::read(path).unwrap(), k1.to_bytes().to_vec());
 
     let k2 = get_iroh_secret();
-    assert_eq!(k2.to_bytes(), k1.to_bytes(), "secret must be stable across restarts");
+    assert_eq!(
+        k2.to_bytes(),
+        k1.to_bytes(),
+        "secret must be stable across restarts"
+    );
     assert_eq!(k2.public(), k1.public());
 
     fs::write(path, [1u8; 10]).unwrap();

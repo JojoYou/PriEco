@@ -4,8 +4,7 @@ use prieco_core::{EntityType, QU_PIPELINE, QueryIntent, TaggedEntity};
 
 use crate::support::init;
 use crate::web::functions::ranking::meaning::{
-    call::process_query, entities::scan_entities, intent::intent,
-    optimize::synynyms_and_optimize,
+    call::process_query, entities::scan_entities, intent::intent, optimize::synynyms_and_optimize,
 };
 
 /* ───────────────────────────── intent ───────────────────────────── */
@@ -13,11 +12,20 @@ use crate::web::functions::ranking::meaning::{
 #[test]
 fn intent_keywords_english() {
     init();
-    assert_eq!(intent("how to bake bread", "en"), QueryIntent::Informational);
+    assert_eq!(
+        intent("how to bake bread", "en"),
+        QueryIntent::Informational
+    );
     assert_eq!(intent("what is rust", "en"), QueryIntent::Informational);
     assert_eq!(intent("buy iphone", "en"), QueryIntent::Transactional);
-    assert_eq!(intent("cheap flights", "en"), QueryIntent::CommercialInvestigation);
-    assert_eq!(intent("best laptop", "en"), QueryIntent::CommercialInvestigation);
+    assert_eq!(
+        intent("cheap flights", "en"),
+        QueryIntent::CommercialInvestigation
+    );
+    assert_eq!(
+        intent("best laptop", "en"),
+        QueryIntent::CommercialInvestigation
+    );
     assert_eq!(intent("pizza near me", "en"), QueryIntent::Local);
     assert_eq!(intent("near", "en"), QueryIntent::Local);
     assert_eq!(intent("gmail login", "en"), QueryIntent::Navigational);
@@ -42,9 +50,11 @@ fn intent_unknown_language_falls_back_to_english() {
 #[test]
 fn intent_every_supported_language_works() {
     init();
-    for lang in ["ar", "bg", "ca", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "he",
-                 "hr", "hu", "id", "is", "it", "ja", "ko", "lt", "lv", "nl", "no", "pl", "pt",
-                 "ro", "ru", "sk", "sl", "sr", "sv", "tr"] {
+    for lang in [
+        "ar", "bg", "ca", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "he", "hr", "hu",
+        "id", "is", "it", "ja", "ko", "lt", "lv", "nl", "no", "pl", "pt", "ro", "ru", "sk", "sl",
+        "sr", "sv", "tr",
+    ] {
         let _ = intent("some query words here", lang);
         assert_eq!(intent("", lang), QueryIntent::Unknown, "{}", lang);
     }
@@ -93,7 +103,10 @@ fn intent_handles_unicode_queries() {
 #[test]
 fn intent_pirates_is_not_a_purchase() {
     init();
-    assert_ne!(intent("pirates of the caribbean", "en"), QueryIntent::Transactional);
+    assert_ne!(
+        intent("pirates of the caribbean", "en"),
+        QueryIntent::Transactional
+    );
 }
 
 /// BUG: "show tomorrow" contains "how to".
@@ -108,7 +121,10 @@ fn intent_show_tomorrow_is_not_a_how_to() {
 #[test]
 fn intent_keywords_inside_words_do_not_match() {
     init();
-    assert_ne!(intent("stop smoking", "en"), QueryIntent::CommercialInvestigation);
+    assert_ne!(
+        intent("stop smoking", "en"),
+        QueryIntent::CommercialInvestigation
+    );
     assert_eq!(intent("homework", "en"), QueryIntent::Navigational); // 1 token heuristic agrees
     assert_ne!(intent("playlist", "en"), QueryIntent::Informational);
     assert_ne!(intent("macbook", "en"), QueryIntent::Transactional);
@@ -252,7 +268,10 @@ fn optimize_skips_queries_with_operators() {
 
 #[test]
 fn optimize_skips_definition_queries() {
-    assert_eq!(opt("definition rust", QueryIntent::Unknown, &[]), "definition rust");
+    assert_eq!(
+        opt("definition rust", QueryIntent::Unknown, &[]),
+        "definition rust"
+    );
     assert_eq!(opt("def rust", QueryIntent::Unknown, &[]), "def rust");
 }
 
@@ -354,7 +373,11 @@ fn optimize_entity_boosts_by_type() {
 
 #[test]
 fn optimize_entity_uses_original_query_text() {
-    let out = opt("London", QueryIntent::Unknown, &[tag(0..6, EntityType::Place, "london")]);
+    let out = opt(
+        "London",
+        QueryIntent::Unknown,
+        &[tag(0..6, EntityType::Place, "london")],
+    );
     assert!(out.contains("title:\"London\""), "{}", out);
 }
 
@@ -423,7 +446,10 @@ fn process_query_informational() {
     let (i, coords) = process_query(&mut q, "en", "us");
     assert_eq!(i, QueryIntent::Informational);
     assert!(coords.is_none());
-    assert_ne!(q, "how to bake bread", "query should be rewritten for the index");
+    assert_ne!(
+        q, "how to bake bread",
+        "query should be rewritten for the index"
+    );
 }
 
 #[test]
@@ -445,7 +471,16 @@ fn process_query_place_becomes_local() {
 #[test]
 fn process_query_never_panics_on_odd_input() {
     init();
-    for s in ["", " ", "!!!", "Žltý kôň", "İstanbul hotels", "ß straße", "日本 東京", "a\u{0}b"] {
+    for s in [
+        "",
+        " ",
+        "!!!",
+        "Žltý kôň",
+        "İstanbul hotels",
+        "ß straße",
+        "日本 東京",
+        "a\u{0}b",
+    ] {
         let mut q = s.to_string();
         let _ = process_query(&mut q, "en", "us");
     }

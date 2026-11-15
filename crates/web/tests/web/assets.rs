@@ -53,7 +53,10 @@ fn osd_clearnet() {
 
 #[test]
 fn osd_onion() {
-    let x = osd(&Host::parse("priecovk7jsuh3tvkh62c6j4oep3l5bldigpzmay26rdpqz357t5dmad.onion").unwrap()).0;
+    let x = osd(
+        &Host::parse("priecovk7jsuh3tvkh62c6j4oep3l5bldigpzmay26rdpqz357t5dmad.onion").unwrap(),
+    )
+    .0;
     assert!(x.contains("<ShortName>PriEco (Onion)</ShortName>"));
     assert!(x.contains("http://priecovk7jsuh3tvkh62c6j4oep3l5bldigpzmay26rdpqz357t5dmad.onion/search?t=all&amp;q={searchTerms}"));
     assert!(!x.contains("https://prieco.net"));
@@ -88,7 +91,15 @@ fn template(content: &str) -> String {
 #[test]
 fn script_renders_all_variables() {
     let name = template("q={{q}}|t={{t}}|lang={{lang}}|loc={{loc}}|dec={{dec}}");
-    let out = script(&name, Some("all"), Some("sk"), Some("sk"), Some("rust lang"), Some(false)).0;
+    let out = script(
+        &name,
+        Some("all"),
+        Some("sk"),
+        Some("sk"),
+        Some("rust lang"),
+        Some(false),
+    )
+    .0;
     assert_eq!(out, "q=rust%20lang|t=all|lang=sk|loc=sk|dec=false");
 }
 
@@ -125,7 +136,10 @@ fn script_rejects_path_traversal() {
 fn script_missing_template_reports_error() {
     init();
     let out = script("does_not_exist.js", None, None, None, None, None).0;
-    assert_eq!(out, "console.error('Template static/js/hbs/does_not_exist.js not found');");
+    assert_eq!(
+        out,
+        "console.error('Template static/js/hbs/does_not_exist.js not found');"
+    );
 }
 
 #[test]
@@ -171,7 +185,10 @@ fn sw_and_unduck_are_served_when_present() {
     let r = c.get("/sw.js").dispatch();
     assert_eq!(r.content_type(), Some(ContentType::JavaScript));
     assert_eq!(r.into_string().unwrap(), "self.x=1;");
-    assert_eq!(c.get("/unduck.js").dispatch().into_string().unwrap(), "var u=2;");
+    assert_eq!(
+        c.get("/unduck.js").dispatch().into_string().unwrap(),
+        "var u=2;"
+    );
 }
 
 /* ───────────────────────────── favicons ───────────────────────────── */
@@ -195,8 +212,14 @@ fn favicon_file(raw: &[u8]) -> String {
 
 fn fetch_favicon(name: &str) -> (Status, Option<ContentType>, Vec<u8>) {
     let c = client(rocket::routes![assets::favicon]);
-    let r = c.get(format!("/static/prieco_favicons/{}", name)).dispatch();
-    (r.status(), r.content_type(), r.into_bytes().unwrap_or_default())
+    let r = c
+        .get(format!("/static/prieco_favicons/{}", name))
+        .dispatch();
+    (
+        r.status(),
+        r.content_type(),
+        r.into_bytes().unwrap_or_default(),
+    )
 }
 
 #[test]
@@ -216,12 +239,24 @@ fn favicon_type_detection() {
         (vec![0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0], ContentType::JPEG),
         (b"GIF87a\x01\x00\x01\x00".to_vec(), ContentType::GIF),
         (b"GIF89a\x01\x00\x01\x00".to_vec(), ContentType::GIF),
-        (b"<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>".to_vec(), ContentType::SVG),
+        (
+            b"<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>".to_vec(),
+            ContentType::SVG,
+        ),
         (b"<SVG></SVG>....".to_vec(), ContentType::SVG),
-        (vec![0x00, 0x00, 0x01, 0x00, 1, 0, 16, 16], ContentType::Icon),
+        (
+            vec![0x00, 0x00, 0x01, 0x00, 1, 0, 16, 16],
+            ContentType::Icon,
+        ),
         (webp, ContentType::new("image", "webp")),
-        (b"<html><body>hi</body></html>".to_vec(), ContentType::Binary),
-        (b"RIFF\x10\x00\x00\x00WAVEfmt ".to_vec(), ContentType::Binary),
+        (
+            b"<html><body>hi</body></html>".to_vec(),
+            ContentType::Binary,
+        ),
+        (
+            b"RIFF\x10\x00\x00\x00WAVEfmt ".to_vec(),
+            ContentType::Binary,
+        ),
         (vec![1, 2, 3, 4, 5, 6, 7, 8, 9], ContentType::Binary),
         (vec![0x89, 0x50, 0x4E], ContentType::Binary), // shorter than 8 bytes
     ];
@@ -269,7 +304,11 @@ fn favicon_corrupt_brotli_is_server_error() {
     init();
     fs::create_dir_all("static/prieco_favicons").unwrap();
     let name = unique("corrupt");
-    fs::write(format!("static/prieco_favicons/{}.br", name), b"\xff\xff\xff\xffnot brotli").unwrap();
+    fs::write(
+        format!("static/prieco_favicons/{}.br", name),
+        b"\xff\xff\xff\xffnot brotli",
+    )
+    .unwrap();
     assert_eq!(fetch_favicon(&name).0, Status::InternalServerError);
 }
 

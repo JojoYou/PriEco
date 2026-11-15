@@ -1,6 +1,11 @@
 //! Tests for src/web/functions/general.rs
 
-use rocket::{get, http::{CookieJar, SameSite}, routes, time::Duration};
+use rocket::{
+    get,
+    http::{CookieJar, SameSite},
+    routes,
+    time::Duration,
+};
 
 use crate::support::{client, closed_port, http, init, serve};
 use crate::web::functions::general::{
@@ -45,21 +50,40 @@ fn invalid_urls() {
 
 #[test]
 fn get_domain_basic() {
-    assert_eq!(get_domain("https://www.example.com/path", false), "www.example.com");
-    assert_eq!(get_domain("https://www.example.com/path", true), "example.com");
+    assert_eq!(
+        get_domain("https://www.example.com/path", false),
+        "www.example.com"
+    );
+    assert_eq!(
+        get_domain("https://www.example.com/path", true),
+        "example.com"
+    );
     assert_eq!(get_domain("https://example.com", true), "example.com");
-    assert_eq!(get_domain("http://sub.example.org:81/", true), "sub.example.org");
+    assert_eq!(
+        get_domain("http://sub.example.org:81/", true),
+        "sub.example.org"
+    );
 }
 
 #[test]
 fn get_domain_case_and_idn() {
     assert_eq!(get_domain("https://WWW.EXAMPLE.COM", true), "example.com");
-    assert_eq!(get_domain("https://www.bücher.de", true), "xn--bcher-kva.de");
+    assert_eq!(
+        get_domain("https://www.bücher.de", true),
+        "xn--bcher-kva.de"
+    );
 }
 
 #[test]
 fn get_domain_empty_for_ip_invalid_and_hostless() {
-    for u in ["", "garbage", "http://10.0.0.1/", "http://[::1]/", "mailto:a@b.c", "example.com"] {
+    for u in [
+        "",
+        "garbage",
+        "http://10.0.0.1/",
+        "http://[::1]/",
+        "mailto:a@b.c",
+        "example.com",
+    ] {
         assert_eq!(get_domain(u, true), "", "{:?}", u);
     }
 }
@@ -104,7 +128,10 @@ fn hash_node_is_deterministic_and_distinguishes_inputs() {
 #[test]
 fn hash_node_differs_from_url_to_id() {
     // different algorithm (XXH64 vs XXH3) -> callers must not mix them
-    assert_ne!(hash_node("https://a.com"), prieco_core::url_to_id("https://a.com"));
+    assert_ne!(
+        hash_node("https://a.com"),
+        prieco_core::url_to_id("https://a.com")
+    );
 }
 
 /* ───────────────────────────── set_cookie ───────────────────────────── */
@@ -164,8 +191,14 @@ fn set_cookie_http_only_unless_js_needs_it() {
 
 #[test]
 fn set_cookie_secure_flag() {
-    assert_eq!(set("name=a&value=b&long=false&js=true&secure=true").secure(), Some(true));
-    assert_ne!(set("name=a&value=b&long=false&js=true&secure=false").secure(), Some(true));
+    assert_eq!(
+        set("name=a&value=b&long=false&js=true&secure=true").secure(),
+        Some(true)
+    );
+    assert_ne!(
+        set("name=a&value=b&long=false&js=true&secure=false").secure(),
+        Some(true)
+    );
 }
 
 #[test]
@@ -183,7 +216,9 @@ fn http_client() -> reqwest::Client {
 #[tokio::test]
 async fn call_api_parses_json_object() {
     init();
-    let port = serve(1, |_| http("200 OK", "application/json", br#"{"a":1,"b":[true,null]}"#));
+    let port = serve(1, |_| {
+        http("200 OK", "application/json", br#"{"a":1,"b":[true,null]}"#)
+    });
     let v = call_api_future_json(http_client().get(format!("http://127.0.0.1:{}/", port)))
         .await
         .unwrap();
@@ -194,7 +229,13 @@ async fn call_api_parses_json_object() {
 #[tokio::test]
 async fn call_api_parses_json_even_on_error_status() {
     init();
-    let port = serve(1, |_| http("500 Internal Server Error", "application/json", br#"{"error":"x"}"#));
+    let port = serve(1, |_| {
+        http(
+            "500 Internal Server Error",
+            "application/json",
+            br#"{"error":"x"}"#,
+        )
+    });
     let v = call_api_future_json(http_client().get(format!("http://127.0.0.1:{}/", port))).await;
     assert_eq!(v.unwrap()["error"], "x");
 }

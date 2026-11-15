@@ -57,7 +57,14 @@ fn rank(
 }
 
 /// Multiplier applied to a single document (initial score 1.0)
-fn factor_with(d: WebDocument, query: &str, lang: &str, loc: &str, intent: QueryIntent, goggles: &[Arc<GoggleRules>]) -> f64 {
+fn factor_with(
+    d: WebDocument,
+    query: &str,
+    lang: &str,
+    loc: &str,
+    intent: QueryIntent,
+    goggles: &[Arc<GoggleRules>],
+) -> f64 {
     rank(vec![d], query, lang, loc, intent, goggles, false)[0].search_score as f64
 }
 
@@ -107,7 +114,15 @@ fn results_are_sorted_by_boosted_score() {
         d.search_score = 0.5;
         d
     };
-    let out = rank(vec![slow, fast], "q", "en", "zz", QueryIntent::Unknown, &[], false);
+    let out = rank(
+        vec![slow, fast],
+        "q",
+        "en",
+        "zz",
+        QueryIntent::Unknown,
+        &[],
+        false,
+    );
     assert_eq!(out[0].url, "http://fast.xyz");
     assert_eq!(out[1].url, "http://slow.xyz");
 }
@@ -117,7 +132,15 @@ fn nan_scores_do_not_panic_while_sorting() {
     let mut a = base("http://a.xyz");
     a.search_score = f32::NAN;
     let b = base("http://b.xyz");
-    let out = rank(vec![a, b], "q", "en", "zz", QueryIntent::Unknown, &[], false);
+    let out = rank(
+        vec![a, b],
+        "q",
+        "en",
+        "zz",
+        QueryIntent::Unknown,
+        &[],
+        false,
+    );
     assert_eq!(out.len(), 2);
 }
 
@@ -130,20 +153,35 @@ fn https_boost() {
 
 #[test]
 fn com_and_dev_boost() {
-    assert_factor(factor(base("http://a.com"), QueryIntent::Unknown), W_DEV_COM);
-    assert_factor(factor(base("http://a.dev"), QueryIntent::Unknown), W_DEV_COM);
+    assert_factor(
+        factor(base("http://a.com"), QueryIntent::Unknown),
+        W_DEV_COM,
+    );
+    assert_factor(
+        factor(base("http://a.dev"), QueryIntent::Unknown),
+        W_DEV_COM,
+    );
 }
 
 #[test]
 fn org_and_net_boost() {
-    assert_factor(factor(base("http://a.org"), QueryIntent::Unknown), W_ORG_NET);
-    assert_factor(factor(base("http://a.net"), QueryIntent::Unknown), W_ORG_NET);
+    assert_factor(
+        factor(base("http://a.org"), QueryIntent::Unknown),
+        W_ORG_NET,
+    );
+    assert_factor(
+        factor(base("http://a.net"), QueryIntent::Unknown),
+        W_ORG_NET,
+    );
 }
 
 #[test]
 fn tld_matching_location_boost() {
     let d = base("http://a.xyz");
-    assert_factor(factor_with(d, "zzz", "en", "XYZ", QueryIntent::Unknown, &[]), W_TLD_LOC);
+    assert_factor(
+        factor_with(d, "zzz", "en", "XYZ", QueryIntent::Unknown, &[]),
+        W_TLD_LOC,
+    );
 }
 
 #[test]
@@ -171,14 +209,26 @@ fn bad_url_patterns_penalty() {
 
 #[test]
 fn deep_urls_are_penalised_per_extra_slash() {
-    assert_factor(factor(base("http://a.xyz/b"), QueryIntent::Unknown), W_DEPTH);
-    assert_factor(factor(base("http://a.xyz/b/c"), QueryIntent::Unknown), W_DEPTH.powi(2));
-    assert_factor(factor(base("http://a.xyz/b/c/d/e"), QueryIntent::Unknown), W_DEPTH.powi(4));
+    assert_factor(
+        factor(base("http://a.xyz/b"), QueryIntent::Unknown),
+        W_DEPTH,
+    );
+    assert_factor(
+        factor(base("http://a.xyz/b/c"), QueryIntent::Unknown),
+        W_DEPTH.powi(2),
+    );
+    assert_factor(
+        factor(base("http://a.xyz/b/c/d/e"), QueryIntent::Unknown),
+        W_DEPTH.powi(4),
+    );
 }
 
 #[test]
 fn query_string_and_fragment_are_ignored() {
-    assert_factor(factor(base("http://a.xyz?x=1/2/3"), QueryIntent::Unknown), 1.0);
+    assert_factor(
+        factor(base("http://a.xyz?x=1/2/3"), QueryIntent::Unknown),
+        1.0,
+    );
     assert_factor(factor(base("http://a.xyz#/x/y"), QueryIntent::Unknown), 1.0);
 }
 
@@ -237,12 +287,21 @@ fn nan_load_gets_the_slowest_penalty() {
 fn query_in_title_boost_case_insensitive() {
     let mut d = base("http://a.xyz");
     d.title = "The RUST Programming Language".into();
-    assert_factor(factor_with(d, "Rust", "en", "zz", QueryIntent::Unknown, &[]), W_TITLE);
+    assert_factor(
+        factor_with(d, "Rust", "en", "zz", QueryIntent::Unknown, &[]),
+        W_TITLE,
+    );
 }
 
 #[test]
 fn quality_score_boost_is_clamped() {
-    for (qna, f) in [(600.0f32, 1.25), (1200.0, 1.25), (240.0, 1.1), (-240.0, 0.9), (-10_000.0, 0.8)] {
+    for (qna, f) in [
+        (600.0f32, 1.25),
+        (1200.0, 1.25),
+        (240.0, 1.1),
+        (-240.0, 0.9),
+        (-10_000.0, 0.8),
+    ] {
         let mut d = base("http://a.xyz");
         d.qna = qna;
         assert_factor(factor(d, QueryIntent::Unknown), f);
@@ -276,7 +335,10 @@ fn has_500_words_boost_depends_on_intent() {
 
 #[test]
 fn short_pages_penalised_for_informational_queries() {
-    assert_factor(factor(base("http://a.xyz"), QueryIntent::Informational), 0.9);
+    assert_factor(
+        factor(base("http://a.xyz"), QueryIntent::Informational),
+        0.9,
+    );
 }
 
 #[test]
@@ -341,14 +403,25 @@ fn navigational_homepage_beats_deep_page() {
         d.search_score = 3.0;
         d
     };
-    let out = rank(vec![deep, home], "github", "en", "us", QueryIntent::Navigational, &[], false);
+    let out = rank(
+        vec![deep, home],
+        "github",
+        "en",
+        "us",
+        QueryIntent::Navigational,
+        &[],
+        false,
+    );
     assert_eq!(out[0].url, "https://github.com");
 }
 
 #[test]
 fn commercial_product_and_shop_domains() {
     assert_factor(
-        factor(base("http://a.xyz/product/1"), QueryIntent::CommercialInvestigation),
+        factor(
+            base("http://a.xyz/product/1"),
+            QueryIntent::CommercialInvestigation,
+        ),
         W_SHOP_PRODUCT * W_DEPTH.powi(2),
     );
     assert_factor(
@@ -410,14 +483,28 @@ fn goggle_boost_and_downrank() {
     let mut g = rules();
     g.boost.insert(id, 2.0);
     assert_factor(
-        factor_with(base("http://a.xyz"), "q", "en", "zz", QueryIntent::Unknown, &[Arc::new(g)]),
+        factor_with(
+            base("http://a.xyz"),
+            "q",
+            "en",
+            "zz",
+            QueryIntent::Unknown,
+            &[Arc::new(g)],
+        ),
         1.3,
     );
 
     let mut g = rules();
     g.downrank.insert(id, 1.0);
     assert_factor(
-        factor_with(base("http://a.xyz"), "q", "en", "zz", QueryIntent::Unknown, &[Arc::new(g)]),
+        factor_with(
+            base("http://a.xyz"),
+            "q",
+            "en",
+            "zz",
+            QueryIntent::Unknown,
+            &[Arc::new(g)],
+        ),
         0.5,
     );
 }
@@ -428,13 +515,27 @@ fn goggle_values_are_capped_at_three() {
     let mut g = rules();
     g.boost.insert(id, 1000.0);
     assert_factor(
-        factor_with(base("http://a.xyz"), "q", "en", "zz", QueryIntent::Unknown, &[Arc::new(g)]),
+        factor_with(
+            base("http://a.xyz"),
+            "q",
+            "en",
+            "zz",
+            QueryIntent::Unknown,
+            &[Arc::new(g)],
+        ),
         1.45,
     );
     let mut g = rules();
     g.downrank.insert(id, 1000.0);
     assert_factor(
-        factor_with(base("http://a.xyz"), "q", "en", "zz", QueryIntent::Unknown, &[Arc::new(g)]),
+        factor_with(
+            base("http://a.xyz"),
+            "q",
+            "en",
+            "zz",
+            QueryIntent::Unknown,
+            &[Arc::new(g)],
+        ),
         0.25,
     );
 }
@@ -466,7 +567,14 @@ fn important_goggle_replaces_all_other_signals() {
     let mut g = rules();
     g.important.insert(id);
     g.boost.insert(id, 2.0);
-    let f = factor_with(base(url), "q", "en", "zz", QueryIntent::Unknown, &[Arc::new(g)]);
+    let f = factor_with(
+        base(url),
+        "q",
+        "en",
+        "zz",
+        QueryIntent::Unknown,
+        &[Arc::new(g)],
+    );
     assert_factor(f, 1.3);
 }
 
@@ -477,17 +585,33 @@ fn important_goggle_downrank_replaces_signals() {
     let mut g = rules();
     g.important.insert(id);
     g.downrank.insert(id, 3.0);
-    let f = factor_with(base(url), "q", "en", "zz", QueryIntent::Unknown, &[Arc::new(g)]);
+    let f = factor_with(
+        base(url),
+        "q",
+        "en",
+        "zz",
+        QueryIntent::Unknown,
+        &[Arc::new(g)],
+    );
     assert_factor(f, 0.25);
 }
 
 #[test]
 fn goggles_for_other_domains_have_no_effect() {
     let mut g = rules();
-    g.boost.insert(url_to_domain_id("https://other.example"), 3.0);
-    g.downrank.insert(url_to_domain_id("https://other2.example"), 3.0);
+    g.boost
+        .insert(url_to_domain_id("https://other.example"), 3.0);
+    g.downrank
+        .insert(url_to_domain_id("https://other2.example"), 3.0);
     assert_factor(
-        factor_with(base("http://a.xyz"), "q", "en", "zz", QueryIntent::Unknown, &[Arc::new(g)]),
+        factor_with(
+            base("http://a.xyz"),
+            "q",
+            "en",
+            "zz",
+            QueryIntent::Unknown,
+            &[Arc::new(g)],
+        ),
         1.0,
     );
 }
@@ -496,8 +620,22 @@ fn goggles_for_other_domains_have_no_effect() {
 fn goggle_path_rules_boost_matching_urls() {
     let mut g = rules();
     g.path.push(("a.xyz/blog".into(), 2.0));
-    let f = factor_with(base("http://a.xyz/blog"), "q", "en", "zz", QueryIntent::Unknown, &[Arc::new(g.clone())]);
+    let f = factor_with(
+        base("http://a.xyz/blog"),
+        "q",
+        "en",
+        "zz",
+        QueryIntent::Unknown,
+        &[Arc::new(g.clone())],
+    );
     assert_factor(f, 1.3 * W_DEPTH);
-    let f = factor_with(base("http://a.xyz/shop"), "q", "en", "zz", QueryIntent::Unknown, &[Arc::new(g)]);
+    let f = factor_with(
+        base("http://a.xyz/shop"),
+        "q",
+        "en",
+        "zz",
+        QueryIntent::Unknown,
+        &[Arc::new(g)],
+    );
     assert_factor(f, W_DEPTH);
 }

@@ -439,7 +439,11 @@ fn url_to_id_is_case_sensitive_and_slash_sensitive() {
 fn url_to_id_has_no_collisions_on_100k_generated_urls() {
     let mut seen = std::collections::HashSet::with_capacity(100_000);
     for i in 0..100_000u32 {
-        assert!(seen.insert(url_to_id(&format!("https://site{}.com/page/{}", i % 997, i))));
+        assert!(seen.insert(url_to_id(&format!(
+            "https://site{}.com/page/{}",
+            i % 997,
+            i
+        ))));
     }
 }
 
@@ -566,7 +570,10 @@ fn normalize_strips_query_and_fragment_on_root() {
 #[test]
 fn normalize_strips_single_trailing_slash() {
     assert_eq!(normalize_url("https://example.com/"), "https://example.com");
-    assert_eq!(normalize_url("https://example.com/a/"), "https://example.com/a");
+    assert_eq!(
+        normalize_url("https://example.com/a/"),
+        "https://example.com/a"
+    );
 }
 
 #[test]
@@ -595,8 +602,14 @@ fn normalize_lowercases_host_but_keeps_path_case() {
 
 #[test]
 fn normalize_removes_default_ports() {
-    assert_eq!(normalize_url("https://example.com:443/"), "https://example.com");
-    assert_eq!(normalize_url("http://example.com:80/x"), "http://example.com/x");
+    assert_eq!(
+        normalize_url("https://example.com:443/"),
+        "https://example.com"
+    );
+    assert_eq!(
+        normalize_url("http://example.com:80/x"),
+        "http://example.com/x"
+    );
 }
 
 #[test]
@@ -625,15 +638,15 @@ fn normalize_percent_encodes_spaces_in_path() {
 
 #[test]
 fn normalize_converts_idn_to_punycode() {
-    assert_eq!(normalize_url("https://bücher.de/"), "https://xn--bcher-kva.de");
+    assert_eq!(
+        normalize_url("https://bücher.de/"),
+        "https://xn--bcher-kva.de"
+    );
 }
 
 #[test]
 fn normalize_handles_ipv6_hosts() {
-    assert_eq!(
-        normalize_url("http://[::1]:8080/x/"),
-        "http://[::1]:8080/x"
-    );
+    assert_eq!(normalize_url("http://[::1]:8080/x/"), "http://[::1]:8080/x");
 }
 
 #[test]
@@ -652,7 +665,10 @@ fn normalize_empty_string_returns_empty_string() {
 #[test]
 fn normalize_unparsable_http_url_is_returned_unchanged() {
     assert_eq!(normalize_url("http://"), "http://");
-    assert_eq!(normalize_url("https://exa mple.com"), "https://exa mple.com");
+    assert_eq!(
+        normalize_url("https://exa mple.com"),
+        "https://exa mple.com"
+    );
 }
 
 #[test]

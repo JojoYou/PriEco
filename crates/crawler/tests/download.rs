@@ -68,7 +68,9 @@ fn closed_port() -> u16 {
 
 #[tokio::test]
 async fn ok_response_returns_body_status_time_and_url() {
-    let port = serve(1, |_, _| http("200 OK", "Content-Type: text/html\r\n", b"<p>hello</p>"));
+    let port = serve(1, |_, _| {
+        http("200 OK", "Content-Type: text/html\r\n", b"<p>hello</p>")
+    });
     let url = format!("http://127.0.0.1:{}/page", port);
     let (body, status, time, final_url) = download(&client(), &url).await;
     assert_eq!(body, "<p>hello</p>");
@@ -117,7 +119,9 @@ async fn redirects_are_followed_and_final_url_reported() {
 
 #[tokio::test]
 async fn invalid_utf8_body_is_decoded_lossily() {
-    let port = serve(1, |_, _| http("200 OK", "", &[b'o', b'k', 0xff, 0xfe, b'!']));
+    let port = serve(1, |_, _| {
+        http("200 OK", "", &[b'o', b'k', 0xff, 0xfe, b'!'])
+    });
     let (body, status, _, _) = download(&client(), &format!("http://127.0.0.1:{}/", port)).await;
     assert_eq!(status, 200);
     assert!(body.starts_with("ok"));
@@ -136,7 +140,10 @@ async fn large_body_is_fully_read() {
 async fn connection_refused_returns_empty_tuple() {
     let url = format!("http://127.0.0.1:{}/", closed_port());
     let (body, status, time, final_url) = download(&client(), &url).await;
-    assert_eq!((body.as_str(), status, time, final_url.as_str()), ("", 0, 0.0, ""));
+    assert_eq!(
+        (body.as_str(), status, time, final_url.as_str()),
+        ("", 0, 0.0, "")
+    );
 }
 
 #[tokio::test]

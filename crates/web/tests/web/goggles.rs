@@ -3,26 +3,39 @@
 use std::sync::Arc;
 
 use prieco_core::{url_to_domain_id, url_to_id};
-use rocket::{get, http::{Cookie, CookieJar}, routes};
+use rocket::{
+    get,
+    http::{Cookie, CookieJar},
+    routes,
+};
 
 use crate::support::{client, http, init, serve, serve_on, unique_u64};
 use crate::web::functions::ranking::goggles::{
-    Goggle, GoggleRules, delete, domain_str_to_id, fetch_and_store, get, get_goggle_ids,
-    list_all, list_public, load_goggles, parse_goggle, put, touch_fetched_at,
+    Goggle, GoggleRules, delete, domain_str_to_id, fetch_and_store, get, get_goggle_ids, list_all,
+    list_public, load_goggles, parse_goggle, put, touch_fetched_at,
 };
 
 /* ───────────────────────────── domain_str_to_id ───────────────────────────── */
 
 #[test]
 fn domain_str_to_id_matches_url_domain_id() {
-    assert_eq!(domain_str_to_id("example.com"), url_to_domain_id("https://example.com/"));
+    assert_eq!(
+        domain_str_to_id("example.com"),
+        url_to_domain_id("https://example.com/")
+    );
     assert_eq!(domain_str_to_id("example.com"), url_to_id("example.com"));
-    assert_eq!(domain_str_to_id("EXAMPLE.com"), domain_str_to_id("example.com"));
+    assert_eq!(
+        domain_str_to_id("EXAMPLE.com"),
+        domain_str_to_id("example.com")
+    );
 }
 
 #[test]
 fn domain_str_to_id_www_is_distinct() {
-    assert_ne!(domain_str_to_id("www.example.com"), domain_str_to_id("example.com"));
+    assert_ne!(
+        domain_str_to_id("www.example.com"),
+        domain_str_to_id("example.com")
+    );
 }
 
 #[test]
@@ -132,7 +145,8 @@ fn parse_boost_without_or_with_invalid_value_is_ignored() {
 
 #[test]
 fn parse_downrank_with_and_without_value() {
-    let r = parse_goggle("$downrank=4,site=a.com\n$downrank,site=b.com\n$downrank=x,site=c.com").rules;
+    let r =
+        parse_goggle("$downrank=4,site=a.com\n$downrank,site=b.com\n$downrank=x,site=c.com").rules;
     assert_eq!(r.downrank[&domain_str_to_id("a.com")], 4.0);
     assert_eq!(r.downrank[&domain_str_to_id("b.com")], 1.0);
     assert_eq!(r.downrank[&domain_str_to_id("c.com")], 1.0);
@@ -188,7 +202,9 @@ fn parse_last_rule_for_same_site_wins() {
 
 #[test]
 fn parse_many_sites() {
-    let text: String = (0..1000).map(|i| format!("$boost=1,site=s{}.com\n", i)).collect();
+    let text: String = (0..1000)
+        .map(|i| format!("$boost=1,site=s{}.com\n", i))
+        .collect();
     assert_eq!(parse_goggle(&text).rules.boost.len(), 1000);
 }
 
@@ -196,7 +212,11 @@ fn parse_many_sites() {
 fn parse_unicode_does_not_panic() {
     let m = parse_goggle("! name: Žltý 🐴\n$boost=2,site=bücher.de\n$💥\n!:");
     assert_eq!(m.name, "Žltý 🐴");
-    assert!(m.rules.boost.contains_key(&domain_str_to_id("xn--bcher-kva.de")));
+    assert!(
+        m.rules
+            .boost
+            .contains_key(&domain_str_to_id("xn--bcher-kva.de"))
+    );
 }
 
 /// GAP: Brave-style path rules (`/blog/$boost=2`) are documented in GoggleRules.path
@@ -362,8 +382,14 @@ fn goggle_ids_from_param() {
     assert_eq!(get_goggle_ids(Some("1,2,3"), None), vec![1, 2, 3]);
     assert_eq!(get_goggle_ids(Some(" 1 , 2 ,x,,3 "), None), vec![1, 2, 3]);
     assert_eq!(get_goggle_ids(Some(""), None), Vec::<u64>::new());
-    assert_eq!(get_goggle_ids(Some("-1,18446744073709551616"), None), Vec::<u64>::new());
-    assert_eq!(get_goggle_ids(Some("18446744073709551615"), None), vec![u64::MAX]);
+    assert_eq!(
+        get_goggle_ids(Some("-1,18446744073709551616"), None),
+        Vec::<u64>::new()
+    );
+    assert_eq!(
+        get_goggle_ids(Some("18446744073709551615"), None),
+        vec![u64::MAX]
+    );
     assert_eq!(get_goggle_ids(None, None), Vec::<u64>::new());
 }
 
@@ -422,7 +448,14 @@ fn is_default(g: &Goggle) -> bool {
 #[tokio::test]
 async fn fetch_rejects_invalid_and_non_http_urls() {
     init();
-    for u in ["", "not a url", "ftp://example.com/x.goggle", "file:///etc/passwd", "javascript:alert(1)", "data:text/plain,$discard"] {
+    for u in [
+        "",
+        "not a url",
+        "ftp://example.com/x.goggle",
+        "file:///etc/passwd",
+        "javascript:alert(1)",
+        "data:text/plain,$discard",
+    ] {
         assert!(is_default(&fetch_and_store(u.to_string()).await), "{}", u);
     }
 }
@@ -445,7 +478,11 @@ async fn fetch_rejects_local_network_hosts() {
 }
 
 fn goggle_body(_: &str) -> Vec<u8> {
-    http("200 OK", "text/plain", b"! name: Internal\n$boost=2,site=a.com\n")
+    http(
+        "200 OK",
+        "text/plain",
+        b"! name: Internal\n$boost=2,site=a.com\n",
+    )
 }
 
 /// SECURITY (SSRF): the blocklist misses IPv6 loopback, so a goggle URL pointing at
@@ -482,7 +519,10 @@ async fn fetch_from_public_style_server_parses_and_stores() {
     assert_eq!(g.id, url_to_id(&url));
     assert_eq!(g.name, "Internal");
     assert_eq!(g.url, url);
-    assert_eq!(g.content_hash, url_to_id("! name: Internal\n$boost=2,site=a.com\n"));
+    assert_eq!(
+        g.content_hash,
+        url_to_id("! name: Internal\n$boost=2,site=a.com\n")
+    );
     assert!(g.fetched_at > 0);
     assert_eq!(get(g.id).unwrap().name, "Internal");
 }

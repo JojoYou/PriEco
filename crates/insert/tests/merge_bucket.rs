@@ -47,7 +47,11 @@ fn read_bucket(bucket: usize) -> Vec<(u64, f32)> {
     let mut dec = zstd::stream::Decoder::new(fs::File::open(bucket_path(bucket)).unwrap()).unwrap();
     let mut raw = Vec::new();
     dec.read_to_end(&mut raw).unwrap();
-    assert_eq!(raw.len() % RECORD_SIZE, 0, "bucket contains a partial record");
+    assert_eq!(
+        raw.len() % RECORD_SIZE,
+        0,
+        "bucket contains a partial record"
+    );
     raw.chunks_exact(RECORD_SIZE)
         .map(|r| {
             (
@@ -93,7 +97,10 @@ fn merge_creates_bucket_from_staging() {
     write_staging(3, &[record(1, 1.0), record(2, 2.0), record(3, 3.0)]);
     merge_bucket(3).unwrap();
     assert_eq!(read_bucket(3), vec![(1, 1.0), (2, 2.0), (3, 3.0)]);
-    assert!(!std::path::Path::new(&staging_path(3)).exists(), "staging must be removed");
+    assert!(
+        !std::path::Path::new(&staging_path(3)).exists(),
+        "staging must be removed"
+    );
     assert!(no_tmp_files(3));
 }
 

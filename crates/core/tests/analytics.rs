@@ -198,7 +198,11 @@ fn visitors_pageviews_countries_and_dedup() {
         .collect();
     assert!(seen.len() >= 5);
     for k in seen {
-        assert!(!k.contains("203.0.113"), "raw ip leaked into analytics key {}", k);
+        assert!(
+            !k.contains("203.0.113"),
+            "raw ip leaked into analytics key {}",
+            k
+        );
     }
 }
 
@@ -320,7 +324,10 @@ fn flush_twice_is_harmless() {
     ANALYTICS.count(&name);
     ANALYTICS.flush();
     ANALYTICS.flush();
-    assert_eq!(raw(&format!("ctr:{}:{}", day(0), name)), Some(1u64.to_le_bytes().to_vec()));
+    assert_eq!(
+        raw(&format!("ctr:{}:{}", day(0), name)),
+        Some(1u64.to_le_bytes().to_vec())
+    );
 }
 
 /* ───────────────────────────── worker batches ───────────────────────────── */

@@ -10,7 +10,12 @@ fn check(q: &str) -> Option<String> {
 
 #[test]
 fn correct_queries_return_none() {
-    for q in ["hello world", "receive", "the government", "search engine privacy"] {
+    for q in [
+        "hello world",
+        "receive",
+        "the government",
+        "search engine privacy",
+    ] {
         assert_eq!(check(q), None, "{}", q);
     }
 }
@@ -73,7 +78,15 @@ fn protected_entities_are_not_corrected() {
 
 #[test]
 fn unicode_and_symbols_do_not_panic() {
-    for q in ["Žltý kôň", "日本語", "🐴🐴", "c++ vs c#", "a\u{0}b", "İstanbul", "ß"] {
+    for q in [
+        "Žltý kôň",
+        "日本語",
+        "🐴🐴",
+        "c++ vs c#",
+        "a\u{0}b",
+        "İstanbul",
+        "ß",
+    ] {
         let _ = check(q);
     }
 }

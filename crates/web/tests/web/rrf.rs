@@ -26,7 +26,17 @@ fn run(
     dec: Vec<WebDocument>,
 ) -> Vec<WebDocument> {
     init();
-    rrf::run(query, "all", &QueryIntent::Unknown, dir, fts, ivf, dis, dec, K)
+    rrf::run(
+        query,
+        "all",
+        &QueryIntent::Unknown,
+        dir,
+        fts,
+        ivf,
+        dis,
+        dec,
+        K,
+    )
 }
 
 fn urls(v: &[WebDocument]) -> Vec<&str> {
@@ -57,7 +67,10 @@ fn single_source_keeps_rank_order() {
         vec![],
         vec![],
     );
-    assert_eq!(urls(&out), vec!["https://1.com", "https://2.com", "https://3.com"]);
+    assert_eq!(
+        urls(&out),
+        vec!["https://1.com", "https://2.com", "https://3.com"]
+    );
 }
 
 #[test]
@@ -113,7 +126,12 @@ fn source_weights_order_first_ranked_results() {
     );
     assert_eq!(
         urls(&out),
-        vec!["https://dir.com", "https://fts.com", "https://dec.com", "https://dis.com"]
+        vec![
+            "https://dir.com",
+            "https://fts.com",
+            "https://dec.com",
+            "https://dis.com"
+        ]
     );
     assert!(close(out[0].search_score, 3.0 / (K + 1.0)));
     assert!(close(out[2].search_score, 0.9 / (K + 1.0)));
@@ -157,7 +175,10 @@ fn duplicate_inside_one_source_adds_score_but_not_source() {
     );
     assert_eq!(out.len(), 1);
     assert_eq!(out[0].source, "FTS");
-    assert!(close(out[0].search_score, 1.0 / (K + 1.0) + 1.0 / (K + 2.0)));
+    assert!(close(
+        out[0].search_score,
+        1.0 / (K + 1.0) + 1.0 / (K + 2.0)
+    ));
 }
 
 #[test]
@@ -196,8 +217,12 @@ fn result_is_sorted_descending() {
 
 #[test]
 fn many_results() {
-    let fts: Vec<WebDocument> = (0..500).map(|i| doc(&format!("https://f{}.com", i))).collect();
-    let ivf: Vec<WebDocument> = (0..500).map(|i| doc(&format!("https://f{}.com", 499 - i))).collect();
+    let fts: Vec<WebDocument> = (0..500)
+        .map(|i| doc(&format!("https://f{}.com", i)))
+        .collect();
+    let ivf: Vec<WebDocument> = (0..500)
+        .map(|i| doc(&format!("https://f{}.com", 499 - i)))
+        .collect();
     let out = run(NEUTRAL, vec![], fts, ivf, vec![], vec![]);
     assert_eq!(out.len(), 500);
     assert!(out.iter().all(|d| d.source == "FTS + IVF"));
@@ -215,7 +240,10 @@ fn fts_ivf_scores(query: &str) -> (f32, f32) {
         vec![],
     );
     let get = |u: &str| out.iter().find(|d| d.url == u).unwrap().search_score;
-    (get("https://fts.com") * (K + 1.0), get("https://ivf.com") * (K + 1.0))
+    (
+        get("https://fts.com") * (K + 1.0),
+        get("https://ivf.com") * (K + 1.0),
+    )
 }
 
 #[test]
@@ -279,36 +307,58 @@ fn empty_query_counts_as_short() {
 fn ivf_score(lang: &str, doc_lang: &str, intent: QueryIntent, source: &str) -> f32 {
     init();
     let d = vec![lang_doc("https://x.com", doc_lang)];
-    let (fts, ivf) = if source == "IVF" { (vec![], d) } else { (d, vec![]) };
+    let (fts, ivf) = if source == "IVF" {
+        (vec![], d)
+    } else {
+        (d, vec![])
+    };
     let out = rrf::run(NEUTRAL, lang, &intent, vec![], fts, ivf, vec![], vec![], K);
     out[0].search_score * (K + 1.0)
 }
 
 #[test]
 fn foreign_vector_results_are_penalised() {
-    assert!(close(ivf_score("en", "de", QueryIntent::Unknown, "IVF"), 0.1));
-    assert!(close(ivf_score("en", "de", QueryIntent::Informational, "IVF"), 0.1));
+    assert!(close(
+        ivf_score("en", "de", QueryIntent::Unknown, "IVF"),
+        0.1
+    ));
+    assert!(close(
+        ivf_score("en", "de", QueryIntent::Informational, "IVF"),
+        0.1
+    ));
 }
 
 #[test]
 fn foreign_vector_results_penalised_less_for_navigational() {
-    assert!(close(ivf_score("en", "de", QueryIntent::Navigational, "IVF"), 0.7));
+    assert!(close(
+        ivf_score("en", "de", QueryIntent::Navigational, "IVF"),
+        0.7
+    ));
 }
 
 #[test]
 fn matching_language_is_not_penalised() {
-    assert!(close(ivf_score("en", "en", QueryIntent::Unknown, "IVF"), 1.0));
+    assert!(close(
+        ivf_score("en", "en", QueryIntent::Unknown, "IVF"),
+        1.0
+    ));
 }
 
 #[test]
 fn all_or_empty_language_disables_penalty() {
-    assert!(close(ivf_score("all", "de", QueryIntent::Unknown, "IVF"), 1.0));
+    assert!(close(
+        ivf_score("all", "de", QueryIntent::Unknown, "IVF"),
+        1.0
+    ));
     assert!(close(ivf_score("", "de", QueryIntent::Unknown, "IVF"), 1.0));
 }
 
 #[test]
 fn language_penalty_only_applies_to_vector_source() {
-    assert!(close(ivf_score("en", "de", QueryIntent::Unknown, "FTS"), 1.0));
+    assert!(close(
+        ivf_score("en", "de", QueryIntent::Unknown, "FTS"),
+        1.0
+    ));
 }
 
 /* ───────────────────────────── site: / domain: filters ───────────────────────────── */

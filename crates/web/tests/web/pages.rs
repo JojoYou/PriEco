@@ -11,12 +11,15 @@ use rocket::{
 use crate::support::client;
 use crate::web::functions::ranking::goggles::{domain_str_to_id, parse_goggle};
 use crate::web::routes::pages::{
-    self, ClientIp, apply_goggles, country_info, export_quick_tune, goggles_tint,
-    handle_shortcuts, index_head, set_preferences, settings_update, update_qt,
+    self, ClientIp, apply_goggles, country_info, export_quick_tune, goggles_tint, handle_shortcuts,
+    index_head, set_preferences, settings_update, update_qt,
 };
 
 fn location(r: &LocalResponse<'_>) -> String {
-    r.headers().get_one("Location").unwrap_or_default().to_string()
+    r.headers()
+        .get_one("Location")
+        .unwrap_or_default()
+        .to_string()
 }
 
 fn cookie<'a>(r: &'a LocalResponse<'_>, name: &str) -> Option<Cookie<'static>> {
@@ -66,8 +69,12 @@ fn country_info_table_is_consistent() {
     let mut count = 0;
     for line in body.lines() {
         let line = line.trim();
-        let Some(rest) = line.strip_prefix('"') else { continue };
-        let Some((code, _)) = rest.split_once('"') else { continue };
+        let Some(rest) = line.strip_prefix('"') else {
+            continue;
+        };
+        let Some((code, _)) = rest.split_once('"') else {
+            continue;
+        };
         count += 1;
         assert!(seen.insert(code.to_string()), "duplicate code {}", code);
         let (name, flag) = country_info(code);
@@ -82,7 +89,11 @@ fn country_info_table_is_consistent() {
         }
     }
     assert!(count > 200, "parsed only {} entries", count);
-    assert!(bad_flags.is_empty(), "flags not matching their code: {:?}", bad_flags);
+    assert!(
+        bad_flags.is_empty(),
+        "flags not matching their code: {:?}",
+        bad_flags
+    );
 }
 
 /// Every country that the language auto detection knows should have a display name
@@ -107,15 +118,30 @@ fn tint_defaults() {
 
 #[test]
 fn tint_valid_hex_with_and_without_hash() {
-    assert_eq!(goggles_tint(Some("ff00AA"), Some("card")).1, ".card { background-color: #ff00AA66; }");
-    assert_eq!(goggles_tint(Some("#123456"), Some("x")).1, ".x { background-color: #12345666; }");
-    assert_eq!(goggles_tint(Some("##123456"), Some("x")).1, ".x { background-color: #12345666; }");
+    assert_eq!(
+        goggles_tint(Some("ff00AA"), Some("card")).1,
+        ".card { background-color: #ff00AA66; }"
+    );
+    assert_eq!(
+        goggles_tint(Some("#123456"), Some("x")).1,
+        ".x { background-color: #12345666; }"
+    );
+    assert_eq!(
+        goggles_tint(Some("##123456"), Some("x")).1,
+        ".x { background-color: #12345666; }"
+    );
 }
 
 #[test]
 fn tint_invalid_hex_falls_back() {
-    for t in ["", "fff", "1234567", "gggggg", "12345z", "#12 456", "ŽŽŽ", "red"] {
-        assert!(goggles_tint(Some(t), Some("x")).1.contains("#14141E66"), "{:?}", t);
+    for t in [
+        "", "fff", "1234567", "gggggg", "12345z", "#12 456", "ŽŽŽ", "red",
+    ] {
+        assert!(
+            goggles_tint(Some(t), Some("x")).1.contains("#14141E66"),
+            "{:?}",
+            t
+        );
     }
 }
 
@@ -137,7 +163,10 @@ fn tint_route_serves_css() {
     let c = client(routes![tint_route]);
     let r = c.get("/tint?tint=00ff00&target=g1").dispatch();
     assert_eq!(r.content_type(), Some(ContentType::CSS));
-    assert_eq!(r.into_string().unwrap(), ".g1 { background-color: #00ff0066; }");
+    assert_eq!(
+        r.into_string().unwrap(),
+        ".g1 { background-color: #00ff0066; }"
+    );
 }
 
 /* ───────────────────────────── index_head ───────────────────────────── */
@@ -190,7 +219,10 @@ fn client_ip_uses_first_forwarded_for_entry() {
 #[test]
 fn client_ip_real_ip_header() {
     let c = ip_client();
-    let r = c.get("/ip").header(Header::new("X-Real-IP", "9.9.9.9")).dispatch();
+    let r = c
+        .get("/ip")
+        .header(Header::new("X-Real-IP", "9.9.9.9"))
+        .dispatch();
     assert_eq!(r.into_string().unwrap(), "9.9.9.9");
 }
 
@@ -242,7 +274,10 @@ fn shortcuts_client() -> Client {
 fn post_shortcut(c: &Client, form: &str, existing: Option<&str>) -> (Status, String, Vec<String>) {
     let mut req = c.post("/").header(ContentType::Form).body(form.to_string());
     if let Some(v) = existing {
-        req = req.cookie(Cookie::new("shortcuts", urlencoding::encode(v).into_owned()));
+        req = req.cookie(Cookie::new(
+            "shortcuts",
+            urlencoding::encode(v).into_owned(),
+        ));
     }
     let r = req.dispatch();
     let status = r.status();
@@ -262,7 +297,11 @@ fn post_shortcut(c: &Client, form: &str, existing: Option<&str>) -> (Status, Str
 #[test]
 fn shortcut_add_first_inserts_dummy_and_adds_https() {
     let c = shortcuts_client();
-    let (status, loc, items) = post_shortcut(&c, "action=add&shortcut_name=Git&shortcut_url=github.com", None);
+    let (status, loc, items) = post_shortcut(
+        &c,
+        "action=add&shortcut_name=Git&shortcut_url=github.com",
+        None,
+    );
     assert_eq!(status, Status::SeeOther);
     assert_eq!(loc, "/");
     assert_eq!(items, vec!["dummy=dummy", "Git=https://github.com"]);
@@ -282,7 +321,11 @@ fn shortcut_add_keeps_explicit_scheme() {
 #[test]
 fn shortcut_add_without_name_or_url_changes_nothing() {
     let c = shortcuts_client();
-    let (_, _, items) = post_shortcut(&c, "action=add&shortcut_name=X", Some("dummy=dummy,A=https://a.com"));
+    let (_, _, items) = post_shortcut(
+        &c,
+        "action=add&shortcut_name=X",
+        Some("dummy=dummy,A=https://a.com"),
+    );
     assert_eq!(items, vec!["dummy=dummy", "A=https://a.com"]);
 }
 
@@ -311,14 +354,22 @@ fn shortcut_edit_out_of_range_is_ignored() {
 #[test]
 fn shortcut_delete() {
     let c = shortcuts_client();
-    let (_, _, items) = post_shortcut(&c, "action=delete&shortcut_id=1", Some("dummy=dummy,A=https://a.com,B=https://b.com"));
+    let (_, _, items) = post_shortcut(
+        &c,
+        "action=delete&shortcut_id=1",
+        Some("dummy=dummy,A=https://a.com,B=https://b.com"),
+    );
     assert_eq!(items, vec!["dummy=dummy", "B=https://b.com"]);
 }
 
 #[test]
 fn shortcut_delete_out_of_range_and_missing_id() {
     let c = shortcuts_client();
-    let (_, _, items) = post_shortcut(&c, "action=delete&shortcut_id=5", Some("dummy=dummy,A=https://a.com"));
+    let (_, _, items) = post_shortcut(
+        &c,
+        "action=delete&shortcut_id=5",
+        Some("dummy=dummy,A=https://a.com"),
+    );
     assert_eq!(items, vec!["dummy=dummy", "A=https://a.com"]);
     let (_, _, items) = post_shortcut(&c, "action=delete", Some("dummy=dummy,A=https://a.com"));
     assert_eq!(items, vec!["dummy=dummy", "A=https://a.com"]);
@@ -348,7 +399,11 @@ fn shortcut_cookie_attributes() {
 #[test]
 fn shortcut_missing_action_is_unprocessable() {
     let c = shortcuts_client();
-    let r = c.post("/").header(ContentType::Form).body("shortcut_name=A").dispatch();
+    let r = c
+        .post("/")
+        .header(ContentType::Form)
+        .body("shortcut_name=A")
+        .dispatch();
     assert_eq!(r.status(), Status::UnprocessableEntity);
 }
 
@@ -357,7 +412,11 @@ fn shortcut_missing_action_is_unprocessable() {
 #[test]
 fn shortcut_name_with_comma_stays_one_shortcut() {
     let c = shortcuts_client();
-    let (_, _, items) = post_shortcut(&c, "action=add&shortcut_name=a%2Cb&shortcut_url=x.com", None);
+    let (_, _, items) = post_shortcut(
+        &c,
+        "action=add&shortcut_name=a%2Cb&shortcut_url=x.com",
+        None,
+    );
     let stored = items.join(",");
     let (_, _, after) = post_shortcut(&c, "action=delete&shortcut_id=1", Some(&stored));
     assert_eq!(after, vec!["dummy=dummy"], "left over: {:?}", after);
@@ -368,7 +427,10 @@ fn shortcut_name_with_comma_stays_one_shortcut() {
 fn post_settings(form: &str, cookies: &[(&str, &str)]) -> LocalResponse<'static> {
     // Leak a client per call: LocalResponse borrows it
     let c: &'static Client = Box::leak(Box::new(client(routes![settings_update])));
-    let mut req = c.post("/settings_update").header(ContentType::Form).body(form.to_string());
+    let mut req = c
+        .post("/settings_update")
+        .header(ContentType::Form)
+        .body(form.to_string());
     for (k, v) in cookies {
         req = req.cookie(Cookie::new(k.to_string(), v.to_string()));
     }
@@ -377,10 +439,21 @@ fn post_settings(form: &str, cookies: &[(&str, &str)]) -> LocalResponse<'static>
 
 #[test]
 fn settings_update_sets_cookies_and_redirects_home() {
-    let r = post_settings("newtab=on&index=on&theme=dark&lang=sk&loc=sk&js=on&post=on", &[]);
+    let r = post_settings(
+        "newtab=on&index=on&theme=dark&lang=sk&loc=sk&js=on&post=on",
+        &[],
+    );
     assert_eq!(r.status(), Status::SeeOther);
     assert_eq!(location(&r), "/");
-    for (k, v) in [("newtab", "1"), ("index", "1"), ("theme", "dark"), ("lang", "sk"), ("loc", "sk"), ("js", "1"), ("post", "1")] {
+    for (k, v) in [
+        ("newtab", "1"),
+        ("index", "1"),
+        ("theme", "dark"),
+        ("lang", "sk"),
+        ("loc", "sk"),
+        ("js", "1"),
+        ("post", "1"),
+    ] {
         let ck = cookie(&r, k).unwrap_or_else(|| panic!("{} not set", k));
         assert_eq!(ck.value(), v, "{}", k);
         assert_eq!(ck.max_age(), Some(rocket::time::Duration::days(365)));
@@ -389,7 +462,10 @@ fn settings_update_sets_cookies_and_redirects_home() {
 
 #[test]
 fn settings_update_removes_unchecked_flags() {
-    let r = post_settings("", &[("newtab", "1"), ("index", "1"), ("js", "1"), ("post", "1")]);
+    let r = post_settings(
+        "",
+        &[("newtab", "1"), ("index", "1"), ("js", "1"), ("post", "1")],
+    );
     for k in ["newtab", "index", "js", "post"] {
         let ck = cookie(&r, k).unwrap_or_else(|| panic!("no removal cookie for {}", k));
         assert!(is_removal(&ck), "{} not removed: {:?}", k, ck);
@@ -423,8 +499,19 @@ fn get_set(query: &str, cookies: &[(&str, &str)]) -> LocalResponse<'static> {
 
 #[test]
 fn set_preferences_sets_strict_secure_cookies() {
-    let r = get_set("lang=de&loc=at&theme=light&newtab=1&js=1&index=1&post=1", &[]);
-    for (k, v) in [("lang", "de"), ("loc", "at"), ("theme", "light"), ("newtab", "1"), ("js", "1"), ("index", "1"), ("post", "1")] {
+    let r = get_set(
+        "lang=de&loc=at&theme=light&newtab=1&js=1&index=1&post=1",
+        &[],
+    );
+    for (k, v) in [
+        ("lang", "de"),
+        ("loc", "at"),
+        ("theme", "light"),
+        ("newtab", "1"),
+        ("js", "1"),
+        ("index", "1"),
+        ("post", "1"),
+    ] {
         let ck = cookie(&r, k).unwrap_or_else(|| panic!("{}", k));
         assert_eq!(ck.value(), v);
         assert_eq!(ck.same_site(), Some(SameSite::Strict));
@@ -435,7 +522,10 @@ fn set_preferences_sets_strict_secure_cookies() {
 
 #[test]
 fn set_preferences_zero_removes_flags() {
-    let r = get_set("newtab=0&js=0&index=0&post=0", &[("newtab", "1"), ("js", "1"), ("index", "1"), ("post", "1")]);
+    let r = get_set(
+        "newtab=0&js=0&index=0&post=0",
+        &[("newtab", "1"), ("js", "1"), ("index", "1"), ("post", "1")],
+    );
     for k in ["newtab", "js", "index", "post"] {
         assert!(is_removal(&cookie(&r, k).unwrap()), "{}", k);
     }
@@ -450,14 +540,29 @@ fn set_preferences_without_params_changes_nothing() {
 
 #[test]
 fn set_preferences_redirects_to_local_paths() {
-    assert_eq!(location(&get_set("return_to=%2Fsearch%3Fq%3Drust", &[])), "/search?q=rust");
-    assert_eq!(location(&get_set("return_to=%2Fsettings", &[])), "/settings");
+    assert_eq!(
+        location(&get_set("return_to=%2Fsearch%3Fq%3Drust", &[])),
+        "/search?q=rust"
+    );
+    assert_eq!(
+        location(&get_set("return_to=%2Fsettings", &[])),
+        "/settings"
+    );
 }
 
 #[test]
 fn set_preferences_refuses_absolute_redirects() {
-    for target in ["https%3A%2F%2Fevil.example", "evil.example", "javascript%3Aalert(1)"] {
-        assert_eq!(location(&get_set(&format!("return_to={}", target), &[])), "/", "{}", target);
+    for target in [
+        "https%3A%2F%2Fevil.example",
+        "evil.example",
+        "javascript%3Aalert(1)",
+    ] {
+        assert_eq!(
+            location(&get_set(&format!("return_to={}", target), &[])),
+            "/",
+            "{}",
+            target
+        );
     }
 }
 
@@ -486,7 +591,10 @@ fn apply(query: &str, cookies: &[(&str, &str)]) -> LocalResponse<'static> {
 fn apply_goggles_sets_joined_ids() {
     let r = apply("?ids=1&ids=22&ids=18446744073709551615", &[]);
     assert_eq!(location(&r), "/goggles");
-    assert_eq!(cookie(&r, "active_goggles").unwrap().value(), "1,22,18446744073709551615");
+    assert_eq!(
+        cookie(&r, "active_goggles").unwrap().value(),
+        "1,22,18446744073709551615"
+    );
 }
 
 #[test]
@@ -506,7 +614,10 @@ fn apply_goggles_rejects_non_numeric_ids() {
 
 fn qt_post(form: &str, existing: Option<&str>) -> LocalResponse<'static> {
     let c: &'static Client = Box::leak(Box::new(client(routes![update_qt])));
-    let mut req = c.post("/quick_tune_update").header(ContentType::Form).body(form.to_string());
+    let mut req = c
+        .post("/quick_tune_update")
+        .header(ContentType::Form)
+        .body(form.to_string());
     if let Some(v) = existing {
         req = req.cookie(Cookie::new("prieco_qt_prefs", v.to_string()));
     }
@@ -519,7 +630,10 @@ fn qt_prefs(r: &LocalResponse<'_>) -> serde_json::Value {
 
 #[test]
 fn quick_tune_adds_preferences() {
-    let r = qt_post("return_url=%2Fsearch&prefs[alpha]=boost&prefs[beta]=downrank&prefs[gamma]=discard", None);
+    let r = qt_post(
+        "return_url=%2Fsearch&prefs[alpha]=boost&prefs[beta]=downrank&prefs[gamma]=discard",
+        None,
+    );
     assert_eq!(location(&r), "/search");
     let v = qt_prefs(&r);
     assert_eq!(v["boost"], serde_json::json!(["alpha"]));
@@ -546,16 +660,26 @@ fn quick_tune_unknown_action_clears_domain() {
 
 #[test]
 fn quick_tune_invalid_existing_cookie_starts_fresh() {
-    let v = qt_prefs(&qt_post("return_url=%2F&prefs[alpha]=boost", Some("not json")));
+    let v = qt_prefs(&qt_post(
+        "return_url=%2F&prefs[alpha]=boost",
+        Some("not json"),
+    ));
     assert_eq!(v["boost"], serde_json::json!(["alpha"]));
 }
 
 /// SECURITY (open redirect): return_url is used verbatim as redirect target.
 #[test]
 fn quick_tune_refuses_off_site_redirects() {
-    let r = qt_post("return_url=https%3A%2F%2Fevil.example%2Fphish&prefs[a]=boost", None);
+    let r = qt_post(
+        "return_url=https%3A%2F%2Fevil.example%2Fphish&prefs[a]=boost",
+        None,
+    );
     let loc = location(&r);
-    assert!(loc.starts_with('/') && !loc.starts_with("//"), "redirects to {}", loc);
+    assert!(
+        loc.starts_with('/') && !loc.starts_with("//"),
+        "redirects to {}",
+        loc
+    );
 }
 
 #[get("/export")]
@@ -569,7 +693,10 @@ fn quick_tune_export_is_a_valid_goggle_download() {
     let prefs = r#"{"boost":["a.com"],"downrank":["b.com"],"discard":["c.com"]}"#;
     let r = c
         .get("/export")
-        .cookie(Cookie::new("prieco_qt_prefs", urlencoding::encode(prefs).into_owned()))
+        .cookie(Cookie::new(
+            "prieco_qt_prefs",
+            urlencoding::encode(prefs).into_owned(),
+        ))
         .dispatch();
     assert_eq!(r.content_type(), Some(ContentType::Plain));
     assert_eq!(
@@ -593,5 +720,8 @@ fn quick_tune_export_is_a_valid_goggle_download() {
 fn quick_tune_export_without_cookie_has_only_header() {
     let c = client(routes![export_route]);
     let text = c.get("/export").dispatch().into_string().unwrap();
-    assert_eq!(text, "! name: My PriEco Goggle\n! description: Exported Goggle\n! public: false\n\n");
+    assert_eq!(
+        text,
+        "! name: My PriEco Goggle\n! description: Exported Goggle\n! public: false\n\n"
+    );
 }

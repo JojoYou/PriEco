@@ -18,7 +18,10 @@ fn inserter_record_layout_constants() {
     assert_eq!(ID_SIZE, 8);
     assert_eq!(ID_SIZE, std::mem::size_of::<u64>());
     assert_eq!(VECTOR_DIM, 384);
-    assert_eq!(RECORD_SIZE, ID_SIZE + VECTOR_DIM * std::mem::size_of::<f32>());
+    assert_eq!(
+        RECORD_SIZE,
+        ID_SIZE + VECTOR_DIM * std::mem::size_of::<f32>()
+    );
     assert_eq!(RECORD_SIZE, 1544);
 }
 
@@ -404,8 +407,10 @@ fn img_and_scroll_results_serialize() {
 
 #[test]
 fn bang_deserializes() {
-    let b: Bang = serde_json::from_str(r#"{"d":"github.com","t":"gh","u":"https://github.com/search?q={{{s}}}"}"#)
-        .unwrap();
+    let b: Bang = serde_json::from_str(
+        r#"{"d":"github.com","t":"gh","u":"https://github.com/search?q={{{s}}}"}"#,
+    )
+    .unwrap();
     assert_eq!(b.t, "gh");
     assert_eq!(b.d, "github.com");
     assert!(b.u.contains("{{{s}}}"));
@@ -484,8 +489,7 @@ fn registry() -> EntityRegistry {
 #[test]
 fn entity_registry_json_roundtrip() {
     let reg = registry();
-    let back: EntityRegistry =
-        serde_json::from_str(&serde_json::to_string(&reg).unwrap()).unwrap();
+    let back: EntityRegistry = serde_json::from_str(&serde_json::to_string(&reg).unwrap()).unwrap();
     assert_eq!(back.places.len(), 2);
     assert_eq!(back.places["Springfield"].len(), 2);
     assert_eq!(back.places["Bratislava"][0].country, "sk");
@@ -501,7 +505,10 @@ fn entity_registry_rkyv_roundtrip_and_validation() {
     assert_eq!(b.len(), 1);
     assert_eq!(b[0].country.as_str(), "sk");
     assert!((b[0].lat - 48.1486).abs() < 1e-4);
-    assert!(archived.places.get("bratislava").is_none(), "keys are case sensitive");
+    assert!(
+        archived.places.get("bratislava").is_none(),
+        "keys are case sensitive"
+    );
 }
 
 #[test]
@@ -541,6 +548,9 @@ fn user_agent_guard_defaults_to_unknown() {
 #[test]
 fn user_agent_guard_keeps_empty_header_value() {
     let client = ua_client();
-    let res = client.get("/ua").header(Header::new("User-Agent", "")).dispatch();
+    let res = client
+        .get("/ua")
+        .header(Header::new("User-Agent", ""))
+        .dispatch();
     assert_eq!(res.into_string().unwrap(), "");
 }

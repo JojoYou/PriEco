@@ -13,9 +13,7 @@ use std::{
 
 use prieco_core::{normalize_url, url_to_id};
 use prieco_pagerank::{
-    compute::{
-        self, IdMap, read_u64_pair, read_u64_pair_zstd, zstd_reader, zstd_writer,
-    },
+    compute::{self, IdMap, read_u64_pair, read_u64_pair_zstd, zstd_reader, zstd_writer},
     import::{hashing, merge, translate},
     iter::iterate,
     nodes::csr,
@@ -402,7 +400,11 @@ fn hashing_trims_whitespace_around_urls() {
     let t = Tmp::new();
     let conn = t.dir("conn");
     let edges = t.dir("edges");
-    write_conn(&conn, "c.txt", "   https://a.com/x   ->\thttps://b.com/y \t\n");
+    write_conn(
+        &conn,
+        "c.txt",
+        "   https://a.com/x   ->\thttps://b.com/y \t\n",
+    );
     let shards = hashing::run_in(&conn, &edges).unwrap();
     assert_eq!(
         read_pairs_raw(&shards[0]),
@@ -501,7 +503,11 @@ fn hashing_merges_multiple_files_into_one_shard() {
     let conn = t.dir("conn");
     let edges = t.dir("edges");
     write_conn(&conn, "1.txt", "https://a.com->https://b.com\n");
-    write_conn(&conn, "2.txt", "https://c.com->https://d.com\nhttps://a.com->https://b.com\n");
+    write_conn(
+        &conn,
+        "2.txt",
+        "https://c.com->https://d.com\nhttps://a.com->https://b.com\n",
+    );
     let shards = hashing::run_in(&conn, &edges).unwrap();
     assert_eq!(shards.len(), 1);
     assert_eq!(read_pairs_raw(&shards[0]).len(), 2);
@@ -514,7 +520,11 @@ fn hashing_handles_crlf_line_endings() {
     let t = Tmp::new();
     let conn = t.dir("conn");
     let edges = t.dir("edges");
-    write_conn(&conn, "c.txt", "https://a.com->https://b.com\r\nhttps://c.com->https://d.com\r\n");
+    write_conn(
+        &conn,
+        "c.txt",
+        "https://a.com->https://b.com\r\nhttps://c.com->https://d.com\r\n",
+    );
     let shards = hashing::run_in(&conn, &edges).unwrap();
     let pairs: HashSet<(u64, u64)> = read_pairs_raw(&shards[0]).into_iter().collect();
     assert!(pairs.contains(&(h("https://a.com"), h("https://b.com"))));
@@ -580,7 +590,11 @@ fn merge_removes_temporary_node_shards() {
     write_pairs_raw(&shard, &[(1, 2)]);
     merge::run_with(&[shard], &id_map, &nodes, &merged, &total).unwrap();
     assert_eq!(fs::read_dir(&nodes).unwrap().count(), 0);
-    assert_eq!(fs::read_dir(&merged).unwrap().count(), 0, "merged file must be renamed away");
+    assert_eq!(
+        fs::read_dir(&merged).unwrap().count(),
+        0,
+        "merged file must be renamed away"
+    );
 }
 
 #[test]
@@ -646,7 +660,12 @@ fn merge_corrupt_total_nodes_must_not_reuse_existing_ids() {
     write_pairs_raw(&s, &[(8, 9)]);
     let result = merge::run_with(&[s], &id_map, &nodes, &merged, &total);
     if let Ok(_) = result {
-        let ids: Vec<u64> = IdMap::open(&id_map).unwrap().pairs().iter().map(|p| p.1).collect();
+        let ids: Vec<u64> = IdMap::open(&id_map)
+            .unwrap()
+            .pairs()
+            .iter()
+            .map(|p| p.1)
+            .collect();
         let unique: HashSet<u64> = ids.iter().copied().collect();
         assert_eq!(unique.len(), ids.len(), "duplicate ids assigned: {:?}", ids);
     }
@@ -668,7 +687,10 @@ fn translate_maps_hashes_to_ids_and_drops_unknown_nodes() {
     translate::run_with(vec![shard.clone()], &id_map, &edges_sorted, &edges_dir).unwrap();
 
     assert_eq!(read_pairs_zstd(&edges_sorted), vec![(0, 1), (1, 2), (2, 0)]);
-    assert!(!std::path::Path::new(&shard).exists(), "input shard must be removed");
+    assert!(
+        !std::path::Path::new(&shard).exists(),
+        "input shard must be removed"
+    );
 }
 
 #[test]
@@ -889,7 +911,9 @@ fn run_pagerank(t: &Tmp, n: usize, edges: &[(u64, u64)]) -> Vec<f32> {
     build_csr(t, n, edges);
     let sa = t.p("scores_a.bin");
     let sb = t.p("scores_b.bin");
-    let init: Vec<u8> = (0..n).flat_map(|_| (1.0f32 / n as f32).to_le_bytes()).collect();
+    let init: Vec<u8> = (0..n)
+        .flat_map(|_| (1.0f32 / n as f32).to_le_bytes())
+        .collect();
     fs::write(&sa, init).unwrap();
     let out = iterate::run_with(
         n,
@@ -1011,7 +1035,10 @@ fn hashing_merge_translate_chain_preserves_edge_set() {
         ("https://c.com", "https://a.com"),
         ("https://d.com", "https://a.com"),
     ];
-    let content: String = links.iter().map(|(a, b)| format!("{}->{}\n", a, b)).collect();
+    let content: String = links
+        .iter()
+        .map(|(a, b)| format!("{}->{}\n", a, b))
+        .collect();
     write_conn(&conn, "c.txt", &content);
 
     let shards = hashing::run_in(&conn, &edges_dir).unwrap();
