@@ -344,7 +344,6 @@ async fn main() -> Result<(), rocket::Error> {
                     robots,   // Robots.txt
                     osd,
                     script,
-                    favicon,
                     privacy, // Privacy Policy
                     // Landing page
                     index,
@@ -615,7 +614,8 @@ fn create_embeder() -> Session {
         builder
     };
 
-    let session_builder = create_base_builder();
+    #[allow(unused_mut)]
+    let mut session_builder = create_base_builder();
 
     #[cfg(feature = "cuda")]
     {

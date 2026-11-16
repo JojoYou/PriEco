@@ -857,7 +857,7 @@ fn search_tantivy(
 
     let searcher = TANTIVY_READER.searcher();
     let top_docs = searcher
-        .search(&final_query, &TopDocs::with_limit(limit))
+        .search(&final_query, &TopDocs::with_limit(limit).order_by_score())
         .ok()?;
 
     let mut id_score_vec: Vec<(u64, f32)> = Vec::with_capacity(top_docs.len());

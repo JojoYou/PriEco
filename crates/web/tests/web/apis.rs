@@ -10,12 +10,12 @@ use crate::web::routes::apis::{self, cache_ver, om_sug, proxy_get, proxy_post};
 
 async fn get_status(u: &str) -> Result<(ContentType, Vec<u8>), Status> {
     init();
-    proxy_get(u, None, None).await
+    proxy_get(u).await
 }
 
 async fn post_status(u: &str) -> Result<(ContentType, Vec<u8>), Status> {
     init();
-    proxy_post(u, b"{}".to_vec(), None, None).await
+    proxy_post(u, b"{}".to_vec()).await
 }
 
 /* ───────────────────────────── proxy: malformed input ───────────────────────────── */

@@ -146,7 +146,7 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
 
         for entry_idx in 0..archive.len() {
             let entry = archive.by_index(entry_idx)?;
-            let entry_name = entry.name().to_string();
+            let entry_name = entry.name()?.to_string();
             if !entry_name.ends_with(".txt") {
                 continue;
             }
@@ -168,7 +168,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
 
                 // Preserve uniqness
                 if PRIECO_META.meta_ks.get(id.to_be_bytes()).unwrap().is_some() {
-                    println!("Uniqnuess: {}", url);
                     continue;
                 }
 

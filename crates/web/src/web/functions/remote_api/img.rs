@@ -2,7 +2,7 @@ use aes_gcm::{
     Aes256Gcm, Key, Nonce,
     aead::{Aead, KeyInit},
 };
-use rand::Rng;
+use rand::RngExt;
 use serde_json::Value;
 use std::{
     fs::{metadata, read, write},

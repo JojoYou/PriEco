@@ -25,9 +25,7 @@ dotenvy = { workspace = true }
 reqwest = { workspace = true }
 rand = { workspace = true }
 socket2 = { workspace = true }
-brotli = { workspace = true }
 urlencoding = { workspace = true }
-image = { workspace = true }
 libc = { workspace = true }
 ort = { workspace = true }
 tokenizers = { workspace = true }
@@ -51,11 +49,15 @@ fjall = { workspace = true }
 aes-gcm = { workspace = true }
 regex = { workspace = true }
 iroh = { workspace = true }
-iroh-gossip  = { workspace = true }
+iroh-gossip = { workspace = true }
 futures-lite = { workspace = true }
 data-encoding = { workspace = true }
 n0-future = { workspace = true }
 
 [features]
 default = []
-cuda = ["prieco_insert/cuda", "prieco_pagerank/cuda", "ort/cuda"]  # Compile:  RUSTFLAGS='-C target-cpu=native' cargo build --release --features cuda
+cuda = [
+    "prieco_insert/cuda",
+    "prieco_pagerank/cuda",
+    "ort/cuda",
+] # Compile:  RUSTFLAGS='-C target-cpu=native' cargo build --release --features cuda

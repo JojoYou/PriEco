@@ -15,7 +15,6 @@
 */
 use std::{
     fs::read_to_string,
-    io::Cursor,
     net::{IpAddr, ToSocketAddrs},
     path::Path,
 };
@@ -23,7 +22,6 @@ use std::{
 /*
   Import external libraries
 */
-use image::GenericImageView;
 use rocket::{
     FromForm, State,
     form::Form,
@@ -210,12 +208,8 @@ pub async fn api(
   Input: URL, Optional width, Optional height
   Output: Content
 */
-#[get("/proxy?<u>&<width>&<height>")]
-pub async fn proxy_get(
-    u: &str,
-    width: Option<u32>,
-    height: Option<u32>,
-) -> Result<(ContentType, Vec<u8>), Status> {
+#[get("/proxy?<u>")]
+pub async fn proxy_get(u: &str) -> Result<(ContentType, Vec<u8>), Status> {
     let decoded_url = match urlencoding::decode(u) {
         Ok(dec) => dec.into_owned(),
         Err(_) => return Err(Status::BadRequest),
@@ -232,7 +226,7 @@ pub async fn proxy_get(
     }
 
     // File type
-    let (content_type, body) = proxy_request(&url, None, "GET", width, height).await?;
+    let (content_type, body) = proxy_request(&url, None, "GET").await?;
 
     if allowed_type(&url, &content_type) {
         Ok((content_type, body))
@@ -247,13 +241,8 @@ pub async fn proxy_get(
   Input: URL, Optional width, Optional height
   Output: Content
 */
-#[post("/proxy?<u>&<width>&<height>", data = "<body>")]
-pub async fn proxy_post(
-    u: &str,
-    body: Vec<u8>,
-    width: Option<u32>,
-    height: Option<u32>,
-) -> Result<(ContentType, Vec<u8>), Status> {
+#[post("/proxy?<u>", data = "<body>")]
+pub async fn proxy_post(u: &str, body: Vec<u8>) -> Result<(ContentType, Vec<u8>), Status> {
     let decoded_url = match urlencoding::decode(u) {
         Ok(dec) => dec.into_owned(),
         Err(_) => return Err(Status::BadRequest),
@@ -270,7 +259,7 @@ pub async fn proxy_post(
     }
 
     // File type
-    let (content_type, body) = proxy_request(&url, Some(body), "POST", width, height).await?;
+    let (content_type, body) = proxy_request(&url, Some(body), "POST").await?;
 
     if allowed_type(&url, &content_type) {
         Ok((content_type, body))
@@ -361,7 +350,7 @@ fn allowed_type(url: &Url, content_type: &ContentType) -> bool {
 
     // Images are allowed
     // CSS and JS only Search Expander
-    if top == "image" && allowed_data && allowed_domain {
+    if top == "image" || (allowed_data && allowed_domain) {
         true
     }
     // Reject the rest
@@ -380,8 +369,6 @@ async fn proxy_request(
     url: &Url,
     body: Option<Vec<u8>>,
     method: &str,
-    width: Option<u32>,
-    height: Option<u32>,
 ) -> Result<(ContentType, Vec<u8>), Status> {
     let mut target_url = url.clone();
     if target_url
@@ -507,23 +494,10 @@ async fn proxy_request(
         return Err(Status::PayloadTooLarge);
     }
 
-    let mut body = match response.bytes().await {
+    let body = match response.bytes().await {
         Ok(bytes) => bytes.to_vec(),
         Err(_) => return Err(Status::InternalServerError),
     };
-
-    if (width.is_some() || height.is_some())
-        && (content_type == ContentType::PNG
-            || content_type == ContentType::JPEG
-            || content_type == ContentType::GIF
-            || content_type == ContentType::WEBP
-            || content_type == ContentType::SVG)
-    {
-        body = match resize_image(&body, width, height) {
-            Ok(resized) => resized,
-            Err(_) => return Err(Status::InternalServerError),
-        };
-    }
 
     Ok((content_type, body))
 }
@@ -550,50 +524,6 @@ fn detect_content_type_from_url(url: &Url) -> ContentType {
         Some("txt") => ContentType::Text,
         _ => ContentType::Binary,
     }
-}
-
-/*
-  Description: Resizes image based on target width and height
-
-  Input: Image bytes, Optional target width, Optional target height
-  Output: Image data
-*/
-fn resize_image(
-    data: &[u8],
-    target_width: Option<u32>,
-    target_height: Option<u32>,
-) -> Result<Vec<u8>, image::ImageError> {
-    let img = image::load_from_memory(data)?;
-
-    let (orig_width, orig_height) = img.dimensions();
-
-    // Decide target size while keeping aspect ratio
-    let (new_width, new_height) = match (target_width, target_height) {
-        (Some(w), None) => {
-            let h = (orig_height as f32 * (w as f32 / orig_width as f32)).round() as u32;
-            (w, h)
-        }
-        (None, Some(h)) => {
-            let w = (orig_width as f32 * (h as f32 / orig_height as f32)).round() as u32;
-            (w, h)
-        }
-        (Some(w), Some(h)) => (w, h), // caller forces both, aspect ratio may break
-        _ => (orig_width, orig_height),
-    };
-
-    let resized = img.resize_exact(new_width, new_height, image::imageops::Lanczos3);
-
-    // Encode back to the same format (e.g. JPEG if original was JPEG)
-    let mut out = Cursor::new(Vec::new());
-    match image::guess_format(data)? {
-        image::ImageFormat::Jpeg => resized.write_to(&mut out, image::ImageFormat::Jpeg)?,
-        image::ImageFormat::Png => resized.write_to(&mut out, image::ImageFormat::Png)?,
-        image::ImageFormat::Gif => resized.write_to(&mut out, image::ImageFormat::Gif)?,
-        image::ImageFormat::WebP => resized.write_to(&mut out, image::ImageFormat::WebP)?,
-        _ => resized.write_to(&mut out, image::ImageFormat::Png)?,
-    }
-
-    Ok(out.into_inner())
 }
 
 /*

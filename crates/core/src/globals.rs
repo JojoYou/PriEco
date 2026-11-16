@@ -59,7 +59,7 @@ use ort::{
 };
 use parking_lot::{Condvar, Mutex, RwLock};
 use primp::{Client as PIMP_CLIENT, Impersonate, ImpersonateOS, redirect::Policy};
-use rand::RngCore;
+use rand::TryRng;
 #[cfg(feature = "cuda")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use redb::{Database, ReadableDatabase, TableDefinition};
@@ -2783,7 +2783,7 @@ fn generate_analytics_salt(date: NaiveDate) -> [u8; 32] {
 
     // Generate new salt
     let mut new_salt = [0u8; 32];
-    rand::rng().fill_bytes(&mut new_salt);
+    rand::rng().try_fill_bytes(&mut new_salt);
 
     let salt_hex: String = new_salt.iter().map(|b| format!("{:02x}", b)).collect();
     let content = format!("{}:{}", date, salt_hex);

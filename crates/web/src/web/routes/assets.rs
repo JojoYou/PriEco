@@ -13,10 +13,7 @@
 /*
   Import system libraries
 */
-use std::{
-    io::{Cursor, Read},
-    path::Path,
-};
+use std::{io::Cursor, path::Path};
 
 /*
   Import external libraries
@@ -25,7 +22,7 @@ use rocket::{
     Request, Response,
     fs::NamedFile,
     get,
-    http::{ContentType, Status, uri::Host},
+    http::{ContentType, uri::Host},
     response::{
         self, Responder,
         content::{RawJavaScript, RawText, RawXml},
@@ -184,85 +181,4 @@ pub fn script(
         )
         .unwrap_or_else(|_| format!("console.error('Failed to render {}');", script_name)),
     )
-}
-
-/*
-  Description: Serves own PriEco result favicons
-
-  Input: Favicon id
-  Output: Favicon as image
-*/
-#[rocket::get("/static/prieco_favicons/<filename>")]
-pub async fn favicon(filename: String) -> Result<DecompressedImage, Status> {
-    if filename.contains("..") || filename.contains("/") {
-        return Err(Status::BadRequest);
-    }
-
-    let file_path = format!("static/prieco_favicons/{}.br", filename);
-    let path = Path::new(&file_path);
-
-    if !path.exists() {
-        return Err(Status::NotFound);
-    }
-
-    let compressed_data = match std::fs::read(path) {
-        Ok(data) => data,
-        Err(_) => return Err(Status::InternalServerError),
-    };
-
-    let mut decompressed = Vec::new();
-    let mut decoder = brotli::Decompressor::new(compressed_data.as_slice(), 4096);
-
-    match decoder.read_to_end(&mut decompressed) {
-        Ok(_) => {
-            let content_type = detect_image_type(&decompressed);
-            Ok(DecompressedImage {
-                data: decompressed,
-                content_type,
-            })
-        }
-        Err(_) => Err(Status::InternalServerError),
-    }
-}
-
-/* Helper functions */
-
-/*
-  Description: Use image bytes to detect image type
-
-  Input: Image bytes
-  Output: Possible image type
-*/
-fn detect_image_type(data: &[u8]) -> ContentType {
-    if data.len() < 8 {
-        return ContentType::Binary;
-    }
-
-    // Check file signatures
-    match &data[0..8] {
-        // PNG: 89 50 4E 47 0D 0A 1A 0A
-        [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] => ContentType::PNG,
-        // JPEG: FF D8 FF
-        [0xFF, 0xD8, 0xFF, ..] => ContentType::JPEG,
-        // GIF87a: 47 49 46 38 37 61
-        [0x47, 0x49, 0x46, 0x38, 0x37, 0x61, ..] => ContentType::GIF,
-        // GIF89a: 47 49 46 38 39 61
-        [0x47, 0x49, 0x46, 0x38, 0x39, 0x61, ..] => ContentType::GIF,
-        // SVG: Check if it starts with < and contains "svg"
-        [0x3C, ..] => {
-            if let Ok(text) = std::str::from_utf8(&data[0..100.min(data.len())])
-                && text.to_lowercase().contains("svg")
-            {
-                return ContentType::SVG;
-            }
-            ContentType::Binary
-        }
-        // ICO: 00 00 01 00
-        [0x00, 0x00, 0x01, 0x00, ..] => ContentType::Icon,
-        // WebP: RIFF....WEBP
-        [0x52, 0x49, 0x46, 0x46, _, _, _, _] if data.len() >= 12 && &data[8..12] == b"WEBP" => {
-            ContentType::new("image", "webp")
-        }
-        _ => ContentType::Binary,
-    }
 }
