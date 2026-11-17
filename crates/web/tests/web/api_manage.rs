@@ -4,8 +4,8 @@
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use chrono::{Datelike, Utc};
 use prieco_core::PRIECO_META;
+use time::OffsetDateTime;
 
 use crate::support::{init, unique, unique_u64};
 use crate::web::functions::api::manage::{API_BILLING_QUEUE, flush, free, paid};
@@ -13,7 +13,7 @@ use crate::web::functions::api::manage::{API_BILLING_QUEUE, flush, free, paid};
 const LIMIT: usize = 25;
 
 fn today() -> u32 {
-    Utc::now().date_naive().num_days_from_ce() as u32
+    (OffsetDateTime::now_utc().date().to_julian_day() - 1_721_425) as u32
 }
 
 /// Fresh 10.x.x.x address, so parallel tests never share a counter

@@ -5,7 +5,7 @@ authors = ["Roman Láncoš <support@prieco.net>"]
 edition = "2024"
 
 readme = "README.md"
-license-file = "LICENSE"
+license.workspace = true
 
 repository = "https://codeberg.org/JojoYou/PriEco"
 homepage = "https://prieco.net"
@@ -26,7 +26,7 @@ rayon = { workspace = true }
 dashmap = { workspace = true }
 zstd = { workspace = true }
 tokio = { workspace = true }
-chrono = { workspace = true }
+time = { workspace = true }
 ndarray = { workspace = true }
 rocket = { workspace = true }
 memmap2 = { workspace = true }
@@ -39,7 +39,6 @@ bincode-next = { workspace = true }
 rkyv = { workspace = true }
 primp = { workspace = true }
 rand = { workspace = true }
-bytemuck = { workspace = true }
 
 [features]
 default = []

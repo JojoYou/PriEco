@@ -18,7 +18,6 @@ use std::{collections::HashMap, net::IpAddr, time::Duration};
 /*
   Import external libraries
 */
-use chrono::{Datelike, Utc};
 
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
@@ -27,6 +26,7 @@ use parking_lot::Mutex;
 */
 use prieco_core::{CLIENT, PRIECO_META, colors};
 use serde_json::{Value, json};
+use time::OffsetDateTime;
 use tokio::time::sleep;
 
 /*
@@ -45,7 +45,8 @@ pub fn free(ip: IpAddr) -> bool {
         IpAddr::V6(v6) => key.extend_from_slice(&v6.octets()[..8]),
     }
 
-    let today = (Utc::now().date_naive().num_days_from_ce() as u32).to_le_bytes();
+    let today =
+        ((OffsetDateTime::now_utc().date().to_julian_day() - 1_721_425) as u32).to_le_bytes();
 
     // Get value
     let value = PRIECO_META.api_ks.get(&key).unwrap_or(None);
@@ -90,13 +91,13 @@ fn stale(key: &str) -> Option<String> {
         && (customer.subscribed || customer.balance > 0)
     {
         customer.balance -= 1;
-        customer.checked = Utc::now().timestamp() - CACHE_EXPIRE + 60;
+        customer.checked = OffsetDateTime::now_utc().unix_timestamp() - CACHE_EXPIRE + 60;
         return Some(id.clone());
     }
     None
 }
 pub async fn paid(key: &str) -> Option<String> {
-    let now = Utc::now().timestamp();
+    let now = OffsetDateTime::now_utc().unix_timestamp();
 
     // Check cache
     {
@@ -155,7 +156,7 @@ pub async fn paid(key: &str) -> Option<String> {
                 id: None,
                 subscribed: false,
                 balance: 0,
-                checked: Utc::now().timestamp(),
+                checked: OffsetDateTime::now_utc().unix_timestamp(),
             },
         );
 
@@ -202,7 +203,7 @@ pub async fn paid(key: &str) -> Option<String> {
                     id: None,
                     subscribed: false,
                     balance: 0,
-                    checked: Utc::now().timestamp(),
+                    checked: OffsetDateTime::now_utc().unix_timestamp(),
                 },
             );
 
@@ -279,7 +280,7 @@ pub async fn paid(key: &str) -> Option<String> {
             id: Some(id.clone()),
             subscribed,
             balance: final_balance,
-            checked: Utc::now().timestamp(),
+            checked: OffsetDateTime::now_utc().unix_timestamp(),
         },
     );
 

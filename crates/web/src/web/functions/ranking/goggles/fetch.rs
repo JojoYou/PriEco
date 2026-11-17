@@ -2,8 +2,8 @@ use crate::web::functions::ranking::goggles::parse_goggle;
 
 use super::storage::{delete, list_all, put, touch_fetched_at};
 use super::types::Goggle;
-use chrono::Utc;
 use prieco_core::{CLIENT, colors, url_to_id};
+use time::OffsetDateTime;
 
 pub async fn fetch_and_store(url: String) -> Goggle {
     if !is_safe_goggle_url(&url) {
@@ -62,7 +62,7 @@ pub async fn refresh_stale_goggles() {
         }
 
         // Time hasnt passed
-        if Utc::now().timestamp() - stored.fetched_at < STALE_AFTER_SECS {
+        if OffsetDateTime::now_utc().unix_timestamp() - stored.fetched_at < STALE_AFTER_SECS {
             continue;
         }
 
@@ -139,7 +139,7 @@ fn store_goggle(text: String, url: String) -> Goggle {
         public: meta.public,
         avatar: meta.avatar,
         content_hash: url_to_id(&text),
-        fetched_at: Utc::now().timestamp(),
+        fetched_at: OffsetDateTime::now_utc().unix_timestamp(),
         url,
         rules: meta.rules,
     };

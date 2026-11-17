@@ -31,7 +31,6 @@ use std::{
 /*
   Import external libraries
 */
-use chrono::NaiveDate;
 use iroh::{EndpointAddr, PublicKey};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
@@ -46,6 +45,7 @@ use tantivy::{
     query::{BooleanQuery, Occur, Query, TermQuery, TermSetQuery},
     schema::{IndexRecordOption, Value},
 };
+use time::{Date, macros::format_description};
 use zstd::bulk::Decompressor;
 
 /*
@@ -1027,8 +1027,13 @@ fn normalize_search_operators(query: &str) -> String {
             let operator = caps[1].to_lowercase();
             let date_str = &caps[2];
 
-            if let Ok(date) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-                let formatted_date = date.format("%y%m%d").to_string();
+            if let Ok(date) = Date::parse(
+                date_str,
+                format_description!("[year]-[month padding:none]-[day padding:none]"),
+            ) {
+                let formatted_date = date
+                    .format(format_description!("[year repr:last_two][month][day]"))
+                    .unwrap_or_default();
                 if let Ok(date_int) = formatted_date.parse::<i64>() {
                     match operator.as_str() {
                         "before" => format!("date:{{* TO {}}}", date_int),

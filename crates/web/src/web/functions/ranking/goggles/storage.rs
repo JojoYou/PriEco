@@ -1,4 +1,5 @@
 use prieco_core::PRIECO_META;
+use time::OffsetDateTime;
 
 use super::types::Goggle;
 
@@ -22,7 +23,7 @@ pub fn delete(id: u64) {
 
 pub fn touch_fetched_at(id: u64) {
     if let Some(mut g) = get(id) {
-        g.fetched_at = chrono::Utc::now().timestamp();
+        g.fetched_at = OffsetDateTime::now_utc().unix_timestamp();
         put(&g);
     }
 }

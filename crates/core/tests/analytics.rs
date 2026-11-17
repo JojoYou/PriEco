@@ -14,15 +14,15 @@ use std::{
     time::Duration as StdDuration,
 };
 
-use chrono::{Duration, NaiveDate, Utc};
 use common::{sandbox, unique};
 use prieco_core::{ANALYTICS, PRIECO_META, Stage, lat_bucket_ms};
+use time::{Date, Duration, OffsetDateTime};
 
 /// Both query tests touch the same "queries:{today}" key
 static QUERY_TESTS: Mutex<()> = Mutex::new(());
 
-fn today() -> NaiveDate {
-    Utc::now().date_naive()
+fn today() -> Date {
+    OffsetDateTime::now_utc().date()
 }
 
 fn day(offset_days: i64) -> String {

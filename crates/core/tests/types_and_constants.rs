@@ -502,13 +502,14 @@ fn entity_registry_json_roundtrip() {
 #[test]
 fn entity_registry_rkyv_roundtrip_and_validation() {
     let reg = registry();
-    let bytes = rkyv::to_bytes::<_, 256>(&reg).unwrap();
-    let archived = rkyv::check_archived_root::<EntityRegistry>(&bytes).unwrap();
+    let bytes = rkyv::to_bytes::<rkyv::rancor::Error>(&reg).unwrap();
+    let archived =
+        rkyv::access::<rkyv::Archived<EntityRegistry>, rkyv::rancor::Error>(&bytes).unwrap();
     assert_eq!(archived.places.len(), 2);
     let b = archived.places.get("Bratislava").unwrap();
     assert_eq!(b.len(), 1);
     assert_eq!(b[0].country.as_str(), "sk");
-    assert!((b[0].lat - 48.1486).abs() < 1e-4);
+    assert!((b[0].lat.to_native() - 48.1486).abs() < 1e-4);
     assert!(
         archived.places.get("bratislava").is_none(),
         "keys are case sensitive"
@@ -518,7 +519,7 @@ fn entity_registry_rkyv_roundtrip_and_validation() {
 #[test]
 fn entity_registry_rkyv_rejects_garbage() {
     let garbage = vec![0xAAu8; 64];
-    assert!(rkyv::check_archived_root::<EntityRegistry>(&garbage).is_err());
+    assert!(rkyv::access::<rkyv::Archived<EntityRegistry>, rkyv::rancor::Error>(&garbage).is_err());
 }
 
 /* ───────────────────────────── UserAgent request guard ───────────────────────────── */

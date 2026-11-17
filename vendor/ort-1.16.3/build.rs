@@ -289,7 +289,11 @@ fn extract_zip(filename: &Path, outpath: &Path) {
         let mut file = archive.by_index(i).unwrap();
         #[allow(deprecated)]
         let outpath = outpath.join(file.enclosed_name().unwrap());
-        if !file.name().ends_with('/') {
+        if !file
+            .name()
+            .expect("Failed to get extract zip file name")
+            .ends_with('/')
+        {
             println!(
                 "File {} extracted to \"{}\" ({} bytes)",
                 i,

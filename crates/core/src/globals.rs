@@ -37,7 +37,6 @@ use std::{
 use ahash::{AHashMap, AHashSet};
 use aho_corasick::{AhoCorasick, MatchKind};
 use charabia::{Tokenizer as CHARABIA_TOKENIZER, TokenizerBuilder};
-use chrono::{Duration, NaiveDate, Utc};
 #[cfg(feature = "cuda")]
 use cudarc::{
     cublas::{CudaBlas, Gemm, GemmConfig, StridedBatchedConfig, sys::cublasOperation_t},
@@ -63,7 +62,7 @@ use rand::TryRng;
 #[cfg(feature = "cuda")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use redb::{Database, ReadableDatabase, TableDefinition};
-use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
+use rkyv::{Archive, Archived, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize, access};
 use rocket::{
     Request,
     request::{FromRequest, Outcome},
@@ -79,6 +78,7 @@ use tantivy::{
     },
     tokenizer::{TextAnalyzer, Token, TokenStream, Tokenizer as TANTIVY_TOKENIZER},
 };
+use time::{Date, Duration, OffsetDateTime, macros::format_description};
 use tokenizers::{PaddingParams, PaddingStrategy, Tokenizer, TruncationParams};
 use tokio::task;
 use twox_hash::XxHash3_64;
@@ -1980,7 +1980,6 @@ pub struct TaggedEntity {
 }
 
 #[derive(Archive, Deserialize, Serialize, RkyvSerialize, RkyvDeserialize, Debug, Clone)]
-#[archive(check_bytes)]
 pub struct GeoCoords {
     pub country: String,
     pub lon: f32,
@@ -1988,7 +1987,6 @@ pub struct GeoCoords {
 }
 
 #[derive(Archive, Deserialize, Serialize, RkyvSerialize, RkyvDeserialize, Debug, Clone)]
-#[archive(check_bytes)]
 pub struct EntityRegistry {
     pub places: HashMap<String, Vec<GeoCoords>>,
 }
@@ -2010,7 +2008,8 @@ pub static QU_PIPELINE: Lazy<QueryUnderstandingPipeline> = Lazy::new(|| {
     }
 
     let places_bytes = include_bytes_aligned!("../../../data/entities/places.rkyv");
-    let archived_places = rkyv::check_archived_root::<EntityRegistry>(places_bytes).unwrap();
+    let archived_places =
+        access::<Archived<EntityRegistry>, rkyv::rancor::Error>(&places_bytes[..]).unwrap();
 
     let keywords_str = include_str!("../../../data/entities/keywords_automaton.txt");
 
@@ -2178,7 +2177,7 @@ pub static SPELL_CHECKER: Lazy<Arc<SymSpell<UnicodeStringStrategy>>> = Lazy::new
   They don't matter enough, and AI can do a good job in this
 */
 pub static ANALYTICS: Lazy<AnalyticsDb> = Lazy::new(|| {
-    let date = Utc::now().date_naive();
+    let date = OffsetDateTime::now_utc().date();
 
     AnalyticsDb {
         db: PRIECO_META.meta_db.clone(),
@@ -2188,7 +2187,7 @@ pub static ANALYTICS: Lazy<AnalyticsDb> = Lazy::new(|| {
 
         pending: Mutex::new(HashMap::new()),
         flush_lock: Mutex::new(()),
-        last_flush: AtomicI64::new(Utc::now().timestamp()),
+        last_flush: AtomicI64::new(OffsetDateTime::now_utc().unix_timestamp()),
     }
 });
 
@@ -2322,7 +2321,7 @@ pub fn summarize(hist: &BTreeMap<u16, u64>) -> LatencySummary {
 pub struct AnalyticsDb {
     db: FJALL_DATABASE,
     ks: Keyspace,
-    salt: RwLock<(NaiveDate, [u8; 32])>,
+    salt: RwLock<(Date, [u8; 32])>,
 
     pending: Mutex<HashMap<String, u64>>,
     flush_lock: Mutex<()>,
@@ -2604,9 +2603,9 @@ impl AnalyticsDb {
 
                 // The date is not always the first segment ("api:total:2026-01-01"),
                 // so take the first segment that parses as a date.
-                let date = key_str[prefix.len()..]
-                    .split(':')
-                    .find_map(|part| NaiveDate::parse_from_str(part, "%Y-%m-%d").ok());
+                let date = key_str[prefix.len()..].split(':').find_map(|part| {
+                    Date::parse(part, format_description!("[year]-[month]-[day]")).ok()
+                });
 
                 if let Some(date) = date
                     && date < cutoff
@@ -2621,13 +2620,10 @@ impl AnalyticsDb {
     pub async fn background_purge_task(&self) {
         self.purge_expired();
         loop {
-            let now = Utc::now();
+            let now = OffsetDateTime::now_utc();
             let secs_until_midnight = {
-                let tomorrow = (now + Duration::days(1))
-                    .date_naive()
-                    .and_hms_opt(0, 0, 0)
-                    .unwrap();
-                (tomorrow.and_utc() - now).num_seconds().max(0) as u64
+                let tomorrow = (now.date() + Duration::days(1)).midnight().assume_utc();
+                (tomorrow - now).whole_seconds().max(0) as u64
             };
             tokio::time::sleep(tokio::time::Duration::from_secs(secs_until_midnight)).await;
             self.purge_expired();
@@ -2640,8 +2636,10 @@ impl AnalyticsDb {
         let _guard = self.flush_lock.lock();
 
         let drained: HashMap<String, u64> = std::mem::take(&mut *self.pending.lock());
-        self.last_flush
-            .store(Utc::now().timestamp(), Ordering::Relaxed);
+        self.last_flush.store(
+            OffsetDateTime::now_utc().unix_timestamp(),
+            Ordering::Relaxed,
+        );
 
         if drained.is_empty() {
             return;
@@ -2662,7 +2660,7 @@ impl AnalyticsDb {
     }
 
     fn maybe_flush(&self) {
-        let now = Utc::now().timestamp();
+        let now = OffsetDateTime::now_utc().unix_timestamp();
         let last = self.last_flush.load(Ordering::Relaxed);
 
         if now - last >= 30
@@ -2675,7 +2673,7 @@ impl AnalyticsDb {
         }
     }
 
-    fn day_hist(&self, date: NaiveDate, stage: Stage) -> BTreeMap<u16, u64> {
+    fn day_hist(&self, date: Date, stage: Stage) -> BTreeMap<u16, u64> {
         let prefix = format!("lat:{}:{}:", date, stage.key());
         let mut hist = BTreeMap::new();
 
@@ -2698,8 +2696,8 @@ impl AnalyticsDb {
     }
 
     // Helpers
-    fn today(&self) -> NaiveDate {
-        Utc::now().date_naive()
+    fn today(&self) -> Date {
+        OffsetDateTime::now_utc().date()
     }
 
     fn get_u64(&self, key: &str) -> u64 {
@@ -2718,7 +2716,7 @@ impl AnalyticsDb {
             .expect("Analytics write failed");
     }
 
-    fn get_daily_salt(&self, today: NaiveDate) -> [u8; 32] {
+    fn get_daily_salt(&self, today: Date) -> [u8; 32] {
         {
             let guard = self.salt.read();
             if guard.0 == today {
@@ -2739,7 +2737,7 @@ impl AnalyticsDb {
         new_salt
     }
 
-    fn fingerprint(&self, ip: &str, user_agent: &str, entity_id: &str, date: NaiveDate) -> String {
+    fn fingerprint(&self, ip: &str, user_agent: &str, entity_id: &str, date: Date) -> String {
         let mut hasher = XxHash3_64::default();
         self.get_daily_salt(date).hash(&mut hasher);
         ip.hash(&mut hasher);
@@ -2752,7 +2750,7 @@ impl AnalyticsDb {
 
 const DAILY_SALT_PATH: &str = "config/analytics_daily_salt.txt";
 
-fn generate_analytics_salt(date: NaiveDate) -> [u8; 32] {
+fn generate_analytics_salt(date: Date) -> [u8; 32] {
     let data = read_file(DAILY_SALT_PATH);
 
     let parts: Vec<&str> = data.split(':').collect();

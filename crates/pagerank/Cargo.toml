@@ -5,7 +5,7 @@ authors = ["Roman Láncoš <support@prieco.net>"]
 edition = "2024"
 
 readme = "README.md"
-license-file = "LICENSE"
+license.workspace = true
 
 repository = "https://codeberg.org/JojoYou/PriEco"
 homepage = "https://prieco.net"

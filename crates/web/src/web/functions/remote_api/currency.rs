@@ -1,4 +1,3 @@
-use chrono::{Duration, Utc};
 use prieco_core::{CLIENT, PRIECO_META};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -8,6 +7,7 @@ use std::{
     sync::LazyLock,
     time::{SystemTime, UNIX_EPOCH},
 };
+use time::{Duration, OffsetDateTime};
 
 static CURRENCY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
@@ -81,8 +81,8 @@ pub async fn get_fx_widget(q: &str) -> Option<FxWidget> {
         return Some(c.data);
     }
 
-    let start = (Utc::now() - Duration::days(30))
-        .format("%Y-%m-%d")
+    let start = (OffsetDateTime::now_utc() - Duration::days(30))
+        .date()
         .to_string();
     let url = format!(
         "https://api.frankfurter.dev/v2/rates?from={}&base={}&quotes={}",

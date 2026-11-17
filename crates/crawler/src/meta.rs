@@ -1,7 +1,8 @@
 use ahash::AHashMap;
-use chrono::Local;
 use dashmap::DashMap;
+use maxminddb::geoip2::Country;
 use once_cell::sync::Lazy;
+use time::{OffsetDateTime, macros::format_description};
 
 use scraper::{Html, Selector};
 use std::collections::HashSet;
@@ -42,7 +43,9 @@ pub fn extract_metadata(
         location: String::new(),
         points: Vec::new(),
         loading_time,
-        date_of_crawling: Local::now().format("%y%m%d").to_string(),
+        date_of_crawling: OffsetDateTime::now_utc()
+            .format(format_description!("[year repr:last_two][month][day]"))
+            .unwrap_or_default(),
         vector: String::new(),
         tag_data: tag_data.clone(),
     };
@@ -307,15 +310,15 @@ fn get_website_country(url: &str) -> String {
     };
 
     // GeoLite2 database
-    let record: maxminddb::geoip2::Country = match GEOIP_READER.lookup(ip) {
-        Ok(r) => r,
-        Err(_) => return String::new(),
+    let record: Country = match GEOIP_READER.lookup(ip).and_then(|r| r.decode()) {
+        Ok(Some(r)) => r,
+        _ => return String::new(),
     };
 
     // Extract country name
     let country_code = record
         .country
-        .and_then(|c| c.iso_code)
+        .iso_code
         .map(|s| s.to_lowercase())
         .unwrap_or_default();
     if country_code.is_empty() {

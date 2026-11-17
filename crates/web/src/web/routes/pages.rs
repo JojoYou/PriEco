@@ -23,7 +23,6 @@ use std::{
 /*
   Import external libraries
 */
-use chrono::{NaiveDate, NaiveTime, Utc};
 use prieco_blob::decode::decode_blob_to_html_rendered;
 use rocket::{
     Request, Response, State,
@@ -43,6 +42,9 @@ use rocket::{
 use rocket_dyn_templates::Template;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use time::{
+    Date, OffsetDateTime, format_description::well_known::Rfc2822, macros::format_description,
+};
 use urlencoding::{decode, encode};
 
 /*
@@ -1016,7 +1018,11 @@ pub async fn stats(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host<
     let mut context: HashMap<String, Value> = HashMap::from([
         (
             String::from("generated_at"),
-            json!(Utc::now().format("updated %H:%M UTC").to_string()),
+            json!(
+                OffsetDateTime::now_utc()
+                    .format(format_description!("updated [hour]:[minute] UTC"))
+                    .unwrap_or_default()
+            ),
         ),
         // index
         (String::from("index_size_display"), json!(index_display.0)),
@@ -1998,12 +2004,13 @@ pub fn rss_feed() -> (ContentType, String) {
 
     let mut items = String::new();
     for post in posts {
-        let parsed_date = NaiveDate::parse_from_str(&post.date, "%Y-%m-%d")
-            .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap());
+        let parsed_date = Date::parse(
+            &post.date,
+            format_description!("[year]-[month padding:none]-[day padding:none]"),
+        )
+        .unwrap_or_else(|_| OffsetDateTime::UNIX_EPOCH.date());
 
-        let datetime = parsed_date
-            .and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap())
-            .and_utc();
+        let datetime = parsed_date.midnight().assume_utc();
 
         items.push_str(&format!(
             r#"
@@ -2018,7 +2025,7 @@ pub fn rss_feed() -> (ContentType, String) {
             title = post.title,
             slug = post.slug,
             desc = post.desc,
-            date = datetime.to_rfc2822(),
+            date = datetime.format(&Rfc2822).unwrap_or_default(),
             full_html = post.html
         ));
     }

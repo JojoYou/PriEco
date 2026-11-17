@@ -50,7 +50,11 @@ fn date_of_crawling_is_today_yymmdd() {
     assert!(m.date_of_crawling.chars().all(|c| c.is_ascii_digit()));
     assert_eq!(
         m.date_of_crawling,
-        chrono::Local::now().format("%y%m%d").to_string()
+        time::OffsetDateTime::now_utc()
+            .format(time::macros::format_description!(
+                "[year repr:last_two][month][day]"
+            ))
+            .unwrap()
     );
 }
 
@@ -398,8 +402,8 @@ fn geoip_database_is_embedded_and_parses() {
     assert!(!GEOIP_DB.is_empty());
     let r = &*GEOIP_READER;
     let ip: std::net::IpAddr = "8.8.8.8".parse().unwrap();
-    let c: maxminddb::geoip2::Country = r.lookup(ip).unwrap();
-    assert_eq!(c.country.and_then(|c| c.iso_code), Some("US"));
+    let c: maxminddb::geoip2::Country = r.lookup(ip).unwrap().decode().unwrap().unwrap();
+    assert_eq!(c.country.iso_code, Some("US"));
 }
 
 /* ───────────────────────────── NSFW ───────────────────────────── */

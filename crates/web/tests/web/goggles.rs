@@ -320,7 +320,7 @@ fn storage_touch_updates_fetched_at_only() {
     let mut g = stored(true);
     g.fetched_at = 0;
     put(&g);
-    let before = chrono::Utc::now().timestamp();
+    let before = time::OffsetDateTime::now_utc().unix_timestamp();
     touch_fetched_at(g.id);
     let back = get(g.id).unwrap();
     assert!(back.fetched_at >= before);

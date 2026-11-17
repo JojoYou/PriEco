@@ -11,7 +11,7 @@
 
 [package]
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.85"
 name = "ort"
 version = "1.16.3"
 authors = [
@@ -118,7 +118,7 @@ optional = true
 default-features = false
 
 [build-dependencies.zip]
-version = "0.6"
+version = "9.6.0"
 features = ["deflate"]
 optional = true
 default-features = false

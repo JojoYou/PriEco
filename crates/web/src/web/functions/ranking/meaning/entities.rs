@@ -20,9 +20,11 @@ pub fn scan_entities(
                     // Find place in user location
                     let local_match = coords.iter().find(|c| c.country.eq_ignore_ascii_case(loc));
                     if let Some(local_coord) = local_match {
-                        spatial_coords = Some((local_coord.lat, local_coord.lon));
+                        spatial_coords =
+                            Some((local_coord.lat.to_native(), local_coord.lon.to_native()));
                     } else if !coords.is_empty() {
-                        spatial_coords = Some((coords[0].lat, coords[0].lon)); // Fallback to idx 0
+                        spatial_coords =
+                            Some((coords[0].lat.to_native(), coords[0].lon.to_native()));
                     }
                 }
 

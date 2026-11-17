@@ -5,7 +5,7 @@ authors = ["Roman Láncoš <support@prieco.net>"]
 edition = "2024"
 
 readme = "README.md"
-license-file = "LICENSE"
+license.workspace = true
 
 repository = "https://codeberg.org/JojoYou/PriEco"
 homepage = "https://prieco.net"
@@ -29,7 +29,7 @@ urlencoding = { workspace = true }
 libc = { workspace = true }
 ort = { workspace = true }
 tokenizers = { workspace = true }
-chrono = { workspace = true }
+time = { workspace = true }
 serde_json = { workspace = true }
 twox-hash = { workspace = true }
 url = { workspace = true }

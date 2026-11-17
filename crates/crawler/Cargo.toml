@@ -5,7 +5,7 @@ authors = ["Roman Láncoš <support@prieco.net>"]
 edition = "2024"
 
 readme = "README.md"
-license-file = "LICENSE"
+license.workspace = true
 
 repository = "https://codeberg.org/JojoYou/PriEco"
 homepage = "https://prieco.net"
@@ -22,7 +22,7 @@ bincode-next = { workspace = true }
 parking_lot = { workspace = true }
 url = { workspace = true }
 once_cell = { workspace = true }
-chrono = { workspace = true }
+time = { workspace = true }
 regex = { workspace = true }
 whatlang = { workspace = true }
 dashmap = { workspace = true }

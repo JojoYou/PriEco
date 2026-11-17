@@ -17,8 +17,15 @@ async fn security_txt_has_contact_and_expiry() {
     assert!(s.contains("Contact: mailto:support@prieco.net"));
     assert!(s.contains("Expires: "));
     let exp = s.lines().find(|l| l.starts_with("Expires: ")).unwrap();
-    let date = chrono::DateTime::parse_from_rfc3339(&exp["Expires: ".len()..]).unwrap();
-    assert!(date > chrono::Utc::now(), "security.txt is expired");
+    let date = time::OffsetDateTime::parse(
+        &exp["Expires: ".len()..],
+        &time::format_description::well_known::Rfc3339,
+    )
+    .unwrap();
+    assert!(
+        date > time::OffsetDateTime::now_utc(),
+        "security.txt is expired"
+    );
 }
 
 #[tokio::test]

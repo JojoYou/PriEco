@@ -1,0 +1,32 @@
+# Allowed licenses for this project
+[licenses]
+allow = [
+    "0BSD",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Zlib",
+    "bzip2-1.0.6",
+    "AGPL-3.0-only",
+]
+
+
+# What platforms PriEco supports
+[graph]
+targets = [
+    "x86_64-unknown-linux-gnu",  # 64bit Intel/AMD Linux
+    "aarch64-unknown-linux-gnu", # 64bit ARM Linux
+]
+
+# Temporary allowed
+[advisories]
+ignore = [
+    { id = "RUSTSEC-2024-0436", reason = "paste is pulled in by tokenizers and netlink-packet-core; no update available" },
+]
