@@ -480,6 +480,53 @@ fn uppercase_entries_in_bad_word_list_can_match() {
     assert!(m.safe_search, "\"bdsm\" never counts as a bad word");
 }
 
+#[test]
+fn bad_word_in_url_is_case_insensitive() {
+    for url in ["http://127.0.0.1/PORN/", "http://127.0.0.1/Nude"] {
+        let m = meta_at(&page("<title>T</title>", ""), url);
+        assert!(m.safe_search, "{} not flagged", url);
+    }
+}
+
+#[test]
+fn bad_word_between_url_separators_flags_page() {
+    for url in [
+        "http://127.0.0.1/free-porn-videos",
+        "http://127.0.0.1/a_nude_b",
+        "http://127.0.0.1/x.porn.html",
+        "http://127.0.0.1/search?q=porn",
+        "http://127.0.0.1/page#naked",
+    ] {
+        let m = meta_at(&page("<title>T</title>", ""), url);
+        assert!(m.safe_search, "{} not flagged", url);
+    }
+}
+
+#[test]
+fn bad_word_url_check_ignores_scheme_and_ip() {
+    let m = meta_at(&page("<title>T</title>", ""), "https://127.0.0.1/");
+    assert!(!m.safe_search);
+}
+
+/// BUG: unique bad words are collected in a HashSet of the *original* words and only
+/// lowercased for the lookup, so "SEX sex Sex" counts as three different bad words.
+#[test]
+fn same_bad_word_in_different_case_counts_once() {
+    let m = meta(&page("", "<p>SEX sex Sex</p>"));
+    assert!(
+        !m.safe_search,
+        "one word in three spellings flagged the page"
+    );
+}
+
+/// BUG: content is split on whitespace only, so punctuation glued to a word
+/// ("sex," "bondage.") hides it from the bad word list.
+#[test]
+fn bad_words_followed_by_punctuation_are_counted() {
+    let m = meta(&page("", "<p>sex, fetish; bondage.</p>"));
+    assert!(m.safe_search);
+}
+
 /* ───────────────────────────── serde of crawler payloads ───────────────────────────── */
 
 #[test]

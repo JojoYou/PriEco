@@ -50,6 +50,7 @@ use crate::web::{
 use prieco_core::{
     CLIENT, PROXY_CLIENT, colors,
     globals::{ANALYTICS, EmbeddingService, UserAgent},
+    local_redirect,
 };
 
 const POLAR_URL: &str = "https://buy.polar.sh/polar_cl_oj0yTj0z4isxyAzUEg33xBjerkhrJpIhclrHU484jSE";
@@ -575,7 +576,7 @@ pub async fn send_signal(feedback: Form<RoadmapFeedback<'_>>) -> Redirect {
         Err(_) => {
             eprintln!("Warning: SIGNAL_BOT_NUMBER is missing!");
 
-            return Redirect::to(feedback.return_path.to_string());
+            return Redirect::to(local_redirect(feedback.return_path));
         }
     };
 
@@ -584,7 +585,7 @@ pub async fn send_signal(feedback: Form<RoadmapFeedback<'_>>) -> Redirect {
         Err(_) => {
             eprintln!("Warning: SIGNAL_RECIPIENT_NUMBER is missing!");
 
-            return Redirect::to(feedback.return_path.to_string());
+            return Redirect::to(local_redirect(feedback.return_path));
         }
     };
 
@@ -614,7 +615,7 @@ pub async fn send_signal(feedback: Form<RoadmapFeedback<'_>>) -> Redirect {
         }
     }
 
-    Redirect::to(feedback.return_path.to_string())
+    Redirect::to(local_redirect(feedback.return_path))
 }
 
 #[derive(Deserialize)]

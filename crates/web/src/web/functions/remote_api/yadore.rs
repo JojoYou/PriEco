@@ -14,7 +14,7 @@ pub async fn run(
         Err(_) => {
             eprintln!("Warning: YADORE_API_KEY is missing!");
 
-            return Err("NEWS_API_KEY is missing".into());
+            return Err("YADORE_API_KEY is missing".into());
         }
     };
 

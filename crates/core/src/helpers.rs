@@ -83,6 +83,8 @@ pub fn write_file<C: AsRef<[u8]>>(file_path: &str, content: C, append: bool) {
                 file_path,
                 e
             );
+
+            release_file_lock(file_path);
             return;
         }
     };
@@ -106,7 +108,7 @@ pub fn acquire_file_lock(path: &str) {
 pub fn release_file_lock(path: &str) {
     let set = FILE_LOCKS.set.lock();
     set.remove(path);
-    FILE_LOCKS.condvar.notify_one();
+    FILE_LOCKS.condvar.notify_all();
 }
 
 pub fn url_to_id(url: &str) -> u64 {
@@ -141,11 +143,14 @@ pub fn url_to_domain_id(url: &str) -> u64 {
 }
 
 pub fn normalize_url(raw: &str) -> String {
-    let url_str = if !raw.starts_with("http") {
-        format!("http://{}", raw)
-    } else {
+    let url_str = if raw.to_ascii_lowercase().starts_with("http://")
+        || raw.to_ascii_lowercase().starts_with("https://")
+    {
         raw.to_owned()
+    } else {
+        format!("http://{}", raw)
     };
+
     Url::parse(&url_str)
         .ok()
         .map(|mut url| {
@@ -174,4 +179,17 @@ pub fn get_dir_size(path: impl AsRef<Path>) -> u64 {
         }
     }
     size
+}
+
+/// Enforce local redirects only
+pub fn local_redirect(target: &str) -> String {
+    if target.starts_with('/')
+        && !target.starts_with("//")
+        && !target.starts_with("/\\")
+        && !target.chars().any(|c| c.is_control())
+    {
+        target.to_string()
+    } else {
+        "/".to_string()
+    }
 }

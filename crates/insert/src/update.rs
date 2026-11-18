@@ -49,7 +49,7 @@ impl UpdateState {
         let mut merged: Vec<Range> = Vec::new();
         for current in ranges.drain(..) {
             if let Some(last) = merged.last_mut()
-                && current.start <= last.end + 1
+                && current.start <= last.end.saturating_add(1)
             {
                 last.end = last.end.max(current.end);
                 continue;
@@ -85,7 +85,7 @@ impl UpdateState {
             && let Some(first_range) = ranges.first()
             && first_range.start == 0
         {
-            return first_range.end + 1;
+            return first_range.end.saturating_add(1);
         }
 
         0

@@ -166,6 +166,10 @@ pub enum ResolvedToken<'a> {
 }
 
 fn resolve_token<'a>(slice: &'a [u8]) -> (ResolvedToken<'a>, bool) {
+    if slice.len() > 8 {
+        return (ResolvedToken::Raw(""), false);
+    }
+
     if slice.len() > 3 {
         let mut id = 0u64;
         for (j, b) in slice.iter().enumerate() {

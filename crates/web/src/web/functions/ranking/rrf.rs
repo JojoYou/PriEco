@@ -45,6 +45,7 @@ pub fn run(params: RRFParams<'_>) -> Vec<WebDocument> {
 
             if params.lang != "all"
                 && !params.lang.is_empty()
+                && !doc.lang.is_empty()
                 && doc.lang != params.lang
                 && (source_name == "IVF" || source_name == "FTS")
             {

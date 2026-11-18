@@ -122,11 +122,20 @@ fn is_safe_goggle_url(url: &str) -> bool {
     };
 
     // Is it trying to call something on local network?
-    !matches!(host, "localhost")
-        && !host.starts_with("127.")
-        && !host.starts_with("169.254.")
-        && !host.starts_with("10.")
-        && !host.starts_with("192.168.")
+    let internal_ip = match parsed.host() {
+        Some(url::Host::Ipv4(ip)) => {
+            ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified()
+        }
+        Some(url::Host::Ipv6(ip)) => {
+            ip.is_loopback()
+                || ip.is_unspecified()
+                || ip.is_unique_local()
+                || ip.is_unicast_link_local()
+        }
+        _ => false,
+    };
+
+    host != "localhost" && !internal_ip
 }
 
 fn store_goggle(text: String, url: String) -> Goggle {

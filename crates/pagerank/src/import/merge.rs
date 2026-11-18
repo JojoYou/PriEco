@@ -65,7 +65,12 @@ pub fn run_with(
         read_to_string(total_nodes_path)?
             .trim()
             .parse()
-            .unwrap_or(0)
+            .map_err(|e| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("{} is corrupt: {}", total_nodes_path, e),
+                )
+            })?
     } else {
         0
     };

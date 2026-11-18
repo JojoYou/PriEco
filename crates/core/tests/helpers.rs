@@ -15,8 +15,8 @@ use std::{
 
 use common::{TmpDir, run_with_timeout, unique};
 use prieco_core::{
-    acquire_file_lock, file_exists, get_dir_size, normalize_url, read_file, release_file_lock,
-    url_to_domain_id, url_to_id, write_file,
+    acquire_file_lock, file_exists, get_dir_size, local_redirect, normalize_url, read_file,
+    release_file_lock, url_to_domain_id, url_to_id, write_file,
 };
 
 /* ───────────────────────────── file_exists ───────────────────────────── */
@@ -261,6 +261,11 @@ fn write_file_failure_must_release_the_lock() {
     let finished = run_with_timeout(Duration::from_secs(5), move || {
         write_file(&p, "y", false);
     });
+    if finished.is_none() {
+        // Free the leaked lock so the stuck writer exits instead of sitting in the
+        // shared condvar queue and stealing wake ups from other tests in this binary
+        release_file_lock(&dir_path);
+    }
     assert!(
         finished.is_some(),
         "second write_file on the same path hung: lock leaked after a failed open"
@@ -327,6 +332,90 @@ fn lock_blocks_second_acquirer_until_released() {
     release_file_lock(&path);
     handle.join().unwrap();
     assert!(acquired.load(Ordering::SeqCst));
+}
+
+/// BUG: all paths share one condvar and `release_file_lock` calls `notify_one`. That wakes
+/// the oldest waiter of ANY path; if it waits for another (still locked) path it sleeps
+/// again and the waiter of the released path is never woken -> writer hangs forever.
+/// Needs `notify_all` (or one condvar per path).
+#[test]
+fn releasing_one_path_wakes_its_waiter_while_other_paths_are_held() {
+    let busy = unique("lock_busy");
+    let target = unique("lock_target");
+    acquire_file_lock(&busy);
+    acquire_file_lock(&target);
+
+    let spawn_busy = || {
+        let b = busy.clone();
+        let h = thread::spawn(move || {
+            acquire_file_lock(&b);
+            release_file_lock(&b);
+        });
+        thread::sleep(Duration::from_millis(30));
+        h
+    };
+
+    // Target waiter sits in the middle of the queue, so neither FIFO nor LIFO
+    // wake up order picks it by luck
+    let mut busy_waiters: Vec<_> = (0..4).map(|_| spawn_busy()).collect();
+    let (tx, rx) = std::sync::mpsc::channel();
+    let t = target.clone();
+    thread::spawn(move || {
+        acquire_file_lock(&t);
+        release_file_lock(&t);
+        let _ = tx.send(());
+    });
+    thread::sleep(Duration::from_millis(30));
+    busy_waiters.extend((0..4).map(|_| spawn_busy()));
+
+    release_file_lock(&target);
+    let woke = rx.recv_timeout(Duration::from_secs(3)).is_ok();
+
+    // Clean up: every release wakes at most one parked thread, so keep releasing
+    // until nobody from this test is left on the shared condvar
+    for _ in 0..50 {
+        release_file_lock(&busy);
+        release_file_lock(&target);
+        if busy_waiters.iter().all(|h| h.is_finished()) {
+            break;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+    let _ = rx.recv_timeout(Duration::from_secs(1));
+
+    assert!(
+        woke,
+        "waiter of the released path was never woken (lost wakeup)"
+    );
+}
+
+/// Many writers on many paths at once: every one must finish.
+#[test]
+fn concurrent_writers_on_different_paths_all_finish() {
+    let tmp = TmpDir::new("wf_many_paths");
+    let paths: Vec<String> = (0..8)
+        .map(|i| tmp.join_str(&format!("f{}.txt", i)))
+        .collect();
+    let ps = paths.clone();
+    let done = run_with_timeout(Duration::from_secs(20), move || {
+        let handles: Vec<_> = (0..64)
+            .map(|i| {
+                let p = ps[i % ps.len()].clone();
+                thread::spawn(move || {
+                    for _ in 0..50 {
+                        write_file(&p, "x", true);
+                    }
+                })
+            })
+            .collect();
+        for h in handles {
+            h.join().unwrap();
+        }
+    });
+    assert!(done.is_some(), "writers deadlocked");
+    for p in &paths {
+        assert_eq!(fs::read_to_string(p).unwrap().len(), 8 * 50, "{}", p);
+    }
 }
 
 #[test]
@@ -701,6 +790,100 @@ fn normalize_bare_domain_starting_with_http_gets_a_scheme() {
 #[test]
 fn normalize_uppercase_scheme() {
     assert_eq!(normalize_url("HTTPS://EXAMPLE.COM/"), "https://example.com");
+}
+
+/* ───────────────────────────── local_redirect ───────────────────────────── */
+
+#[test]
+fn local_redirect_keeps_local_paths() {
+    for target in [
+        "/",
+        "/search",
+        "/search?q=rust&page=2",
+        "/settings#theme",
+        "/a/b/c/",
+        "/search?q=%2F%2Fevil.example",
+        "/search?next=//evil.example",
+        "/ž/日本語",
+    ] {
+        assert_eq!(local_redirect(target), target, "{:?}", target);
+    }
+}
+
+#[test]
+fn local_redirect_rejects_absolute_urls() {
+    for target in [
+        "https://evil.example/phish",
+        "http://evil.example",
+        "HTTPS://EVIL.EXAMPLE",
+        "javascript:alert(1)",
+        "data:text/html,<script>alert(1)</script>",
+        "mailto:a@b.c",
+    ] {
+        assert_eq!(local_redirect(target), "/", "{:?}", target);
+    }
+}
+
+#[test]
+fn local_redirect_rejects_relative_and_empty_targets() {
+    for target in [
+        "",
+        "search",
+        "evil.example",
+        "./search",
+        "../etc",
+        "?q=1",
+        "#top",
+    ] {
+        assert_eq!(local_redirect(target), "/", "{:?}", target);
+    }
+}
+
+/// Browsers treat "//host" and "/\host" as protocol relative URLs to another origin.
+#[test]
+fn local_redirect_rejects_protocol_relative_urls() {
+    for target in [
+        "//evil.example",
+        "//evil.example/x",
+        "///evil.example",
+        "/\\evil.example",
+        "/\\/evil.example",
+    ] {
+        assert_eq!(local_redirect(target), "/", "{:?}", target);
+    }
+}
+
+/// Browsers strip tab/CR/LF inside URLs, so "/\t/evil.example" becomes "//evil.example".
+/// CR/LF would also allow header injection in the Location header.
+#[test]
+fn local_redirect_rejects_control_characters() {
+    for target in [
+        "/\t/evil.example",
+        "/\n/evil.example",
+        "/\r\n/evil.example",
+        "/search\r\nSet-Cookie: a=b",
+        "/\0",
+        "/\u{7f}",
+        "/\u{85}x",
+    ] {
+        assert_eq!(local_redirect(target), "/", "{:?}", target);
+    }
+}
+
+/// Leading whitespace is stripped by browsers too; " //evil" must not survive.
+#[test]
+fn local_redirect_rejects_leading_whitespace() {
+    for target in [" /search", " //evil.example", "\t//evil.example"] {
+        assert_eq!(local_redirect(target), "/", "{:?}", target);
+    }
+}
+
+#[test]
+fn local_redirect_is_idempotent() {
+    for target in ["/", "/search?q=1", "//evil.example", "https://x.y", ""] {
+        let once = local_redirect(target);
+        assert_eq!(local_redirect(&once), once, "{:?}", target);
+    }
 }
 
 /* ───────────────────────────── get_dir_size ───────────────────────────── */

@@ -158,6 +158,48 @@ fn synonym_store_cache_is_safe_across_threads() {
     }
 }
 
+/// Many threads racing on the very first load must all end up sharing one store,
+/// not each keep their own copy (the old read -> load -> write overwrote entries).
+#[test]
+fn synonym_store_is_shared_when_loaded_concurrently() {
+    for lang in SYNONYM_LANGS {
+        let barrier = Arc::new(std::sync::Barrier::new(16));
+        let handles: Vec<_> = (0..16)
+            .map(|_| {
+                let barrier = barrier.clone();
+                let lang = lang.to_string();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    get_store(&lang).unwrap()
+                })
+            })
+            .collect();
+        let stores: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+        let first = get_store(lang).unwrap();
+        for s in &stores {
+            assert!(Arc::ptr_eq(&first, s), "{}", lang);
+        }
+    }
+}
+
+#[test]
+fn synonym_store_missing_language_stays_missing() {
+    for _ in 0..3 {
+        assert!(get_store("zz").is_none());
+        assert!(get_store("").is_none());
+    }
+}
+
+#[test]
+fn synonym_store_language_code_is_exact() {
+    // "EN" or "en " are not "en"; they must not panic and must not alias another store
+    for lang in ["EN", "en ", " en", "en-US"] {
+        if let Some(s) = get_store(lang) {
+            assert!(!Arc::ptr_eq(&s, &get_store("en").unwrap()), "{:?}", lang);
+        }
+    }
+}
+
 #[test]
 fn synonym_lookup_unknown_term_is_none() {
     let store = get_store("en").unwrap();
@@ -344,12 +386,14 @@ fn entity_tags_are_non_overlapping_and_ordered() {
     }
 }
 
+/// Keys are stored lowercase so the lowercase text found by the automaton can be
+/// looked up directly (see scan_entities).
 #[test]
-fn entity_places_registry_contains_capitalised_keys() {
+fn entity_places_registry_keys_are_lowercase() {
     let coords = QU_PIPELINE
         .archived_places
         .places
-        .get("Trnava pri Laborci")
+        .get("trnava pri laborci")
         .expect("place missing in registry");
     assert!(!coords.is_empty());
     assert!(
@@ -357,6 +401,19 @@ fn entity_places_registry_contains_capitalised_keys() {
             .iter()
             .any(|c| c.country.as_str().eq_ignore_ascii_case("sk"))
     );
+}
+
+#[test]
+fn entity_places_registry_has_no_uppercase_keys() {
+    let upper: Vec<&str> = QU_PIPELINE
+        .archived_places
+        .places
+        .keys()
+        .map(|k| k.as_str())
+        .filter(|k| *k != k.to_lowercase())
+        .take(5)
+        .collect();
+    assert!(upper.is_empty(), "uppercase keys: {:?}", upper);
 }
 
 /// BUG (data): the NAME list contains plain English words ("the", "how", "to",

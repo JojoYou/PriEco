@@ -39,6 +39,7 @@ bincode-next = { workspace = true }
 rkyv = { workspace = true }
 primp = { workspace = true }
 rand = { workspace = true }
+bytemuck = { workspace = true }
 
 [features]
 default = []

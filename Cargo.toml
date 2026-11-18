@@ -20,6 +20,9 @@ default-members = [
 ]
 resolver = "3"
 
+###
+# Full performance
+###
 [profile.release]
 # Performance
 opt-level = 3     # Compiler optimization
@@ -31,6 +34,9 @@ strip = true             # Removes debug symbols
 debug = 0                # Disables debug information
 debug-assertions = false # Removes debug assertions
 
+###
+# Almost performance
+###
 [profile.release-dev]
 inherits = "release"
 
@@ -41,6 +47,12 @@ lto = false
 
 # Binary size
 strip = false
+
+###
+# Debug mode for tests needs this optimized
+###
+[profile.dev.package.aho-corasick]
+opt-level = 3
 
 [workspace.dependencies]
 # Mapping
@@ -82,7 +94,9 @@ tikv-jemallocator = "0.7.0" # Memory allocator
 memmap2 = "0.9.12" # Sequencial access
 #io-uring = "0.7.16" # Random access
 
-zip = "9.6.0" # Stream zip results files to index
+zip = { version = "9.6.0", default-features = false, features = [
+    "deflate-flate2-zlib-rs",
+] } # Stream zip results files to index
 
 ###
 # Database
@@ -123,12 +137,14 @@ rkyv = { version = "0.8.18", features = [
 ] } # 0 copy deserialization; Used for places
 
 # Vector embedding
-ort = { path = "vendor/ort-1.16.3" } # Query to vector
-tokenizers = "0.23.2"                # Ort model tokenizer
-cudarc = { version = "0.19.2" }      # Nvidia GPU, used for comparing cosine distance between vectors
+ort = { path = "vendor/ort-1.16.3", default-features = false, features = [
+    "half",
+] } # Query to vector
+tokenizers = "0.23.2" # Ort model tokenizer
+cudarc = { version = "0.19.2" } # Nvidia GPU, used for comparing cosine distance between vectors
 ndarray = "0.15.1"
 bytemuck = "1.25.0"
-half = "2.7.1"                       # F16 embeds
+half = "2.7.1" # F16 embeds
 
 # Mini crawler
 bincode-next = { version = "2.1.0", features = ["serde"] }

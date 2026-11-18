@@ -53,6 +53,7 @@ iroh-gossip = { workspace = true }
 futures-lite = { workspace = true }
 data-encoding = { workspace = true }
 n0-future = { workspace = true }
+aho-corasick = { workspace = true }
 
 [features]
 default = []

@@ -78,7 +78,7 @@ pub fn run(
 
     // Language
     if cookie_jar.get("lang").is_none()
-        && let Some(loc) = cookie_jar.get("loc").map(|c| c.value().to_string())
+        && let Some(loc) = cookie_jar.get_pending("loc").map(|c| c.value().to_string())
     {
         let lang = COUNTRY_TO_LANG
             .get(loc.as_str())
@@ -91,7 +91,7 @@ pub fn run(
         String::from("selected_loc"),
         json!(
             cookie_jar
-                .get("loc")
+                .get_pending("loc")
                 .map(|c| c.value().to_string())
                 .unwrap_or_else(|| "all".to_string())
         ),
@@ -100,7 +100,7 @@ pub fn run(
         String::from("selected_lang"),
         json!(
             cookie_jar
-                .get("lang")
+                .get_pending("lang")
                 .map(|c| c.value().to_string())
                 .unwrap_or_else(|| "all".to_string())
         ),

@@ -62,7 +62,7 @@ pub fn extract_tag_data(document: &Html) -> AHashMap<String, Vec<String>> {
         &selectors.img_selector,
         "img",
         "src",
-        true,
+        false,
     );
     extract_data(
         document,
@@ -74,21 +74,20 @@ pub fn extract_tag_data(document: &Html) -> AHashMap<String, Vec<String>> {
     );
 
     // Limit to first 20 unique <a> URLs
-    if let Some(urls) = tag_data.get_mut("a") {
-        let mut seen = AHashSet::with_capacity(100);
-        let mut limited = Vec::with_capacity(25);
-
-        for url in urls.iter() {
-            if seen.insert(url) {
-                // insert returns false if already in set
-                limited.push(url.clone());
+    for key in ["a", "a_href"] {
+        if let Some(values) = tag_data.get_mut(key) {
+            let mut seen = AHashSet::with_capacity(100);
+            let mut limited = Vec::with_capacity(25);
+            for v in values.iter() {
+                if seen.insert(v) {
+                    limited.push(v.clone());
+                }
+                if limited.len() >= 20 {
+                    break;
+                }
             }
-            if limited.len() >= 20 {
-                break;
-            }
+            *values = limited;
         }
-
-        *urls = limited;
     }
 
     tag_data
@@ -144,14 +143,8 @@ fn extract_data(
                         return String::new();
                     }
 
-                    // Find the position of http:// or https://
-                    let start_pos = attr
-                        .find("http://")
-                        .or_else(|| attr.find("https://"))
-                        .unwrap_or_default();
-
                     // Get the substring from the protocol onwards
-                    let cleaned_url = &attr[start_pos..];
+                    let cleaned_url = attr.trim();
 
                     if add_slash && !cleaned_url.ends_with('/') {
                         format!("{}/", cleaned_url)
@@ -178,7 +171,7 @@ fn extract_data(
         {
             tag_data.insert(format!("{}_{}", tag, keyword), data);
         } else {
-            tag_data.insert(tag.to_string(), data);
+            tag_data.entry(tag.to_string()).or_default().extend(data);
         }
     }
 }

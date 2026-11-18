@@ -26,8 +26,9 @@ pub fn synynyms_and_optimize(
         || query.contains('|')
         || query.contains(" OR ")
         || query.contains(" AND ")
-        || query.contains("def")
-        || query.contains("definition")
+        || query
+            .split_whitespace()
+            .any(|w| matches!(w.to_lowercase().as_str(), "def" | "definition"))
     {
         return;
     }

@@ -61,7 +61,7 @@ fn parse_meta_line(line: &str, meta: &mut GoggleMeta) {
 }
 
 fn parse_rule_line(line: &str, rules: &mut GoggleRules) {
-    let Some((_, modifiers)) = line.split_once('$') else {
+    let Some((pattern, modifiers)) = line.split_once('$') else {
         return;
     };
 
@@ -98,6 +98,14 @@ fn parse_rule_line(line: &str, rules: &mut GoggleRules) {
             rules.downrank.insert(id, boost_val.unwrap_or(1.0));
         } else if let Some(b) = boost_val {
             rules.boost.insert(id, b);
+        }
+    } else if let Some(b) = boost_val
+        && !is_downrank
+        && !is_discard
+    {
+        let pattern = pattern.trim();
+        if !pattern.is_empty() {
+            rules.path.push((pattern.to_string(), b));
         }
     }
 }

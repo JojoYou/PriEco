@@ -216,7 +216,7 @@ pub fn run(
         }
 
         // Deep url
-        let path_depth = clean_url.matches('/').count();
+        let path_depth = clean_url.trim_end_matches('/').matches('/').count();
         if path_depth > 2 {
             let extra_slashes = (path_depth - 2) as i32;
             boost *= weights.path_depth_penalty.powi(extra_slashes);
@@ -360,6 +360,7 @@ fn strip_url_noise(url: &str) -> &str {
 
     (url.split('#').next().unwrap_or(url)) as _
 }
+
 fn is_effectively_homepage(url: &str) -> bool {
     let path = url
         .split("://")
@@ -376,10 +377,11 @@ fn is_effectively_homepage(url: &str) -> bool {
 
     // Match locale-only paths: en, en-CA, fr-FR, zh-Hans, pt-BR etc.
     let is_locale = |seg: &str| -> bool {
-        let seg = seg.trim_end_matches('/');
-        matches!(seg.len(), 2..=7)
-            && seg.chars().all(|c| c.is_ascii_alphabetic() || c == '-')
-            && seg.contains(|c: char| c.is_ascii_alphabetic()) // not just dashes
+        let alpha = |s: &str, n: std::ops::RangeInclusive<usize>| {
+            n.contains(&s.len()) && s.chars().all(|c| c.is_ascii_alphabetic())
+        };
+        let (lang, region) = seg.split_once(['-', '_']).unwrap_or((seg, ""));
+        alpha(lang, 2..=2) && (region.is_empty() || alpha(region, 2..=4))
     };
 
     // Single locale segment: /en-CA/ or /en/

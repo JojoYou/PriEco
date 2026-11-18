@@ -62,7 +62,7 @@ use crate::web::{
 use prieco_core::{
     BANGS, CLIENT, LatencySummary, PRIECO_BLOBS, Stage, TANTIVY_INDEX,
     globals::{ANALYTICS, CSS_VERSION, EmbeddingService, JS_VERSION, UserAgent},
-    lat_bucket_ms,
+    lat_bucket_ms, local_redirect,
 };
 
 /*
@@ -149,8 +149,14 @@ pub fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host) -> Te
 
             let parts: Vec<&str> = item.splitn(2, '=').collect();
             if parts.len() == 2 {
-                let name = parts[0].to_string();
-                let url = parts[1].to_string();
+                let dec = |s: &str| {
+                    decode(s)
+                        .map(|c| c.into_owned())
+                        .unwrap_or_else(|_| s.to_string())
+                };
+                let name = dec(parts[0]);
+                let url = dec(parts[1]);
+
                 let icon = format!(
                     "/proxy?u={}",
                     urlencoding::encode(&format!(
@@ -159,8 +165,8 @@ pub fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host) -> Te
                     ))
                 );
 
-                let display_name = if name.len() > 10 {
-                    format!("{}...", &name[..7])
+                let display_name = if name.chars().count() > 10 {
+                    format!("{}...", name.chars().take(7).collect::<String>())
                 } else {
                     name.clone()
                 };
@@ -218,7 +224,7 @@ pub fn handle_shortcuts(form: Form<ShortcutAction<'_>>, cookie_jar: &CookieJar<'
                     format!("https://{}", url)
                 };
 
-                items.push(format!("{}={}", name, final_url));
+                items.push(format!("{}={}", encode(name), encode(&final_url)));
             }
         }
         "edit" => {
@@ -232,7 +238,7 @@ pub fn handle_shortcuts(form: Form<ShortcutAction<'_>>, cookie_jar: &CookieJar<'
                     format!("https://{}", url)
                 };
 
-                items[id] = format!("{}={}", name, final_url);
+                items[id] = format!("{}={}", encode(name), encode(&final_url));
             }
         }
         "delete" => {
@@ -1263,8 +1269,8 @@ pub fn set_preferences(params: SetPrefParams, cookie_jar: &CookieJar<'_>) -> Red
     }
 
     let redirect_url = match params.return_to {
-        Some(url) if url.starts_with('/') => url,
-        _ => String::from("/"),
+        Some(url) => local_redirect(&url),
+        None => String::from("/"),
     };
 
     Redirect::to(redirect_url)
@@ -1538,8 +1544,11 @@ pub fn apply_goggles(ids: Option<Vec<u64>>, cookie_jar: &CookieJar<'_>) -> Redir
 #[get("/static/css/goggles_tint.css.hbs?<tint>&<target>")]
 pub fn goggles_tint(tint: Option<&str>, target: Option<&str>) -> (ContentType, String) {
     let hex = validate_hex(tint.unwrap_or("14141E")).unwrap_or_else(|| String::from("14141E"));
-    let target = target.unwrap_or_default();
-
+    let target: String = target
+        .unwrap_or_default()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .collect();
     let css = format!(".{target} {{ background-color: #{hex}66; }}");
 
     (ContentType::CSS, css)
@@ -1586,7 +1595,7 @@ pub fn update_qt(form: Form<QtUpdateForm>, cookie_jar: &CookieJar<'_>) -> Redire
     cookie.set_max_age(rocket::time::Duration::days(365));
     cookie_jar.add(cookie);
 
-    Redirect::to(form.return_url.clone())
+    Redirect::to(local_redirect(&form.return_url))
 }
 
 pub struct QuickTuneExport(String);
@@ -1722,6 +1731,7 @@ pub fn country_info(code: &str) -> (&'static str, &'static str) {
         "fj" => ("Fiji", "🇫🇯"),
         "fi" => ("Finland", "🇫🇮"),
         "fr" => ("France", "🇫🇷"),
+        "gb" => ("United Kingdom", "🇬🇧"),
         "gf" => ("French Guiana", "🇬🇫"),
         "pf" => ("French Polynesia", "🇵🇫"),
         "tf" => ("French Southern Territories", "🇹🇫"),
@@ -1825,6 +1835,7 @@ pub fn country_info(code: &str) -> (&'static str, &'static str) {
         "ro" => ("Romania", "🇷🇴"),
         "ru" => ("Russia", "🇷🇺"),
         "rw" => ("Rwanda", "🇷🇼"),
+        "rs" => ("Serbia", "🇷🇸"),
         "sh" => ("Saint Helena", "🇸🇭"),
         "kn" => ("Saint Kitts and Nevis", "🇰🇳"),
         "lc" => ("Saint Lucia", "🇱🇨"),

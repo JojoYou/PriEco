@@ -27,7 +27,7 @@ use prieco_core::{
     ANALYTICS, PRIECO_CONFIG, Stage, TANTIVY_INDEX, TANTIVY_READER, WebDocument, file_exists,
     url_to_id, write_file,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use tokio::time::interval;
 
@@ -43,6 +43,7 @@ use crate::web::functions::{
   Constants
 */
 pub static IROH_ENDPOINT: OnceLock<Endpoint> = OnceLock::new();
+const BLOOM_BYTES: usize = 512;
 
 // Ticket
 #[derive(Debug, Serialize, Deserialize)]
@@ -112,12 +113,25 @@ fn gen_iroh_secret() -> SecretKey {
 // Profile
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeywordBloom {
+    #[serde(deserialize_with = "exact_bloom_bits")]
     pub bits: Vec<u8>,
+}
+fn exact_bloom_bits<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
+    let bits = Vec::<u8>::deserialize(d)?;
+    if bits.len() != BLOOM_BYTES {
+        return Err(serde::de::Error::invalid_length(
+            bits.len(),
+            &"512 bloom bytes",
+        ));
+    }
+    Ok(bits)
 }
 
 impl KeywordBloom {
     pub fn new() -> Self {
-        Self { bits: vec![0; 512] }
+        Self {
+            bits: vec![0; BLOOM_BYTES],
+        }
     }
 
     pub fn insert(&mut self, keyword_hash: u64) {
@@ -139,12 +153,16 @@ impl KeywordBloom {
         (h1, h2, h3)
     }
 
-    fn set_bit(&mut self, index: usize) {
-        self.bits[index / 8] |= 1 << (index % 8);
+    fn set_bit(&mut self, i: usize) {
+        if let Some(b) = self.bits.get_mut(i / 8) {
+            *b |= 1 << (i % 8);
+        }
     }
 
-    fn get_bit(&self, index: usize) -> bool {
-        (self.bits[index / 8] & (1 << (index % 8))) != 0
+    fn get_bit(&self, i: usize) -> bool {
+        self.bits
+            .get(i / 8)
+            .is_some_and(|b| b & (1 << (i % 8)) != 0)
     }
 }
 

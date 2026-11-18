@@ -54,9 +54,13 @@ fn country_info_unknown_codes() {
     }
 }
 
+/// Codes without a flag of their own: Netherlands Antilles -> Bonaire,
+/// Serbia and Montenegro -> Serbia, uk -> alias of gb
+const LEGACY_COUNTRY_FLAGS: &[(&str, &str)] = &[("an", "🇧🇶"), ("cs", "🇷🇸"), ("uk", "🇬🇧")];
+
 /// Every arm of the big match is parsed from the source and checked for consistency:
 /// unique codes, non-empty names, and the flag must be the regional indicator pair
-/// of its own code.
+/// of its own code (except LEGACY_COUNTRY_FLAGS).
 #[test]
 fn country_info_table_is_consistent() {
     let src = include_str!("../../src/web/routes/pages.rs");
@@ -78,6 +82,10 @@ fn country_info_table_is_consistent() {
         count += 1;
         assert!(seen.insert(code.to_string()), "duplicate code {}", code);
         let (name, flag) = country_info(code);
+        // Retired or alias codes intentionally show the flag of today's country
+        if LEGACY_COUNTRY_FLAGS.contains(&(code, flag)) {
+            continue;
+        }
         assert_ne!(name, "Unknown", "{}", code);
         assert!(!name.trim().is_empty());
         let expected: String = code
@@ -96,7 +104,9 @@ fn country_info_table_is_consistent() {
     );
 }
 
-/// Every country that the language auto detection knows should have a display name
+/// Every country that the language auto detection knows should have a display name.
+/// BUG: still fails for "he", "da", "ja", "ko", "el": those are language codes inserted
+/// into COUNTRY_TO_LANG as countries (see core/tests/country_to_lang.rs).
 #[test]
 fn country_info_covers_language_detection_countries() {
     let missing: Vec<&str> = prieco_core::COUNTRY_TO_LANG
@@ -105,6 +115,12 @@ fn country_info_covers_language_detection_countries() {
         .filter(|c| country_info(c).0 == "Unknown")
         .collect();
     assert!(missing.is_empty(), "codes without a country: {:?}", missing);
+}
+
+#[test]
+fn country_info_uk_and_gb_are_the_same_country() {
+    assert_eq!(country_info("gb"), country_info("uk"));
+    assert_eq!(country_info("gb").0, "United Kingdom");
 }
 
 /* ───────────────────────────── goggles_tint ───────────────────────────── */
@@ -294,6 +310,19 @@ fn post_shortcut(c: &Client, form: &str, existing: Option<&str>) -> (Status, Str
     (status, loc, items)
 }
 
+/// Names and urls are stored percent encoded (so "," in a name stays one shortcut);
+/// decode each part to compare what the user typed.
+fn decoded(items: &[String]) -> Vec<String> {
+    let dec = |s: &str| urlencoding::decode(s).unwrap().into_owned();
+    items
+        .iter()
+        .map(|i| match i.split_once('=') {
+            Some((n, u)) => format!("{}={}", dec(n), dec(u)),
+            None => i.clone(),
+        })
+        .collect()
+}
+
 #[test]
 fn shortcut_add_first_inserts_dummy_and_adds_https() {
     let c = shortcuts_client();
@@ -304,7 +333,10 @@ fn shortcut_add_first_inserts_dummy_and_adds_https() {
     );
     assert_eq!(status, Status::SeeOther);
     assert_eq!(loc, "/");
-    assert_eq!(items, vec!["dummy=dummy", "Git=https://github.com"]);
+    assert_eq!(
+        decoded(&items),
+        vec!["dummy=dummy", "Git=https://github.com"]
+    );
 }
 
 #[test]
@@ -315,7 +347,10 @@ fn shortcut_add_keeps_explicit_scheme() {
         "action=add&shortcut_name=Old&shortcut_url=http%3A%2F%2Fold.example",
         Some("dummy=dummy"),
     );
-    assert_eq!(items, vec!["dummy=dummy", "Old=http://old.example"]);
+    assert_eq!(
+        decoded(&items),
+        vec!["dummy=dummy", "Old=http://old.example"]
+    );
 }
 
 #[test]
@@ -337,7 +372,7 @@ fn shortcut_edit() {
         "action=edit&shortcut_id=1&shortcut_name=B&shortcut_url=b.com",
         Some("dummy=dummy,A=https://a.com"),
     );
-    assert_eq!(items, vec!["dummy=dummy", "B=https://b.com"]);
+    assert_eq!(decoded(&items), vec!["dummy=dummy", "B=https://b.com"]);
 }
 
 #[test]

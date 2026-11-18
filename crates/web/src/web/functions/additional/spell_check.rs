@@ -10,9 +10,11 @@ pub fn spell_check_query(q: &str) -> Option<String> {
     for word in q.split_whitespace() {
         let start_idx = word.as_ptr() as usize - q.as_ptr() as usize;
 
-        let is_protected = tags.iter().any(|tag| tag.range.contains(&start_idx));
+        let protected = tags.iter().any(|tag| tag.range.contains(&start_idx))
+            && !best_correction(word)
+                .is_some_and(|best| best.distance == 1 && best.count >= 1_000_000_000);
 
-        if is_protected {
+        if protected {
             corrected_words.push(word.to_string());
         } else {
             match correct_word(word) {
@@ -44,16 +46,12 @@ fn best_correction(word: &str) -> Option<Suggestion> {
     let word_lower = word.to_lowercase();
 
     candidates.into_iter().max_by_key(|c| {
-        let cand_lower = c.term.to_lowercase();
-        (
-            -c.distance,
-            word_lower
-                .chars()
-                .zip(cand_lower.chars())
-                .take_while(|(x, y)| x == y)
-                .count(),
-            c.count,
-        )
+        let prefix = word_lower
+            .chars()
+            .zip(c.term.to_lowercase().chars())
+            .take_while(|(x, y)| x == y)
+            .count();
+        (-c.distance, c.count, prefix)
     })
 }
 

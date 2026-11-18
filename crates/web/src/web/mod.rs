@@ -31,7 +31,6 @@ pub mod functions {
 
     pub mod additional {
         pub mod discover;
-        pub mod goggles;
         pub mod spell_check;
     }
 

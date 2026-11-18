@@ -109,11 +109,95 @@ fn bloom_serde_roundtrip() {
 /// A malformed profile from the network (short bit vector) must not crash the node
 #[test]
 fn bloom_from_peer_with_short_bits_does_not_panic() {
-    let b: KeywordBloom = serde_json::from_str(r#"{"bits":[1,2,3]}"#).unwrap();
+    let Ok(b) = serde_json::from_str::<KeywordBloom>(r#"{"bits":[1,2,3]}"#) else {
+        return; // rejected on parse: fine
+    };
     let r = std::panic::catch_unwind(|| b.contains(u64::MAX));
     assert!(
         r.is_ok(),
         "peer controlled bloom size caused an out of bounds panic"
+    );
+}
+
+/// Peers can send any size. Whatever the node does with it (reject on parse, or accept
+/// and treat missing bytes as zero), reading and writing must never panic.
+#[test]
+fn bloom_from_peer_with_any_size_never_panics() {
+    for len in [0usize, 1, 3, 64, 511, 513, 4096] {
+        let json = format!(r#"{{"bits":{:?}}}"#, vec![0xFFu8; len]);
+        let Ok(mut b) = serde_json::from_str::<KeywordBloom>(&json) else {
+            continue; // rejecting a malformed profile is fine too
+        };
+        for h in [0u64, 1, 0xFFF, 0xFFF_FFF_FFF, u64::MAX] {
+            let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                b.contains(h);
+                b.insert(h);
+            }));
+            assert!(r.is_ok(), "len {} hash {:#x} panicked", len, h);
+        }
+    }
+}
+
+/// A short bloom must never claim to contain a keyword whose bits it does not have,
+/// otherwise a broken peer gets every federated query.
+#[test]
+fn bloom_from_peer_with_short_bits_matches_nothing_outside_its_range() {
+    let Ok(b) = serde_json::from_str::<KeywordBloom>(r#"{"bits":[255,255,255]}"#) else {
+        return;
+    };
+    // index 4095 lives in byte 511 which this bloom does not have
+    assert!(!b.contains(u64::MAX));
+    assert!(!b.contains(0xFFF));
+}
+
+/// SECURITY: a peer decides the size of `bits`. Anything other than the 512 bytes the
+/// hashes address must be rejected when the profile is parsed, so a broken or hostile
+/// peer is dropped instead of being kept with a filter that never or always matches.
+#[test]
+fn bloom_from_peer_with_wrong_size_is_rejected() {
+    for len in [0usize, 1, 3, 511, 513, 4096] {
+        let json = format!(r#"{{"bits":{:?}}}"#, vec![0u8; len]);
+        assert!(
+            serde_json::from_str::<KeywordBloom>(&json).is_err(),
+            "{} byte bloom was accepted",
+            len
+        );
+    }
+}
+
+#[test]
+fn bloom_from_peer_with_exact_size_is_accepted() {
+    let json = format!(r#"{{"bits":{:?}}}"#, vec![0u8; 512]);
+    let b: KeywordBloom = serde_json::from_str(&json).unwrap();
+    assert_eq!(b.bits.len(), 512);
+}
+
+#[test]
+fn bloom_from_peer_with_invalid_bytes_is_rejected() {
+    for json in [
+        r#"{"bits":[256]}"#,
+        r#"{"bits":[-1]}"#,
+        r#"{"bits":"AAAA"}"#,
+        r#"{"bits":null}"#,
+        r#"{}"#,
+    ] {
+        assert!(
+            serde_json::from_str::<KeywordBloom>(json).is_err(),
+            "{}",
+            json
+        );
+    }
+}
+
+#[test]
+fn bloom_from_peer_with_correct_size_behaves_like_local() {
+    let mut local = KeywordBloom::new();
+    local.insert(url_to_id("rust"));
+    let peer: KeywordBloom = serde_json::from_str(&serde_json::to_string(&local).unwrap()).unwrap();
+    assert!(peer.contains(url_to_id("rust")));
+    assert_eq!(
+        peer.contains(url_to_id("python")),
+        local.contains(url_to_id("python"))
     );
 }
 

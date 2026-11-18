@@ -535,22 +535,19 @@ pub static COUNTRY_TO_LANG: Lazy<Arc<AHashMap<&'static str, &'static str>>> = La
     map.insert("no", "no");
     map.insert("pl", "pl");
     map.insert("ro", "ro");
-    map.insert("sr", "sr");
     map.insert("sk", "sk");
-    map.insert("sl", "sl");
     map.insert("fi", "fi");
-    map.insert("sv", "sv");
     map.insert("tr", "tr");
-    map.insert("el", "el");
     map.insert("bg", "bg");
-    map.insert("cs", "cs");
-    map.insert("da", "da");
-    map.insert("he", "he");
-    map.insert("ja", "ja");
-    map.insert("ko", "ko");
     map.insert("ru", "ru");
-    map.insert("ar", "ar");
-    map.insert("se", "nl");
+    map.insert("rs", "sr");
+    map.insert("si", "sl");
+    map.insert("se", "sv");
+    map.insert("gr", "el");
+    map.insert("cz", "cs");
+    map.insert("dk", "da");
+    map.insert("jp", "ja");
+    map.insert("kr", "ko");
 
     // === Closest language mappings ===
     map.insert("cy", "el"); // Cyprus → Greek
@@ -1852,17 +1849,16 @@ impl LangSynonyms {
 static SYNONYM_STORES: Lazy<RwLock<std::collections::HashMap<String, Option<Arc<LangSynonyms>>>>> =
     Lazy::new(|| RwLock::new(std::collections::HashMap::new()));
 pub fn get_store(lang: &str) -> Option<Arc<LangSynonyms>> {
-    {
-        let cache = SYNONYM_STORES.read();
-        if let Some(entry) = cache.get(lang) {
-            return entry.clone();
-        }
+    if let Some(entry) = SYNONYM_STORES.read().get(lang) {
+        return entry.clone();
     }
-    let loaded = LangSynonyms::load(lang);
-    SYNONYM_STORES
-        .write()
-        .insert(lang.to_string(), loaded.clone());
-    loaded
+    let mut w = SYNONYM_STORES.write();
+    if let Some(entry) = w.get(lang) {
+        return entry.clone();
+    }
+    let loaded = LangSynonyms::load(lang)?;
+    w.insert(lang.to_string(), Some(loaded.clone()));
+    Some(loaded)
 }
 
 /*
@@ -2016,6 +2012,14 @@ pub static QU_PIPELINE: Lazy<QueryUnderstandingPipeline> = Lazy::new(|| {
     let mut patterns = Vec::new();
     let mut metadata_map = Vec::new();
 
+    for place_name in archived_places.places.keys() {
+        let name_str = place_name.as_str().to_lowercase();
+        if name_str.len() > 1 {
+            patterns.push(name_str.clone());
+            metadata_map.push((EntityType::Place, name_str));
+        }
+    }
+
     for line in keywords_str.lines() {
         if let Some((prefix, value)) = line.split_once('|') {
             if value.trim().len() < 2 {
@@ -2029,14 +2033,6 @@ pub static QU_PIPELINE: Lazy<QueryUnderstandingPipeline> = Lazy::new(|| {
             };
             patterns.push(value.to_string());
             metadata_map.push((etype, value.to_string()));
-        }
-    }
-
-    for place_name in archived_places.places.keys() {
-        let name_str = place_name.as_str().to_lowercase();
-        if name_str.len() > 1 {
-            patterns.push(name_str.clone());
-            metadata_map.push((EntityType::Place, name_str));
         }
     }
 
@@ -2140,7 +2136,8 @@ pub static TOP_DOMAINS: Lazy<AHashSet<&'static str>> =
 pub static SPELL_CHECKER: Lazy<Arc<SymSpell<UnicodeStringStrategy>>> = Lazy::new(|| {
     let mut symspell: SymSpell<UnicodeStringStrategy> = SymSpell::default();
 
-    let en_dict = include_str!("../../../data/spell_check/frequency_dictionary_en_82_765.txt");
+    let en_dict = include_str!("../../../data/spell_check/frequency_dictionary_en_82_765.txt")
+        .trim_start_matches('\u{feff}');
     let mut word_count = 0;
     for line in en_dict.lines() {
         if symspell.load_dictionary_line(line, 0, 1, " ") {
@@ -2155,7 +2152,8 @@ pub static SPELL_CHECKER: Lazy<Arc<SymSpell<UnicodeStringStrategy>>> = Lazy::new
     );
 
     let en_bigrams =
-        include_str!("../../../data/spell_check/frequency_bigramdictionary_en_243_342.txt");
+        include_str!("../../../data/spell_check/frequency_bigramdictionary_en_243_342.txt")
+            .trim_start_matches('\u{feff}');
     let mut bigram_count = 0;
     for line in en_bigrams.lines() {
         if symspell.load_bigram_dictionary_line(line, 0, 2, " ") {
@@ -2188,6 +2186,8 @@ pub static ANALYTICS: Lazy<AnalyticsDb> = Lazy::new(|| {
         pending: Mutex::new(HashMap::new()),
         flush_lock: Mutex::new(()),
         last_flush: AtomicI64::new(OffsetDateTime::now_utc().unix_timestamp()),
+
+        inc_lock: Mutex::new(()),
     }
 });
 
@@ -2326,6 +2326,8 @@ pub struct AnalyticsDb {
     pending: Mutex<HashMap<String, u64>>,
     flush_lock: Mutex<()>,
     last_flush: AtomicI64,
+
+    inc_lock: Mutex<()>,
 }
 
 impl AnalyticsDb {
@@ -2710,9 +2712,10 @@ impl AnalyticsDb {
     }
 
     fn inc(&self, key: &str, delta: u64) {
+        let _guard = self.inc_lock.lock();
         let current = self.get_u64(key);
         self.ks
-            .insert(key.as_bytes(), (current + delta).to_le_bytes())
+            .insert(key.as_bytes(), current.saturating_add(delta).to_le_bytes())
             .expect("Analytics write failed");
     }
 

@@ -158,13 +158,17 @@ pub fn script(
     let mut hbs = Handlebars::new();
 
     let template_path = format!("static/js/hbs/{}", script_name);
-    let template_content = std::fs::read_to_string(&template_path)
-        .unwrap_or_else(|_| format!("console.error('Template {} not found');", template_path));
+    let template_content = std::fs::read_to_string(&template_path).unwrap_or_else(|_| {
+        format!(
+            "console.error({});",
+            serde_json::to_string(&format!("Template {} not found", template_path)).unwrap()
+        )
+    });
 
     if let Err(e) = hbs.register_template_string("js_template", &template_content) {
         return RawJavaScript(format!(
-            "console.error('Failed to register template: {}');",
-            e
+            "console.error({});",
+            serde_json::to_string(&format!("Failed to register template: {}", e)).unwrap()
         ));
     }
 

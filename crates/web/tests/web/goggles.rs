@@ -185,13 +185,15 @@ fn parse_important_flag() {
     assert_eq!(r.boost.len(), 1);
 }
 
+/// Without `site=` nothing becomes a domain rule; only a pattern before `$` makes
+/// a path rule.
 #[test]
 fn parse_rules_without_site_are_ignored() {
     let r = parse_goggle("$boost=2\n$discard,important\n/blog/$boost=2\nno dollar sign").rules;
     assert!(r.boost.is_empty());
     assert!(r.discard.is_empty());
     assert!(r.important.is_empty());
-    assert!(r.path.is_empty());
+    assert_eq!(r.path, vec![("/blog/".to_string(), 2.0)]);
 }
 
 #[test]
@@ -225,6 +227,42 @@ fn parse_unicode_does_not_panic() {
 fn parse_path_rules_are_supported() {
     let r = parse_goggle("/blog/$boost=2").rules;
     assert_eq!(r.path.len(), 1, "path rules are never parsed");
+}
+
+/// GAP: the pattern and boost value must both be kept so hand ranking can apply them.
+#[test]
+fn parse_path_rule_keeps_pattern_and_boost() {
+    let r = parse_goggle("/blog/$boost=2\n/docs/$boost=0.5").rules;
+    assert_eq!(
+        r.path,
+        vec![("/blog/".to_string(), 2.0), ("/docs/".to_string(), 0.5)]
+    );
+}
+
+/// An empty pattern matches every URL (`url.contains("")`), so `$boost=3` alone must
+/// never become a path rule that boosts the whole index.
+#[test]
+fn parse_rule_without_pattern_is_not_a_path_rule() {
+    for line in ["$boost=3", " $boost=3", "$boost=3,downrank", "$"] {
+        let r = parse_goggle(line).rules;
+        assert!(r.path.is_empty(), "{:?} -> {:?}", line, r.path);
+    }
+}
+
+/// A path pattern next to `site=` scopes the site rule; it must not turn into a global
+/// path rule that matches `/blog/` on every domain.
+#[test]
+fn parse_site_rule_with_pattern_is_not_a_global_path_rule() {
+    let r = parse_goggle("/blog/$boost=2,site=example.com").rules;
+    assert!(r.path.is_empty(), "{:?}", r.path);
+}
+
+#[test]
+fn parse_path_rule_without_valid_boost_is_ignored() {
+    for line in ["/blog/$boost=", "/blog/$boost=abc", "/blog/$", "/blog/"] {
+        let r = parse_goggle(line).rules;
+        assert!(r.path.is_empty(), "{:?} -> {:?}", line, r.path);
+    }
 }
 
 /// The quick tune export format must round trip through the parser

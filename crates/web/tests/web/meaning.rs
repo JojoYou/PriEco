@@ -180,10 +180,10 @@ fn entities_business_keeps_known_intents() {
 fn entities_person_upgrades_unknown_and_navigational_to_informational() {
     init();
     for i in [QueryIntent::Unknown, QueryIntent::Navigational] {
-        let mut q = String::from("einstein");
+        let mut q = String::from("barack");
         assert_eq!(scan_entities(&mut q, i, "de").0, QueryIntent::Informational);
     }
-    let mut q = String::from("einstein");
+    let mut q = String::from("barack");
     assert_eq!(
         scan_entities(&mut q, QueryIntent::Transactional, "de").0,
         QueryIntent::Transactional

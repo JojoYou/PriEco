@@ -61,13 +61,13 @@ pub fn extract_metadata(
     result.description = extract_description(
         document,
         &selectors.og_description_selector,
-        &selectors.meta_selector,
+        &selectors.meta_description_selector,
         &selectors.p_selector,
         &result.title,
     );
 
     // Truncate length
-    if result.title.len() > 60 {
+    if result.title.chars().count() > 60 {
         let end = result
             .title
             .char_indices()
@@ -76,7 +76,7 @@ pub fn extract_metadata(
             .unwrap_or(result.title.len());
         result.title = format!("{}...", &result.title[..end]);
     }
-    if result.description.len() > 160 {
+    if result.description.chars().count() > 160 {
         let end = result
             .description
             .char_indices()
@@ -214,7 +214,7 @@ fn extract_title(
     }
 
     // <h1..6> tags
-    for i in 1..6 {
+    for i in 0..6 {
         if let Some(h_selector) = h_selectors.get(i)
             && let Some(h_element) = document.select(h_selector).next()
         {
@@ -358,7 +358,7 @@ fn get_language_code(lang_info: Option<Lang>) -> String {
             "ind" => "id".to_string(),
             "isl" => "is".to_string(),
             "ita" => "it".to_string(),
-            "heb" => "iw".to_string(),
+            "heb" => "he".to_string(),
             "jpn" => "ja".to_string(),
             "kor" => "ko".to_string(),
             "lit" => "lt".to_string(),
@@ -411,7 +411,12 @@ fn nsfw_check(result: &HTMLResultData) -> bool {
         "dicksucked",
     ];
     // Check if URL contains any of the bad words
-    if bad_words_url.iter().any(|ext| result.url.contains(ext)) {
+    if result
+        .url
+        .to_lowercase()
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .any(|w| bad_words_url.contains(&w))
+    {
         return true;
     }
 
@@ -547,7 +552,7 @@ fn nsfw_check(result: &HTMLResultData) -> bool {
         "pornography",
         "fetish",
         "kink",
-        "BDSM",
+        "bdsm",
         "foreplay",
         "intimacy",
         "arousal",
@@ -602,13 +607,15 @@ fn nsfw_check(result: &HTMLResultData) -> bool {
         "masochism",
     ];
     // Count number of unique bad words in the content
-    let containing_bad_words: HashSet<&str> = result
+    let containing_bad_words: HashSet<String> = result
         .tag_data
         .values()
-        .flat_map(|values| values.iter())
-        .flat_map(|value| value.split_whitespace())
-        .filter(|&word| bad_word.contains(&word.to_lowercase().as_str()))
+        .flatten()
+        .flat_map(|v| v.split(|c: char| !c.is_alphanumeric()))
+        .map(str::to_lowercase)
+        .filter(|w| bad_word.contains(&w.as_str()))
         .collect();
+
     // If more than 3 bad words are found, the page is NSFW
     if containing_bad_words.len() >= 3 {
         return true;

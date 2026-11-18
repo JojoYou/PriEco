@@ -145,7 +145,7 @@ fn script_missing_template_reports_error() {
     let out = script("does_not_exist.js", None, None, None, None, None).0;
     assert_eq!(
         out,
-        "console.error('Template static/js/hbs/does_not_exist.js not found');"
+        "console.error(\"Template static/js/hbs/does_not_exist.js not found\");"
     );
 }
 
@@ -162,8 +162,16 @@ fn script_invalid_template_reports_error() {
 #[test]
 fn script_name_cannot_inject_javascript() {
     init();
-    let out = script("x');alert(document.domain);(", None, None, None, None, None).0;
-    assert!(!out.contains("');alert(document.domain);("), "{}", out);
+    let name = "x');alert(document.domain);(\"+alert(1)+\"";
+    let out = script(name, None, None, None, None, None).0;
+    // The whole message must be ONE string literal: console.error(<json string>);
+    let arg = out
+        .strip_prefix("console.error(")
+        .and_then(|s| s.strip_suffix(");"))
+        .unwrap_or_else(|| panic!("unexpected output {}", out));
+    let msg: String = serde_json::from_str(arg)
+        .unwrap_or_else(|_| panic!("argument is not a single string literal: {}", out));
+    assert!(msg.contains(name), "{}", msg);
 }
 
 #[test]

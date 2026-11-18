@@ -193,7 +193,7 @@ fn k_zero_gives_inverse_rank() {
         ivf_results: vec![],
         dis_results: vec![],
         dec_results: vec![],
-        k: K,
+        k: 0.0,
     });
 
     assert!(close(out[0].search_score, 1.0));
@@ -365,12 +365,87 @@ fn all_or_empty_language_disables_penalty() {
     assert!(close(ivf_score("", "de", QueryIntent::Unknown, "IVF"), 1.0));
 }
 
+/// Score of a foreign-language doc divided by the score of the same doc in the user's
+/// language, for one source. 1.0 means no language penalty.
+fn lang_penalty(source: &str, intent: QueryIntent, doc_lang: &str) -> f32 {
+    init();
+    let score = |lang: &str| {
+        let d = vec![lang_doc("https://x.com", lang)];
+        let pick = |s: &str| if s == source { d.clone() } else { vec![] };
+        rrf::run(RRFParams {
+            query: NEUTRAL,
+            lang: "en",
+            intent: &intent,
+            dir_results: pick("DIR"),
+            fts_results: pick("FTS"),
+            ivf_results: pick("IVF"),
+            dis_results: pick("DIS"),
+            dec_results: pick("DEC"),
+            k: K,
+        })[0]
+            .search_score
+    };
+    score(doc_lang) / score("en")
+}
+
 #[test]
-fn language_penalty_only_applies_to_vector_source() {
-    assert!(close(
-        ivf_score("en", "de", QueryIntent::Unknown, "FTS"),
-        1.0
-    ));
+fn language_penalty_applies_to_full_text_and_vector_sources() {
+    for source in ["FTS", "IVF"] {
+        assert!(
+            close(lang_penalty(source, QueryIntent::Unknown, "de"), 0.1),
+            "{}",
+            source
+        );
+        assert!(
+            close(lang_penalty(source, QueryIntent::Navigational, "de"), 0.7),
+            "{}",
+            source
+        );
+    }
+}
+
+#[test]
+fn language_penalty_skips_direct_discovered_and_federated_sources() {
+    for source in ["DIR", "DIS", "DEC"] {
+        for intent in [QueryIntent::Unknown, QueryIntent::Navigational] {
+            assert!(
+                close(lang_penalty(source, intent, "de"), 1.0),
+                "{} {:?}",
+                source,
+                intent
+            );
+        }
+    }
+}
+
+#[test]
+fn language_penalty_is_the_same_for_every_non_navigational_intent() {
+    for intent in [
+        QueryIntent::Informational,
+        QueryIntent::Transactional,
+        QueryIntent::CommercialInvestigation,
+        QueryIntent::Local,
+        QueryIntent::Unknown,
+    ] {
+        assert!(
+            close(lang_penalty("FTS", intent, "de"), 0.1),
+            "{:?}",
+            intent
+        );
+    }
+}
+
+/// BUG: a document whose language could not be detected (`lang == ""`) is treated as
+/// foreign and loses 90% of its score. Unknown is not the same as "different language".
+#[test]
+fn documents_with_unknown_language_are_not_penalised() {
+    for source in ["FTS", "IVF"] {
+        assert!(
+            close(lang_penalty(source, QueryIntent::Unknown, ""), 1.0),
+            "{}",
+            source
+        );
+    }
 }
 
 /* ───────────────────────────── site: / domain: filters ───────────────────────────── */
