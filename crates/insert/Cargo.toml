@@ -1,14 +1,13 @@
 [package]
 name = "prieco_insert"
-version = "3.0.0"
-authors = ["Roman Láncoš <support@prieco.net>"]
-edition = "2024"
-
-readme = "README.md"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+readme.workspace = true
 license.workspace = true
-
-repository = "https://codeberg.org/JojoYou/PriEco"
-homepage = "https://prieco.net"
+homepage.workspace = true
+repository.workspace = true
+publish.workspace = true
 
 [dependencies]
 prieco_core = { workspace = true }

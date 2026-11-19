@@ -1,6 +1,22 @@
+###
+# PriEco
+###
 [workspace.package]
+edition = "2024" # Rust Edition
+
+homepage = "https://prieco.net/"
+repository = "https://codeberg.org/JojoYou/PriEco/"
+
+version = "3.0.0"                               # PriEco version
+authors = ["Roman Láncoš <support@prieco.net>"]
+readme = "README.md"
 license = "AGPL-3.0-only"
 
+publish = false # Dont publish to crates.io
+
+###
+# Workspaces
+###
 [workspace]
 members = [
     "crates/core",

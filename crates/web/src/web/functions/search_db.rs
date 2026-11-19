@@ -35,7 +35,7 @@ use iroh::{EndpointAddr, PublicKey};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use prieco_insert::db_insert::ingest_peer_documents;
-use rayon::{iter::ParallelIterator, slice::ParallelSlice};
+use rayon::{current_num_threads, iter::ParallelIterator, slice::ParallelSlice};
 use regex::Regex;
 use rocket::{State, serde::json::Json};
 use serde_json::Value as Json_Value;
@@ -921,7 +921,10 @@ fn fetch_documents(
     let mut ids_to_fetch: Vec<u64> = unique_ids.into_iter().collect();
     ids_to_fetch.sort_unstable(); // Optimistic attempt to increase locality
 
-    let chunk_size = 100;
+    let chunk_size = ids_to_fetch
+        .len()
+        .div_ceil(current_num_threads() * 3)
+        .max(1);
     let fetched_docs: HashMap<u64, WebDocument> = ids_to_fetch
         .par_chunks(chunk_size)
         .map_init(

@@ -185,7 +185,6 @@ pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
                     .filter_map(|s| s.parse().ok())
                     .collect();
                 if points.len() != 4 {
-                    println!("Point len: {}", points.len());
                     continue;
                 }
 
