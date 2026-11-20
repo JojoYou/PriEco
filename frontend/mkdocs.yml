@@ -1,0 +1,37 @@
+site_name: PriEco Documentation
+site_url: https://prieco.net/docs/
+theme:
+  name: material
+  font: false
+  features:
+    - navigation.sections
+    - navigation.expand
+    - toc.integrate
+  palette:
+    - scheme: default
+      primary: white
+extra_css:
+  - stylesheets/extra.css
+nav:
+  - Getting Started:
+      - Introduction: index.md
+
+  - User:
+      - Quick Start: user/quickstart.md
+      - Comparision:
+          - PriEco vs Google: user/com/google.md
+      - Contributing: user/contribute.md
+
+  - Node:
+      - Quick Start: node/quickstart.md
+
+  - PriEco Architecture:
+      - Layout: layout.md
+      - Core System: core.md
+      - Mini Crawler: minicrawler.md
+      - Blob Storage: blob.md
+      - Data Inserter: inserter.md
+      - Web Search: search.md
+      - Crawler: crawler.md
+
+  - API Reference: api/prieco_core/index.html

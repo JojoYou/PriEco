@@ -1,0 +1,722 @@
+//!  File: main.rs
+//!  Description: Sets up configuration for PriEco, starts web server and threads
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created: 2025-09-20
+//!  Last Modified: 2026-01-31
+//!
+//!  Usage: Run PriEco and complete set up questions
+//!  TODO:
+
+/*
+  Set global allovator
+  Reason: Default was insufficient for deallocating RAM from crawler HTTP connections
+  This one is modern
+*/
+#[cfg(not(target_env = "msvc"))]
+use tikv_jemallocator::Jemalloc;
+use tokio::runtime::Runtime;
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: Jemalloc = Jemalloc;
+
+/*
+  Import system libraries
+*/
+use std::{
+    path::Path,
+    process::exit,
+    str::FromStr,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
+    thread::{sleep, spawn},
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+
+/*
+  Import external libraries
+*/
+use env_logger::Env;
+use fjall::PersistMode;
+use iroh::{Endpoint, PublicKey, SecretKey, endpoint::presets::N0, protocol::Router};
+use iroh_gossip::{ALPN, Gossip, TopicId};
+use once_cell::sync::Lazy;
+#[cfg(feature = "cuda")]
+use ort::ExecutionProvider;
+use ort::{Environment, GraphOptimizationLevel, Session, SessionBuilder};
+use rocket::{
+    Data, Request, Response,
+    fairing::{AdHoc, Fairing, Info, Kind},
+    fs::{FileServer, Options},
+    http::Header,
+    main, routes,
+};
+use rocket_dyn_templates::Template;
+use tokenizers::{PaddingDirection, PaddingParams, PaddingStrategy, Tokenizer};
+
+/*
+  Import own libraries
+*/
+pub mod web;
+use crate::web::{
+    functions::{
+        api::manage::{flush, flush_loop},
+        decentralized::{
+            IROH_ENDPOINT, PROFILE_CACHE, SearchProtocol, Ticket, build_node_profile,
+            get_iroh_secret, gossip_sync,
+        },
+        general::set_cookie,
+    },
+    routes::{
+        apis::*,
+        assets::*,
+        mcp::{mcp, mcp_get},
+        pages::*,
+    },
+};
+use prieco_blob as blob;
+use prieco_core::{
+    ANALYTICS, COUNTRY_TO_LANG, DOCS_DIR, EMBED_MODEL, EmbeddingService, PRIECO_BLOBS,
+    PRIECO_CONFIG, PRIECO_META, STATIC_DIR, STOP_FILE, TANTIVY_WRITER, TEMPLATES_DIR,
+    VECTOR_EMBEDDING_TOKENIZER, colors, icons,
+};
+use prieco_insert::{db_insert, update::UpdateEngine, updates::ping::PingDeadLinksUpdate};
+use prieco_mini_crawler::mini_crawler;
+use prieco_pagerank as pagerank;
+
+/*
+  Set PriEco web server headers
+*/
+pub struct GlobalHeaders;
+#[rocket::async_trait]
+impl Fairing for GlobalHeaders {
+    fn info(&self) -> Info {
+        Info {
+            name: "CORS + Security Headers + Block Bots + Browser Locale",
+            kind: Kind::Response | Kind::Request,
+        }
+    }
+
+    async fn on_request(&self, req: &mut Request<'_>, _: &mut Data<'_>) {
+        if req
+            .host()
+            .is_some_and(|h| h.domain().as_str().ends_with(".onion"))
+        {
+            return;
+        }
+
+        let jar = req.cookies();
+        let Some(tag) = req
+            .headers()
+            .get_one("Accept-Language")
+            .and_then(|h| h.split([',', ';']).next())
+        else {
+            return;
+        };
+
+        let mut p = tag.split('-');
+        let lang = p.next().unwrap_or("").to_ascii_lowercase();
+
+        if jar.get("lang").is_none() && COUNTRY_TO_LANG.values().any(|l| *l == lang) {
+            set_cookie(jar, "lang".into(), lang, false, true, true);
+        }
+        if jar.get("loc").is_none()
+            && let Some(r) = p.next().filter(|r| r.len() == 2)
+        {
+            set_cookie(jar, "loc".into(), r.to_ascii_lowercase(), false, true, true);
+        }
+    }
+
+    async fn on_response<'r>(&self, req: &'r Request<'_>, res: &mut Response<'r>) {
+        // --- CORS headers ---
+        res.set_header(Header::new("Access-Control-Allow-Origin", "*"));
+        res.set_header(Header::new("Access-Control-Allow-Methods", "GET"));
+        res.set_header(Header::new(
+            "Access-Control-Allow-Headers",
+            "Content-Type, Authorization",
+        ));
+        // --- Security headers ---
+        let csp = if req.uri().path().as_str().starts_with("/docs") {
+            "default-src 'self'; \
+             script-src 'self' 'unsafe-inline'; \
+             style-src 'self' 'unsafe-inline'; \
+             img-src 'self' data:; \
+             font-src 'self' data:; \
+             frame-ancestors 'self'; \
+             object-src 'none'; \
+             base-uri 'self';"
+        } else {
+            "default-src 'self'; \
+             script-src 'self'; \
+             style-src 'self'; \
+             img-src 'self' data: https://proxy.prieco.net; \
+             connect-src 'self'; \
+             frame-src 'self' https://cartes.app; \
+             frame-ancestors 'self'; \
+             form-action 'self' https:; \
+             object-src 'none'; \
+             base-uri 'self';"
+        };
+        res.set_header(Header::new("Content-Security-Policy", csp));
+
+        res.set_header(Header::new("X-Frame-Options", "SAMEORIGIN"));
+        res.set_header(Header::new("X-Content-Type-Options", "nosniff"));
+        res.set_header(Header::new("Referrer-Policy", "no-referrer"));
+        res.set_header(Header::new("Cache-Control", "no-store"));
+    }
+}
+
+/// Description: Creates embeder + launches thread manager + launches Rocket web server
+///
+/// Input: None
+/// Output: None
+#[main]
+#[allow(clippy::result_large_err)]
+async fn main() -> Result<(), rocket::Error> {
+    // Disable foster parenting warning
+    env_logger::Builder::from_env(Env::default().default_filter_or("warn"))
+        .filter_module("html5ever", log::LevelFilter::Error)
+        .filter_module("markup5ever", log::LevelFilter::Error)
+        .init();
+
+    // Load .env
+    match dotenvy::from_path("backend/.env") {
+        Ok(_) => {}
+        Err(e) if e.not_found() => {
+            println!(
+                "{}No backend/.env, using environment only{}",
+                colors::YELLOW,
+                colors::RESET
+            );
+        }
+        Err(e) => {
+            eprintln!(
+                "{}Failed loading .env file!{} {}",
+                colors::RED,
+                colors::RESET,
+                e
+            );
+            exit(1);
+        }
+    }
+
+    // Print banner
+    println!(
+        "{}
+     ____  ____  _  _____ ____ ____
+    /  __\\/  __\\/ \\/  __//   _Y  _ \\
+    |  \\/||  \\/|| ||  \\  |  / | / \\|
+    |  __/|    /| ||  /_ |  \\_| \\_/|
+    \\_/   \\_/\\_\\\\_/\\____\\\\____|____/
+    {}",
+        colors::GREEN,
+        colors::RESET
+    );
+    println!("Info:");
+    println!(
+        "{}: Blob storage\n{}: Database inserter\n{}: Pagerank\n{}: Mini crawler\n{}: Updater\n",
+        icons::BLOB,
+        icons::DB_INSERT,
+        icons::PAGERANK_ICON,
+        icons::MINI_CRAWLER_ICON,
+        icons::INDEX_UPDATER
+    );
+
+    // Load config
+    let _ = PRIECO_CONFIG;
+
+    // Decentralization
+    let peer_ticket_env = std::env::var("PRIECO_TICKET").unwrap_or_default();
+
+    let iroh_secret_key: SecretKey = get_iroh_secret();
+    let iroh_endpoint: Endpoint = Endpoint::builder(N0)
+        .secret_key(iroh_secret_key.clone())
+        .bind()
+        .await
+        .unwrap();
+    let _ = IROH_ENDPOINT.set(iroh_endpoint.clone());
+
+    let iroh_gossip: Gossip = Gossip::builder().spawn(iroh_endpoint.clone());
+
+    let pub_key_bytes = *iroh_secret_key.public().as_bytes();
+    let my_profile = build_node_profile(pub_key_bytes);
+    let search_protocol = SearchProtocol {
+        profile: my_profile.clone(),
+    };
+
+    let iroh_router: Router = Router::builder(iroh_endpoint.clone())
+        .accept(ALPN, iroh_gossip.clone())
+        .accept(b"prieco-search/0", search_protocol)
+        .spawn();
+    let mut iroh_peers: Vec<PublicKey> = vec![];
+
+    let mut iroh_topic_id = TopicId::from_bytes([23u8; 32]);
+    if !peer_ticket_env.is_empty() {
+        if let Ok(peer_ticket) = Ticket::from_str(&peer_ticket_env) {
+            iroh_topic_id = peer_ticket.topic;
+
+            for addr in peer_ticket.endpoints {
+                for ip in addr.ip_addrs() {
+                    iroh_endpoint.add_external_addr(*ip).await;
+                }
+                iroh_peers.push(addr.id);
+            }
+            println!("Loaded peer ticket! Joining topic: {:?}", iroh_topic_id);
+        } else {
+            println!("Failed to parse the provided peer ticket.");
+        }
+    }
+
+    let ticket = Ticket {
+        topic: iroh_topic_id,
+        endpoints: vec![iroh_endpoint.addr()],
+    };
+
+    println!("Your ticket to invite others is: {}", ticket);
+
+    let gossip_clone = iroh_gossip.clone();
+    let cache_clone = PROFILE_CACHE.clone();
+    let topic_clone = iroh_topic_id;
+
+    // Background tasks
+    tokio::spawn(async move {
+        if let Err(e) = gossip_sync(
+            gossip_clone,
+            topic_clone,
+            iroh_peers,
+            my_profile,
+            cache_clone,
+        )
+        .await
+        {
+            println!("Gossip sync failed: {}", e);
+        }
+    });
+    tokio::spawn(flush_loop());
+
+    // Spawn Thread Manager
+    let _thread_handle = std::thread::spawn(move || {
+        thread_manager();
+    });
+
+    // Analytics
+    tokio::spawn(async { ANALYTICS.background_purge_task().await });
+
+    // Launch Rocket web server
+    let topic_shutdown = iroh_topic_id;
+    let pub_key_shutdown = pub_key_bytes;
+
+    if PRIECO_CONFIG.enable_web_server {
+        let gossip_shutdown = iroh_gossip.clone();
+
+        // Vector Embeding
+        let embedding_service = EmbeddingService {
+            tokenizer: Arc::new(tokio::sync::Mutex::new(create_tokenizer())),
+            model: Arc::new(tokio::sync::Mutex::new(create_embeder())),
+        };
+
+        let rocket_web = rocket::build()
+            .configure(
+                rocket::Config::figment()
+                    .merge(("address", &PRIECO_CONFIG.ip))
+                    .merge(("port", PRIECO_CONFIG.port))
+                    .merge(("workers", num_cpus::get() * 2))
+                    .merge(("template_dir", TEMPLATES_DIR))
+            )
+            .manage(embedding_service)
+            .attach(GlobalHeaders)
+            .attach(Template::fairing())
+            .attach(AdHoc::on_shutdown("Flush DBs", move |_| {
+                Box::pin(async move {
+                    println!("Broadcasting offline status to peers...");
+                    let offline_msg = serde_json::json!({
+                        "offline": pub_key_shutdown
+                    });
+
+                    if let Ok(payload) = serde_json::to_vec(&offline_msg)
+                        && let Ok(ticket) = gossip_shutdown.subscribe(topic_shutdown, vec![]).await
+                    {
+                        let (sender, _) = ticket.split();
+                        let _ = sender.broadcast(payload.into()).await;
+                    }
+
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+                    if let Err(e) = iroh_router.shutdown().await {
+                        eprintln!("Failed to shut down iroh router! {}", e);
+                    };
+
+                    println!("Flushing Fjall to disk...");
+                    let _ = PRIECO_META.meta_db.persist(PersistMode::SyncAll);
+                    if let Some(blobs) = Lazy::get(&PRIECO_BLOBS) {
+                        println!("Flushing Blob DB to disk...");
+                        let _ = blobs.blob_db.persist(PersistMode::SyncAll);
+                    }
+
+                    println!("Flushing Tantivy to disk...");
+                    let _ = TANTIVY_WRITER.lock().commit();
+
+                    println!("{}Shutdown!{}", colors::GREEN, colors::RESET);
+                })
+            }))
+            .mount(
+                "/",
+                routes![
+                    // Assets
+                    set_preferences, // Set cookie preferences
+                    sw_js,           // Service worker (Browser cache + unduck)
+                    unduck_js,
+                    security, // Security.txt
+                    robots,   // Robots.txt
+                    osd,
+                    script,
+                    privacy, // Privacy Policy
+                    // Landing page
+                    index,
+                    index_head,
+                    handle_shortcuts,
+                    // Search
+                    search,
+                    search_post,
+                    results_htmls,
+                    api,
+                    stats,
+                    cache_ver,
+                    pageview,
+                    om_sug, // Omnibox suggestions
+                    // MCP
+                    mcp,
+                    mcp_get,
+                    // Settings
+                    settings_htmls,
+                    settings_update,
+                    // Proxy
+                    proxy_get,
+                    proxy_post,
+                    // Extension
+                    ext_privacy,
+                    // Roadmap
+                    roadmap,
+                    submit_roadmap_vote,
+                    // Goggles
+                    goggles,
+                    load_goggle,
+                    apply_goggles,
+                    goggles_tint,
+                    update_qt,
+                    export_quick_tune,
+                    // Thanks page
+                    thanks,
+                    submit,
+                    submit_post,
+                    send_signal,
+                    // Blob storage
+                    view_blob,
+                    // Blog
+                    blog,
+                    blog_post,
+                    rss_feed
+                ],
+            )
+            .mount("/static", FileServer::from(STATIC_DIR)) // Assets
+            .mount("/docs", FileServer::new(DOCS_DIR, Options::Index | Options::Missing | Options::NormalizeDirs)) // Documentation + API docs
+        ;
+
+        rocket_web.launch().await?;
+        println!("Flushing Polar billing events...");
+        flush().await;
+    } else {
+        println!(
+            "{}Web server was disabled in config!{}",
+            colors::GREEN,
+            colors::RESET
+        );
+
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {
+                println!("Shutdown triggered by Ctrl+C.");
+            }
+            _ = async {
+                loop {
+                    if stop_requested() {
+                        println!("Shutdown triggered by stop.txt");
+                        break;
+                    }
+
+                    tokio::time::sleep(std::time::Duration::from_millis(3_000)).await;
+                }
+            } => {}
+        }
+
+        println!("Broadcasting offline status to peers...");
+        let offline_msg = serde_json::json!({
+            "offline": pub_key_shutdown
+        });
+
+        if let Ok(payload) = serde_json::to_vec(&offline_msg)
+            && let Ok(ticket) = iroh_gossip.subscribe(topic_shutdown, vec![]).await
+        {
+            let (sender, _) = ticket.split();
+            let _ = sender.broadcast(payload.into()).await;
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+        if let Err(e) = iroh_router.shutdown().await {
+            eprintln!("Failed to shut down iroh router! {}", e);
+        };
+
+        println!("Flushing Fjall to disk...");
+        let _ = PRIECO_META.meta_db.persist(PersistMode::SyncAll);
+        if let Some(blobs) = Lazy::get(&PRIECO_BLOBS) {
+            println!("Flushing Blob DB to disk...");
+            let _ = blobs.blob_db.persist(PersistMode::SyncAll);
+        }
+
+        println!("Flushing Tantivy to disk...");
+        let _ = TANTIVY_WRITER.lock().commit();
+
+        println!("{}Shutdown!{}", colors::GREEN, colors::RESET);
+    }
+
+    Ok(())
+}
+
+/// Description: Manages different PriEco threads like blob storage, database insertion and mini crawler
+///
+/// Input: None
+/// Output: None
+fn thread_manager() {
+    // Initialize
+    let _ = &*PRIECO_META;
+
+    // Blob storage
+    let blob_thread = if PRIECO_CONFIG.enable_blob_storage {
+        Some(spawn(move || {
+            while !stop_requested() {
+                blob::run();
+                sleep(Duration::from_mins(1));
+            }
+        }))
+    } else {
+        None
+    };
+
+    // Result database inserter
+    let insert_thread = if PRIECO_CONFIG.enable_db_inserter {
+        Some(spawn(move || {
+            unsafe {
+                libc::syscall(libc::SYS_ioprio_set, 1, 0, (3 << 13) | 7);
+            }
+            while !stop_requested() {
+                if let Err(e) = db_insert::run() {
+                    println!(
+                        "{}Error inserting results: {}{}",
+                        colors::RED,
+                        e,
+                        colors::RESET
+                    );
+                };
+                sleep(Duration::from_mins(1));
+            }
+        }))
+    } else {
+        None
+    };
+
+    // Pagerank
+    let pagerank_thread = if PRIECO_CONFIG.enable_pagerank {
+        Some(spawn(move || {
+            while !stop_requested() {
+                pagerank::compute::run();
+                sleep(Duration::from_hours(3));
+            }
+        }))
+    } else {
+        None
+    };
+
+    // Mini crawler
+    let peer_ticket_env = std::env::var("PRIECO_TICKET").unwrap_or_default();
+    let mini_crawler_thread = if !PRIECO_CONFIG.enable_mini_crawler
+        || peer_ticket_env.is_empty()
+        || PRIECO_CONFIG.worker_concurrent < 1
+    {
+        None
+    } else {
+        Some(spawn(move || {
+            let rt = Runtime::new().expect("Failed to create Tokio runtime for mini crawler");
+            while !stop_requested() {
+                rt.block_on(async {
+                    crate::mini_crawler::run().await;
+                });
+            }
+        }))
+    };
+
+    // Index updater
+    let updater_thread = if PRIECO_CONFIG.enable_index_updater {
+        Some(spawn(move || {
+            let mut engine = UpdateEngine::new();
+            engine.add(Box::new(PingDeadLinksUpdate::new()));
+
+            while !stop_requested() {
+                engine.run();
+                sleep(Duration::from_secs(3600));
+            }
+        }))
+    } else {
+        None
+    };
+
+    if let Some(thread) = blob_thread {
+        let _ = thread.join();
+    }
+    if let Some(thread) = insert_thread {
+        let _ = thread.join();
+    }
+    if let Some(thread) = pagerank_thread {
+        let _ = thread.join();
+    }
+    if let Some(thread) = mini_crawler_thread {
+        let _ = thread.join();
+    }
+    if let Some(thread) = updater_thread {
+        let _ = thread.join();
+    }
+
+    println!("{}Threads finished!{}", colors::GREEN, colors::RESET);
+}
+
+/* Helper functions */
+// Vector embeder creation
+fn create_tokenizer() -> Tokenizer {
+    let mut tokenizer: Tokenizer = match Tokenizer::from_bytes(VECTOR_EMBEDDING_TOKENIZER) {
+        Ok(tokenizer) => tokenizer,
+        Err(e) => {
+            println!(
+                "{}Main: Failed to create tokenizer: {}{}",
+                colors::RED,
+                e,
+                colors::RESET
+            );
+            exit(1);
+        }
+    };
+    tokenizer.with_padding(Some(PaddingParams {
+        strategy: PaddingStrategy::BatchLongest,
+        direction: PaddingDirection::Right,
+        pad_to_multiple_of: None,
+        pad_id: 0,
+        pad_type_id: 0,
+        pad_token: "[PAD]".into(),
+    }));
+
+    tokenizer
+}
+
+fn create_embeder() -> Session {
+    let environment: Arc<Environment> = match Environment::builder()
+        .with_name("embedder")
+        .with_log_level(ort::LoggingLevel::Warning)
+        .build()
+    {
+        Ok(env) => Arc::new(env),
+        Err(e) => {
+            println!(
+                "{}Main: Failed to create env: {}{}",
+                colors::RED,
+                e,
+                colors::RESET
+            );
+            std::process::exit(1);
+        }
+    };
+
+    let create_base_builder = || {
+        let mut builder = SessionBuilder::new(&environment).unwrap();
+        builder = builder
+            .with_optimization_level(GraphOptimizationLevel::Level3)
+            .unwrap();
+        builder = builder.with_parallel_execution(true).unwrap();
+        builder
+    };
+
+    #[allow(unused_mut)]
+    let mut session_builder = create_base_builder();
+
+    #[cfg(feature = "cuda")]
+    {
+        session_builder = match session_builder
+            .with_execution_providers([ExecutionProvider::CUDA(Default::default())])
+        {
+            Ok(builder) => {
+                println!("CUDA Execution Provider registered for embeddings.");
+                builder
+            }
+            Err(e) => {
+                println!(
+                    "{}Main: Failed to register CUDA for embeddings: {}{}\nFalling back to CPU.",
+                    colors::RED,
+                    e,
+                    colors::RESET
+                );
+                create_base_builder()
+            }
+        };
+    }
+
+    match session_builder.with_model_from_file(EMBED_MODEL) {
+        Ok(emb) => emb,
+        Err(e) => {
+            println!(
+                "{}Main: Failed to create embeder: {}{}",
+                colors::RED,
+                e,
+                colors::RESET
+            );
+            exit(1);
+        }
+    }
+}
+
+/*
+  Description: Checks if stop.txt exists, used for stopping threads
+
+  Input: None
+  Output: true if stop.txt exists, false otherwise
+*/
+static LAST_CHECK: AtomicU64 = AtomicU64::new(0);
+static STOP_FLAG: AtomicBool = AtomicBool::new(false);
+
+pub fn stop_requested() -> bool {
+    if STOP_FLAG.load(Ordering::Relaxed) {
+        return true;
+    }
+
+    let now = match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(duration) => duration.as_secs(),
+        Err(e) => {
+            println!(
+                "{}Error getting system time: {}{}",
+                colors::YELLOW,
+                e,
+                colors::RESET
+            );
+            return false;
+        }
+    };
+
+    let last = LAST_CHECK.load(Ordering::Relaxed);
+    if now - last >= 1 {
+        let exists = Path::new(STOP_FILE).exists();
+        STOP_FLAG.store(exists, Ordering::Relaxed);
+        LAST_CHECK.store(now, Ordering::Relaxed);
+    }
+
+    STOP_FLAG.load(Ordering::Relaxed)
+}

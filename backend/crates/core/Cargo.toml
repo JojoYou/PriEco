@@ -1,0 +1,55 @@
+[package]
+name = "prieco_core"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+readme.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+url = { workspace = true }
+twox-hash = { workspace = true }
+ahash = { workspace = true }
+once_cell = { workspace = true }
+parking_lot = { workspace = true }
+
+tantivy = { workspace = true }
+tokenizers = { workspace = true }
+rayon = { workspace = true }
+dashmap = { workspace = true }
+zstd = { workspace = true }
+tokio = { workspace = true }
+time = { workspace = true }
+ndarray = { workspace = true }
+rocket = { workspace = true }
+memmap2 = { workspace = true }
+symspell = { workspace = true }
+fjall = { workspace = true }
+charabia = { workspace = true }
+aho-corasick = { workspace = true }
+fst = { workspace = true }
+bincode-next = { workspace = true }
+rkyv = { workspace = true }
+primp = { workspace = true }
+rand = { workspace = true }
+bytemuck = { workspace = true }
+
+[features]
+default = []
+cuda = ["dep:cudarc", "ort/cuda"]
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+ort = { workspace = true, features = ["load-dynamic"] }
+cudarc = { workspace = true, optional = true, features = [
+    "cublas",
+    "nvrtc",
+    "cuda-version-from-build-system",
+] }
+
+[target.'cfg(not(target_arch = "x86_64"))'.dependencies]
+ort = { workspace = true, features = ["load-dynamic"] }

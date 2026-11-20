@@ -25,4 +25,4 @@
 *.yml      linguist-language=YAML
 .git*      linguist-language=Shell
 Cargo.lock linguist-language=TOML linguist-generated
-/vendor/** linguist-vendored
+/backend/vendor/** linguist-vendored

@@ -1,9 +1,10 @@
-.env
-/kv
-/target
-/idx
-settings.conf
-docs/api/
-site/
-analytics_daily_salt.txt
-config/
+# Secrets
+/backend/.env
+
+# Build
+/target/
+/frontend/site/
+/frontend/docs/api/
+
+# Runtime
+/runtime/

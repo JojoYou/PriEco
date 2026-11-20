@@ -18,21 +18,22 @@ publish = false # Dont publish to crates.io
 # Workspaces
 ###
 [workspace]
+exclude = ["backend/vendor"]
 members = [
-    "crates/core",
-    "crates/blob",
-    "crates/pagerank",
-    "crates/insert",
-    "crates/web",
-    "crates/crawler",
+    "backend/crates/core",
+    "backend/crates/blob",
+    "backend/crates/pagerank",
+    "backend/crates/insert",
+    "backend/crates/web",
+    "backend/crates/crawler",
 ]
 default-members = [
-    "crates/core",
-    "crates/blob",
-    "crates/pagerank",
-    "crates/insert",
-    "crates/web",
-    "crates/crawler",
+    "backend/crates/core",
+    "backend/crates/blob",
+    "backend/crates/pagerank",
+    "backend/crates/insert",
+    "backend/crates/web",
+    "backend/crates/crawler",
 ]
 resolver = "3"
 
@@ -72,11 +73,11 @@ opt-level = 3
 
 [workspace.dependencies]
 # Mapping
-prieco_core = { path = "crates/core" }
-prieco_blob = { path = "crates/blob" }
-prieco_pagerank = { path = "crates/pagerank" }
-prieco_insert = { path = "crates/insert" }
-prieco_mini_crawler = { path = "crates/crawler" }
+prieco_core = { path = "backend/crates/core" }
+prieco_blob = { path = "backend/crates/blob" }
+prieco_pagerank = { path = "backend/crates/pagerank" }
+prieco_insert = { path = "backend/crates/insert" }
+prieco_mini_crawler = { path = "backend/crates/crawler" }
 
 ###
 # System
@@ -153,7 +154,7 @@ rkyv = { version = "0.8.18", features = [
 ] } # 0 copy deserialization; Used for places
 
 # Vector embedding
-ort = { path = "vendor/ort-1.16.3", default-features = false, features = [
+ort = { path = "backend/vendor/ort-1.16.3", default-features = false, features = [
     "half",
 ] } # Query to vector
 tokenizers = "0.23.2" # Ort model tokenizer
@@ -191,8 +192,6 @@ serde_json = "1.0.154" # JSON
 # Remove
 
 zstd = "0.14.4" # Zstandard compression
-
-redb = "3.0.1" # Key-Value
 
 reqwest = { version = "0.12.23", default-features = false, features = [
     "json",

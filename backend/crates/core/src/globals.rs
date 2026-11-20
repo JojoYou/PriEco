@@ -1,0 +1,2700 @@
+//!  File: globals.rs
+//!  Description: Manages global variables
+//!
+//!  Author: Roman Lancos <support@prieco.net>
+//!  License: AGPL v3.0
+//!
+//!  Date Created: 2025-09-20
+//!  Last Modified: 2026-02-06
+//!
+//!  Usage:
+//!  TODO:
+
+/*
+  Import system libraries
+*/
+#[cfg(feature = "cuda")]
+use std::io::{Cursor, Read};
+use std::{
+    cmp::Reverse,
+    collections::{BTreeMap, HashMap},
+    error::Error,
+    fs::{File, write},
+    hash::{Hash, Hasher},
+    ops::Range,
+    path::Path,
+    str::from_utf8,
+    sync::{
+        Arc,
+        atomic::{AtomicI64, Ordering},
+    },
+    time::Duration as stdDuration,
+};
+
+/*
+  Import external libraries
+*/
+use ahash::{AHashMap, AHashSet};
+use aho_corasick::{AhoCorasick, MatchKind};
+use charabia::{Tokenizer as CHARABIA_TOKENIZER, TokenizerBuilder};
+#[cfg(feature = "cuda")]
+use cudarc::{
+    cublas::{CudaBlas, Gemm, GemmConfig, StridedBatchedConfig, sys::cublasOperation_t},
+    driver::{CudaContext, CudaSlice, CudaStream, DevicePtr, LaunchConfig, PushKernelArg},
+    nvrtc::compile_ptx,
+};
+use dashmap::DashSet;
+use fjall::{
+    CompressionType, Database as FJALL_DATABASE, Keyspace, KeyspaceCreateOptions,
+    KvSeparationOptions, config::CompressionPolicy,
+};
+use fst::Map as FstMap;
+use memmap2::{Mmap, MmapOptions};
+use ndarray::{Array, Array2, CowArray, IxDyn};
+use once_cell::sync::Lazy;
+use ort::{
+    Environment, ExecutionProvider, GraphOptimizationLevel, Session, SessionBuilder, Value,
+    tensor::OrtOwnedTensor,
+};
+use parking_lot::{Condvar, Mutex, RwLock};
+use primp::{Client as PIMP_CLIENT, Impersonate, ImpersonateOS, redirect::Policy};
+use rand::TryRng;
+#[cfg(feature = "cuda")]
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rkyv::{Archive, Archived, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize, access};
+use rocket::{
+    Request,
+    request::{FromRequest, Outcome},
+};
+use serde::{Deserialize, Serialize};
+use symspell::{SymSpell, UnicodeStringStrategy};
+use tantivy::{
+    Index, IndexReader, IndexWriter, ReloadPolicy,
+    directory::MmapDirectory,
+    query::QueryParser,
+    schema::{
+        FAST, INDEXED, IndexRecordOption, STORED, STRING, Schema, TextFieldIndexing, TextOptions,
+    },
+    tokenizer::{TextAnalyzer, Token, TokenStream, Tokenizer as TANTIVY_TOKENIZER},
+};
+use time::{Date, Duration, OffsetDateTime, macros::format_description};
+use tokenizers::{PaddingParams, PaddingStrategy, Tokenizer, TruncationParams};
+use tokio::task;
+use twox_hash::XxHash3_64;
+#[cfg(feature = "cuda")]
+use zstd::decode_all;
+use zstd::dict::DecoderDictionary;
+
+#[cfg(feature = "cuda")]
+use crate::{ID_SIZE, RECORD_SIZE};
+
+/*
+  Import own libraries
+*/
+use crate::{
+    BGE_MODEL, DAILY_SALT_FILE, STATIC_DIR,
+    helpers::{normalize_url, url_to_id},
+};
+use crate::{ZSTD_DICT, set_up};
+use crate::{
+    constants::{FINAL_SCORES, ID_MAP_FILE},
+    read_file,
+};
+
+/*
+  Constants
+*/
+pub const CSS_VERSION: &str = "0.2.0";
+pub const JS_VERSION: &str = "0.2.0";
+
+// Terminal print colors
+pub mod colors {
+    pub const RESET: &str = "\x1b[0m"; // Must be used after every print message
+    pub const BLACK: &str = "\x1b[30m";
+    pub const RED: &str = "\x1b[31m";
+    pub const GREEN: &str = "\x1b[32m";
+    pub const YELLOW: &str = "\x1b[33m";
+    pub const BLUE: &str = "\x1b[34m";
+    pub const MAGENTA: &str = "\x1b[35m";
+    pub const CYAN: &str = "\x1b[36m";
+    pub const WHITE: &str = "\x1b[37m";
+}
+
+pub mod icons {
+    pub const BLOB: &str = "🪼";
+    pub const DB_INSERT: &str = "💾";
+    pub const PAGERANK_ICON: &str = "📋";
+    pub const MINI_CRAWLER_ICON: &str = "👾";
+    pub const INDEX_UPDATER: &str = "📚";
+}
+
+/*
+  PriEco structures
+*/
+#[derive(Serialize)]
+pub struct SearchResult {
+    pub url: String,
+    pub display_url: String,
+    pub domain: String,
+
+    pub title: String,
+    pub description: String,
+
+    pub image: String,
+    pub favicon: String,
+
+    pub html_id: Option<String>,
+
+    pub content: String,
+    pub reading_level: String,
+    pub formatted_load: String,
+    pub intent: String,
+    pub source_engine: String,
+}
+#[derive(Serialize, Clone)]
+pub struct ImgResult {
+    pub thumbnail: String,
+    pub image: String,
+
+    pub title: String,
+
+    pub site_url: String,
+    pub site_domain: String,
+    pub favicon: String,
+}
+#[derive(Serialize)]
+pub struct WebScrollResult {
+    pub url: String,
+    pub domain: String,
+    pub image: String,
+    pub favicon: String,
+    pub title: String,
+    pub price: String,
+}
+// Index documents
+fn default_unknown_intent() -> u8 {
+    5
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct WebDocument {
+    pub url: String,
+
+    pub title: String,
+    pub description: String,
+    pub content: String,
+    pub favicon: String,
+    pub image: String,
+    pub keywords: String,
+
+    pub safe_s: bool,
+    pub lang: String,
+    pub loc: String,
+
+    pub html: String, // Html blob id
+
+    pub impressions: u32,
+    pub clicks: u32,
+    pub confidence: f32, // Flesch Reading Ease and Text Image Ratio
+    pub effort: f32,     // Text effort
+    pub qna: f32,        // Quality score
+    pub sts: f32,
+
+    pub load: f64, // Loading time
+    pub date: i64, // Date of crawling
+
+    #[serde(default = "default_unknown_intent")]
+    pub intent: u8,
+
+    #[serde(default)]
+    pub is_mobile: bool,
+    #[serde(default)]
+    pub has_500_words: bool,
+
+    // Dynamic data
+    #[serde(default)]
+    pub search_score: f32,
+    #[serde(default)]
+    pub source: String,
+}
+
+pub struct FileLocks {
+    pub set: Mutex<DashSet<String>>,
+    pub condvar: Condvar,
+}
+pub static FILE_LOCKS: Lazy<Arc<FileLocks>> = Lazy::new(|| {
+    Arc::new(FileLocks {
+        set: Mutex::new(DashSet::new()),
+        condvar: Condvar::new(),
+    })
+});
+
+pub struct UserAgent<'r>(pub &'r str);
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for UserAgent<'r> {
+    type Error = ();
+    async fn from_request(req: &'r Request<'_>) -> Outcome<Self, ()> {
+        Outcome::Success(UserAgent(
+            req.headers().get_one("User-Agent").unwrap_or("unknown"),
+        ))
+    }
+}
+
+/*
+PriEco config
+*/
+pub static PRIECO_CONFIG: Lazy<PriEcoConfig> = Lazy::new(set_up::set_up_wizard);
+fn default_true() -> bool {
+    true
+}
+#[derive(Serialize, Deserialize)]
+pub struct PriEcoConfig {
+    pub ip: String,
+    pub port: i32,
+
+    pub tantivy_path: String,
+    pub meta_path: String,
+    pub vector_path: String,
+    pub blob_path: String,
+
+    pub worker_concurrent: u32,
+
+    #[serde(default = "default_true")]
+    pub enable_blob_storage: bool,
+    #[serde(default = "default_true")]
+    pub enable_db_inserter: bool,
+    #[serde(default = "default_true")]
+    pub enable_pagerank: bool,
+    #[serde(default = "default_true")]
+    pub enable_mini_crawler: bool,
+    #[serde(default = "default_true")]
+    pub enable_index_updater: bool,
+    #[serde(default = "default_true")]
+    pub enable_web_server: bool,
+}
+
+/*
+ Request Client
+*/
+pub static CLIENT: Lazy<PIMP_CLIENT> = Lazy::new(|| {
+    println!("Created primp client!");
+
+    PIMP_CLIENT::builder()
+        .impersonate(Impersonate::ChromeV148)
+        .impersonate_os(ImpersonateOS::Windows)
+        .timeout(stdDuration::from_secs(15))
+        .connect_timeout(stdDuration::from_secs(5))
+        .build()
+        .expect("Failed to create primp client")
+});
+
+pub static PROXY_CLIENT: Lazy<PIMP_CLIENT> = Lazy::new(|| {
+    println!("Created primp proxy client!");
+
+    PIMP_CLIENT::builder()
+        .impersonate(Impersonate::ChromeV148)
+        .impersonate_os(ImpersonateOS::Windows)
+        .redirect(Policy::none())
+        .timeout(stdDuration::from_secs(15))
+        .connect_timeout(stdDuration::from_secs(5))
+        .build()
+        .expect("Failed to create primp proxy client")
+});
+
+pub static PING_CLIENT: Lazy<PIMP_CLIENT> = Lazy::new(|| {
+    println!("Created simple primp ping client!");
+
+    PIMP_CLIENT::builder()
+        .timeout(stdDuration::from_secs(5))
+        .build()
+        .expect("Failed to build ping client")
+});
+
+/*
+ Vector embeder
+*/
+pub static VECTOR_EMBEDDING_TOKENIZER: &[u8] = include_bytes!("../../../data/tokenizer.json");
+#[derive(Clone)]
+pub struct EmbeddingService {
+    pub tokenizer: Arc<tokio::sync::Mutex<Tokenizer>>,
+    pub model: Arc<tokio::sync::Mutex<Session>>,
+}
+impl EmbeddingService {
+    pub async fn embed_query(
+        &self,
+        query: &str,
+    ) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
+        let query = query.to_string();
+        let tokenizer = self.tokenizer.clone();
+        let model = self.model.clone();
+
+        task::spawn_blocking(
+            move || -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
+                let tokenizer_guard = tokio::runtime::Handle::current().block_on(tokenizer.lock());
+
+                let encoding = tokenizer_guard
+                    .encode(query, true)
+                    .map_err(|e| format!("Tokenization failed: {}", e))?;
+
+                let token_ids: Vec<i64> = encoding.get_ids().iter().map(|&id| id as i64).collect();
+                let attention_mask: Vec<i64> = encoding
+                    .get_attention_mask()
+                    .iter()
+                    .map(|&v| v as i64)
+                    .collect();
+
+                let type_ids: Vec<i64> =
+                    encoding.get_type_ids().iter().map(|&v| v as i64).collect();
+
+                let shape = [1, token_ids.len()];
+                let cow_input_ids = CowArray::from(
+                    Array::from_shape_vec(IxDyn(&shape), token_ids)
+                        .map_err(|e| format!("Failed to create input_ids array: {}", e))?,
+                );
+                let cow_attention_masks = CowArray::from(
+                    Array::from_shape_vec(IxDyn(&shape), attention_mask.clone())
+                        .map_err(|e| format!("Failed to create attention_mask array: {}", e))?,
+                );
+
+                let cow_type_ids = CowArray::from(
+                    Array::from_shape_vec(IxDyn(&shape), type_ids)
+                        .map_err(|e| format!("Failed to create type_ids array: {}", e))?,
+                );
+
+                let embedder = tokio::runtime::Handle::current().block_on(model.lock());
+
+                let input_tensor_ids = ort::Value::from_array(embedder.allocator(), &cow_input_ids)
+                    .map_err(|e| format!("Failed to create input tensor: {}", e))?;
+                let input_tensor_attention_mask =
+                    ort::Value::from_array(embedder.allocator(), &cow_attention_masks)
+                        .map_err(|e| format!("Failed to create attention mask tensor: {}", e))?;
+
+                let input_tensor_type_ids =
+                    ort::Value::from_array(embedder.allocator(), &cow_type_ids)
+                        .map_err(|e| format!("Failed to create type_ids tensor: {}", e))?;
+
+                let outputs: Vec<ort::Value<'static>> = embedder
+                    .run(vec![
+                        input_tensor_ids,
+                        input_tensor_attention_mask,
+                        input_tensor_type_ids,
+                    ])
+                    .map_err(|e| format!("Model inference failed: {}", e))?;
+
+                let tensor: OrtOwnedTensor<f32, _> = outputs[0]
+                    .try_extract()
+                    .map_err(|e| format!("Failed to extract output tensor: {}", e))?;
+
+                let view = tensor.view();
+                let shape = view.shape();
+                let hidden_size = shape[2];
+
+                let batch_row = view.outer_iter().next().ok_or("No embedding row found")?;
+
+                let mut sum_vec = vec![0.0f32; hidden_size];
+                let mut token_count = 0.0f32;
+
+                for (j, token_vec) in batch_row.outer_iter().enumerate() {
+                    if attention_mask[j] == 1 {
+                        for k in 0..hidden_size {
+                            sum_vec[k] += token_vec[k];
+                        }
+                        token_count += 1.0;
+                    }
+                }
+
+                // Average
+                if token_count > 0.0 {
+                    for val in &mut sum_vec[..hidden_size] {
+                        *val /= token_count;
+                    }
+                }
+
+                Ok(sum_vec)
+            },
+        )
+        .await?
+    }
+}
+
+pub static COUNTRY_TO_LANG: Lazy<Arc<AHashMap<&'static str, &'static str>>> = Lazy::new(|| {
+    let mut map = AHashMap::with_capacity(200);
+
+    // Direct mappings
+    map.insert("de", "de");
+    map.insert("at", "de");
+    map.insert("ch", "de");
+    map.insert("fr", "fr");
+    map.insert("es", "es");
+    map.insert("mx", "es");
+    map.insert("ar", "es");
+    map.insert("cl", "es");
+    map.insert("co", "es");
+    map.insert("pe", "es");
+    map.insert("pt", "pt");
+    map.insert("br", "pt");
+    map.insert("us", "en");
+    map.insert("gb", "en");
+    map.insert("au", "en");
+    map.insert("nz", "en");
+    map.insert("ie", "en");
+    map.insert("ca", "all"); // fallback to All
+    map.insert("it", "it");
+    map.insert("is", "is");
+    map.insert("id", "id");
+    map.insert("lv", "lv");
+    map.insert("lt", "lt");
+    map.insert("hu", "hu");
+    map.insert("nl", "nl");
+    map.insert("no", "no");
+    map.insert("pl", "pl");
+    map.insert("ro", "ro");
+    map.insert("sk", "sk");
+    map.insert("fi", "fi");
+    map.insert("tr", "tr");
+    map.insert("bg", "bg");
+    map.insert("ru", "ru");
+    map.insert("rs", "sr");
+    map.insert("si", "sl");
+    map.insert("se", "sv");
+    map.insert("gr", "el");
+    map.insert("cz", "cs");
+    map.insert("dk", "da");
+    map.insert("jp", "ja");
+    map.insert("kr", "ko");
+
+    // === Closest language mappings ===
+    map.insert("cy", "el"); // Cyprus → Greek
+    map.insert("il", "he"); // Israel → Hebrew
+
+    // Arabic world
+    for c in [
+        "sa", "ae", "eg", "dz", "ma", "tn", "ye", "om", "iq", "jo", "ps", "kw", "qa", "bh", "ly",
+        "sd", "sy",
+    ] {
+        map.insert(c, "ar");
+    }
+
+    // Former USSR → Russian
+    for c in ["uz", "kz", "kg", "tj", "by", "ua", "am", "az", "ge"] {
+        map.insert(c, "ru");
+    }
+
+    // Chinese-speaking (no zh support) → All fallback
+    for c in ["sg", "hk", "mo", "tw", "cn"] {
+        map.insert(c, "all");
+    }
+
+    // South Asia → English
+    for c in ["in", "pk", "bd", "np", "lk"] {
+        map.insert(c, "en");
+    }
+
+    // Africa & rest → English
+    for c in ["ng", "za", "ke", "gh", "tz", "ug", "zm", "zw", "mw"] {
+        map.insert(c, "en");
+    }
+
+    Arc::new(map)
+});
+
+/*
+  PriEco Storage
+  Description: FJALL key-value storage. Stores results meta data and html blobs
+*/
+pub static META_DICTIONARY: Lazy<Option<Vec<u8>>> = Lazy::new(|| {
+    let path = std::env::var("PRIECO_ZSTD_DICT").unwrap_or_else(|_| ZSTD_DICT.to_string());
+
+    match std::fs::read(&path) {
+        Ok(bytes) => {
+            println!("Loaded ZSTD dictionary from {}", path);
+            Some(bytes)
+        }
+        Err(_) => {
+            eprintln!("Warning: ZSTD dictionary not found. Proceeding with standard compression.");
+            None
+        }
+    }
+});
+
+pub static META_DECODER: Lazy<Option<DecoderDictionary<'static>>> = Lazy::new(|| {
+    META_DICTIONARY
+        .as_ref()
+        .map(|dict_bytes| DecoderDictionary::copy(dict_bytes))
+});
+
+pub const BLOB_IMPORT_DIR: &str = "/mnt/hdd/imp_blob/";
+
+pub struct PriecoMetaStorage {
+    // Meta data: Titles, Descriptions, URLs...
+    pub meta_db: FJALL_DATABASE,
+    pub meta_ks: Keyspace,
+
+    // Goggles
+    pub goggles_ks: Keyspace,
+
+    // Widgets
+    pub widgets_ks: Keyspace,
+
+    // Analytics
+    pub analytics_ks: Keyspace,
+
+    // API
+    pub api_ks: Keyspace,
+}
+
+pub struct PriecoBlobStorage {
+    // Blob storage: Compressed web page data
+    pub blob_db: FJALL_DATABASE,
+    pub blobs_ks: Keyspace,
+}
+
+pub static PRIECO_META: Lazy<Arc<PriecoMetaStorage>> = Lazy::new(|| {
+    let meta_db = FJALL_DATABASE::builder(Path::new(&PRIECO_CONFIG.meta_path))
+        .worker_threads(4)
+        .cache_size(2 * 1024 * 1024 * 1024)
+        .open()
+        .expect("Failed to open Meta Fjall DB");
+
+    let meta_opts = KeyspaceCreateOptions::default()
+        .data_block_compression_policy(CompressionPolicy::disabled())
+        .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
+    let meta_ks = meta_db.keyspace("meta", || meta_opts.clone()).unwrap();
+
+    let goggles_opts = KeyspaceCreateOptions::default()
+        .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
+        .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
+    let goggles_ks = meta_db.keyspace("goggles", || goggles_opts).unwrap();
+
+    let widgets_opts = KeyspaceCreateOptions::default()
+        .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
+        .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
+    let widgets_ks = meta_db.keyspace("widgets", || widgets_opts).unwrap();
+
+    let analytics_opts = KeyspaceCreateOptions::default()
+        .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
+        .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
+    let analytics_ks = meta_db.keyspace("analytics", || analytics_opts).unwrap();
+
+    let api_opts = KeyspaceCreateOptions::default()
+        .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
+        .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
+    let api_ks = meta_db.keyspace("api", || api_opts).unwrap();
+
+    Arc::new(PriecoMetaStorage {
+        meta_db,
+        meta_ks,
+
+        goggles_ks,
+
+        widgets_ks,
+
+        analytics_ks,
+
+        api_ks,
+    })
+});
+
+pub static PRIECO_BLOBS: Lazy<Arc<PriecoBlobStorage>> = Lazy::new(|| {
+    let blob_db = FJALL_DATABASE::builder(Path::new(&PRIECO_CONFIG.blob_path))
+        .worker_threads(2)
+        .cache_size(1024 * 1024 * 1024)
+        .open()
+        .expect("Failed to open Blob Fjall DB");
+
+    let blob_opts = KeyspaceCreateOptions::default()
+        .max_memtable_size(2048 * 1024 * 1024)
+        .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
+        .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
+        .with_kv_separation(Some(KvSeparationOptions {
+            compression: CompressionType::None,
+            file_target_size: 2048 * 1024 * 1024,
+            separation_threshold: 100,
+            staleness_threshold: 0.9,
+            age_cutoff: 0.0,
+        }));
+
+    let blobs_ks = blob_db.keyspace("blobs", || blob_opts).unwrap();
+
+    Arc::new(PriecoBlobStorage { blob_db, blobs_ks })
+});
+
+/*
+  Index
+*/
+pub const TANTIVY_HEAP_SIZE: usize = 512_000_000;
+pub const TANTIVY_WRITER_THREADS: usize = 2;
+pub static TANTIVY_INDEX: Lazy<Arc<Index>> = Lazy::new(|| {
+    // Build schema
+    let mut builder = Schema::builder();
+
+    builder.add_u64_field("doc_id", STORED | INDEXED);
+    builder.add_u64_field("domain_id", INDEXED | FAST);
+
+    let multilingual = TextFieldIndexing::default()
+        .set_tokenizer("multilingual")
+        .set_index_option(IndexRecordOption::WithFreqsAndPositions);
+    let text_opts = TextOptions::default().set_indexing_options(multilingual);
+
+    builder.add_text_field("title", text_opts.clone());
+    builder.add_text_field("description", text_opts.clone());
+    builder.add_text_field("content", text_opts.clone());
+    builder.add_text_field("keywords", text_opts);
+
+    builder.add_text_field("lang", STRING | FAST);
+    builder.add_text_field("loc", STRING | FAST);
+    builder.add_i64_field("date", INDEXED | FAST);
+    builder.add_bool_field("safe_s", INDEXED | FAST);
+
+    builder.add_u64_field("intent", INDEXED | FAST);
+
+    let schema = builder.build();
+
+    // Open index
+    let dir = MmapDirectory::open(Path::new(&PRIECO_CONFIG.tantivy_path))
+        .expect("Failed to open Tantivy V2 directory");
+    let mut index =
+        Index::open_or_create(dir, schema.clone()).expect("Failed to open Tantivy index");
+    index
+        .set_multithread_executor(6)
+        .expect("Failed to set Tantivy executor");
+
+    index
+        .tokenizers()
+        .register("multilingual", TextAnalyzer::from(Multilingual::new()));
+
+    Arc::new(index)
+});
+
+pub static TANTIVY_READER: Lazy<Arc<IndexReader>> = Lazy::new(|| {
+    Arc::new(
+        TANTIVY_INDEX
+            .reader_builder()
+            .reload_policy(ReloadPolicy::OnCommitWithDelay)
+            .try_into()
+            .expect("Failed to create Tantivy reader"),
+    )
+});
+
+pub static TANTIVY_WRITER: Lazy<Arc<Mutex<IndexWriter>>> = Lazy::new(|| {
+    Arc::new(Mutex::new(
+        TANTIVY_INDEX
+            .writer_with_num_threads(TANTIVY_WRITER_THREADS, TANTIVY_HEAP_SIZE)
+            .expect("Failed to create Tantivy V2 writer"),
+    ))
+});
+
+pub static TANTIVY_QUERY_PARSER: Lazy<QueryParser> = Lazy::new(|| {
+    let schema = TANTIVY_INDEX.schema();
+    let title_field = schema.get_field("title").unwrap();
+    let description_field = schema.get_field("description").unwrap();
+    let content_field = schema.get_field("content").unwrap();
+    let keywords_field = schema.get_field("keywords").unwrap();
+
+    let mut parser = QueryParser::for_index(
+        &TANTIVY_INDEX,
+        vec![
+            title_field,
+            description_field,
+            content_field,
+            keywords_field,
+        ],
+    );
+
+    parser.set_conjunction_by_default();
+
+    parser
+});
+
+// Multilang tokenization
+#[derive(Clone)]
+pub struct Multilingual(Arc<CHARABIA_TOKENIZER<'static>>);
+
+impl Multilingual {
+    pub fn new() -> Self {
+        let builder: &'static mut TokenizerBuilder<Vec<u8>> =
+            Box::leak(Box::new(TokenizerBuilder::default()));
+        Self(Arc::new(builder.build()))
+    }
+}
+
+impl Default for Multilingual {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub struct MultiStream(std::vec::IntoIter<Token>, Option<Token>);
+
+impl TokenStream for MultiStream {
+    fn advance(&mut self) -> bool {
+        self.1 = self.0.next();
+        self.1.is_some()
+    }
+    fn token(&self) -> &Token {
+        self.1.as_ref().unwrap()
+    }
+    fn token_mut(&mut self) -> &mut Token {
+        self.1.as_mut().unwrap()
+    }
+}
+
+impl TANTIVY_TOKENIZER for Multilingual {
+    type TokenStream<'a> = MultiStream;
+
+    fn token_stream(&mut self, text: &str) -> MultiStream {
+        let tokens: Vec<Token> = self
+            .0
+            .tokenize(text)
+            .filter(|t| t.is_word())
+            .enumerate()
+            .map(|(i, t)| Token {
+                offset_from: t.byte_start,
+                offset_to: t.byte_end,
+                position: i,
+                text: t.lemma().to_string(),
+                position_length: 1,
+            })
+            .collect();
+        MultiStream(tokens.into_iter(), None)
+    }
+}
+
+/*
+  Inserter
+*/
+pub const INSERTER_IMPORT_DIR: &str = "/tmp/res_imp";
+pub static CENTROPOIDS_BIN: &[u8] = include_bytes!("../../../data/ivf/centroids.bin");
+
+pub static VECTOR_CENTROPOIDS: Lazy<Arc<CentroidIndex>> =
+    Lazy::new(|| Arc::new(CentroidIndex::new(CENTROPOIDS_BIN).unwrap()));
+#[cfg(feature = "cuda")]
+pub struct CentroidIndex {
+    ctx: Arc<CudaContext>,
+    stream: Arc<CudaStream>,
+    blas: CudaBlas,
+    centroids_gpu: CudaSlice<f32>,
+    num_centroids: usize,
+    dims: usize,
+    normalize_fn: cudarc::driver::CudaFunction,
+    argmax_fn: cudarc::driver::CudaFunction,
+    topk_fn: cudarc::driver::CudaFunction,
+}
+
+#[cfg(feature = "cuda")]
+impl CentroidIndex {
+    fn new(data: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut cursor = Cursor::new(data);
+        let mut buf = [0u8; 4];
+
+        cursor.read_exact(&mut buf)?;
+        let num_centroids = u32::from_le_bytes(buf) as usize;
+        cursor.read_exact(&mut buf)?;
+        let dims = u32::from_le_bytes(buf) as usize;
+
+        let mut floats = vec![0f32; num_centroids * dims];
+        for val in floats.iter_mut() {
+            let mut b = [0u8; 4];
+            cursor.read_exact(&mut b)?;
+            *val = f32::from_le_bytes(b);
+        }
+
+        let ctx = CudaContext::new(0)?;
+        let stream = ctx.default_stream();
+        let mut centroids_gpu = unsafe { stream.alloc::<f32>(floats.len())? };
+        stream.memcpy_htod(&floats, &mut centroids_gpu)?;
+        let blas = CudaBlas::new(stream.clone())?;
+
+        let kernel_src = r#"
+extern "C" __global__ void normalize_rows(
+    float* data,
+    int rows,
+    int cols
+) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= rows) return;
+
+    float* row = data + (long long)i * cols;
+    float norm = 0.0f;
+    for (int j = 0; j < cols; j++) {
+        norm += row[j] * row[j];
+    }
+    norm = sqrtf(norm);
+    if (norm < 1e-10f) norm = 1e-10f;
+    for (int j = 0; j < cols; j++) {
+        row[j] /= norm;
+    }
+}
+
+extern "C" __global__ void row_argmax(
+    const float* sims,
+    int* argmax,
+    int num_centroids,
+    int batch_size
+) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= batch_size) return;
+
+    const float* row = sims + (long long)i * num_centroids;
+    float best_val = -1e38f;
+    int best_idx = 0;
+    for (int j = 0; j < num_centroids; j++) {
+        float v = row[j];
+        if (v > best_val) {
+            best_val = v;
+            best_idx = j;
+        }
+    }
+    argmax[i] = best_idx;
+}
+extern "C" __global__ void topk_argmax(
+    const float* sims,
+    int* top_k_indices,
+    int num_centroids,
+    int num_queries,
+    int T
+) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= num_queries) return;
+
+    const float* row = sims + (long long)i * num_centroids;
+    int   best_idx[32];
+
+    for (int t = 0; t < T; t++) {
+        float bv = -1e38f;
+        int   bi = 0;
+        for (int j = 0; j < num_centroids; j++) {
+            bool already = false;
+            for (int p = 0; p < t; p++) if (best_idx[p] == j) { already = true; break; }
+            if (!already && row[j] > bv) { bv = row[j]; bi = j; }
+        }
+        best_idx[t] = bi;
+    }
+    for (int t = 0; t < T; t++) {
+        top_k_indices[(long long)i * T + t] = best_idx[t];
+    }
+}
+"#;
+
+        let ptx = compile_ptx(kernel_src)?;
+        let module = ctx.load_module(ptx)?;
+        let normalize_fn = module.load_function("normalize_rows")?;
+        let argmax_fn = module.load_function("row_argmax")?;
+        let topk_fn = module.load_function("topk_argmax")?;
+
+        println!("✅ Centroids loaded to GPU: {}x{}", num_centroids, dims);
+        Ok(CentroidIndex {
+            ctx,
+            stream,
+            blas,
+            centroids_gpu,
+            num_centroids,
+            dims,
+            normalize_fn,
+            argmax_fn,
+            topk_fn,
+        })
+    }
+
+    pub fn assign_batch(
+        &self,
+        vectors: &[Vec<f32>],
+    ) -> Result<Vec<usize>, Box<dyn Error + Send + Sync>> {
+        let batch_size = vectors.len();
+        let dims = self.dims;
+
+        // FLATTEN (CPU)
+        let flat: Vec<f32> = vectors.iter().flatten().copied().collect();
+
+        // COPY H→D
+        let mut queries_gpu = unsafe { self.stream.alloc::<f32>(flat.len())? };
+        self.stream.memcpy_htod(&flat, &mut queries_gpu)?;
+
+        // NORMALIZE ON GPU
+        let threads = 256u32;
+        let blocks = ((batch_size as u32) + threads - 1) / threads;
+        let cfg = LaunchConfig {
+            grid_dim: (blocks, 1, 1),
+            block_dim: (threads, 1, 1),
+            shared_mem_bytes: 0,
+        };
+        let rows_i32 = batch_size as i32;
+        let cols_i32 = dims as i32;
+        unsafe {
+            let mut builder = self.stream.launch_builder(&self.normalize_fn);
+            builder.arg(&mut queries_gpu);
+            builder.arg(&rows_i32);
+            builder.arg(&cols_i32);
+            builder.launch(cfg)?;
+        }
+        self.stream.synchronize()?;
+
+        // ALLOC SIM BUFFER
+        let mut sims_gpu = self
+            .stream
+            .alloc_zeros::<f32>(batch_size * self.num_centroids)?;
+
+        // GEMM
+        unsafe {
+            self.blas.gemm(
+                GemmConfig {
+                    transa: cublasOperation_t::CUBLAS_OP_T,
+                    transb: cublasOperation_t::CUBLAS_OP_N,
+                    m: self.num_centroids as i32,
+                    n: batch_size as i32,
+                    k: dims as i32,
+                    alpha: 1.0f32,
+                    lda: dims as i32,
+                    ldb: dims as i32,
+                    beta: 0.0f32,
+                    ldc: self.num_centroids as i32,
+                },
+                &self.centroids_gpu,
+                &queries_gpu,
+                &mut sims_gpu,
+            )?;
+        }
+        self.stream.synchronize()?;
+
+        // ARGMAX ON GPU
+        let mut argmax_gpu = self.stream.alloc_zeros::<i32>(batch_size)?;
+        let num_centroids_i32 = self.num_centroids as i32;
+        let batch_size_i32 = batch_size as i32;
+        unsafe {
+            let mut builder = self.stream.launch_builder(&self.argmax_fn);
+            builder.arg(&sims_gpu);
+            builder.arg(&mut argmax_gpu);
+            builder.arg(&num_centroids_i32);
+            builder.arg(&batch_size_i32);
+            builder.launch(cfg)?;
+        }
+        self.stream.synchronize()?;
+
+        // COPY ARGMAX D→H
+        let mut argmax_cpu = vec![0i32; batch_size];
+        self.stream.memcpy_dtoh(&argmax_gpu, &mut argmax_cpu)?;
+
+        let result: Vec<usize> = argmax_cpu.into_iter().map(|x| x as usize).collect();
+
+        Ok(result)
+    }
+
+    pub fn search(
+        &self,
+        query: &[f32],
+        n: usize,
+        t: usize,
+    ) -> Result<Vec<(u64, f32)>, Box<dyn std::error::Error>> {
+        assert!(t <= 32, "t must be <=32");
+        let dims = self.dims;
+
+        // Upload + normalize query on GPU
+        let mut q_gpu = unsafe { self.stream.alloc::<f32>(dims)? };
+        self.stream.memcpy_htod(query, &mut q_gpu)?;
+
+        let rows_i32 = 1i32;
+        let cols_i32 = dims as i32;
+        let cfg1 = LaunchConfig {
+            grid_dim: (1, 1, 1),
+            block_dim: (256, 1, 1),
+            shared_mem_bytes: 0,
+        };
+        unsafe {
+            let mut b = self.stream.launch_builder(&self.normalize_fn);
+            b.arg(&mut q_gpu);
+            b.arg(&rows_i32);
+            b.arg(&cols_i32);
+            b.launch(cfg1)?;
+        }
+        self.stream.synchronize()?;
+
+        // GEMM: sims = centroids^T · query → (num_centroids × 1)
+        let mut sims_gpu = self.stream.alloc_zeros::<f32>(self.num_centroids)?;
+        unsafe {
+            self.blas.gemm(
+                GemmConfig {
+                    transa: cublasOperation_t::CUBLAS_OP_T,
+                    transb: cublasOperation_t::CUBLAS_OP_N,
+                    m: self.num_centroids as i32,
+                    n: 1i32,
+                    k: dims as i32,
+                    alpha: 1.0f32,
+                    lda: dims as i32,
+                    ldb: dims as i32,
+                    beta: 0.0f32,
+                    ldc: self.num_centroids as i32,
+                },
+                &self.centroids_gpu,
+                &q_gpu,
+                &mut sims_gpu,
+            )?;
+        }
+        self.stream.synchronize()?;
+
+        // Top-T argmax on GPU
+        let mut topk_gpu = self.stream.alloc_zeros::<i32>(t)?;
+        let nc_i32 = self.num_centroids as i32;
+        let one_i32 = 1i32;
+        let t_i32 = t as i32;
+        unsafe {
+            let mut b = self.stream.launch_builder(&self.topk_fn);
+            b.arg(&sims_gpu);
+            b.arg(&mut topk_gpu);
+            b.arg(&nc_i32);
+            b.arg(&one_i32);
+            b.arg(&t_i32);
+            b.launch(LaunchConfig {
+                grid_dim: (1, 1, 1),
+                block_dim: (1, 1, 1),
+                shared_mem_bytes: 0,
+            })?;
+        }
+        self.stream.synchronize()?;
+
+        let mut topk_cpu = vec![0i32; t];
+        self.stream.memcpy_dtoh(&topk_gpu, &mut topk_cpu)?;
+        let centroid_ids: Vec<usize> = topk_cpu.into_iter().map(|x| x as usize).collect();
+
+        // Normalize query on CPU for cosine scan
+        let norm: f32 = query.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-10);
+        let query_norm: Vec<f32> = query.iter().map(|x| x / norm).collect();
+
+        // Scan probed buckets in parallel, cosine similarity
+        let all: Vec<Vec<(u64, f32)>> = centroid_ids
+            .par_iter()
+            .filter_map(|&cid| {
+                let zst_path = format!("{}/bucket_{:06}.bin.zst", &PRIECO_CONFIG.vector_path, cid);
+                if !Path::new(&zst_path).exists() {
+                    return None;
+                }
+
+                if let Ok(meta) = std::fs::metadata(&zst_path) {
+                    if meta.len() > 1_073_741_824 {
+                        return None;
+                    }
+                } else {
+                    return None; // Skip if we can't read file metadata
+                }
+
+                let compressed = std::fs::read(&zst_path).ok()?;
+                let data = decode_all(compressed.as_slice()).ok()?;
+                let count = data.len() / RECORD_SIZE;
+                let mut results = Vec::with_capacity(count);
+
+                for i in 0..count {
+                    let base = i * RECORD_SIZE;
+                    let id = u64::from_le_bytes(data[base..base + ID_SIZE].try_into().unwrap());
+                    let slice: &[f32] =
+                        bytemuck::cast_slice(&data[base + ID_SIZE..base + RECORD_SIZE]);
+
+                    let dot: f32 = slice
+                        .iter()
+                        .zip(query_norm.iter())
+                        .map(|(v, q)| v * q)
+                        .sum();
+
+                    results.push((id, dot));
+                }
+
+                Some(results)
+            })
+            .collect();
+
+        // Flatten, dedup, sort, truncate
+        let mut candidates: Vec<(u64, f32)> = all.into_iter().flatten().collect();
+        candidates.sort_unstable_by_key(|(id, _)| *id);
+        candidates.dedup_by(|a, b| {
+            if a.0 == b.0 {
+                if a.1 > b.1 {
+                    b.1 = a.1;
+                }
+                true
+            } else {
+                false
+            }
+        });
+        candidates.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        if n > 0 {
+            candidates.truncate(n);
+        }
+
+        Ok(candidates)
+    }
+}
+#[cfg(not(feature = "cuda"))]
+pub struct CentroidIndex;
+
+#[cfg(not(feature = "cuda"))]
+impl CentroidIndex {
+    pub fn new(_: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
+        println!("CUDA feature not enabled");
+        Ok(Self)
+    }
+
+    pub fn assign_batch(&self, _: &[Vec<f32>]) -> Result<Vec<usize>, Box<dyn Error + Send + Sync>> {
+        println!("CUDA feature not enabled");
+        Ok(Vec::new())
+    }
+
+    pub fn search(
+        &self,
+        _: &[f32],
+        _: usize,
+        _: usize,
+    ) -> Result<Vec<(u64, f32)>, Box<dyn std::error::Error>> {
+        Err("CUDA feature not enabled".into())
+    }
+}
+
+/*
+  PageRank
+*/
+pub static PAGERANK: Lazy<RwLock<Option<Arc<PageRank>>>> =
+    Lazy::new(|| RwLock::new(PageRank::open(ID_MAP_FILE, FINAL_SCORES).ok().map(Arc::new)));
+
+pub struct PageRank {
+    _id_mmap: Mmap,
+    ptr: *const (u64, u64),
+    len: usize,
+    _scores_mmap: Mmap,
+    scores_ptr: *const f32,
+}
+
+unsafe impl Send for PageRank {}
+unsafe impl Sync for PageRank {}
+
+impl PageRank {
+    pub fn open(id_map_path: &str, scores_path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let id_file = File::open(id_map_path)?;
+        let id_mmap = unsafe { MmapOptions::new().map(&id_file)? };
+        id_mmap.advise(memmap2::Advice::Random)?;
+
+        let len = id_mmap.len() / 16;
+        let ptr = id_mmap.as_ptr() as *const (u64, u64);
+
+        let scores_file = File::open(scores_path)?;
+        let scores_mmap = unsafe { MmapOptions::new().map(&scores_file)? };
+        scores_mmap.advise(memmap2::Advice::Random)?;
+
+        let scores_ptr = scores_mmap.as_ptr() as *const f32;
+
+        Ok(Self {
+            _id_mmap: id_mmap,
+            ptr,
+            len,
+            _scores_mmap: scores_mmap,
+            scores_ptr,
+        })
+    }
+
+    pub fn pairs(&self) -> &[(u64, u64)] {
+        unsafe { std::slice::from_raw_parts(self.ptr, self.len) }
+    }
+
+    pub fn lookup(&self, hash: u64) -> Option<u64> {
+        let pairs = self.pairs();
+        pairs
+            .binary_search_by_key(&hash, |&(h, _)| h)
+            .ok()
+            .map(|i| pairs[i].1)
+    }
+
+    pub fn get_score(&self, url: &str) -> f32 {
+        let hash = url_to_id(&normalize_url(url.trim()));
+        let node_id = match self.lookup(hash) {
+            Some(id) => id,
+            None => return 0.0,
+        };
+
+        unsafe { *self.scores_ptr.add(node_id as usize) }
+    }
+}
+
+/*
+  Reranker
+*/
+pub static BGE_TOKENIZER: &[u8] = include_bytes!("../../../data/bge/tokenizer.json");
+pub static RERANKER: Lazy<Reranker> = Lazy::new(Reranker::new);
+
+pub struct Reranker {
+    pub session: Arc<Session>,
+    pub tokenizer: Arc<Tokenizer>,
+}
+
+impl Reranker {
+    pub fn new() -> Self {
+        let environment = Environment::builder()
+            .with_name("reranker")
+            .with_log_level(ort::LoggingLevel::Verbose)
+            .build()
+            .unwrap()
+            .into_arc();
+
+        let session = SessionBuilder::new(&environment)
+            .expect("Failed to create SessionBuilder")
+            .with_optimization_level(GraphOptimizationLevel::Level3)
+            .expect("Failed to set optimization level")
+            .with_execution_providers([ExecutionProvider::CUDA(
+                ort::execution_providers::CUDAExecutionProviderOptions {
+                    enable_cuda_graph: false,
+                    ..Default::default()
+                },
+            )])
+            .expect("Failed to attach CUDA provider")
+            .with_model_from_file(BGE_MODEL)
+            .expect("Failed to load BGE model");
+
+        let mut tokenizer = Tokenizer::from_bytes(BGE_TOKENIZER).unwrap();
+
+        tokenizer.with_padding(Some(PaddingParams {
+            strategy: PaddingStrategy::BatchLongest,
+            pad_to_multiple_of: Some(64),
+            ..Default::default()
+        }));
+
+        if let Err(e) = tokenizer.with_truncation(Some(TruncationParams {
+            max_length: 512,
+            ..Default::default()
+        })) {
+            println!(
+                "{}Failed to set tokenizer truncation!{} {}",
+                colors::RED,
+                colors::RESET,
+                e
+            );
+        };
+
+        Self {
+            session: Arc::new(session),
+            tokenizer: Arc::new(tokenizer),
+        }
+    }
+
+    pub async fn score_batch(
+        &self,
+        query: &str,
+        passages: &[String],
+    ) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
+        if passages.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let query = query.to_string();
+        let passages = passages.to_vec();
+
+        let session = self.session.clone();
+        let tokenizer = self.tokenizer.clone();
+
+        let scores = tokio::task::spawn_blocking(
+            move || -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
+                let batch_size = passages.len();
+
+                let input_pairs: Vec<(&str, &str)> = passages
+                    .iter()
+                    .map(|p| (query.as_str(), p.as_str()))
+                    .collect();
+
+                let encodings = tokenizer
+                    .encode_batch(input_pairs, true)
+                    .map_err(|e| e.to_string())?;
+
+                let seq_len = encodings[0].get_ids().len();
+
+                let mut ids = Vec::with_capacity(batch_size * seq_len);
+                let mut mask = Vec::with_capacity(batch_size * seq_len);
+
+                for enc in &encodings {
+                    ids.extend(enc.get_ids().iter().map(|&x| x as i32));
+                    mask.extend(enc.get_attention_mask().iter().map(|&x| x as i32));
+                }
+
+                let input_ids_arr = Array2::from_shape_vec((batch_size, seq_len), ids).unwrap();
+                let attention_mask_arr =
+                    Array2::from_shape_vec((batch_size, seq_len), mask).unwrap();
+
+                let input_ids = CowArray::from(input_ids_arr).into_dyn();
+                let attention_mask = CowArray::from(attention_mask_arr).into_dyn();
+
+                let input_ids_val = Value::from_array(session.allocator(), &input_ids).unwrap();
+                let attention_mask_val =
+                    Value::from_array(session.allocator(), &attention_mask).unwrap();
+
+                let outputs = session.run(vec![input_ids_val, attention_mask_val])?;
+
+                let scores_tensor = outputs[0].try_extract::<f32>()?;
+                let view = scores_tensor.view();
+
+                let mut results = Vec::with_capacity(batch_size);
+                if view.ndim() == 2 {
+                    for i in 0..batch_size {
+                        results.push(view[[i, 0]]);
+                    }
+                } else {
+                    for i in 0..batch_size {
+                        results.push(view[[i]]);
+                    }
+                }
+
+                Ok(results)
+            },
+        )
+        .await??;
+
+        Ok(scores)
+    }
+}
+
+impl Default for Reranker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/*
+  Synonyms
+*/
+pub struct LangSynonyms {
+    index: FstMap<&'static [u8]>,
+    rows: Vec<Box<[Box<str>]>>,
+}
+
+fn get_synonym_bytes(lang: &str) -> Option<(&'static [u8], &'static [u8])> {
+    match lang {
+        "ar" => Some((
+            include_bytes!("../../../data/synonyms/ar.fst"),
+            include_bytes!("../../../data/synonyms/ar.rows.bin"),
+        )),
+        "bg" => Some((
+            include_bytes!("../../../data/synonyms/bg.fst"),
+            include_bytes!("../../../data/synonyms/bg.rows.bin"),
+        )),
+        "ca" => Some((
+            include_bytes!("../../../data/synonyms/ca.fst"),
+            include_bytes!("../../../data/synonyms/ca.rows.bin"),
+        )),
+        "da" => Some((
+            include_bytes!("../../../data/synonyms/da.fst"),
+            include_bytes!("../../../data/synonyms/da.rows.bin"),
+        )),
+        "en" => Some((
+            include_bytes!("../../../data/synonyms/en.fst"),
+            include_bytes!("../../../data/synonyms/en.rows.bin"),
+        )),
+        "et" => Some((
+            include_bytes!("../../../data/synonyms/et.fst"),
+            include_bytes!("../../../data/synonyms/et.rows.bin"),
+        )),
+        "fi" => Some((
+            include_bytes!("../../../data/synonyms/fi.fst"),
+            include_bytes!("../../../data/synonyms/fi.rows.bin"),
+        )),
+        "he" => Some((
+            include_bytes!("../../../data/synonyms/he.fst"),
+            include_bytes!("../../../data/synonyms/he.rows.bin"),
+        )),
+        "hr" => Some((
+            include_bytes!("../../../data/synonyms/hr.fst"),
+            include_bytes!("../../../data/synonyms/hr.rows.bin"),
+        )),
+        "hu" => Some((
+            include_bytes!("../../../data/synonyms/hu.fst"),
+            include_bytes!("../../../data/synonyms/hu.rows.bin"),
+        )),
+        "is" => Some((
+            include_bytes!("../../../data/synonyms/is.fst"),
+            include_bytes!("../../../data/synonyms/is.rows.bin"),
+        )),
+        "lt" => Some((
+            include_bytes!("../../../data/synonyms/lt.fst"),
+            include_bytes!("../../../data/synonyms/lt.rows.bin"),
+        )),
+        "lv" => Some((
+            include_bytes!("../../../data/synonyms/lv.fst"),
+            include_bytes!("../../../data/synonyms/lv.rows.bin"),
+        )),
+        "nb" => Some((
+            include_bytes!("../../../data/synonyms/nb.fst"),
+            include_bytes!("../../../data/synonyms/nb.rows.bin"),
+        )),
+        "nn" => Some((
+            include_bytes!("../../../data/synonyms/nn.fst"),
+            include_bytes!("../../../data/synonyms/nn.rows.bin"),
+        )),
+        "no" => Some((
+            include_bytes!("../../../data/synonyms/no.fst"),
+            include_bytes!("../../../data/synonyms/no.rows.bin"),
+        )),
+        "ro" => Some((
+            include_bytes!("../../../data/synonyms/ro.fst"),
+            include_bytes!("../../../data/synonyms/ro.rows.bin"),
+        )),
+        "sk" => Some((
+            include_bytes!("../../../data/synonyms/sk.fst"),
+            include_bytes!("../../../data/synonyms/sk.rows.bin"),
+        )),
+        "sl" => Some((
+            include_bytes!("../../../data/synonyms/sl.fst"),
+            include_bytes!("../../../data/synonyms/sl.rows.bin"),
+        )),
+        "sr" => Some((
+            include_bytes!("../../../data/synonyms/sr.fst"),
+            include_bytes!("../../../data/synonyms/sr.rows.bin"),
+        )),
+        "sv" => Some((
+            include_bytes!("../../../data/synonyms/sv.fst"),
+            include_bytes!("../../../data/synonyms/sv.rows.bin"),
+        )),
+        _ => None,
+    }
+}
+
+pub static LOCAL_NO_EXPAND: Lazy<AHashSet<&'static str>> = Lazy::new(|| {
+    let words = vec![
+        // 🇬🇧English (en)
+        "near",
+        "nearby",
+        "close",
+        "closest",
+        "around",
+        "by",
+        "at",
+        "vicinity",
+        "me",
+        "my",
+        "here",
+        "myself",
+        "area",
+        "neighborhood",
+        "town",
+        "city",
+        "location",
+        "place",
+        "district",
+        "street",
+        "zip",
+        "open",
+        "now",
+        "today",
+        "tonight",
+        "hours",
+        "map",
+        "directions",
+        "distance",
+        "walking",
+        "driving",
+        "route",
+        "miles",
+        "km",
+        // 🇸🇰 Slovak (sk) & 🇨🇿 Czech (cs - similar behavior)
+        "blízko",
+        "blizko",
+        "najbližšie",
+        "najblizsie",
+        "pri",
+        "okolo",
+        "mne",
+        "mi",
+        "tu",
+        "oblasť",
+        "oblast",
+        "mesto",
+        "miesto",
+        "ulica",
+        "otvorené",
+        "otvorene",
+        "teraz",
+        "dnes",
+        "večer",
+        "hodiny",
+        "mapa",
+        "trasa",
+        "vzdialenosť",
+        // 🇭🇷 Croatian (hr) & 🇷🇸 Serbian (sr)
+        "blizu",
+        "najbliže",
+        "oko",
+        "kod",
+        "meni",
+        "mi",
+        "ovdje",
+        "ovde",
+        "područje",
+        "grad",
+        "mjesto",
+        "mesto",
+        "otvoreno",
+        "sada",
+        "danas",
+        "večeras",
+        "mapa",
+        "karta",
+        "ruta",
+        "udaljenost",
+        // 🇸🇮 Slovenian (sl)
+        "blizu",
+        "najbližje",
+        "okoli",
+        "pri",
+        "meni",
+        "mi",
+        "tukaj",
+        "območje",
+        "mesto",
+        "kraj",
+        "odprto",
+        "zdaj",
+        "danes",
+        "zemljevid",
+        // 🇧🇬 Bulgarian (bg)
+        "близо",
+        "най-близо",
+        "около",
+        "при",
+        "мен",
+        "ми",
+        "тук",
+        "район",
+        "град",
+        "място",
+        "отворено",
+        "сега",
+        "днес",
+        "карта",
+        // 🇷🇴 Romanian (ro)
+        "aproape",
+        "lângă",
+        "langa",
+        "în jur",
+        "mine",
+        "aici",
+        "zonă",
+        "zona",
+        "oraș",
+        "oras",
+        "loc",
+        "stradă",
+        "deschis",
+        "acum",
+        "astăzi",
+        "hartă",
+        "harta",
+        // 🇭🇺 Hungarian (hu)
+        "közel",
+        "legközelebb",
+        "körül",
+        "mellett",
+        "nekem",
+        "itt",
+        "terület",
+        "város",
+        "hely",
+        "utca",
+        "nyitva",
+        "most",
+        "ma",
+        "térkép",
+        // 🇸🇪 Swedish (sv), 🇳🇴 Norwegian (no/nb/nn), 🇩🇰 Danish (da)
+        "nära",
+        "nær",
+        "närmaste",
+        "nærmeste",
+        "runt",
+        "rundt",
+        "mig",
+        "meg",
+        "här",
+        "her",
+        "område",
+        "stad",
+        "by",
+        "plats",
+        "sted",
+        "öppen",
+        "åpen",
+        "åben",
+        "nu",
+        "idag",
+        "i dag",
+        "karta",
+        "kart",
+        "kort",
+        "väg",
+        "vei",
+        // 🇫🇮 Finnish (fi)
+        "lähellä",
+        "lähin",
+        "ympärillä",
+        "minua",
+        "minun",
+        "täällä",
+        "alue",
+        "kaupunki",
+        "paikka",
+        "katu",
+        "auki",
+        "avoinna",
+        "nyt",
+        "tänään",
+        "kartta",
+        // 🇪🇪 Estonian (et)
+        "lähedal",
+        "lähim",
+        "ümber",
+        "minu",
+        "siin",
+        "piirkond",
+        "linn",
+        "koht",
+        "avatud",
+        "praegu",
+        "täna",
+        "kaart",
+        // 🇱🇻 Latvian (lv) & 🇱🇹 Lithuanian (lt)
+        "tuvu",
+        "tuvākais",
+        "arti",
+        "arčiausiai",
+        "aplink",
+        "man",
+        "šeit",
+        "čia",
+        "rajons",
+        "rajonas",
+        "pilsēta",
+        "miestas",
+        "vieta",
+        "atvērts",
+        "atidaryta",
+        "tagad",
+        "dabar",
+        "šodien",
+        "šiandien",
+        "karte",
+        "žemėlapis",
+        // 🇮🇸 Icelandic (is)
+        "nálægt",
+        "næst",
+        "kringum",
+        "mig",
+        "hér",
+        "svæði",
+        "borg",
+        "staður",
+        "opið",
+        "núna",
+        "í dag",
+        "kort",
+        // 🇦🇩 Catalan (ca)
+        "prop",
+        "a prop",
+        "més proper",
+        "voltant",
+        "mi",
+        "aquí",
+        "àrea",
+        "ciutat",
+        "lloc",
+        "carrer",
+        "obert",
+        "ara",
+        "avui",
+        "mapa",
+        // 🇮🇱 Hebrew (he)
+        "קרוב",
+        "הכי קרוב",
+        "סביב",
+        "לי",
+        "שלי",
+        "כאן",
+        "אזור",
+        "עיר",
+        "מקום",
+        "רחוב",
+        "פתוח",
+        "עכשיו",
+        "היום",
+        "מפה",
+        "כיוונים",
+        // 🇸🇦 Arabic (ar)
+        "قريب",
+        "الأقرب",
+        "حولي",
+        "بجانبي",
+        "لي",
+        "هنا",
+        "منطقة",
+        "مدينة",
+        "مكان",
+        "شارع",
+        "مفتوح",
+        "الآن",
+        "اليوم",
+        "خريطة",
+        "اتجاهات",
+    ];
+
+    let mut set = AHashSet::with_capacity(words.len());
+    for w in words {
+        set.insert(w);
+    }
+    set
+});
+
+impl LangSynonyms {
+    fn load(lang: &str) -> Option<Arc<LangSynonyms>> {
+        let (fst_bytes, rows_bytes) = get_synonym_bytes(lang)?;
+
+        let index = FstMap::new(fst_bytes).ok()?;
+
+        let (rows, _bytes_read): (Vec<Box<[Box<str>]>>, usize) =
+            bincode_next::decode_from_slice(rows_bytes, bincode_next::config::standard()).ok()?;
+
+        Some(Arc::new(LangSynonyms { index, rows }))
+    }
+
+    pub fn lookup(&self, term: &str) -> Option<&[Box<str>]> {
+        let id = self.index.get(term)?;
+        self.rows.get(id as usize).map(|r| r.as_ref())
+    }
+}
+
+static SYNONYM_STORES: Lazy<RwLock<std::collections::HashMap<String, Option<Arc<LangSynonyms>>>>> =
+    Lazy::new(|| RwLock::new(std::collections::HashMap::new()));
+pub fn get_store(lang: &str) -> Option<Arc<LangSynonyms>> {
+    if let Some(entry) = SYNONYM_STORES.read().get(lang) {
+        return entry.clone();
+    }
+    let mut w = SYNONYM_STORES.write();
+    if let Some(entry) = w.get(lang) {
+        return entry.clone();
+    }
+    let loaded = LangSynonyms::load(lang)?;
+    w.insert(lang.to_string(), Some(loaded.clone()));
+    Some(loaded)
+}
+
+/*
+  Intent
+*/
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QueryIntent {
+    Informational,           // Learn information
+    Transactional,           // Action purchase, download, sign up
+    CommercialInvestigation, // Research, comparing options
+    Navigational,            // Reach a known domain, page
+    Local,                   // Near me businesses
+    Unknown,                 // Failed to determine
+}
+
+pub struct LangMatcher {
+    pub automaton: AhoCorasick,
+    pub intent_map: Vec<QueryIntent>,
+}
+
+#[derive(Deserialize)]
+struct LanguageKeywords {
+    #[serde(default)]
+    informational_keywords: Vec<String>,
+    #[serde(default)]
+    transactional_keywords: Vec<String>,
+    #[serde(default)]
+    commercial_keywords: Vec<String>,
+    #[serde(default)]
+    local_keywords: Vec<String>,
+    #[serde(default)]
+    navigational_keywords: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct IntentConfig {
+    #[serde(flatten)]
+    languages: AHashMap<String, LanguageKeywords>,
+}
+
+pub static MATCHERS: Lazy<AHashMap<String, LangMatcher>> = Lazy::new(|| {
+    let mut matchers = AHashMap::new();
+
+    let json_data = include_str!("../../../data/intent.json");
+    let config: IntentConfig = serde_json::from_str(json_data)
+        .expect("Error: intents.json format does not match required schema.");
+
+    for (lang_code, keywords_struct) in config.languages {
+        let mut patterns = Vec::new();
+        let mut intent_map = Vec::new();
+
+        let mut add_patterns = |keywords: Vec<String>, intent: QueryIntent| {
+            for kw in keywords {
+                let trimmed = kw.trim().to_lowercase();
+                if !trimmed.is_empty() {
+                    patterns.push(trimmed);
+                    intent_map.push(intent);
+                }
+            }
+        };
+
+        add_patterns(
+            keywords_struct.informational_keywords,
+            QueryIntent::Informational,
+        );
+        add_patterns(
+            keywords_struct.transactional_keywords,
+            QueryIntent::Transactional,
+        );
+        add_patterns(
+            keywords_struct.commercial_keywords,
+            QueryIntent::CommercialInvestigation,
+        );
+        add_patterns(keywords_struct.local_keywords, QueryIntent::Local);
+        add_patterns(
+            keywords_struct.navigational_keywords,
+            QueryIntent::Navigational,
+        );
+
+        if !patterns.is_empty() {
+            let automaton = AhoCorasick::builder()
+                .ascii_case_insensitive(true)
+                .match_kind(MatchKind::LeftmostFirst)
+                .build(&patterns)
+                .expect("Failed to build AhoCorasick state machine");
+
+            matchers.insert(
+                lang_code,
+                LangMatcher {
+                    automaton,
+                    intent_map,
+                },
+            );
+        }
+    }
+
+    matchers
+});
+
+/*
+  Entities
+*/
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EntityType {
+    PersonName,
+    Business,
+    Place,
+}
+
+#[derive(Debug, Clone)]
+pub struct TaggedEntity {
+    pub range: Range<usize>,
+    pub entity_type: EntityType,
+    pub matched_text: String,
+}
+
+#[derive(Archive, Deserialize, Serialize, RkyvSerialize, RkyvDeserialize, Debug, Clone)]
+pub struct GeoCoords {
+    pub country: String,
+    pub lon: f32,
+    pub lat: f32,
+}
+
+#[derive(Archive, Deserialize, Serialize, RkyvSerialize, RkyvDeserialize, Debug, Clone)]
+pub struct EntityRegistry {
+    pub places: HashMap<String, Vec<GeoCoords>>,
+}
+
+pub struct QueryUnderstandingPipeline {
+    pub automaton: AhoCorasick,
+    pub metadata_map: Vec<(EntityType, String)>,
+    pub archived_places: &'static rkyv::Archived<EntityRegistry>,
+}
+
+pub static QU_PIPELINE: Lazy<QueryUnderstandingPipeline> = Lazy::new(|| {
+    macro_rules! include_bytes_aligned {
+        ($path:expr) => {{
+            #[repr(C, align(16))]
+            struct Aligned([u8; include_bytes!($path).len()]);
+            static ALIGNED: Aligned = Aligned(*include_bytes!($path));
+            &ALIGNED.0
+        }};
+    }
+
+    let places_bytes = include_bytes_aligned!("../../../data/entities/places.rkyv");
+    let archived_places =
+        access::<Archived<EntityRegistry>, rkyv::rancor::Error>(&places_bytes[..]).unwrap();
+
+    let keywords_str = include_str!("../../../data/entities/keywords_automaton.txt");
+
+    let mut patterns = Vec::new();
+    let mut metadata_map = Vec::new();
+
+    for place_name in archived_places.places.keys() {
+        let name_str = place_name.as_str().to_lowercase();
+        if name_str.len() > 1 {
+            patterns.push(name_str.clone());
+            metadata_map.push((EntityType::Place, name_str));
+        }
+    }
+
+    for line in keywords_str.lines() {
+        if let Some((prefix, value)) = line.split_once('|') {
+            if value.trim().len() < 2 {
+                continue;
+            }
+
+            let etype = match prefix {
+                "BIZ" => EntityType::Business,
+                "NAME" => EntityType::PersonName,
+                _ => continue,
+            };
+            patterns.push(value.to_string());
+            metadata_map.push((etype, value.to_string()));
+        }
+    }
+
+    let automaton = AhoCorasick::builder()
+        .ascii_case_insensitive(true)
+        .match_kind(MatchKind::LeftmostLongest)
+        .build(&patterns)
+        .unwrap();
+
+    QueryUnderstandingPipeline {
+        automaton,
+        metadata_map,
+        archived_places,
+    }
+});
+impl QueryUnderstandingPipeline {
+    pub fn get_tags(&self, query: &str) -> Vec<TaggedEntity> {
+        let query_lower = query.to_lowercase();
+        let query_bytes = query_lower.as_bytes();
+
+        self.automaton
+            .find_iter(&query_lower)
+            .filter_map(|mat| {
+                let start = mat.start();
+                let end = mat.end();
+
+                let is_start_boundary =
+                    start == 0 || !query_bytes[start - 1].is_ascii_alphanumeric();
+                let is_end_boundary =
+                    end == query_bytes.len() || !query_bytes[end].is_ascii_alphanumeric();
+
+                if is_start_boundary && is_end_boundary {
+                    let (etype, text) = &self.metadata_map[mat.pattern().as_usize()];
+                    Some(TaggedEntity {
+                        range: mat.range(),
+                        entity_type: *etype,
+                        matched_text: text.clone(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+}
+
+/*
+  Server-side bangs
+*/
+#[derive(Deserialize, Debug, Clone)]
+pub struct Bang {
+    pub d: String,
+    pub t: String,
+    pub u: String,
+}
+pub static BANGS: Lazy<AHashMap<String, Bang>> = Lazy::new(|| {
+    let content = read_file(&format!("{}/js/unduck/bangs.js", STATIC_DIR));
+    let mut map = AHashMap::new();
+
+    if content.is_empty() {
+        return map;
+    }
+
+    let blocks = content.split("},{");
+
+    for block in blocks {
+        let t = extract_val(block, "t:\"");
+        let d = extract_val(block, "d:\"");
+        let u = extract_val(block, "u:\"");
+
+        if let (Some(t_val), Some(d_val), Some(u_val)) = (t, d, u) {
+            map.insert(
+                t_val.clone(),
+                Bang {
+                    t: t_val,
+                    d: d_val,
+                    u: u_val,
+                },
+            );
+        }
+    }
+
+    map
+});
+fn extract_val(block: &str, key: &str) -> Option<String> {
+    let start = block.find(key)? + key.len();
+    let end = block[start..].find('"')?;
+    Some(block[start..start + end].to_string())
+}
+
+pub static TOP_DOMAINS: Lazy<AHashSet<&'static str>> =
+    Lazy::new(|| include_str!("../../../data/domains.txt").lines().collect());
+
+/*
+  Spell checker
+*/
+pub static SPELL_CHECKER: Lazy<Arc<SymSpell<UnicodeStringStrategy>>> = Lazy::new(|| {
+    let mut symspell: SymSpell<UnicodeStringStrategy> = SymSpell::default();
+
+    let en_dict = include_str!("../../../data/spell_check/frequency_dictionary_en_82_765.txt")
+        .trim_start_matches('\u{feff}');
+    let mut word_count = 0;
+    for line in en_dict.lines() {
+        if symspell.load_dictionary_line(line, 0, 1, " ") {
+            word_count += 1;
+        }
+    }
+    println!(
+        "{}Loaded English dictionary ({} words){}",
+        colors::GREEN,
+        word_count,
+        colors::RESET
+    );
+
+    let en_bigrams =
+        include_str!("../../../data/spell_check/frequency_bigramdictionary_en_243_342.txt")
+            .trim_start_matches('\u{feff}');
+    let mut bigram_count = 0;
+    for line in en_bigrams.lines() {
+        if symspell.load_bigram_dictionary_line(line, 0, 2, " ") {
+            bigram_count += 1;
+        }
+    }
+    println!(
+        "{}Loaded English bigrams ({} entries){}",
+        colors::GREEN,
+        bigram_count,
+        colors::RESET
+    );
+
+    Arc::new(symspell)
+});
+
+/*
+  Analytics (only PriEco purely vibe coded part)
+  They don't matter enough, and AI can do a good job in this
+*/
+pub static ANALYTICS: Lazy<AnalyticsDb> = Lazy::new(|| {
+    let date = OffsetDateTime::now_utc().date();
+
+    AnalyticsDb {
+        db: PRIECO_META.meta_db.clone(),
+        ks: PRIECO_META.analytics_ks.clone(),
+
+        salt: RwLock::new((date, generate_analytics_salt(date))),
+
+        pending: Mutex::new(HashMap::new()),
+        flush_lock: Mutex::new(()),
+        last_flush: AtomicI64::new(OffsetDateTime::now_utc().unix_timestamp()),
+
+        inc_lock: Mutex::new(()),
+    }
+});
+
+/*
+  Latency stages
+*/
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Stage {
+    /// Whole run_core_search (concurrent engines + fetch + sort)
+    Core,
+    /// Tantivy full text search
+    Fts,
+    /// Vector / IVF search
+    Vector,
+    /// Direct domain lookup
+    Dir,
+    /// Document fetch from the KV store
+    Fetch,
+    /// Handling an inbound federated query from a peer
+    PeerServe,
+    /// Round trip of an outbound federated query
+    PeerRtt,
+}
+
+impl Stage {
+    pub const ALL: [Stage; 7] = [
+        Stage::Core,
+        Stage::Fts,
+        Stage::Vector,
+        Stage::Dir,
+        Stage::Fetch,
+        Stage::PeerServe,
+        Stage::PeerRtt,
+    ];
+
+    pub fn key(self) -> &'static str {
+        match self {
+            Stage::Core => "core",
+            Stage::Fts => "fts",
+            Stage::Vector => "ivf",
+            Stage::Dir => "dir",
+            Stage::Fetch => "fetch",
+            Stage::PeerServe => "peer_serve",
+            Stage::PeerRtt => "peer_rtt",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Stage::Core => "End to end",
+            Stage::Fts => "Full text",
+            Stage::Vector => "Vector",
+            Stage::Dir => "Direct lookup",
+            Stage::Fetch => "Doc fetch",
+            Stage::PeerServe => "Peer serve",
+            Stage::PeerRtt => "Peer round trip",
+        }
+    }
+
+    pub fn desc(self) -> &'static str {
+        match self {
+            Stage::Core => "All engines, fetch and sort",
+            Stage::Fts => "Tantivy search",
+            Stage::Vector => "IVF centroid search",
+            Stage::Dir => "Domain guess lookup",
+            Stage::Fetch => "Metadata read from storage",
+            Stage::PeerServe => "Answering other nodes",
+            Stage::PeerRtt => "Asking other nodes",
+        }
+    }
+}
+
+/*
+  Log-scale histogram: 16 buckets per e-fold -> ~6.5% relative error on every percentile.
+  Bucket b covers [e^(b/16), e^((b+1)/16)) microseconds.
+*/
+const LAT_RES: f64 = 16.0;
+const LAT_MAX_BUCKET: u16 = 400;
+
+fn lat_bucket(micros: u64) -> u16 {
+    ((micros.max(1) as f64).ln() * LAT_RES)
+        .floor()
+        .min(LAT_MAX_BUCKET as f64) as u16
+}
+
+/// Geometric middle of a bucket, in milliseconds
+pub fn lat_bucket_ms(bucket: u16) -> f64 {
+    (((bucket as f64) + 0.5) / LAT_RES).exp() / 1000.0
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct LatencySummary {
+    pub count: u64,
+    pub p50: f64,
+    pub p95: f64,
+    pub p99: f64,
+}
+
+pub fn percentile(hist: &BTreeMap<u16, u64>, q: f64) -> f64 {
+    let total: u64 = hist.values().sum();
+    if total == 0 {
+        return 0.0;
+    }
+
+    // Nearest-rank method
+    let rank = ((q * total as f64).ceil() as u64).clamp(1, total);
+    let mut cumulative = 0u64;
+
+    for (bucket, count) in hist {
+        cumulative += count;
+        if cumulative >= rank {
+            return lat_bucket_ms(*bucket);
+        }
+    }
+
+    hist.keys()
+        .next_back()
+        .map(|b| lat_bucket_ms(*b))
+        .unwrap_or(0.0)
+}
+
+pub fn summarize(hist: &BTreeMap<u16, u64>) -> LatencySummary {
+    LatencySummary {
+        count: hist.values().sum(),
+        p50: percentile(hist, 0.50),
+        p95: percentile(hist, 0.95),
+        p99: percentile(hist, 0.99),
+    }
+}
+
+pub struct AnalyticsDb {
+    db: FJALL_DATABASE,
+    ks: Keyspace,
+    salt: RwLock<(Date, [u8; 32])>,
+
+    pending: Mutex<HashMap<String, u64>>,
+    flush_lock: Mutex<()>,
+    last_flush: AtomicI64,
+
+    inc_lock: Mutex<()>,
+}
+
+impl AnalyticsDb {
+    // Write
+    pub fn record_query(&self) {
+        self.inc(&format!("queries:{}", self.today()), 1);
+    }
+
+    pub fn record_visitor(
+        &self,
+        ip: &str,
+        user_agent: &str,
+        entity_id: &str,
+        country_code: Option<&str>,
+    ) {
+        let date = self.today();
+
+        let pvk = format!("pageviews:{}", date);
+        let mut batch = self.db.batch();
+        batch.insert(
+            &self.ks,
+            pvk.as_bytes(),
+            (self.get_u64(&pvk) + 1).to_le_bytes(),
+        );
+
+        let seen_key = format!(
+            "seen:{}:{}",
+            date,
+            self.fingerprint(ip, user_agent, entity_id, date)
+        );
+
+        if self.ks.get(seen_key.as_bytes()).ok().flatten().is_none() {
+            batch.insert(&self.ks, seen_key.as_bytes(), [1u8]);
+
+            let vk = format!("visitors:{}", date);
+            batch.insert(
+                &self.ks,
+                vk.as_bytes(),
+                (self.get_u64(&vk) + 1).to_le_bytes(),
+            );
+
+            if let Some(cc) = country_code
+                && cc != "all"
+            {
+                let ck = format!("country:{}:{}", date, cc.to_lowercase());
+                batch.insert(
+                    &self.ks,
+                    ck.as_bytes(),
+                    (self.get_u64(&ck) + 1).to_le_bytes(),
+                );
+            }
+        }
+
+        batch.commit().expect("Analytics visitor write failed");
+    }
+
+    pub fn record_api_request(&self) {
+        let date = self.today();
+        let mut batch = self.db.batch();
+        let total_key = format!("api:total:{}", date);
+        batch.insert(
+            &self.ks,
+            total_key.as_bytes(),
+            (self.get_u64(&total_key) + 1).to_le_bytes(),
+        );
+        batch.commit().expect("API request tracking write failed");
+    }
+
+    /// Record one latency sample. Cheap: one mutex + hashmap increment.
+    pub fn record_latency(&self, stage: Stage, elapsed: std::time::Duration) {
+        let key = format!(
+            "lat:{}:{}:{:03}",
+            self.today(),
+            stage.key(),
+            lat_bucket(elapsed.as_micros() as u64)
+        );
+        *self.pending.lock().entry(key).or_insert(0) += 1;
+        self.maybe_flush();
+    }
+
+    /// Generic daily counter, e.g. count("p2p_served")
+    pub fn count(&self, name: &str) {
+        self.count_by(name, 1);
+    }
+
+    pub fn count_by(&self, name: &str, n: u64) {
+        if n == 0 {
+            return;
+        }
+        let key = format!("ctr:{}:{}", self.today(), name);
+        *self.pending.lock().entry(key).or_insert(0) += n;
+        self.maybe_flush();
+    }
+
+    /// One mini crawler batch was accepted by the main crawler.
+    /// Unique contributors are counted with the same daily-salted fingerprint as visitors.
+    pub fn record_worker_batch(&self, ip: &str, pages: u64, bytes: u64) {
+        let date = self.today();
+
+        self.count("worker_batches");
+        self.count_by("worker_pages", pages);
+        self.count_by("worker_bytes", bytes);
+
+        let seen_key = format!(
+            "wseen:{}:{}",
+            date,
+            self.fingerprint(ip, "mini-crawler", "worker", date)
+        );
+
+        if self.ks.get(seen_key.as_bytes()).ok().flatten().is_none()
+            && self.ks.insert(seen_key.as_bytes(), [1u8]).is_ok()
+        {
+            self.count("workers");
+        }
+    }
+
+    // Read
+    pub fn daily_queries(&self, days: u32) -> Vec<(String, u64)> {
+        let today = self.today();
+        (0..days)
+            .rev()
+            .map(|i| {
+                let date = today - Duration::days(i as i64);
+                (date.to_string(), self.get_u64(&format!("queries:{}", date)))
+            })
+            .collect()
+    }
+
+    pub fn daily_visitors(&self, days: u32) -> Vec<(String, u64)> {
+        let today = self.today();
+        (0..days)
+            .rev()
+            .map(|i| {
+                let date = today - Duration::days(i as i64);
+                (
+                    date.to_string(),
+                    self.get_u64(&format!("visitors:{}", date)),
+                )
+            })
+            .collect()
+    }
+
+    pub fn visitor_stats(&self) -> (u64, u64, u64, u64) {
+        let today = self.today();
+        let yesterday = today - Duration::days(1);
+        (
+            self.get_u64(&format!("visitors:{}", today)),
+            self.get_u64(&format!("visitors:{}", yesterday)),
+            self.get_u64(&format!("pageviews:{}", today)),
+            self.get_u64(&format!("pageviews:{}", yesterday)),
+        )
+    }
+
+    pub fn top_countries(&self) -> Vec<(String, u64)> {
+        let prefix = format!("country:{}:", self.today());
+        let mut results: Vec<(String, u64)> = self
+            .ks
+            .prefix(prefix.as_bytes())
+            .filter_map(|item| {
+                let (k, v) = match item.into_inner() {
+                    Ok(kv) => kv,
+                    Err(_) => return None,
+                };
+
+                let key_str = std::str::from_utf8(&k).ok()?;
+
+                if !key_str.starts_with(&prefix) {
+                    return None;
+                }
+
+                let cc = key_str.rsplit(':').next()?.to_string();
+                let count = u64::from_le_bytes((&v[..]).try_into().unwrap_or([0; 8]));
+                Some((cc, count))
+            })
+            .collect();
+        results.sort_by_key(|a| Reverse(a.1));
+        results
+    }
+
+    pub fn daily_api_requests(&self, days: u32) -> Vec<(String, u64)> {
+        let today = self.today();
+        (0..days)
+            .rev()
+            .map(|i| {
+                let date = today - Duration::days(i as i64);
+                (
+                    date.to_string(),
+                    self.get_u64(&format!("api:{}:{}", "total", date)),
+                )
+            })
+            .collect()
+    }
+
+    pub fn api_stats_today_yesterday(&self) -> (u64, u64) {
+        let today = self.today();
+        let yesterday = today - Duration::days(1);
+        (
+            self.get_u64(&format!("api:total:{}", today)),
+            self.get_u64(&format!("api:total:{}", yesterday)),
+        )
+    }
+
+    /// Daily values of a generic counter, oldest first (last item = today)
+    pub fn counter_series(&self, name: &str, days: u32) -> Vec<(String, u64)> {
+        self.flush();
+        let today = self.today();
+        (0..days)
+            .rev()
+            .map(|i| {
+                let date = today - Duration::days(i as i64);
+                (
+                    date.to_string(),
+                    self.get_u64(&format!("ctr:{}:{}", date, name)),
+                )
+            })
+            .collect()
+    }
+
+    /// Merged histogram of the last `days` days (1 = today only)
+    pub fn latency_hist(&self, stage: Stage, days: u32) -> BTreeMap<u16, u64> {
+        self.flush();
+        let today = self.today();
+        let mut merged: BTreeMap<u16, u64> = BTreeMap::new();
+
+        for i in 0..days {
+            let date = today - Duration::days(i as i64);
+            for (bucket, count) in self.day_hist(date, stage) {
+                *merged.entry(bucket).or_insert(0) += count;
+            }
+        }
+
+        merged
+    }
+
+    pub fn latency_summary(&self, stage: Stage, days: u32) -> LatencySummary {
+        summarize(&self.latency_hist(stage, days))
+    }
+
+    /// Per-day percentiles, oldest first
+    pub fn latency_daily(&self, stage: Stage, days: u32) -> Vec<(String, LatencySummary)> {
+        self.flush();
+        let today = self.today();
+        (0..days)
+            .rev()
+            .map(|i| {
+                let date = today - Duration::days(i as i64);
+                (date.to_string(), summarize(&self.day_hist(date, stage)))
+            })
+            .collect()
+    }
+
+    // Purge
+    pub fn purge_expired(&self) {
+        let cutoff = self.today() - Duration::days(30);
+        let mut batch = self.db.batch();
+        for prefix in [
+            "queries:",
+            "visitors:",
+            "pageviews:",
+            "country:",
+            "seen:",
+            "api:",
+            "lat:",
+            "ctr:",
+            "wseen:",
+        ] {
+            for item in self.ks.prefix(prefix.as_bytes()) {
+                let k = match item.key() {
+                    Ok(i) => i,
+                    Err(_) => continue,
+                };
+                let Ok(key_str) = std::str::from_utf8(&k) else {
+                    continue;
+                };
+
+                // The date is not always the first segment ("api:total:2026-01-01"),
+                // so take the first segment that parses as a date.
+                let date = key_str[prefix.len()..].split(':').find_map(|part| {
+                    Date::parse(part, format_description!("[year]-[month]-[day]")).ok()
+                });
+
+                if let Some(date) = date
+                    && date < cutoff
+                {
+                    batch.remove(&self.ks, k);
+                }
+            }
+        }
+        batch.commit().expect("Analytics purge failed");
+    }
+
+    pub async fn background_purge_task(&self) {
+        self.purge_expired();
+        loop {
+            let now = OffsetDateTime::now_utc();
+            let secs_until_midnight = {
+                let tomorrow = (now.date() + Duration::days(1)).midnight().assume_utc();
+                (tomorrow - now).whole_seconds().max(0) as u64
+            };
+            tokio::time::sleep(tokio::time::Duration::from_secs(secs_until_midnight)).await;
+            self.purge_expired();
+        }
+    }
+
+    // Buffered writes
+    /// Write all buffered increments to the database. Safe to call from anywhere, any time.
+    pub fn flush(&self) {
+        let _guard = self.flush_lock.lock();
+
+        let drained: HashMap<String, u64> = std::mem::take(&mut *self.pending.lock());
+        self.last_flush.store(
+            OffsetDateTime::now_utc().unix_timestamp(),
+            Ordering::Relaxed,
+        );
+
+        if drained.is_empty() {
+            return;
+        }
+
+        let mut batch = self.db.batch();
+        for (key, delta) in drained {
+            batch.insert(
+                &self.ks,
+                key.as_bytes(),
+                (self.get_u64(&key) + delta).to_le_bytes(),
+            );
+        }
+
+        if let Err(e) = batch.commit() {
+            eprintln!("Analytics flush failed: {}", e);
+        }
+    }
+
+    fn maybe_flush(&self) {
+        let now = OffsetDateTime::now_utc().unix_timestamp();
+        let last = self.last_flush.load(Ordering::Relaxed);
+
+        if now - last >= 30
+            && self
+                .last_flush
+                .compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+        {
+            self.flush();
+        }
+    }
+
+    fn day_hist(&self, date: Date, stage: Stage) -> BTreeMap<u16, u64> {
+        let prefix = format!("lat:{}:{}:", date, stage.key());
+        let mut hist = BTreeMap::new();
+
+        for item in self.ks.prefix(prefix.as_bytes()) {
+            let Ok((k, v)) = item.into_inner() else {
+                continue;
+            };
+            let Some(bucket) = std::str::from_utf8(&k)
+                .ok()
+                .and_then(|s| s.rsplit(':').next())
+                .and_then(|s| s.parse::<u16>().ok())
+            else {
+                continue;
+            };
+            let count = u64::from_le_bytes((&v[..]).try_into().unwrap_or([0; 8]));
+            hist.insert(bucket, count);
+        }
+
+        hist
+    }
+
+    // Helpers
+    fn today(&self) -> Date {
+        OffsetDateTime::now_utc().date()
+    }
+
+    fn get_u64(&self, key: &str) -> u64 {
+        self.ks
+            .get(key.as_bytes())
+            .ok()
+            .flatten()
+            .map(|v| u64::from_le_bytes((&v[..]).try_into().unwrap_or([0; 8])))
+            .unwrap_or(0)
+    }
+
+    fn inc(&self, key: &str, delta: u64) {
+        let _guard = self.inc_lock.lock();
+        let current = self.get_u64(key);
+        self.ks
+            .insert(key.as_bytes(), current.saturating_add(delta).to_le_bytes())
+            .expect("Analytics write failed");
+    }
+
+    fn get_daily_salt(&self, today: Date) -> [u8; 32] {
+        {
+            let guard = self.salt.read();
+            if guard.0 == today {
+                return guard.1;
+            }
+        }
+
+        let mut guard = self.salt.write();
+
+        if guard.0 == today {
+            return guard.1;
+        }
+
+        let new_salt = generate_analytics_salt(today);
+
+        *guard = (today, new_salt);
+
+        new_salt
+    }
+
+    fn fingerprint(&self, ip: &str, user_agent: &str, entity_id: &str, date: Date) -> String {
+        let mut hasher = XxHash3_64::default();
+        self.get_daily_salt(date).hash(&mut hasher);
+        ip.hash(&mut hasher);
+        user_agent.hash(&mut hasher);
+        date.to_string().hash(&mut hasher);
+        entity_id.hash(&mut hasher);
+        format!("{:016x}", hasher.finish())
+    }
+}
+
+fn generate_analytics_salt(date: Date) -> [u8; 32] {
+    let data = read_file(DAILY_SALT_FILE);
+
+    let parts: Vec<&str> = data.split(':').collect();
+    if parts.len() == 2 && parts[0] == date.to_string() {
+        let mut salt = [0u8; 32];
+        let mut valid = true;
+
+        for (i, chunk) in parts[1].as_bytes().chunks(2).enumerate() {
+            if i >= 32 {
+                break;
+            }
+
+            if let Ok(str_chunk) = from_utf8(chunk) {
+                if let Ok(byte) = u8::from_str_radix(str_chunk, 16) {
+                    salt[i] = byte;
+                } else {
+                    valid = false;
+                }
+            } else {
+                valid = false;
+            }
+        }
+
+        if valid {
+            return salt;
+        }
+    }
+
+    // Generate new salt
+    let mut new_salt = [0u8; 32];
+    rand::rng().try_fill_bytes(&mut new_salt);
+
+    let salt_hex: String = new_salt.iter().map(|b| format!("{:02x}", b)).collect();
+    let content = format!("{}:{}", date, salt_hex);
+
+    write(DAILY_SALT_FILE, content).expect("Failed to write daily salt file");
+
+    new_salt
+}
