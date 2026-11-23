@@ -389,6 +389,59 @@ fn storage_list_all_and_public() {
     assert!(public.iter().all(|g| g.public));
 }
 
+// list_public feeds the settings menu on every /search; it must not carry rules.
+#[test]
+fn storage_list_public_strips_rules() {
+    init();
+    let g = stored(true);
+    put(&g);
+    let listed = list_public().into_iter().find(|x| x.id == g.id).unwrap();
+    assert_eq!(listed.name, g.name);
+    assert_eq!(listed.url, g.url);
+    assert!(listed.rules.boost.is_empty());
+    // full rules still reachable for search
+    assert_eq!(get(g.id).unwrap().rules.boost[&42], 2.0);
+}
+
+#[test]
+fn storage_list_public_sees_delete() {
+    init();
+    let g = stored(true);
+    put(&g);
+    assert!(list_public().iter().any(|x| x.id == g.id));
+    delete(g.id);
+    assert!(!list_public().iter().any(|x| x.id == g.id));
+}
+
+#[test]
+fn storage_list_public_sees_public_flip_and_rename() {
+    init();
+    let mut g = stored(true);
+    put(&g);
+    assert!(list_public().iter().any(|x| x.id == g.id));
+
+    g.name = format!("renamed {}", g.id);
+    put(&g);
+    let listed = list_public().into_iter().find(|x| x.id == g.id).unwrap();
+    assert_eq!(listed.name, g.name);
+
+    g.public = false;
+    put(&g);
+    assert!(!list_public().iter().any(|x| x.id == g.id));
+}
+
+#[test]
+fn storage_list_public_sees_touch() {
+    init();
+    let mut g = stored(true);
+    g.fetched_at = 1;
+    put(&g);
+    let _ = list_public();
+    touch_fetched_at(g.id);
+    let listed = list_public().into_iter().find(|x| x.id == g.id).unwrap();
+    assert!(listed.fetched_at > 1);
+}
+
 #[test]
 fn storage_corrupt_entries_are_skipped() {
     init();

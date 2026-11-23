@@ -121,20 +121,19 @@ pub fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host) -> Te
     context.insert(String::from("css_version"), json!(CSS_VERSION));
     context.insert(String::from("js_version"), json!(JS_VERSION));
 
-    settings::run(&mut context, &Some(ip_addr), cookie_jar, host);
-
     let no_js = cookie_jar.get("js").is_some();
-    context.insert(String::from("no_js"), json!(no_js));
+    let mut settings_ctx: HashMap<String, Value> = HashMap::from([
+        (String::from("css_version"), json!(CSS_VERSION)),
+        (String::from("js_version"), json!(JS_VERSION)),
+        (String::from("no_js"), json!(no_js)),
+    ]);
+    settings::run(&mut settings_ctx, &Some(ip_addr), cookie_jar, host);
 
     if no_js {
-        let mut settings_ctx: HashMap<String, Value> = HashMap::new();
-        settings_ctx.insert("css_version".into(), json!(CSS_VERSION));
-        settings_ctx.insert("js_version".into(), json!(JS_VERSION));
-        settings_ctx.insert(String::from("no_js"), json!(no_js));
-
-        settings::run(&mut settings_ctx, &Some(client_ip.0), cookie_jar, host);
         context.insert(String::from("settings"), json!(settings_ctx));
     }
+
+    context.extend(settings_ctx);
 
     // Shortcuts
     let mut shortcuts = Vec::new();
@@ -397,6 +396,14 @@ pub async fn search(
     let no_js = cookie_jar.get("js").is_some();
     context.insert(String::from("no_js"), json!(no_js));
 
+    // Settings
+    let mut settings_ctx: HashMap<String, Value> = HashMap::from([
+        (String::from("css_version"), json!(CSS_VERSION)),
+        (String::from("js_version"), json!(JS_VERSION)),
+        (String::from("no_js"), json!(no_js)),
+    ]);
+    settings::run(&mut settings_ctx, &Some(client_ip.0), cookie_jar, host);
+
     if no_js {
         if let Some((_clean_query, redirects)) = multibangs(params.q) {
             if redirects.len() == 1 {
@@ -442,17 +449,10 @@ pub async fn search(
         ANALYTICS.record_query();
 
         // Settings
-        let mut settings_ctx: HashMap<String, Value> = HashMap::new();
-        settings_ctx.insert("css_version".into(), json!(CSS_VERSION));
-        settings_ctx.insert("js_version".into(), json!(JS_VERSION));
-        settings_ctx.insert(String::from("no_js"), json!(no_js));
-
-        settings::run(&mut settings_ctx, &Some(client_ip.0), cookie_jar, host);
         context.insert(String::from("settings"), json!(settings_ctx));
     }
 
-    // Aplly cookies' settings to context
-    settings::run(&mut context, &Some(client_ip.0), cookie_jar, host);
+    context.extend(settings_ctx);
 
     // Analytics
     ANALYTICS.record_visitor(
