@@ -26,7 +26,7 @@
 use std::{
     error::Error,
     fs::{File, create_dir_all, rename},
-    io::{BufWriter, Write, copy},
+    io::{BufWriter, Write},
     path::Path,
     time::{Duration, Instant},
 };
@@ -121,7 +121,7 @@ pub async fn run(dir: &str, urls: &[&str]) -> bool {
 ///
 /// Only if system runs out of memory.
 async fn fetch(url: &str, path: &Path) -> Result<(), Box<dyn Error + Send + Sync>> {
-    // Skip cached
+    // Cached
     if file_exists(path) {
         println!("{}: Cached: {}", icons::BENCHMARK, path.display());
         return Ok(());

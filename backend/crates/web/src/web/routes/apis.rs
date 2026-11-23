@@ -48,7 +48,7 @@ use crate::web::{
     routes::pages::ClientIp,
 };
 use prieco_core::{
-    CACHE_VERSION_FILE, CLIENT, PROXY_CLIENT, STATIC_DIR, colors,
+    CACHE_VERSION_FILE, CLIENT, PRIECO_INDEX, PROXY_CLIENT, STATIC_DIR, colors,
     globals::{ANALYTICS, EmbeddingService, UserAgent},
     local_redirect,
 };
@@ -152,6 +152,7 @@ pub async fn api(
         active_goggles,
         false,
         decentralized,
+        PRIECO_INDEX.clone(),
     )
     .await;
 

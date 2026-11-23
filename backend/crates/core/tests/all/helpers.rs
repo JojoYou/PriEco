@@ -1,7 +1,5 @@
 //! Tests for crates/core/src/helpers.rs
 
-mod common;
-
 use std::{
     fs,
     path::PathBuf,
@@ -13,7 +11,7 @@ use std::{
     time::Duration,
 };
 
-use common::{TmpDir, run_with_timeout, unique};
+use crate::common::{TmpDir, run_with_timeout, unique};
 use prieco_core::{
     acquire_file_lock, file_exists, get_dir_size, local_redirect, normalize_url, read_file,
     release_file_lock, url_to_domain_id, url_to_id, write_file,

@@ -1,10 +1,8 @@
 //! Tests for the mmapped PageRank reader (prieco_core::PageRank)
 
-mod common;
-
 use std::fs;
 
-use common::TmpDir;
+use crate::common::TmpDir;
 use prieco_core::{PageRank, normalize_url, url_to_id};
 
 fn write_id_map(path: &str, pairs: &[(u64, u64)]) {

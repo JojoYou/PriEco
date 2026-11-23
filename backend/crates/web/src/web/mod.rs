@@ -10,6 +10,7 @@ pub mod modules {
 }
 
 pub mod functions {
+    pub mod benchmark;
     pub mod decentralized;
     pub mod general;
     pub mod search_db;

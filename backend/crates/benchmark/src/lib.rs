@@ -1,6 +1,3 @@
-pub mod benchmark;
-pub use benchmark::run;
+pub mod constants;
 pub mod download;
-pub mod msmarco {
-    pub mod msmarco;
-}
+pub mod msmarco;

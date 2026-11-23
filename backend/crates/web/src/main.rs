@@ -17,7 +17,10 @@
 */
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
-use tokio::runtime::Runtime;
+use tokio::{
+    runtime::Runtime,
+    signal::unix::{SignalKind, signal},
+};
 #[cfg(not(target_env = "msvc"))]
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
@@ -65,6 +68,7 @@ pub mod web;
 use crate::web::{
     functions::{
         api::manage::{flush, flush_loop},
+        benchmark,
         decentralized::{
             IROH_ENDPOINT, PROFILE_CACHE, SearchProtocol, Ticket, build_node_profile,
             get_iroh_secret, gossip_sync,
@@ -318,6 +322,27 @@ async fn main() -> Result<(), rocket::Error> {
             tokenizer: Arc::new(tokio::sync::Mutex::new(create_tokenizer())),
             model: Arc::new(tokio::sync::Mutex::new(create_embeder())),
         };
+
+        // sends SIGUSR1 to Benchmark on "make benchmark"
+        let benchmark_embedding = embedding_service.clone();
+        tokio::spawn(async move {
+            let mut benchmark_signal = match signal(SignalKind::user_defined1()) {
+                Ok(s) => s,
+                Err(e) => {
+                    println!(
+                        "{}Benchmark: Failed to listen for SIGUSR1: {}{}",
+                        colors::RED,
+                        e,
+                        colors::RESET
+                    );
+                    return;
+                }
+            };
+
+            while benchmark_signal.recv().await.is_some() {
+                benchmark::run(&benchmark_embedding).await;
+            }
+        });
 
         let rocket_web = rocket::build()
             .configure(

@@ -11,7 +11,10 @@ publish.workspace = true
 
 [dependencies]
 prieco_core = { workspace = true }
+prieco_insert = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 zip = { workspace = true }
+flate2 = { workspace = true }
+parking_lot = { workspace = true }
 tokio = { workspace = true }

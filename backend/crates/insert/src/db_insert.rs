@@ -14,7 +14,9 @@ use std::{
 /*
   Import external libraries
 */
+use parking_lot::Mutex;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use tantivy::IndexWriter;
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 use zstd::stream::Encoder as ZstdEncoder;
 
@@ -22,9 +24,9 @@ use zstd::stream::Encoder as ZstdEncoder;
   Import own libraries
 */
 use prieco_core::{
-    ID_SIZE, INSERTER_IMPORT_DIR, META_DICTIONARY, PRIECO_CONFIG, PRIECO_META, RECORD_SIZE,
-    SKIP_MERGE_FILE, TANTIVY_INDEX, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_DIM, WebDocument,
-    file_exists, get_dir_size, globals::icons, url_to_domain_id, url_to_id,
+    ID_SIZE, INSERTER_IMPORT_DIR, META_DICTIONARY, PRIECO_INDEX, PriecoIndex, RECORD_SIZE,
+    SKIP_MERGE_FILE, TANTIVY_WRITER, VECTOR_CENTROPOIDS, VECTOR_DIM, WebDocument, file_exists,
+    get_dir_size, globals::icons, url_to_domain_id, url_to_id,
 };
 
 /*
@@ -70,10 +72,14 @@ impl Write for AtomicFile {
 }
 
 pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
-    run_in(INSERTER_IMPORT_DIR)
+    run_in(INSERTER_IMPORT_DIR, &PRIECO_INDEX, &TANTIVY_WRITER)
 }
 
-pub fn run_in(import_dir: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+pub fn run_in(
+    import_dir: &str,
+    index: &PriecoIndex,
+    writer: &Mutex<IndexWriter>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     create_dir_all(import_dir)?;
 
     // Get files
@@ -104,7 +110,7 @@ pub fn run_in(import_dir: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
 
         let tantivy_size = get_dir_size("/app/data/tantivy");
         let meta_size = get_dir_size("/app/data/meta");
-        let vector_size = get_dir_size(&PRIECO_CONFIG.vector_path);
+        let vector_size = get_dir_size(&index.vector_path);
         let total_size = tantivy_size + meta_size + vector_size;
 
         if total_size >= max_storage_bytes {
@@ -123,7 +129,7 @@ pub fn run_in(import_dir: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
         }
     }
 
-    let schema = TANTIVY_INDEX.schema();
+    let schema = index.tantivy.schema();
     let doc_id_field = schema.get_field("doc_id").unwrap();
     let domain_id_field = schema.get_field("domain_id").unwrap();
     let title_field = schema.get_field("title").unwrap();
@@ -170,7 +176,7 @@ pub fn run_in(import_dir: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
                 let id = url_to_id(&url);
 
                 // Preserve uniqness
-                if PRIECO_META.meta_ks.get(id.to_be_bytes()).unwrap().is_some() {
+                if index.meta_ks.get(id.to_be_bytes()).unwrap().is_some() {
                     continue;
                 }
 
@@ -223,12 +229,10 @@ pub fn run_in(import_dir: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
                 /* FJALL */
                 let doc_bytes = serde_json::to_vec(&doc)?;
                 let compressed_doc = compressor.compress(&doc_bytes)?;
-                PRIECO_META
-                    .meta_ks
-                    .insert(id.to_be_bytes(), &compressed_doc)?;
+                index.meta_ks.insert(id.to_be_bytes(), &compressed_doc)?;
 
                 /* Tantivy */
-                TANTIVY_WRITER.lock().add_document(tantivy::doc!(
+                writer.lock().add_document(tantivy::doc!(
                     doc_id_field => id,
                     domain_id_field => url_to_domain_id(&url),
                     title_field => doc.title.clone(),
@@ -248,7 +252,8 @@ pub fn run_in(import_dir: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
 
                 inserted += 1;
                 if inserted % 1_000 == 0 {
-                    let segment_count = TANTIVY_INDEX
+                    let segment_count = index
+                        .tantivy
                         .searchable_segment_ids()
                         .map(|segments| segments.len())
                         .unwrap_or(0);
@@ -268,16 +273,16 @@ pub fn run_in(import_dir: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
                         vector_idx_buffer.len()
                     );
 
-                    vector_process(&mut vector_idx_buffer)?;
+                    vector_process(&mut vector_idx_buffer, &index.vector_path)?;
                     println!("{}: Vector idx commited", icons::DB_INSERT);
                 }
             }
 
-            vector_process(&mut vector_idx_buffer)?;
+            vector_process(&mut vector_idx_buffer, &index.vector_path)?;
             println!("{}: Vector idx commited", icons::DB_INSERT);
         }
 
-        TANTIVY_WRITER.lock().commit()?;
+        writer.lock().commit()?;
 
         drop(archive);
         remove_file(file_name)?;
@@ -285,10 +290,10 @@ pub fn run_in(import_dir: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
     }
 
     if !file_exists(SKIP_MERGE_FILE) {
-        merge_tantivy();
+        merge_tantivy(index, writer);
 
         println!("Compacting Meta...");
-        PRIECO_META
+        index
             .meta_ks
             .major_compact()
             .expect("Failed to run major compaction");
@@ -298,7 +303,7 @@ pub fn run_in(import_dir: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
             icons::DB_INSERT
         );
 
-        let staging_files: Vec<usize> = read_dir(&PRIECO_CONFIG.vector_path)
+        let staging_files: Vec<usize> = read_dir(&index.vector_path)
             .unwrap()
             .filter_map(|e| e.ok())
             .filter_map(|e| {
@@ -318,7 +323,7 @@ pub fn run_in(import_dir: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
             .build()?;
         merge_pool.install(|| {
             staging_files.par_iter().for_each(|bucket_id| {
-                if let Err(e) = merge_bucket(*bucket_id) {
+                if let Err(e) = merge_bucket(*bucket_id, &index.vector_path) {
                     println!("Failed to merge bucket {}! {}", bucket_id, e);
                 } else {
                     let current = merged_count.fetch_add(1, Ordering::Relaxed) + 1;
@@ -344,6 +349,7 @@ pub fn run_in(import_dir: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
 
 pub fn vector_process(
     chunk_buffer: &mut HashMap<u64, Vec<f32>>,
+    vector_path: &str,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let entries: Vec<(u64, Vec<f32>)> = chunk_buffer.drain().collect();
     let mut bucket_data: HashMap<usize, Vec<(u64, Vec<f32>)>> = HashMap::new();
@@ -378,7 +384,7 @@ pub fn vector_process(
         bucket_data.len()
     );
     for (bucket_id, items) in bucket_data.iter() {
-        append_to_bucket(*bucket_id, items)
+        append_to_bucket(*bucket_id, items, vector_path)
             .map_err(|e| format!("Failed on bucket {}: {}", bucket_id, e))?;
     }
 
@@ -388,8 +394,9 @@ pub fn vector_process(
 fn append_to_bucket(
     bucket_id: usize,
     items: &[(u64, Vec<f32>)],
+    vector_path: &str,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let staging_path = format!("{}/staging_{:06}.bin", PRIECO_CONFIG.vector_path, bucket_id);
+    let staging_path = format!("{}/staging_{:06}.bin", vector_path, bucket_id);
     let file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -410,14 +417,15 @@ fn append_to_bucket(
 }
 
 /* Merge functions */
-pub fn merge_tantivy() {
-    let mut writer = TANTIVY_WRITER.lock();
+pub fn merge_tantivy(index: &PriecoIndex, writer: &Mutex<IndexWriter>) {
+    let mut writer = writer.lock();
 
     println!("Tantivy Merge: Commiting...");
     writer.commit().expect("Failed to commit pending documents");
 
     println!("Tantivy Merge: Fetching segments...");
-    let segment_ids = TANTIVY_INDEX
+    let segment_ids = index
+        .tantivy
         .searchable_segment_ids()
         .expect("Failed to get searchable segment IDs");
 
@@ -431,12 +439,12 @@ pub fn merge_tantivy() {
     }
 }
 
-pub fn merge_bucket(bucket_id: usize) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let staging_path = format!("{}/staging_{:06}.bin", PRIECO_CONFIG.vector_path, bucket_id);
-    let zst_path = format!(
-        "{}/bucket_{:06}.bin.zst",
-        PRIECO_CONFIG.vector_path, bucket_id
-    );
+pub fn merge_bucket(
+    bucket_id: usize,
+    vector_path: &str,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let staging_path = format!("{}/staging_{:06}.bin", vector_path, bucket_id);
+    let zst_path = format!("{}/bucket_{:06}.bin.zst", vector_path, bucket_id);
 
     if !Path::new(&staging_path).exists() {
         return Ok(());

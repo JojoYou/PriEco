@@ -4,8 +4,6 @@
 //! ANALYTICS / PRIECO_META storages are created in a throw away directory.
 //! Every test uses its own counter names / stages / days so tests can run in parallel.
 
-mod common;
-
 use std::{
     collections::BTreeMap,
     fs,
@@ -14,7 +12,7 @@ use std::{
     time::Duration as StdDuration,
 };
 
-use common::{sandbox, unique};
+use crate::common::{sandbox, unique};
 use prieco_core::{ANALYTICS, PRIECO_META, Stage, lat_bucket_ms};
 use time::{Date, Duration, OffsetDateTime};
 

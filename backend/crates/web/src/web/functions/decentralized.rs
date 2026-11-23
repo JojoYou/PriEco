@@ -24,8 +24,8 @@ use n0_future::StreamExt;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use prieco_core::{
-    ANALYTICS, IROH_SECRET_FILE, PRIECO_CONFIG, Stage, TANTIVY_INDEX, TANTIVY_READER, WebDocument,
-    file_exists, url_to_id, write_file,
+    ANALYTICS, IROH_SECRET_FILE, PRIECO_CONFIG, PRIECO_INDEX, Stage, TANTIVY_INDEX, TANTIVY_READER,
+    WebDocument, file_exists, url_to_id, write_file,
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -394,6 +394,7 @@ impl ProtocolHandler for SearchProtocol {
                     embed,
                     false,
                     Vec::new(),
+                    PRIECO_INDEX.clone(),
                 )
                 .await;
 

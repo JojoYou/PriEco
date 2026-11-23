@@ -58,10 +58,9 @@ use crate::web::functions::{
     ranking::{self, goggles::GoggleRules, rrf::RRFParams},
 };
 use prieco_core::{
-    ANALYTICS, META_DECODER, PRIECO_META, QueryIntent, Stage, TANTIVY_QUERY_PARSER,
+    ANALYTICS, META_DECODER, PRIECO_INDEX, PriecoIndex, QueryIntent, Stage,
     globals::{
-        EmbeddingService, PAGERANK, RERANKER, SearchResult, TANTIVY_INDEX, TANTIVY_READER,
-        VECTOR_CENTROPOIDS, WebDocument, colors,
+        EmbeddingService, PAGERANK, RERANKER, SearchResult, VECTOR_CENTROPOIDS, WebDocument, colors,
     },
     url_to_domain_id, url_to_id,
 };
@@ -124,6 +123,7 @@ pub async fn run(params: SearchDBParams<'_>) {
         params.goggles,
         params.mobile,
         params.decentralize,
+        PRIECO_INDEX.clone(),
     )
     .await;
 
@@ -289,6 +289,11 @@ pub async fn run(params: SearchDBParams<'_>) {
 /// * `embedding_manager` - Query embedder.
 /// * `goggles` - Filters.
 /// * `mobile` - Is user using mobile.
+/// * `decentralize` - Ask peers too.
+/// * `index` - Index to search, [PRIECO_INDEX] or a benchmark index.
+///
+/// Any other index than [PRIECO_INDEX] skips [QUERY_CACHE], peers and discovery,
+/// so benchmark results never reach users, peers or the official index.
 ///
 /// # Returns
 ///
@@ -297,19 +302,26 @@ pub async fn run(params: SearchDBParams<'_>) {
 /// # Panics
 ///
 /// Only if system runs out of memory.
+#[allow(clippy::too_many_arguments)]
 pub async fn run_json(
     query: &str,
     lang: &str,
     loc: &str,
-    embedding_manager: &State<EmbeddingService>,
+    embedding_manager: &EmbeddingService,
     goggles: Vec<Arc<GoggleRules>>,
     mobile: bool,
     decentralize: bool,
+    index: Arc<PriecoIndex>,
 ) -> Vec<Json_Value> {
+    let official_index = Arc::ptr_eq(&index, &PRIECO_INDEX);
+    let decentralize = decentralize && official_index;
+
     let cache_key = format!("{}_{}_{}", query, lang, loc);
-    let cached_data = {
+    let cached_data = if official_index {
         let cache = QUERY_CACHE.read();
         cache.get(&cache_key).cloned()
+    } else {
+        None
     };
 
     let mut fts_query = normalize_search_operators(query);
@@ -341,9 +353,18 @@ pub async fn run_json(
         let emb_clone = embed.clone();
         let g_clone = goggles.clone();
 
+        let index_clone = index.clone();
+
         let local_task = tokio::spawn(async move {
             run_core_search(
-                &q_clone, &l_clone, &loc_clone, &int_clone, emb_clone, true, g_clone,
+                &q_clone,
+                &l_clone,
+                &loc_clone,
+                &int_clone,
+                emb_clone,
+                official_index,
+                g_clone,
+                index_clone,
             )
             .await
         });
@@ -485,7 +506,7 @@ pub async fn run_json(
             !blocked_terms.iter().any(|term| haystack.contains(term))
         });
 
-        {
+        if official_index {
             let mut cache = QUERY_CACHE.write();
             if cache.len() > 5_000 {
                 cache.clear();
@@ -576,6 +597,7 @@ pub async fn run_json(
         .filter_map(|s| serde_json::to_value(s).ok())
         .collect()
 }
+#[allow(clippy::too_many_arguments)]
 pub async fn run_core_search(
     query: &str,
     lang: &str,
@@ -584,6 +606,7 @@ pub async fn run_core_search(
     embed: Vec<f32>,
     run_discovery: bool,
     goggles: Vec<Arc<GoggleRules>>,
+    index: Arc<PriecoIndex>,
 ) -> (
     Vec<WebDocument>,
     Vec<WebDocument>,
@@ -646,6 +669,7 @@ pub async fn run_core_search(
 
     let intent_clone = *intent;
     let goggles_clone = goggles.clone();
+    let index_clone = index.clone();
     let tantivy_task = tokio::task::spawn_blocking(move || {
         let start = std::time::Instant::now();
         if (matches!(lang_clone.as_str(), "zh" | "ja" | "ko" | "th")
@@ -656,6 +680,7 @@ pub async fn run_core_search(
         }
 
         let res = search_tantivy(
+            &index_clone,
             &fts_query,
             &lang_clone,
             &loc_clone,
@@ -668,13 +693,14 @@ pub async fn run_core_search(
         println!(
             "Tantivy took {:.3}s with {} segments",
             start.elapsed().as_secs_f32(),
-            TANTIVY_READER.searcher().segment_readers().len()
+            index_clone.reader.searcher().segment_readers().len()
         );
         ANALYTICS.record_latency(Stage::Fts, start.elapsed());
 
         res
     });
 
+    let vector_index = index.clone();
     let vector_task = tokio::task::spawn_blocking(move || {
         let start = std::time::Instant::now();
         if q_clone3.contains('"')
@@ -686,7 +712,7 @@ pub async fn run_core_search(
             return Vec::new();
         }
         let res: Vec<(u64, f32)> = VECTOR_CENTROPOIDS
-            .search(&embed, 0, NPROBS)
+            .search(&embed, 0, NPROBS, &vector_index.vector_path)
             .unwrap_or_default();
 
         let final_res: Vec<(u64, f32)> = res.into_iter().take(MAX_IVF).collect();
@@ -718,7 +744,7 @@ pub async fn run_core_search(
     engines_map.insert("DIR", dir_ids.unwrap_or_default());
 
     let fetch_start = std::time::Instant::now();
-    let mut fetched_results = fetch_documents(engines_map);
+    let mut fetched_results = fetch_documents(&index, engines_map);
     println!("Fetch took {:.3}s", fetch_start.elapsed().as_secs_f32());
     ANALYTICS.record_latency(Stage::Fetch, fetch_start.elapsed());
 
@@ -751,6 +777,7 @@ pub async fn run_core_search(
 ///
 /// # Arguments
 ///
+/// * `index` - Index to search.
 /// * `query_text` - Search query.
 /// * `lang` - Prefered language.
 /// * `loc` - Prefered location.
@@ -769,6 +796,7 @@ static SITE_EXTRACT_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)(site|domain):([^\s\(\)]+)").unwrap());
 
 fn search_tantivy(
+    index: &PriecoIndex,
     query_text: &str,
     _lang: &str,
     loc: &str,
@@ -776,7 +804,7 @@ fn search_tantivy(
     limit: usize,
     goggles: &[Arc<GoggleRules>],
 ) -> Option<Vec<(u64, f32)>> {
-    let schema = TANTIVY_INDEX.schema();
+    let schema = index.tantivy.schema();
     let doc_id = schema.get_field("doc_id").ok()?;
     let domain_id_field = schema.get_field("domain_id").ok()?;
     let _lang_field = schema.get_field("lang").ok()?;
@@ -808,7 +836,7 @@ fn search_tantivy(
         .replace_all(&clean_query_text, "")
         .to_string();
 
-    let parsed_query = match TANTIVY_QUERY_PARSER.parse_query(&clean_query_text) {
+    let parsed_query = match index.query_parser.parse_query(&clean_query_text) {
         Ok(q) => q,
         Err(_) => {
             return None;
@@ -855,7 +883,7 @@ fn search_tantivy(
         Box::new(BooleanQuery::new(clauses))
     };
 
-    let searcher = TANTIVY_READER.searcher();
+    let searcher = index.reader.searcher();
     let top_docs = searcher
         .search(&final_query, &TopDocs::with_limit(limit).order_by_score())
         .ok()?;
@@ -899,6 +927,7 @@ fn search_tantivy(
 ///
 /// # Arguments
 ///
+/// * `index` - Index whose meta storage is read.
 /// * `engines` - Hashmap of index names and result IDs + scores they returned.
 ///
 /// # Returns
@@ -909,6 +938,7 @@ fn search_tantivy(
 ///
 /// Only if system runs out of memory.
 fn fetch_documents(
+    index: &PriecoIndex,
     engines: HashMap<&'static str, Vec<(u64, f32)>>,
 ) -> HashMap<&'static str, Vec<WebDocument>> {
     let mut unique_ids = HashSet::new();
@@ -939,7 +969,7 @@ fn fetch_documents(
                     let key = id.to_be_bytes();
 
                     // Get data
-                    let compressed_data = match PRIECO_META.meta_ks.get(key) {
+                    let compressed_data = match index.meta_ks.get(key) {
                         Ok(Some(data)) => data,
                         _ => {
                             continue;

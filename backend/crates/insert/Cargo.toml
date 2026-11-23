@@ -9,6 +9,10 @@ homepage.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[lib]
+test = false
+doctest = false
+
 [dependencies]
 prieco_core = { workspace = true }
 
@@ -28,6 +32,7 @@ memmap2 = { workspace = true }
 dashmap = { workspace = true }
 once_cell = { workspace = true }
 libc = { workspace = true }
+parking_lot = { workspace = true }
 
 [features]
 default = []

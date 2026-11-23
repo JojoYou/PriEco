@@ -543,7 +543,7 @@ mod no_cuda {
     #[test]
     fn centroid_index_without_cuda_search_is_error() {
         let idx = CentroidIndex::new(&[]).unwrap();
-        let err = idx.search(&[0.0; 384], 4, 10).unwrap_err();
+        let err = idx.search(&[0.0; 384], 4, 10, "").unwrap_err();
         assert!(err.to_string().contains("CUDA"));
     }
 

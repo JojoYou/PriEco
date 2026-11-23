@@ -9,12 +9,18 @@ homepage.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[[bin]]
+name = "prieco_web"
+path = "src/main.rs"
+test = false
+
 [dependencies]
 prieco_core = { workspace = true }
 prieco_blob = { workspace = true }
 prieco_pagerank = { workspace = true }
 prieco_insert = { workspace = true }
 prieco_mini_crawler = { workspace = true }
+prieco_benchmark = { workspace = true }
 
 rocket = { workspace = true }
 rocket_dyn_templates = { workspace = true }

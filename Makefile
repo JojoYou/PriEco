@@ -65,8 +65,17 @@ run: release docs ## Start PriEco
 ###
 # Benchmark
 ###
-benchmark: ## Download datasets and run all benchmarks
-	cargo run --release -p prieco_benchmark
+benchmark: ## The running PriEco to run all benchmarks
+	@set -e; \
+	bin=target/release/prieco_web; \
+	systemctl is-active --quiet prieco || { echo "✗ prieco is not running, start it with: make restart"; exit 1; }; \
+	grep -qa "Failed to listen for SIGUSR1" $$bin || { echo "✗ $$bin has no benchmark listener, run: make restart"; exit 1; }; \
+	started=$$(date -d "$$(systemctl show -p ExecMainStartTimestamp --value prieco)" +%s); \
+	if [ $$(stat -c %Y $$bin) -gt $$started ]; then \
+	  echo "✗ prieco runs an older build than $$bin, run: make restart"; exit 1; \
+	fi; \
+	systemctl kill --signal=SIGUSR1 --kill-whom=main prieco; \
+	echo "📏 Benchmark started, follow it with: make logs"
 
 ###
 # Server (systemd service "prieco")

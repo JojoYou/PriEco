@@ -19,7 +19,7 @@ use std::{
     cmp::Reverse,
     collections::{BTreeMap, HashMap},
     error::Error,
-    fs::{File, write},
+    fs::{File, create_dir_all, write},
     hash::{Hash, Hasher},
     ops::Range,
     path::Path,
@@ -550,16 +550,8 @@ pub struct PriecoBlobStorage {
 }
 
 pub static PRIECO_META: Lazy<Arc<PriecoMetaStorage>> = Lazy::new(|| {
-    let meta_db = FJALL_DATABASE::builder(Path::new(&PRIECO_CONFIG.meta_path))
-        .worker_threads(4)
-        .cache_size(2 * 1024 * 1024 * 1024)
-        .open()
-        .expect("Failed to open Meta Fjall DB");
-
-    let meta_opts = KeyspaceCreateOptions::default()
-        .data_block_compression_policy(CompressionPolicy::disabled())
-        .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
-    let meta_ks = meta_db.keyspace("meta", || meta_opts.clone()).unwrap();
+    let meta_db = load_meta_db(&PRIECO_CONFIG.meta_path);
+    let meta_ks = load_meta_ks(&meta_db);
 
     let goggles_opts = KeyspaceCreateOptions::default()
         .data_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4))
@@ -595,6 +587,54 @@ pub static PRIECO_META: Lazy<Arc<PriecoMetaStorage>> = Lazy::new(|| {
     })
 });
 
+/// Opens or creates the Fjall database that holds result meta data.
+///
+/// Shared by [PRIECO_META] and [PriecoIndex::open].
+///
+/// # Arguments
+///
+/// * `path` - Directory of the database.
+///
+/// # Returns
+///
+/// Opened database.
+///
+/// # Panics
+///
+/// If the database can't be opened. Start-up only.
+fn load_meta_db(path: &str) -> FJALL_DATABASE {
+    FJALL_DATABASE::builder(Path::new(path))
+        .worker_threads(4)
+        .cache_size(2 * 1024 * 1024 * 1024)
+        .open()
+        .expect("Failed to open Meta Fjall DB")
+}
+
+/// Opens or creates the `meta` keyspace with one [WebDocument] per id.
+///
+/// Data blocks aren't compressed, documents are already zstd compressed.
+///
+/// # Arguments
+///
+/// * `meta_db` - Database from [load_meta_db].
+///
+/// # Returns
+///
+/// The `meta` keyspace.
+///
+/// # Panics
+///
+/// If the keyspace can't be opened. Start-up only.
+fn load_meta_ks(meta_db: &FJALL_DATABASE) -> Keyspace {
+    let meta_opts = KeyspaceCreateOptions::default()
+        .data_block_compression_policy(CompressionPolicy::disabled())
+        .index_block_compression_policy(CompressionPolicy::all(CompressionType::Lz4));
+
+    meta_db
+        .keyspace("meta", || meta_opts)
+        .expect("Failed to open Meta keyspace")
+}
+
 pub static PRIECO_BLOBS: Lazy<Arc<PriecoBlobStorage>> = Lazy::new(|| {
     let blob_db = FJALL_DATABASE::builder(Path::new(&PRIECO_CONFIG.blob_path))
         .worker_threads(2)
@@ -624,7 +664,25 @@ pub static PRIECO_BLOBS: Lazy<Arc<PriecoBlobStorage>> = Lazy::new(|| {
 */
 pub const TANTIVY_HEAP_SIZE: usize = 512_000_000;
 pub const TANTIVY_WRITER_THREADS: usize = 2;
-pub static TANTIVY_INDEX: Lazy<Arc<Index>> = Lazy::new(|| {
+pub static TANTIVY_INDEX: Lazy<Arc<Index>> =
+    Lazy::new(|| Arc::new(load_tantivy(&PRIECO_CONFIG.tantivy_path)));
+
+/// Opens or creates a Tantivy index with the PriEco schema.
+///
+/// Shared by [TANTIVY_INDEX] and [PriecoIndex::open], so every index has the same schema.
+///
+/// # Arguments
+///
+/// * `path` - Directory of the index. Must exist.
+///
+/// # Returns
+///
+/// Index with the multilingual tokenizer registered.
+///
+/// # Panics
+///
+/// If the directory can't be opened or the index is corrupted. Start-up only.
+fn load_tantivy(path: &str) -> Index {
     // Build schema
     let mut builder = Schema::builder();
 
@@ -651,8 +709,7 @@ pub static TANTIVY_INDEX: Lazy<Arc<Index>> = Lazy::new(|| {
     let schema = builder.build();
 
     // Open index
-    let dir = MmapDirectory::open(Path::new(&PRIECO_CONFIG.tantivy_path))
-        .expect("Failed to open Tantivy V2 directory");
+    let dir = MmapDirectory::open(Path::new(path)).expect("Failed to open Tantivy V2 directory");
     let mut index =
         Index::open_or_create(dir, schema.clone()).expect("Failed to open Tantivy index");
     index
@@ -663,18 +720,32 @@ pub static TANTIVY_INDEX: Lazy<Arc<Index>> = Lazy::new(|| {
         .tokenizers()
         .register("multilingual", TextAnalyzer::from(Multilingual::new()));
 
-    Arc::new(index)
-});
+    index
+}
 
-pub static TANTIVY_READER: Lazy<Arc<IndexReader>> = Lazy::new(|| {
-    Arc::new(
-        TANTIVY_INDEX
-            .reader_builder()
-            .reload_policy(ReloadPolicy::OnCommitWithDelay)
-            .try_into()
-            .expect("Failed to create Tantivy reader"),
-    )
-});
+pub static TANTIVY_READER: Lazy<Arc<IndexReader>> =
+    Lazy::new(|| Arc::new(load_tantivy_reader(&TANTIVY_INDEX)));
+
+/// Creates a reader that reloads shortly after every commit.
+///
+/// # Arguments
+///
+/// * `index` - Index to read.
+///
+/// # Returns
+///
+/// Reader of the index.
+///
+/// # Panics
+///
+/// If Tantivy can't create the reader. Start-up only.
+fn load_tantivy_reader(index: &Index) -> IndexReader {
+    index
+        .reader_builder()
+        .reload_policy(ReloadPolicy::OnCommitWithDelay)
+        .try_into()
+        .expect("Failed to create Tantivy reader")
+}
 
 pub static TANTIVY_WRITER: Lazy<Arc<Mutex<IndexWriter>>> = Lazy::new(|| {
     Arc::new(Mutex::new(
@@ -684,15 +755,33 @@ pub static TANTIVY_WRITER: Lazy<Arc<Mutex<IndexWriter>>> = Lazy::new(|| {
     ))
 });
 
-pub static TANTIVY_QUERY_PARSER: Lazy<QueryParser> = Lazy::new(|| {
-    let schema = TANTIVY_INDEX.schema();
+pub static TANTIVY_QUERY_PARSER: Lazy<QueryParser> =
+    Lazy::new(|| load_query_parser(&TANTIVY_INDEX));
+
+/// Creates the query parser over title, description, content and keywords.
+///
+/// All terms must match by default.
+///
+/// # Arguments
+///
+/// * `index` - Index the parser is for.
+///
+/// # Returns
+///
+/// Query parser of the index.
+///
+/// # Panics
+///
+/// If the index has no PriEco schema. Start-up only.
+fn load_query_parser(index: &Index) -> QueryParser {
+    let schema = index.schema();
     let title_field = schema.get_field("title").unwrap();
     let description_field = schema.get_field("description").unwrap();
     let content_field = schema.get_field("content").unwrap();
     let keywords_field = schema.get_field("keywords").unwrap();
 
     let mut parser = QueryParser::for_index(
-        &TANTIVY_INDEX,
+        index,
         vec![
             title_field,
             description_field,
@@ -704,6 +793,80 @@ pub static TANTIVY_QUERY_PARSER: Lazy<QueryParser> = Lazy::new(|| {
     parser.set_conjunction_by_default();
 
     parser
+}
+
+/// One searchable index: Tantivy, result meta data and vector buckets.
+///
+/// Search and the inserter take it as an argument, so they can run
+/// on the official index ([PRIECO_INDEX]) or on a benchmark index.
+pub struct PriecoIndex {
+    pub tantivy: Arc<Index>,
+    pub reader: Arc<IndexReader>,
+    pub query_parser: QueryParser,
+
+    pub meta_db: FJALL_DATABASE,
+    pub meta_ks: Keyspace,
+
+    pub vector_path: String,
+}
+impl PriecoIndex {
+    /// Opens or creates an index in its own directory.
+    ///
+    /// Uses `dir/tantivy`, `dir/meta` and `dir/vectors`, with the same
+    /// schema and settings as the official index.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir` - Directory of the index, created when missing.
+    ///
+    /// # Returns
+    ///
+    /// Opened index.
+    ///
+    /// # Panics
+    ///
+    /// If a directory or database can't be opened. Start-up only.
+    pub fn open(dir: &str) -> Self {
+        let tantivy_path = format!("{}/tantivy", dir);
+        let meta_path = format!("{}/meta", dir);
+        let vector_path = format!("{}/vectors", dir);
+
+        create_dir_all(&tantivy_path).expect("Failed to create Tantivy directory");
+        create_dir_all(&vector_path).expect("Failed to create vector directory");
+
+        // Tantivy
+        let tantivy = Arc::new(load_tantivy(&tantivy_path));
+        let reader = Arc::new(load_tantivy_reader(&tantivy));
+        let query_parser = load_query_parser(&tantivy);
+
+        // Meta
+        let meta_db = load_meta_db(&meta_path);
+        let meta_ks = load_meta_ks(&meta_db);
+
+        PriecoIndex {
+            tantivy,
+            reader,
+            query_parser,
+
+            meta_db,
+            meta_ks,
+
+            vector_path,
+        }
+    }
+}
+
+pub static PRIECO_INDEX: Lazy<Arc<PriecoIndex>> = Lazy::new(|| {
+    Arc::new(PriecoIndex {
+        tantivy: TANTIVY_INDEX.clone(),
+        reader: TANTIVY_READER.clone(),
+        query_parser: TANTIVY_QUERY_PARSER.clone(),
+
+        meta_db: PRIECO_META.meta_db.clone(),
+        meta_ks: PRIECO_META.meta_ks.clone(),
+
+        vector_path: PRIECO_CONFIG.vector_path.clone(),
+    })
 });
 
 // Multilang tokenization
@@ -984,6 +1147,7 @@ extern "C" __global__ void topk_argmax(
         query: &[f32],
         n: usize,
         t: usize,
+        vector_path: &str,
     ) -> Result<Vec<(u64, f32)>, Box<dyn std::error::Error>> {
         assert!(t <= 32, "t must be <=32");
         let dims = self.dims;
@@ -1063,7 +1227,7 @@ extern "C" __global__ void topk_argmax(
         let all: Vec<Vec<(u64, f32)>> = centroid_ids
             .par_iter()
             .filter_map(|&cid| {
-                let zst_path = format!("{}/bucket_{:06}.bin.zst", &PRIECO_CONFIG.vector_path, cid);
+                let zst_path = format!("{}/bucket_{:06}.bin.zst", vector_path, cid);
                 if !Path::new(&zst_path).exists() {
                     return None;
                 }
@@ -1141,6 +1305,7 @@ impl CentroidIndex {
         _: &[f32],
         _: usize,
         _: usize,
+        _: &str,
     ) -> Result<Vec<(u64, f32)>, Box<dyn std::error::Error>> {
         Err("CUDA feature not enabled".into())
     }

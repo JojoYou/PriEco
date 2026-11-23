@@ -36,10 +36,6 @@ pub const FINAL_SCORES: &str = "runtime/pagerank/pageranks.bin";
 
 pub const IMG_CACHE_DIR: &str = "runtime/cache/img/bing";
 
-// Benchmarks
-pub const MSMARCO_DOCUMENT_DIR: &str = "runtime/benchmarks/msmarco/document";
-pub const MSMARCO_PASSAGE_DIR: &str = "runtime/benchmarks/msmarco/passage";
-
 // Insterter
 pub const ID_SIZE: usize = 8;
 pub const VECTOR_DIM: usize = 384;

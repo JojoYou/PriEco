@@ -3,8 +3,6 @@
 //! Runs inside a temp sandbox: PRIECO_CONFIG.vector_path points to a throw away dir.
 //! Each test uses its own bucket ids.
 
-mod common;
-
 use std::{
     collections::HashMap,
     fs,
@@ -12,7 +10,7 @@ use std::{
     panic::{AssertUnwindSafe, catch_unwind},
 };
 
-use common::sandbox;
+use crate::common::sandbox;
 use prieco_core::{ID_SIZE, PRIECO_CONFIG, RECORD_SIZE, VECTOR_DIM};
 use prieco_insert::db_insert::{MAX_VECTORS_IN_RAM, merge_bucket, vector_process};
 
@@ -81,7 +79,7 @@ fn constants() {
 #[test]
 fn merge_without_staging_is_a_no_op() {
     sandbox();
-    merge_bucket(1).unwrap();
+    merge_bucket(1, &PRIECO_CONFIG.vector_path).unwrap();
     assert!(!std::path::Path::new(&bucket_path(1)).exists());
 }
 
@@ -89,7 +87,7 @@ fn merge_without_staging_is_a_no_op() {
 fn merge_without_staging_keeps_existing_bucket() {
     sandbox();
     write_bucket(2, &[record(10, 1.0)]);
-    merge_bucket(2).unwrap();
+    merge_bucket(2, &PRIECO_CONFIG.vector_path).unwrap();
     assert_eq!(read_bucket(2), vec![(10, 1.0)]);
 }
 
@@ -97,7 +95,7 @@ fn merge_without_staging_keeps_existing_bucket() {
 fn merge_creates_bucket_from_staging() {
     sandbox();
     write_staging(3, &[record(1, 1.0), record(2, 2.0), record(3, 3.0)]);
-    merge_bucket(3).unwrap();
+    merge_bucket(3, &PRIECO_CONFIG.vector_path).unwrap();
     assert_eq!(read_bucket(3), vec![(1, 1.0), (2, 2.0), (3, 3.0)]);
     assert!(
         !std::path::Path::new(&staging_path(3)).exists(),
@@ -111,7 +109,7 @@ fn merge_preserves_full_vectors_bit_exact() {
     sandbox();
     let rec = record(77, -12.5);
     write_staging(4, std::slice::from_ref(&rec));
-    merge_bucket(4).unwrap();
+    merge_bucket(4, &PRIECO_CONFIG.vector_path).unwrap();
     let mut dec = zstd::stream::Decoder::new(fs::File::open(bucket_path(4)).unwrap()).unwrap();
     let mut raw = Vec::new();
     dec.read_to_end(&mut raw).unwrap();
@@ -122,7 +120,7 @@ fn merge_preserves_full_vectors_bit_exact() {
 fn merge_duplicate_ids_in_staging_keep_last_write() {
     sandbox();
     write_staging(5, &[record(1, 1.0), record(2, 2.0), record(1, 9.0)]);
-    merge_bucket(5).unwrap();
+    merge_bucket(5, &PRIECO_CONFIG.vector_path).unwrap();
     assert_eq!(read_bucket(5), vec![(2, 2.0), (1, 9.0)]);
 }
 
@@ -131,7 +129,7 @@ fn merge_staging_replaces_old_bucket_entries() {
     sandbox();
     write_bucket(6, &[record(1, 1.0), record(3, 3.0)]);
     write_staging(6, &[record(1, 100.0), record(4, 4.0)]);
-    merge_bucket(6).unwrap();
+    merge_bucket(6, &PRIECO_CONFIG.vector_path).unwrap();
     assert_eq!(read_bucket(6), vec![(3, 3.0), (1, 100.0), (4, 4.0)]);
 }
 
@@ -141,7 +139,7 @@ fn merge_truncates_partial_trailing_record() {
     let mut data = [record(1, 1.0), record(2, 2.0)].concat();
     data.extend_from_slice(&[0xAB; 100]);
     fs::write(staging_path(7), data).unwrap();
-    merge_bucket(7).unwrap();
+    merge_bucket(7, &PRIECO_CONFIG.vector_path).unwrap();
     assert_eq!(read_bucket(7), vec![(1, 1.0), (2, 2.0)]);
 }
 
@@ -150,7 +148,7 @@ fn merge_staging_smaller_than_one_record() {
     sandbox();
     write_bucket(8, &[record(5, 5.0)]);
     fs::write(staging_path(8), [1u8; 10]).unwrap();
-    merge_bucket(8).unwrap();
+    merge_bucket(8, &PRIECO_CONFIG.vector_path).unwrap();
     assert_eq!(read_bucket(8), vec![(5, 5.0)]);
 }
 
@@ -159,7 +157,7 @@ fn merge_empty_staging_keeps_old_bucket() {
     sandbox();
     write_bucket(9, &[record(1, 1.0), record(2, 2.0)]);
     fs::write(staging_path(9), b"").unwrap();
-    merge_bucket(9).unwrap();
+    merge_bucket(9, &PRIECO_CONFIG.vector_path).unwrap();
     assert_eq!(read_bucket(9), vec![(1, 1.0), (2, 2.0)]);
     assert!(!std::path::Path::new(&staging_path(9)).exists());
 }
@@ -169,7 +167,7 @@ fn merge_corrupt_bucket_is_rebuilt_from_staging() {
     sandbox();
     fs::write(bucket_path(10), b"this is not zstd at all").unwrap();
     write_staging(10, &[record(1, 1.0)]);
-    merge_bucket(10).unwrap();
+    merge_bucket(10, &PRIECO_CONFIG.vector_path).unwrap();
     assert_eq!(read_bucket(10), vec![(1, 1.0)]);
 }
 
@@ -177,11 +175,11 @@ fn merge_corrupt_bucket_is_rebuilt_from_staging() {
 fn merge_twice_accumulates() {
     sandbox();
     write_staging(11, &[record(1, 1.0)]);
-    merge_bucket(11).unwrap();
+    merge_bucket(11, &PRIECO_CONFIG.vector_path).unwrap();
     write_staging(11, &[record(2, 2.0)]);
-    merge_bucket(11).unwrap();
+    merge_bucket(11, &PRIECO_CONFIG.vector_path).unwrap();
     write_staging(11, &[record(1, 3.0)]);
-    merge_bucket(11).unwrap();
+    merge_bucket(11, &PRIECO_CONFIG.vector_path).unwrap();
     assert_eq!(read_bucket(11), vec![(2, 2.0), (1, 3.0)]);
 }
 
@@ -190,9 +188,9 @@ fn merge_buckets_are_independent() {
     sandbox();
     write_staging(12, &[record(1, 1.0)]);
     write_staging(13, &[record(2, 2.0)]);
-    merge_bucket(12).unwrap();
+    merge_bucket(12, &PRIECO_CONFIG.vector_path).unwrap();
     assert!(std::path::Path::new(&staging_path(13)).exists());
-    merge_bucket(13).unwrap();
+    merge_bucket(13, &PRIECO_CONFIG.vector_path).unwrap();
     assert_eq!(read_bucket(12), vec![(1, 1.0)]);
     assert_eq!(read_bucket(13), vec![(2, 2.0)]);
 }
@@ -202,7 +200,7 @@ fn merge_large_bucket() {
     sandbox();
     let recs: Vec<Vec<u8>> = (0..2_000u64).map(|i| record(i, i as f32)).collect();
     write_staging(14, &recs);
-    merge_bucket(14).unwrap();
+    merge_bucket(14, &PRIECO_CONFIG.vector_path).unwrap();
     let got = read_bucket(14);
     assert_eq!(got.len(), 2_000);
     assert_eq!(got[1999], (1999, 1999.0));
@@ -213,7 +211,7 @@ fn bucket_ids_wider_than_six_digits() {
     sandbox();
     let id = 1_234_567;
     write_staging(id, &[record(1, 1.0)]);
-    merge_bucket(id).unwrap();
+    merge_bucket(id, &PRIECO_CONFIG.vector_path).unwrap();
     assert!(bucket_path(id).ends_with("bucket_1234567.bin.zst"));
     assert_eq!(read_bucket(id), vec![(1, 1.0)]);
 }
@@ -222,7 +220,7 @@ fn bucket_ids_wider_than_six_digits() {
 fn merge_extreme_ids() {
     sandbox();
     write_staging(15, &[record(0, 0.5), record(u64::MAX, 1.5)]);
-    merge_bucket(15).unwrap();
+    merge_bucket(15, &PRIECO_CONFIG.vector_path).unwrap();
     assert_eq!(read_bucket(15), vec![(0, 0.5), (u64::MAX, 1.5)]);
 }
 
@@ -232,7 +230,7 @@ fn merge_extreme_ids() {
 fn vector_process_empty_buffer_is_ok() {
     sandbox();
     let mut buf: HashMap<u64, Vec<f32>> = HashMap::new();
-    vector_process(&mut buf).unwrap();
+    vector_process(&mut buf, &PRIECO_CONFIG.vector_path).unwrap();
     assert!(buf.is_empty());
 }
 
@@ -245,6 +243,8 @@ fn vector_process_without_cuda_returns_error_instead_of_panicking() {
     sandbox();
     let mut buf: HashMap<u64, Vec<f32>> = HashMap::new();
     buf.insert(42, vec![0.1; VECTOR_DIM]);
-    let r = catch_unwind(AssertUnwindSafe(|| vector_process(&mut buf)));
+    let r = catch_unwind(AssertUnwindSafe(|| {
+        vector_process(&mut buf, &PRIECO_CONFIG.vector_path)
+    }));
     assert!(r.is_ok(), "vector_process panicked");
 }

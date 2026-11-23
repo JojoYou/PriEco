@@ -35,6 +35,7 @@ default-members = [
     "backend/crates/insert",
     "backend/crates/web",
     "backend/crates/crawler",
+    "backend/crates/benchmark",
 ]
 resolver = "3"
 
@@ -69,6 +70,14 @@ strip = false
 ###
 # Debug mode for tests needs this optimized
 ###
+[profile.dev]
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+incremental = true
+
+[profile.dev.package."*"]
+debug = false
+
 [profile.dev.package.aho-corasick]
 opt-level = 3
 
@@ -79,6 +88,7 @@ prieco_blob = { path = "backend/crates/blob" }
 prieco_pagerank = { path = "backend/crates/pagerank" }
 prieco_insert = { path = "backend/crates/insert" }
 prieco_mini_crawler = { path = "backend/crates/crawler" }
+prieco_benchmark = { path = "backend/crates/benchmark" }
 
 ###
 # System
@@ -115,6 +125,9 @@ memmap2 = "0.9.12" # Sequencial access
 zip = { version = "9.6.0", default-features = false, features = [
     "deflate-flate2-zlib-rs",
 ] } # Stream zip results files to index
+flate2 = { version = "1.1.11", default-features = false, features = [
+    "zlib-rs",
+] } # Stream .gz benchmark datasets
 
 ###
 # Database
