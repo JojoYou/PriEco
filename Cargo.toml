@@ -26,6 +26,7 @@ members = [
     "backend/crates/insert",
     "backend/crates/web",
     "backend/crates/crawler",
+    "backend/crates/benchmark",
 ]
 default-members = [
     "backend/crates/core",

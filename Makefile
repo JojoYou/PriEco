@@ -16,7 +16,7 @@ DOC_SRC := frontend/mkdocs.yml $(shell find frontend/docs backend/crates \
 GEOIP := backend/crates/crawler/src/data/GeoLite2-Country.mmdb
 GEOIP_MAX_DAYS := 30
 
-.PHONY: all help check check-release docs release run restart logs clean clean-docs clean-full geoip-check geoip-update
+.PHONY: all help check check-release docs release run benchmark restart logs clean clean-docs clean-full geoip-check geoip-update
 
 all: check docs release
 
@@ -61,6 +61,12 @@ run: release docs ## Start PriEco
 	  export LD_LIBRARY_PATH="$(ORT_LIBS)$(if $(CUDNN_LIBS),:$(CUDNN_LIBS))$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}"; \
 	fi; \
 	exec ./target/release/prieco_web
+
+###
+# Benchmark
+###
+benchmark: ## Download datasets and run all benchmarks
+	cargo run --release -p prieco_benchmark
 
 ###
 # Server (systemd service "prieco")

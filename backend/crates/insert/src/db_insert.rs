@@ -70,11 +70,15 @@ impl Write for AtomicFile {
 }
 
 pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
-    create_dir_all(INSERTER_IMPORT_DIR)?;
+    run_in(INSERTER_IMPORT_DIR)
+}
+
+pub fn run_in(import_dir: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+    create_dir_all(import_dir)?;
 
     // Get files
     let mut files = Vec::with_capacity(100);
-    for entry in read_dir(INSERTER_IMPORT_DIR)? {
+    for entry in read_dir(import_dir)? {
         let entry = entry?;
         if entry.file_type()?.is_file() {
             let path = entry.path();
