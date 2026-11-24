@@ -33,7 +33,7 @@ use crate::web::functions::{
     remote_api::{currency::get_fx_widget, img, news, video},
     search_db::{self, SearchDBParams},
 };
-use prieco_core::{EmbeddingService, QueryIntent, SearchResult, url_to_domain_id};
+use prieco_core::{EmbeddingService, QueryIntent, SearchResult, Sitelink, url_to_domain_id};
 
 /// Description: Decides what kind of search to perform
 /// Input: Search type, Search query, Language, Location, Embedding service, Cookie jar
@@ -229,6 +229,7 @@ async fn all_search(mut params: AllParams<'_>) {
             mobile: params.mobile,
             decentralize: params.decentralize,
             intent: query_intent,
+            limit: 40,
         }), // Search database: Modify results + return confidence score
         async move {
             if videos_enable {
@@ -246,11 +247,19 @@ async fn all_search(mut params: AllParams<'_>) {
         }
     );
 
+    let mut results_vec = merge_sitelinks(results_vec);
+    results_vec.truncate(20);
+
     if !videos.is_empty() {
         params.context.insert(String::from("videos"), json!(videos));
         params.context.insert(
             String::from("videos_at"),
-            json!(results_vec.len().clamp(1, if news.is_empty() { 2 } else { 4 }) - 1),
+            json!(
+                results_vec
+                    .len()
+                    .clamp(1, if news.is_empty() { 2 } else { 4 })
+                    - 1
+            ),
         );
     }
 
@@ -411,10 +420,45 @@ async fn all_search(mut params: AllParams<'_>) {
     if let Ok(yadore_data) = yadore_result {
         context.insert(String::from("yadore"), json!(&yadore_data));
     }
+    */
+}
 
-    // News
-    let news_result = news::run(q, lang, loc, 20).await;
-    if let Ok(news_data) = news_result {
-        context.insert(String::from("news"), json!(&news_data));
-    }*/
+fn merge_sitelinks(results: Vec<SearchResult>) -> Vec<SearchResult> {
+    let mut merged: Vec<SearchResult> = Vec::with_capacity(results.len());
+    let mut by_domain: HashMap<String, usize> = HashMap::new();
+
+    for res in results {
+        let parent = if res.domain.is_empty() {
+            None
+        } else {
+            by_domain.get(&res.domain).copied()
+        };
+
+        match parent {
+            Some(i) => {
+                let title = if res.title.is_empty() || res.title == merged[i].title {
+                    res.display_url
+                        .rsplit('›')
+                        .next()
+                        .unwrap_or_default()
+                        .trim()
+                        .to_string()
+                } else {
+                    res.title
+                };
+                merged[i].sitelinks.push(Sitelink {
+                    title,
+                    url: res.url,
+                });
+            }
+            None => {
+                if !res.domain.is_empty() {
+                    by_domain.insert(res.domain.clone(), merged.len());
+                }
+                merged.push(res);
+            }
+        }
+    }
+
+    merged
 }

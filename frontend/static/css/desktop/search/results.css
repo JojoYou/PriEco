@@ -103,6 +103,21 @@
     padding: 10px;
 }
 
+.sitelinks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    margin-top: 8px;
+}
+
+.sitelinks a {
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+}
+
 .products {
     display: flex;
     margin: -10px 0 10px 0;

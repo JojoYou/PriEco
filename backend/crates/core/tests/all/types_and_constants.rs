@@ -411,6 +411,7 @@ fn search_result_serializes_all_fields() {
         formatted_load: "l".into(),
         intent: "in".into(),
         source_engine: "s".into(),
+        sitelinks: Vec::new(),
     };
     let v = serde_json::to_value(&r).unwrap();
     assert_eq!(v["url"], "u");
@@ -418,7 +419,8 @@ fn search_result_serializes_all_fields() {
     assert_eq!(v["domain"], "dom");
     assert_eq!(v["html_id"], Value::Null);
     assert_eq!(v["source_engine"], "s");
-    assert_eq!(v.as_object().unwrap().len(), 13);
+    assert_eq!(v["sitelinks"], serde_json::json!([]));
+    assert_eq!(v.as_object().unwrap().len(), 14);
 }
 
 #[test]

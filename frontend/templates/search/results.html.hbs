@@ -84,6 +84,13 @@
                 <h3>{{ title }}</h3>
               </a>
               <p>{{{ description }}}</p>
+              {{#if sitelinks}}
+                <div class="sitelinks">
+                  {{#each sitelinks}}
+                    <a href='{{ url }}' rel='noopener noreferrer' {{{ @root.newtab }}} class="link">{{ title }}</a>
+                  {{/each}}
+                </div>
+              {{/if}}
             </div>
 
             {{#if (eq ../css_path "/static/css/desktop/")}}

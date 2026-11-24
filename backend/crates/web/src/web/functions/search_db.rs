@@ -52,7 +52,6 @@ use zstd::bulk::Decompressor;
   Import own libraries
 */
 use crate::web::functions::{
-    additional::discover::discover_and_ping_domains,
     decentralized::{FedQuery, IROH_ENDPOINT, PROFILE_CACHE},
     general::{favicon_url, get_domain},
     ranking::{self, goggles::GoggleRules, rrf::RRFParams},
@@ -114,7 +113,9 @@ pub struct SearchDBParams<'r> {
     pub mobile: bool,
     pub decentralize: bool,
     pub intent: QueryIntent,
+    pub limit: usize,
 }
+
 pub async fn run(params: SearchDBParams<'_>) {
     let local_results = run_json(
         params.query,
@@ -126,6 +127,7 @@ pub async fn run(params: SearchDBParams<'_>) {
         params.decentralize,
         PRIECO_INDEX.clone(),
         Some(params.intent),
+        params.limit,
     )
     .await;
 
@@ -230,6 +232,7 @@ pub async fn run(params: SearchDBParams<'_>) {
                 source_engine,
                 content: content.to_string(),
                 intent,
+                sitelinks: Vec::new(),
             });
         }
     }
@@ -309,6 +312,7 @@ pub async fn run_json(
     decentralize: bool,
     index: Arc<PriecoIndex>,
     intent: Option<QueryIntent>,
+    limit: usize,
 ) -> Vec<Json_Value> {
     let official_index = Arc::ptr_eq(&index, &PRIECO_INDEX);
     let decentralize = decentralize && official_index;
@@ -587,7 +591,7 @@ pub async fn run_json(
         results = deduped;
     }
 
-    let shown_results: Vec<WebDocument> = results.iter().take(20).cloned().collect();
+    let shown_results: Vec<WebDocument> = results.iter().take(limit).cloned().collect();
     shown_results
         .into_iter()
         .filter_map(|s| serde_json::to_value(s).ok())

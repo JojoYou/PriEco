@@ -154,6 +154,7 @@ pub async fn api(
         decentralized,
         PRIECO_INDEX.clone(),
         None,
+        20,
     )
     .await;
 

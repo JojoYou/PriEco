@@ -133,6 +133,12 @@ pub mod icons {
   PriEco structures
 */
 #[derive(Serialize)]
+pub struct Sitelink {
+    pub title: String,
+    pub url: String,
+}
+
+#[derive(Serialize)]
 pub struct SearchResult {
     pub url: String,
     pub display_url: String,
@@ -151,7 +157,10 @@ pub struct SearchResult {
     pub formatted_load: String,
     pub intent: String,
     pub source_engine: String,
+
+    pub sitelinks: Vec<Sitelink>,
 }
+
 #[derive(Serialize, Clone)]
 pub struct ImgResult {
     pub thumbnail: String,
