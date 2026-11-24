@@ -207,7 +207,10 @@ async fn all_search(mut params: AllParams<'_>) {
     let query_intent = search_db::query_intent(params.q, params.lang, params.loc);
     let videos_enable = matches!(
         query_intent,
-        QueryIntent::Informational | QueryIntent::CommercialInvestigation | QueryIntent::Unknown
+        QueryIntent::Informational
+            | QueryIntent::CommercialInvestigation
+            | QueryIntent::Navigational
+            | QueryIntent::Unknown
     );
     let news_enable = matches!(
         query_intent,
