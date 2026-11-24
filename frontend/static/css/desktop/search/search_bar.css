@@ -126,8 +126,8 @@
     margin-top: 10px;
     border: solid transparent 2px;
 }
-.type_btns button:hover {
-    border: solid #3edce2 2px;
+.type_btns button:hover p {
+    color: #2e9da1;
 }
 
 .type_btns img {
