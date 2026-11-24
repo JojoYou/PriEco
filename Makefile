@@ -16,7 +16,7 @@ DOC_SRC := frontend/mkdocs.yml $(shell find frontend/docs backend/crates \
 GEOIP := backend/crates/crawler/src/data/GeoLite2-Country.mmdb
 GEOIP_MAX_DAYS := 30
 
-.PHONY: all help check check-release docs release run benchmark restart logs clean clean-docs clean-full geoip-check geoip-update
+.PHONY: all help check check-release docs release run demo demo-reset benchmark restart logs clean clean-docs clean-full geoip-check geoip-update
 
 all: check docs release
 
@@ -61,6 +61,32 @@ run: release docs ## Start PriEco
 	  export LD_LIBRARY_PATH="$(ORT_LIBS)$(if $(CUDNN_LIBS),:$(CUDNN_LIBS))$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}"; \
 	fi; \
 	exec ./target/release/prieco_web
+
+###
+# Demo
+###
+DEMO := demo
+DEMO_IMPORT := /tmp/res_imp
+DEMO_PORT ?= 8484
+
+demo: ## Sandbox, seeded with sample results
+	cargo build --profile release-dev -p prieco_web
+	mkdir -p $(DEMO)/runtime/config $(DEMO)/runtime/idx/{tantivy,meta,vectors,blob}
+	ln -sfn ../frontend $(DEMO)/frontend
+	ln -sfn ../backend $(DEMO)/backend
+	sed -E 's/"port": [0-9]+/"port": $(DEMO_PORT)/' backend/demo/settings.conf > $(DEMO)/runtime/config/settings.conf
+	[ -f $(DEMO)/runtime/.seeded ] || { python3 -I backend/demo/seed.py backend/demo/results.tsv $(DEMO_IMPORT)/demo.zip && touch $(DEMO)/runtime/.seeded; }
+	@cd $(DEMO); \
+	ulimit -n 65535 || echo "⚠  could not raise open file limit"; \
+	if [ -e "$(ORT_LIBS)/libonnxruntime.so" ]; then \
+	  export ORT_DYLIB_PATH="$(ORT_LIBS)/libonnxruntime.so"; \
+	  export LD_LIBRARY_PATH="$(ORT_LIBS)$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}"; \
+	fi; \
+	unset PRIECO_TICKET; \
+	exec ../target/release-dev/prieco_web
+
+demo-reset: ## Wipe the demo index
+	rm -rf $(DEMO)
 
 ###
 # Benchmark
