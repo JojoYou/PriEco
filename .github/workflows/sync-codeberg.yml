@@ -1,0 +1,32 @@
+name: Sync to Codeberg
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: sync-codeberg
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+      - env:
+          KEY: ${{ secrets.CODEBERG_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/cb_key
+          chmod 600 ~/.ssh/cb_key
+          ssh-keyscan -H codeberg.org >> ~/.ssh/known_hosts
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/cb_key -o IdentitiesOnly=yes"
+          git config user.name "GitHub Sync Bot"
+          git config user.email "sync-bot@prieco.net"
+          git remote add codeberg git@codeberg.org:JojoYou/PriEco.git
+          git fetch codeberg master
+          git merge codeberg/master --no-edit
+          git push codeberg HEAD:master
