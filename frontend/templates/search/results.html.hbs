@@ -123,32 +123,6 @@
           </div>
         {{/if}}
 
-        {{#if (and (eq @index ../videos_at) ../videos)}}
-          <div class="products">
-            <p>📺 Videos</p>
-          </div>
-          <div class="yadore">
-            {{#each ../videos}}
-              <div class="yadore_item video_item">
-                <a href="https://www.youtube.com/watch?v={{ id }}" rel='noopener noreferrer' {{{ @root.newtab }}} title="{{ description }}">
-                  <button>
-                    <img src="proxy?u=https://i.ytimg.com/vi/{{ id }}/mqdefault.jpg" alt="‎" loading="lazy">
-                    {{#if length}}
-                      <span class="video_length">{{ length }}</span>
-                    {{/if}}
-                  </button>
-                  <div class="yadore_text">
-                    <p class="yadore_title">{{ title }}</p>
-                    <div class="yadore_domain">
-                      <p>{{ channel }}{{#if published}} · {{ published }}{{/if}}</p>
-                    </div>
-                  </div>
-                </a>
-              </div>
-            {{/each}}
-          </div>
-        {{/if}}
-
         {{#if (and (eq @index ../news_at) ../news)}}
           <div class="products">
             <p>📰 News</p>
@@ -169,6 +143,32 @@
                         <img src="{{ favicon }}" alt="‎" loading="lazy">
                       {{/if}}
                       <p>{{ domain }}{{#if published}} · {{ published }}{{/if}}</p>
+                    </div>
+                  </div>
+                </a>
+              </div>
+            {{/each}}
+          </div>
+        {{/if}}
+
+        {{#if (and (eq @index ../videos_at) ../videos)}}
+          <div class="products">
+            <p>📺 Videos</p>
+          </div>
+          <div class="yadore">
+            {{#each ../videos}}
+              <div class="yadore_item video_item">
+                <a href="https://www.youtube.com/watch?v={{ id }}" rel='noopener noreferrer' {{{ @root.newtab }}} title="{{ description }}">
+                  <button>
+                    <img src="proxy?u=https://i.ytimg.com/vi/{{ id }}/mqdefault.jpg" alt="‎" loading="lazy">
+                    {{#if length}}
+                      <span class="video_length">{{ length }}</span>
+                    {{/if}}
+                  </button>
+                  <div class="yadore_text">
+                    <p class="yadore_title">{{ title }}</p>
+                    <div class="yadore_domain">
+                      <p>{{ channel }}{{#if published}} · {{ published }}{{/if}}</p>
                     </div>
                   </div>
                 </a>

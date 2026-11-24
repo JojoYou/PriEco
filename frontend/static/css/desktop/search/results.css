@@ -124,7 +124,7 @@
     margin-bottom: 30px;
     display: flex;
     overflow: auto hidden;
-    border-radius: 20px;
+    border-radius: 20px 20px 0 0;
     background: none;
     scroll-behavior: smooth;
     scrollbar-width: none;

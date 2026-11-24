@@ -247,7 +247,7 @@ async fn all_search(mut params: AllParams<'_>) {
         params.context.insert(String::from("videos"), json!(videos));
         params.context.insert(
             String::from("videos_at"),
-            json!(results_vec.len().clamp(1, 4) - 1),
+            json!(results_vec.len().clamp(1, if news.is_empty() { 2 } else { 4 }) - 1),
         );
     }
 
