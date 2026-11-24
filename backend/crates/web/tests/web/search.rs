@@ -214,10 +214,10 @@ async fn discover_empty_queries_do_nothing() {
 /* ───────────────────────────── external API guards ───────────────────────────── */
 
 #[tokio::test]
-async fn news_without_api_key_is_an_error() {
+async fn news_without_api_key_is_empty() {
     init();
-    let err = news::run("rust", "en", "us", 10).await.unwrap_err();
-    assert!(err.to_string().contains("NEWS_API_KEY"));
+    unsafe { std::env::remove_var("ALTERLAB_API_KEY") };
+    assert!(news::run("rust", "en", 10).await.is_empty());
 }
 
 #[tokio::test]
@@ -238,15 +238,34 @@ async fn yadore_error_names_the_right_variable() {
 }
 
 #[test]
-fn news_article_serde() {
-    let a: news::Article = serde_json::from_str(
-        r#"{"id":"1","title":"t","description":"d","url":"u","author":"a","image":"i",
-            "language":"en","category":["tech"],"published":"2026-01-01"}"#,
+fn news_alterlab_format() {
+    let r: news::NewsResponse = serde_json::from_str(
+        r#"{"object":"news_list","count":2,"items":[
+            {"headline":"H1","url":"https://www.bbc.com/news/1","source":"bbc","source_name":"BBC News",
+             "published_at":"2026-11-24T10:00:00Z","author":null,"image":"https://img.example/a.jpg?x=1&y=2",
+             "snippet":"S1","category":"technology","language":"en"},
+            {"headline":"H2","url":"https://npr.org/2","published_at":"bad","image":null}
+        ]}"#,
     )
     .unwrap();
-    assert_eq!(a.category, vec!["tech"]);
-    let r: news::NewsResponse = serde_json::from_str(r#"{"status":"ok","news":[]}"#).unwrap();
-    assert_eq!(r.status, "ok");
-    assert!(r.page.is_none());
-    assert!(serde_json::from_str::<news::NewsResponse>(r#"{"status":"ok"}"#).is_err());
+    let now = time::macros::datetime!(2026-11-24 12:30 UTC);
+    let a = news::format_news(r, now);
+
+    assert_eq!(a.len(), 2);
+    assert_eq!(a[0].title, "H1");
+    assert_eq!(a[0].domain, "BBC News");
+    assert_eq!(a[0].published, "2 h ago");
+    assert_eq!(a[0].description, "S1");
+    assert_eq!(
+        a[0].image,
+        "/proxy?u=https%3A%2F%2Fimg.example%2Fa.jpg%3Fx%3D1%26y%3D2"
+    );
+
+    assert!(a[1].domain.contains("npr.org"));
+    assert!(a[1].published.is_empty());
+    assert!(a[1].image.is_empty());
+    assert!(a[1].description.is_empty());
+
+    let empty: news::NewsResponse = serde_json::from_str(r#"{"object":"news_list"}"#).unwrap();
+    assert!(empty.items.is_empty());
 }

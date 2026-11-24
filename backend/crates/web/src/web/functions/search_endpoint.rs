@@ -70,9 +70,10 @@ pub async fn run(params: EndParams<'_>) -> HashMap<String, Value> {
         }
         "new" => {
             context.insert(String::from("new_results"), json!(true));
-            match news::run(params.q, params.lang, params.loc, 50).await {
-                Ok(n) => context.insert(String::from("news"), json!(&n)),
-                Err(_) => context.insert(
+            let n = news::run(params.q, params.lang, 50).await;
+            match n.is_empty() {
+                false => context.insert(String::from("news"), json!(&n)),
+                true => context.insert(
                     String::from("news"),
                     json!([{
                         "title": "No news found",
@@ -208,9 +209,13 @@ async fn all_search(mut params: AllParams<'_>) {
         query_intent,
         QueryIntent::Informational | QueryIntent::CommercialInvestigation | QueryIntent::Unknown
     );
+    let news_enable = matches!(
+        query_intent,
+        QueryIntent::Informational | QueryIntent::Navigational | QueryIntent::Unknown
+    );
     let (q, lang, loc) = (params.q, params.lang, params.loc);
 
-    let (_, videos) = tokio::join!(
+    let (_, videos, news) = tokio::join!(
         search_db::run(SearchDBParams {
             results: &mut results_vec,
             query: params.q,
@@ -228,6 +233,13 @@ async fn all_search(mut params: AllParams<'_>) {
             } else {
                 Vec::new()
             }
+        },
+        async move {
+            if news_enable {
+                news::run(q, lang, 10).await
+            } else {
+                Vec::new()
+            }
         }
     );
 
@@ -236,6 +248,14 @@ async fn all_search(mut params: AllParams<'_>) {
         params.context.insert(
             String::from("videos_at"),
             json!(results_vec.len().clamp(1, 4) - 1),
+        );
+    }
+
+    if !news.is_empty() {
+        params.context.insert(String::from("news"), json!(news));
+        params.context.insert(
+            String::from("news_at"),
+            json!(results_vec.len().clamp(1, 2) - 1),
         );
     }
 

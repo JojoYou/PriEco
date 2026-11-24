@@ -112,6 +112,13 @@
     margin-left: 5px;
 }
 
+.news_attribution {
+    margin-left: 8px;
+    align-self: center;
+    color: #5e5e5e;
+    font-size: 13px;
+}
+
 .yadore {
     width: 632px;
     margin-bottom: 30px;
