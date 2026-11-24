@@ -165,7 +165,7 @@
     position: absolute;
     left: -52px;
     width: calc(100% + 52px);
-    top: 100%;
+    top: 95%;
     border-radius: 0 0 20px 20px;
     z-index: 10;
     max-height: 300px;

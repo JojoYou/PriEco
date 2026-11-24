@@ -22,7 +22,6 @@
 
 .open-settings-btn:hover img {
   animation-play-state: running;
-  padding: 0;
 }
 
 @keyframes settings-spin {

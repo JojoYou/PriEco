@@ -30,7 +30,8 @@ if ("serviceWorker" in navigator) {
 // Bangs
 function getBangRedirectUrls() {
   var url = new URL(window.location.href);
-  var query = url.searchParams.get("q");
+  var queryMeta = document.querySelector('meta[name="prieco-query"]');
+  var query = url.searchParams.get("q") || (queryMeta && queryMeta.content);
   if (!query) return [];
 
   var words = query.split(/\s+/);

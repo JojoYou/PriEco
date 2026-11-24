@@ -7,6 +7,9 @@ pub fn scan_entities(
 ) -> (QueryIntent, Option<(f32, f32)>, Vec<TaggedEntity>) {
     let tags = QU_PIPELINE.get_tags(query);
     let mut spatial_coords = None;
+    let contains_name = tags
+        .iter()
+        .any(|t| matches!(t.entity_type, EntityType::PersonName | EntityType::Business));
 
     for tag in tags.iter() {
         match tag.entity_type {
@@ -29,7 +32,9 @@ pub fn scan_entities(
                 }
 
                 // Upgrade Unknown or Navigational to Local
-                if final_intent == QueryIntent::Unknown || final_intent == QueryIntent::Navigational
+                if !contains_name
+                    && (final_intent == QueryIntent::Unknown
+                        || final_intent == QueryIntent::Navigational)
                 {
                     final_intent = QueryIntent::Local;
                 }

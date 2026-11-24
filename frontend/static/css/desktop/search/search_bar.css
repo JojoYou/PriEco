@@ -125,6 +125,7 @@
     white-space: nowrap;
     margin-top: 10px;
     border: solid transparent 2px;
+    align-items: center;
 }
 .type_btns button:hover p {
     color: #34a7aa;
@@ -136,9 +137,11 @@
     background: -moz-linear-gradient(green, #00f);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    padding-right: 5px;
 }
 
+.type_btns button p {
+    padding-left: 5px;
+}
 .type_active img {
     filter: invert(56%) sepia(24%) saturate(1094%) hue-rotate(133deg)
         brightness(97%) contrast(84%) !important;
