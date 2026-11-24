@@ -1,8 +1,8 @@
 services:
   prieco:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: container/Dockerfile
     image: prieco:latest
     ports:
       - "127.0.0.1:8000:8000"
@@ -24,8 +24,7 @@ services:
       - blobs:/app/data/blobs
       - meta:/app/data/meta
       - vectors:/app/data/vectors
-      - ./models:/app/models:ro,z
-      - ./data/bge/model.onnx:/app/data/model.onnx:ro,z
+      - runtime:/app/runtime
 
     environment:
       - PRIECO_IP=0.0.0.0
@@ -77,3 +76,4 @@ volumes:
   blobs:
   meta:
   vectors:
+  runtime:
