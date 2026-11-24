@@ -33,7 +33,7 @@ use crate::web::functions::{
     remote_api::{currency::get_fx_widget, img, news, video},
     search_db::{self, SearchDBParams},
 };
-use prieco_core::{EmbeddingService, SearchResult, url_to_domain_id};
+use prieco_core::{EmbeddingService, QueryIntent, SearchResult, url_to_domain_id};
 
 /// Description: Decides what kind of search to perform
 /// Input: Search type, Search query, Language, Location, Embedding service, Cookie jar
@@ -203,6 +203,13 @@ async fn all_search(mut params: AllParams<'_>) {
     let user_rules = params.user_qt_prefs.into_goggle_rules();
     params.goggles.push(Arc::new(user_rules));
 
+    let query_intent = search_db::query_intent(params.q, params.lang, params.loc);
+    let videos_enable = matches!(
+        query_intent,
+        QueryIntent::Informational | QueryIntent::CommercialInvestigation | QueryIntent::Unknown
+    );
+    let (q, lang, loc) = (params.q, params.lang, params.loc);
+
     let (_, videos) = tokio::join!(
         search_db::run(SearchDBParams {
             results: &mut results_vec,
@@ -213,14 +220,19 @@ async fn all_search(mut params: AllParams<'_>) {
             goggles: params.goggles,
             mobile: params.mobile,
             decentralize: params.decentralize,
+            intent: query_intent,
         }), // Search database: Modify results + return confidence score
-        video::run(params.q, params.lang, params.loc, 10)
+        async move {
+            if videos_enable {
+                video::run(q, lang, loc, 10).await
+            } else {
+                Vec::new()
+            }
+        }
     );
 
     if !videos.is_empty() {
-        params
-            .context
-            .insert(String::from("videos"), json!(videos));
+        params.context.insert(String::from("videos"), json!(videos));
         params.context.insert(
             String::from("videos_at"),
             json!(results_vec.len().clamp(1, 4) - 1),

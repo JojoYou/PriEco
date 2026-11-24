@@ -79,6 +79,7 @@ pub async fn run(embedding_service: &EmbeddingService) {
                 false,
                 false,
                 index.clone(),
+                None,
             )
             .await;
 

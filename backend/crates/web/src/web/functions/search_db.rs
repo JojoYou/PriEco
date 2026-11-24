@@ -113,6 +113,7 @@ pub struct SearchDBParams<'r> {
     pub goggles: Vec<Arc<GoggleRules>>,
     pub mobile: bool,
     pub decentralize: bool,
+    pub intent: QueryIntent,
 }
 pub async fn run(params: SearchDBParams<'_>) {
     let local_results = run_json(
@@ -124,6 +125,7 @@ pub async fn run(params: SearchDBParams<'_>) {
         params.mobile,
         params.decentralize,
         PRIECO_INDEX.clone(),
+        Some(params.intent),
     )
     .await;
 
@@ -233,6 +235,11 @@ pub async fn run(params: SearchDBParams<'_>) {
     }
 }
 
+pub fn query_intent(query: &str, lang: &str, loc: &str) -> QueryIntent {
+    let mut fts_query = normalize_search_operators(query);
+    ranking::meaning::call::process_query(&mut fts_query, lang, loc).0
+}
+
 /// # Search Index Pipeline
 ///
 /// This function checks if results for the same query + lang + loc are already in RAM cache.
@@ -301,6 +308,7 @@ pub async fn run_json(
     mobile: bool,
     decentralize: bool,
     index: Arc<PriecoIndex>,
+    intent: Option<QueryIntent>,
 ) -> Vec<Json_Value> {
     let official_index = Arc::ptr_eq(&index, &PRIECO_INDEX);
     let decentralize = decentralize && official_index;
@@ -313,8 +321,7 @@ pub async fn run_json(
         None
     };
 
-    let mut fts_query = normalize_search_operators(query);
-    let (intent, _) = ranking::meaning::call::process_query(&mut fts_query, lang, loc);
+    let intent = intent.unwrap_or_else(|| query_intent(query, lang, loc));
 
     let mut results = if let Some(cached) = cached_data {
         cached
