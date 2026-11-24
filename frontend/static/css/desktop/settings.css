@@ -15,6 +15,19 @@
   right: 0;
 }
 
+.open-settings-btn img {
+  animation: settings-spin 4s linear infinite;
+  animation-play-state: paused;
+}
+
+.open-settings-btn:hover img {
+  animation-play-state: running;
+}
+
+@keyframes settings-spin {
+  to { transform: rotate(360deg); }
+}
+
 .settings-header {
   width: calc(100% - 20px);
   display: flex;
@@ -45,7 +58,8 @@
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  padding: 0 20px;
+  padding: 0 20px;    margin-top: 10px;
+
 }
 
 .settings-item select {

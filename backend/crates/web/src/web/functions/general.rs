@@ -139,3 +139,14 @@ pub async fn call_api_future_json(req: reqwest::RequestBuilder) -> Option<Value>
         }
     }
 }
+
+pub fn favicon_url(url: &str) -> String {
+    let domain = get_domain(url, false);
+    if domain.is_empty() {
+        return String::new();
+    }
+    format!(
+        "/proxy?u={}",
+        urlencoding::encode(&format!("https://icons.duckduckgo.com/ip3/{}.ico", domain))
+    )
+}

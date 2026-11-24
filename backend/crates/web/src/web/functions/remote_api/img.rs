@@ -10,7 +10,7 @@ use std::{
 };
 use twox_hash::XxHash64;
 
-use crate::web::functions::general::get_domain;
+use crate::web::functions::general::{favicon_url, get_domain};
 use prieco_core::{CLIENT, IMG_CACHE_DIR, ImgResult, colors, url_to_id};
 
 /// Description: 3rd party image search with 0 knowledge cache
@@ -147,12 +147,7 @@ fn format_bing(json: Value) -> Vec<ImgResult> {
                 site_url: url.to_string(),
                 site_domain: get_domain(url, true),
 
-                favicon: replace_resulti(
-                    item.get("meta_url")
-                        .and_then(|m| m.get("favicon"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or_default(),
-                ),
+                favicon: favicon_url(url),
             });
         }
     }

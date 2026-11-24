@@ -32,7 +32,7 @@
       <form action="search" method="{{#if check_post}}POST{{else}}GET{{/if}}">
         <input type="hidden" name="t" value="all">
         <input type="hidden" name="q" value="{{query}}">
-        <button class="{{all_active}}">
+        <button class="{{all_active}} type_btn">
           <img src="static/img/icon/earth.svg" alt="web search button">
           <p>All</p>
         </button>
@@ -41,7 +41,7 @@
       <form action="search">
         <input type="hidden" name="t" value="img">
         <input type="hidden" name="q" value="{{query}}">
-        <button class="{{img_active}}">
+        <button class="{{img_active}} type_btn">
           <img src="static/img/icon/image.svg" alt="image search button">
           <p>Images</p>
         </button>
@@ -51,18 +51,18 @@
       <form action="search" method="{{#if check_post}}POST{{else}}GET{{/if}}">
         <input type="hidden" name="t" value="map">
         <input type="hidden" name="q" value="{{query}}">
-        <button class="{{map_active}}">
+        <button class="{{map_active}} type_btn">
           <img src="static/img/icon/map.svg" alt="map search button">
           <p>Maps</p>
         </button>
       </form>
       {{/unless}}
 
-      <button class="btn_settings">
+      <div class="btn_settings">
         <label for="open-settings" class="open-settings-btn">
           <img src="static/img/icon/gear.svg" alt="open settings" width="13px">
         </label>
-      </button>
+      </div>
     </div>
   </div>
 

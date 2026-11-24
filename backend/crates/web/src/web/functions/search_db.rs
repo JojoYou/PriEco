@@ -54,7 +54,7 @@ use zstd::bulk::Decompressor;
 use crate::web::functions::{
     additional::discover::discover_and_ping_domains,
     decentralized::{FedQuery, IROH_ENDPOINT, PROFILE_CACHE},
-    general::get_domain,
+    general::{favicon_url, get_domain},
     ranking::{self, goggles::GoggleRules, rrf::RRFParams},
 };
 use prieco_core::{
@@ -220,18 +220,7 @@ pub async fn run(params: SearchDBParams<'_>) {
                         )
                     })
                     .unwrap_or_default(),
-                favicon: item
-                    .get("favicon")
-                    .and_then(|v| v.as_str())
-                    .filter(|s| !s.is_empty())
-                    .map(|s| format!("static/prieco_favicons/{}", s))
-                    .unwrap_or_else(|| {
-                        let icon = format!(
-                            "https://fav.prieco.net/icon?url={}&size=32",
-                            urlencoding::encode(&get_domain(&url, false))
-                        );
-                        format!("/proxy?u={}", urlencoding::encode(&icon))
-                    }),
+                favicon: favicon_url(&url),
                 html_id,
 
                 reading_level,
@@ -723,11 +712,12 @@ pub async fn run_core_search(
     });
 
     let discovery_task = tokio::spawn(async move {
-        if run_discovery {
+        /*if run_discovery {
             discover_and_ping_domains(&q_clone4).await
         } else {
             Vec::new()
-        }
+        }*/
+        Vec::new()
     });
 
     let (tantivy_ids, vector_ids, dir_ids, discovery_results) =

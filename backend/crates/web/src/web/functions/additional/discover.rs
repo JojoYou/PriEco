@@ -1,5 +1,7 @@
 use prieco_core::{CLIENT, PRIECO_META, WebDocument, url_to_id};
 
+use crate::web::functions::general::favicon_url;
+
 pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
     let trimmed = query.trim();
 
@@ -124,13 +126,7 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
                     title: domain.clone(),
                     description: String::from("Adding to PriEco index..."),
                     content: String::new(),
-                    favicon: format!(
-                        "/proxy?u={}",
-                        urlencoding::encode(&format!(
-                            "https://fav.prieco.net/icon?url={}&size=32",
-                            domain
-                        ))
-                    ),
+                    favicon: favicon_url(&url),
                     image: String::new(),
                     keywords: String::new(),
                     safe_s: true,

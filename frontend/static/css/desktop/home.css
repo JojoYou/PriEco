@@ -20,7 +20,7 @@
 }
 .title {
     font-size: 92px;
-    font-weight: bold;
+    font-weight: 600;
     width: 40%;
     background: linear-gradient(to right, #03d781, #3edce2, #03d781);
     background-size: 200% auto;
@@ -520,7 +520,7 @@ form.suggestions-active .search_button::before {
     font-size: 18px;
     line-height: 1.4;
     margin: 0 0 10px 0;
-    font-weight: 100;
+    font-weight: 300;
 }
 .testimonial_content p {
     font-size: 14px;

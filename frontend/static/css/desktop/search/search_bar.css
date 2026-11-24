@@ -26,6 +26,15 @@
 
 .search_bar {
     display: flex;
+    transition: filter 0.3s ease-in-out;
+    position: relative;
+    z-index: 2;
+}
+
+.search_bar:hover,
+.search_bar:focus-within {
+    filter: drop-shadow(rgba(3, 215, 129, 0.65) -6px 0 8px)
+        drop-shadow(rgba(62, 220, 226, 0.65) 6px 0 8px);
 }
 
 .search_button {
@@ -106,15 +115,19 @@
     font-weight: normal;
     background: none;
     border: none;
-    border-radius: 2px;
+    border-radius: 20px;
     cursor: pointer;
     margin-left: 15px;
     display: flex;
     font-size: 16px;
-    padding-right: 1.5px;
-    padding-left: 1.5px;
+    padding-right: 2.5px;
+    padding-left: 2.5px;
     white-space: nowrap;
     margin-top: 10px;
+    border: solid transparent 2px;
+}
+.type_btns button:hover {
+    border: solid #3edce2 2px;
 }
 
 .type_btns img {
