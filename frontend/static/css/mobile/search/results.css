@@ -80,7 +80,6 @@
 
 .yadore {
     width: 632px;
-    height: 270px;
     margin-bottom: 15px;
     display: flex;
     overflow: auto hidden;
@@ -139,6 +138,34 @@
     height: 16px;
     object-fit: cover;
     margin-right: 5px;
+}
+
+.video_item {
+    width: 240px;
+    flex-shrink: 0;
+    scroll-snap-align: start;
+}
+
+.video_item button {
+    width: 238px;
+    height: 134px;
+    position: relative;
+    border-radius: 20px 20px 0 0;
+}
+
+.video_item button img {
+    object-fit: cover;
+}
+
+.video_length {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: #000c;
+    color: #fff;
+    font-size: 12px;
 }
 
 .sx-overflow-gradient {

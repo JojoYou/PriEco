@@ -30,7 +30,7 @@ use crate::web::functions::{
     additional::spell_check::spell_check_query,
     general::get_domain,
     ranking::goggles::GoggleRules,
-    remote_api::{currency::get_fx_widget, img, news},
+    remote_api::{currency::get_fx_widget, img, news, video},
     search_db::{self, SearchDBParams},
 };
 use prieco_core::{EmbeddingService, SearchResult, url_to_domain_id};
@@ -203,17 +203,29 @@ async fn all_search(mut params: AllParams<'_>) {
     let user_rules = params.user_qt_prefs.into_goggle_rules();
     params.goggles.push(Arc::new(user_rules));
 
-    let _ = search_db::run(SearchDBParams {
-        results: &mut results_vec,
-        query: params.q,
-        lang: params.lang,
-        loc: params.loc,
-        embedding_service: params.embedding_service,
-        goggles: params.goggles,
-        mobile: params.mobile,
-        decentralize: params.decentralize,
-    })
-    .await; // Search database: Modify results + return confidence score
+    let (_, videos) = tokio::join!(
+        search_db::run(SearchDBParams {
+            results: &mut results_vec,
+            query: params.q,
+            lang: params.lang,
+            loc: params.loc,
+            embedding_service: params.embedding_service,
+            goggles: params.goggles,
+            mobile: params.mobile,
+            decentralize: params.decentralize,
+        }), // Search database: Modify results + return confidence score
+        video::run(params.q, params.lang, params.loc, 10)
+    );
+
+    if !videos.is_empty() {
+        params
+            .context
+            .insert(String::from("videos"), json!(videos));
+        params.context.insert(
+            String::from("videos_at"),
+            json!(results_vec.len().clamp(1, 4) - 1),
+        );
+    }
 
     // QUICK TUNE DOMAIN EXTRACTION
     let mut unique_domains = std::collections::HashSet::new();

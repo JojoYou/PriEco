@@ -2,6 +2,11 @@
     background: #eaeaf2;
 }
 
+.yadore::scroll-button(*) {
+    background: #fffc;
+    color: #000;
+}
+
 .output_text {
     color: #474747;
 }

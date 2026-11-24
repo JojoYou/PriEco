@@ -114,12 +114,47 @@
 
 .yadore {
     width: 632px;
-    height: 270px;
     margin-bottom: 15px;
     display: flex;
     overflow: auto hidden;
     border-radius: 20px;
     background: none;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    anchor-name: --yadore;
+    anchor-scope: --yadore;
+}
+
+.yadore::-webkit-scrollbar {
+    display: none;
+}
+
+.yadore::scroll-button(*) {
+    position: fixed;
+    position-anchor: --yadore;
+    top: calc(anchor(center) - 24px);
+    width: 48px;
+    height: 48px;
+    border: none;
+    border-radius: 100%;
+    backdrop-filter: blur(8px);
+    font-size: 22px;
+    cursor: pointer;
+}
+
+.yadore::scroll-button(*):disabled {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.yadore::scroll-button(left) {
+    content: "❮" / "Scroll left";
+    left: calc(anchor(left) + 8px);
+}
+
+.yadore::scroll-button(right) {
+    content: "❯" / "Scroll right";
+    right: calc(anchor(right) + 8px);
 }
 
 .yadore_item {
@@ -172,6 +207,33 @@
     height: 16px;
     object-fit: cover;
     margin-right: 5px;
+}
+
+.video_item {
+    width: 240px;
+    flex-shrink: 0;
+}
+
+.video_item button {
+    width: 238px;
+    height: 134px;
+    position: relative;
+    border-radius: 20px 20px 0 0;
+}
+
+.video_item button img {
+    object-fit: cover;
+}
+
+.video_length {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: #000c;
+    color: #fff;
+    font-size: 12px;
 }
 
 .sx-search-suggestions {
