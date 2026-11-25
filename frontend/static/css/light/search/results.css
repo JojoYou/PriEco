@@ -45,3 +45,23 @@
     background: #ffffff;
     border: 1px solid #eaeaea;
 }
+
+.iw_calc_screen {
+    background-color: #ecf0f3;
+    color: #000a;
+}
+
+.iw_col {
+    box-shadow: -4px -2px 8px #e9e9ed, 4px 2px 8px rgba(149, 162, 211, 0.8);
+}
+
+.iw_con_topic {
+    background-color: #f2f4f7;
+    color: #000a;
+}
+
+.iw_convert input,
+.iw_convert select {
+    background-color: #d1d3d5;
+    color: #000a;
+}

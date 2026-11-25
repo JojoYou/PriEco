@@ -82,3 +82,35 @@
     font-size: 24px;
     width: 90px;
 }
+
+.iw_card,
+.iw_calc button,
+.iw_rn_inp {
+    color: white;
+}
+
+.iw_calc_screen {
+    background-color: #0001;
+    color: white;
+}
+
+.iw_calc_toggle label {
+    border-color: #fff5;
+}
+
+.iw_col {
+    box-shadow:
+        -4px -2px 8px #2a2c2d,
+        4px 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.iw_con_topic {
+    background-color: #202124;
+    color: white;
+}
+
+.iw_convert input,
+.iw_convert select {
+    background-color: #303134;
+    color: white;
+}

@@ -29,6 +29,20 @@
 </div>
 {{/if}}
 
+{{#if ip_widget}}
+<div class="iw_card">
+  <p class="iw_border_bottom iw_center">Your Public IP Address is: <b>{{ip_widget.ip}}</b></p>
+  {{#if (or ip_widget.country ip_widget.code ip_widget.lang)}}
+    <div class="iw_ip_info">
+      <p><b>Info</b></p>
+      {{#if ip_widget.country}}<p>Country: {{ip_widget.country}}</p>{{/if}}
+      {{#if ip_widget.code}}<p>Code: {{ip_widget.code}}</p>{{/if}}
+      {{#if ip_widget.lang}}<p>Language: {{ip_widget.lang}}</p>{{/if}}
+    </div>
+  {{/if}}
+</div>
+{{/if}}
+
 
       {{#each results}}
         <div class='output'>

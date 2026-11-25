@@ -52,6 +52,7 @@ use urlencoding::{decode, encode};
 */
 use crate::web::{
     functions::{
+        additional::ip_widget::get_ip_widget,
         decentralized::PROFILE_CACHE,
         general::{get_domain, set_cookie},
         ranking::goggles::{fetch_and_store, get_goggle_ids, load_goggles, refresh_stale_goggles},
@@ -432,7 +433,7 @@ pub async fn search(
         let mobile = ua.contains("mobi") || ua.contains("android") || ua.contains("iphone");
 
         // Results
-        let results_ctx = search_endpoint::run(EndParams {
+        let mut results_ctx = search_endpoint::run(EndParams {
             t: params.t,
             q: params.q,
             lang,
@@ -444,6 +445,10 @@ pub async fn search(
             decentralize,
         })
         .await;
+
+        if let Some(ip_widget) = get_ip_widget(params.q, client_ip.0) {
+            results_ctx.insert(String::from("ip_widget"), ip_widget);
+        }
 
         context.insert(String::from("search_results"), json!(results_ctx));
         ANALYTICS.record_query();
@@ -545,6 +550,7 @@ pub async fn results_htmls(
     embedding_service: &State<EmbeddingService>,
     cookie_jar: &CookieJar<'_>,
     user_agent: UserAgent<'_>,
+    client_ip: ClientIp,
 ) -> Template {
     ANALYTICS.record_query();
 
@@ -578,6 +584,10 @@ pub async fn results_htmls(
     ctx.insert(String::from("lang"), json!(params.lang));
     ctx.insert(String::from("loc"), json!(params.loc));
     ctx.insert(String::from("no_js"), json!(false));
+
+    if let Some(ip_widget) = get_ip_widget(params.q, client_ip.0) {
+        ctx.insert(String::from("ip_widget"), ip_widget);
+    }
 
     Template::render("search/results", ctx)
 }

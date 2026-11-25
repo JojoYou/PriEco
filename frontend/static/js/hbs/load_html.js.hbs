@@ -36,6 +36,13 @@ Promise.all([
   highResScript.defer = true;
   document.body.appendChild(highResScript);
 
+  ["util", "converter", "random", "color", "calculator"].forEach((name) => {
+    const widgetScript = document.createElement("script");
+    widgetScript.src = "static/js/widgets/" + name + ".js?v={{ js_version }}";
+    widgetScript.async = false;
+    document.body.appendChild(widgetScript);
+  });
+
   // Search Expander script
   const searchExpanderInit = document.createElement("script");
   searchExpanderInit.src = "static/js/hbs/searchexpander.js.hbs?q={{ q }}";
