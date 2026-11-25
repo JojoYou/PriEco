@@ -26,26 +26,111 @@ function loadSection(containerId, url, scriptPath) {
     });
 }
 
-Promise.all([
-  loadSection("js_load_results", "/results_html?t={{t}}&lang={{lang}}&loc={{loc}}&q={{q}}&dec={{dec}}", ""),
-  loadSection("js_load_settings", "/settings_html", "static/js/settings.js"),
-]).then(() => {
-  // High Res Images script
-  const highResScript = document.createElement("script");
-  highResScript.src = "static/js/high_res_img.js?v={{ js_version }}";
-  highResScript.defer = true;
-  document.body.appendChild(highResScript);
+const params = new URLSearchParams(location.search);
+let query = params.get("q");
+const queryEnc = () => (query === null ? "{{q}}" : encodeURIComponent(query));
+const hasBang = (q) => q.split(/\s+/).some((w) => w.length > 1 && w.startsWith("!"));
+const searchForm = document.querySelector("form.search_bar");
+const domReady = new Promise((r) => document.addEventListener("DOMContentLoaded", r, { once: true }));
 
-  ["util", "converter", "random", "color", "calculator"].forEach((name) => {
-    const widgetScript = document.createElement("script");
-    widgetScript.src = "static/js/widgets/" + name + ".js?v={{ js_version }}";
-    widgetScript.async = false;
-    document.body.appendChild(widgetScript);
+function showQuery() {
+  if (query === null) return;
+  document.title = query + " | PriEco";
+  document.querySelectorAll('input[name="q"]').forEach((input) => (input.value = query));
+  const map = document.querySelector("iframe.map");
+  if (map) map.src = "https://cartes.app/?q=" + queryEnc();
+}
+
+function loadPage(withSettings) {
+  const q = query;
+  return Promise.all([
+    loadSection("js_load_results", "/results_html?t={{t}}&lang={{lang}}&loc={{loc}}&q=" + queryEnc() + "&dec={{dec}}", ""),
+    withSettings && loadSection("js_load_settings", "/settings_html", "static/js/settings.js"),
+  ]).then(() => domReady).then(() => {
+    if (q !== query) return;
+
+    // High Res Images script
+    const highResScript = document.createElement("script");
+    highResScript.src = "static/js/high_res_img.js?v={{ js_version }}";
+    highResScript.defer = true;
+    document.body.appendChild(highResScript);
+
+    ["util", "converter", "random", "color", "calculator"].forEach((name) => {
+      const widgetScript = document.createElement("script");
+      widgetScript.src = "static/js/widgets/" + name + ".js?v={{ js_version }}";
+      widgetScript.async = false;
+      document.body.appendChild(widgetScript);
+    });
+
+    // Search Expander script
+    const searchExpanderInit = document.createElement("script");
+    searchExpanderInit.src = "static/js/hbs/searchexpander.js.hbs?q=" + queryEnc();
+    searchExpanderInit.defer = true;
+    document.body.appendChild(searchExpanderInit);
+  });
+}
+
+showQuery();
+
+const activated = document.prerendering
+  ? new Promise((r) => document.addEventListener("prerenderingchange", r, { once: true }))
+  : Promise.resolve();
+
+activated
+  .then(() => window.priecoBangCheck || false)
+  .then((redirected) => redirected || loadPage(true));
+
+navigator.serviceWorker?.addEventListener("message", (event) => {
+  if (event.data?.action !== "shellUpdated" || event.data.type !== params.get("t")) return;
+  try {
+    if (sessionStorage.getItem("prieco-shell-reload") > Date.now() - 10000) return;
+    sessionStorage.setItem("prieco-shell-reload", Date.now());
+  } catch {}
+  location.reload();
+});
+
+const placeholder = document.getElementById("js_load_results");
+if (placeholder && searchForm?.method === "get") {
+  const placeholderCopy = placeholder.cloneNode(true);
+  const resultsStart = document.createComment("");
+  const resultsEnd = document.createComment("");
+  placeholder.before(resultsStart);
+  placeholder.after(resultsEnd);
+
+  searchForm.addEventListener("submit", (event) => {
+    const formParams = new URLSearchParams(new FormData(searchForm));
+    const q = formParams.get("q") || "";
+    if (!q.trim() || hasBang(q) || formParams.get("t") !== params.get("t")) return;
+    event.preventDefault();
+    searchForm.querySelector('input[name="q"]').blur();
+    history.pushState(null, "", "/search?" + formParams);
+    query = q;
+    showQuery();
+    scrollTo(0, 0);
+    while (resultsStart.nextSibling !== resultsEnd) resultsStart.nextSibling.remove();
+    resultsEnd.before(placeholderCopy.cloneNode(true));
+    loadPage(false);
   });
 
-  // Search Expander script
-  const searchExpanderInit = document.createElement("script");
-  searchExpanderInit.src = "static/js/hbs/searchexpander.js.hbs?q={{ q }}";
-  searchExpanderInit.defer = true;
-  document.body.appendChild(searchExpanderInit);
-});
+  window.addEventListener("popstate", () => {
+    if (new URLSearchParams(location.search).get("q") !== query) location.reload();
+  });
+}
+
+if (location.pathname === "/" && searchForm?.method === "get" && HTMLScriptElement.supports?.("speculationrules")) {
+  let rules;
+  let timer;
+  searchForm.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const formParams = new URLSearchParams(new FormData(searchForm));
+      const q = formParams.get("q") || "";
+      rules?.remove();
+      if (!q.trim() || hasBang(q)) return;
+      rules = document.createElement("script");
+      rules.type = "speculationrules";
+      rules.textContent = JSON.stringify({ prerender: [{ source: "list", urls: ["/search?" + formParams] }] });
+      document.head.append(rules);
+    }, 300);
+  });
+}

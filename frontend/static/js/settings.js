@@ -3,7 +3,12 @@ async function clearPriecoCache() {
   if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
     navigator.serviceWorker.controller.postMessage({ action: "clearCache" });
     try {
-      await caches.delete("prieco-cache");
+      await caches.delete("prieco-results");
+      await caches.delete("prieco-media");
+      const ui = await caches.open("prieco-ui");
+      for (const req of await ui.keys()) {
+        if (new URL(req.url).pathname === "/search") await ui.delete(req);
+      }
     } catch (err) {
       console.warn("Failed to clear cache:", err);
     }

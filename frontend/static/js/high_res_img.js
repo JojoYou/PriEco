@@ -1,6 +1,6 @@
-const lazyImages = document.querySelectorAll("img[data-src]");
+var lazyImages = document.querySelectorAll("img[data-src]");
 
-const observer = new IntersectionObserver((entries, observer) => {
+var observer = new IntersectionObserver((entries, observer) => {
   entries.forEach((entry) => {
     if (entry.isIntersecting) {
       const lazyImage = entry.target;

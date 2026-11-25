@@ -28,6 +28,8 @@ if ("serviceWorker" in navigator) {
 }
 
 // Bangs
+var unduckSearch = document.currentScript ? new URL(document.currentScript.src).search : "";
+
 function getBangRedirectUrls() {
   var url = new URL(window.location.href);
   var queryMeta = document.querySelector('meta[name="prieco-query"]');
@@ -80,11 +82,11 @@ function getBangRedirectUrls() {
 
 function doRedirect() {
   var searchUrls = getBangRedirectUrls();
-  if (!searchUrls || searchUrls.length === 0) return;
+  if (!searchUrls || searchUrls.length === 0) return false;
 
   if (searchUrls.length === 1) {
     window.location.replace(searchUrls[0]);
-    return;
+    return true;
   }
 
   var blockedCount = 0;
@@ -97,10 +99,45 @@ function doRedirect() {
   }
 
   if (blockedCount > 0) {
-    return;
+    return false;
   }
 
   window.location.replace(searchUrls[searchUrls.length - 1]);
+  return true;
 }
 
-doRedirect();
+var unduckQuery =
+  new URL(window.location.href).searchParams.get("q") ||
+  document.querySelector('meta[name="prieco-query"]')?.content ||
+  "";
+
+if (location.pathname === "/search" && unduckQuery) {
+  document.title = unduckQuery + " | PriEco";
+  var fillQuery = new MutationObserver(function () {
+    document.querySelectorAll('input[name="q"]').forEach(function (input) {
+      if (!input.value) input.value = unduckQuery;
+    });
+  });
+  fillQuery.observe(document.documentElement, { childList: true, subtree: true });
+  document.addEventListener("DOMContentLoaded", function () {
+    fillQuery.disconnect();
+  });
+}
+
+if (unduckQuery.split(/\s+/).some((w) => w.length > 1 && w.startsWith("!"))) {
+  document.documentElement.style.visibility = "hidden";
+  window.priecoBangCheck = new Promise(function (resolve) {
+    var script = document.createElement("script");
+    script.src = "/static/js/unduck/bangs.js" + unduckSearch;
+    script.onload = function () {
+      resolve(doRedirect());
+    };
+    script.onerror = function () {
+      resolve(false);
+    };
+    document.head.appendChild(script);
+  }).then(function (redirected) {
+    if (!redirected) document.documentElement.style.visibility = "";
+    return redirected;
+  });
+}

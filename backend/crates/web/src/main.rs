@@ -155,7 +155,7 @@ impl Fairing for GlobalHeaders {
              base-uri 'self';"
         } else {
             "default-src 'self'; \
-             script-src 'self'; \
+             script-src 'self' 'inline-speculation-rules'; \
              style-src 'self'; \
              img-src 'self' data: https://proxy.prieco.net; \
              connect-src 'self'; \

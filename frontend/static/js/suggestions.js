@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!response.ok) throw new Error("Proxy network error");
 
         const data = await response.json();
+        if (document.activeElement !== input) return;
         container.innerHTML = "";
         currentFocus = -1;
         ghostInput.textContent = "";
@@ -61,7 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
               input.value = item.phrase;
               ghostInput.textContent = "";
               toggleActiveStyles(false);
-              form.submit();
+              form.requestSubmit();
             });
 
             container.appendChild(div);
@@ -74,6 +75,12 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("Failed to fetch suggestions:", error);
       }
     };
+
+    form.addEventListener("submit", () => {
+      clearTimeout(debounceTimer);
+      ghostInput.textContent = "";
+      toggleActiveStyles(false);
+    });
 
     input.addEventListener("input", (e) => {
       const query = e.target.value;
@@ -92,9 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ghostInput.textContent = "";
       }
 
-      debounceTimer = setTimeout(() => {
-        fetchAndRender(query.trim());
-      }, 300);
+      fetchAndRender(query.trim());
     });
 
     input.addEventListener("keydown", (e) => {

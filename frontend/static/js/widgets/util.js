@@ -28,21 +28,18 @@
     return String(parseFloat(x.toPrecision(12)));
   }
 
-  let mounted = false;
-
   function offer(test, render) {
-    if (mounted) return;
+    const results = document.querySelector(".results");
+    if (!results || results.dataset.widgetMounted) return;
     const query = getQuery();
     if (!query) return;
     const state = test(query, query.toLowerCase());
     if (state === null || state === undefined || state === false) return;
-    const results = document.querySelector(".results");
-    if (!results) return;
     const card = render(state);
     const spell = results.querySelector(".spell_check");
     if (spell) spell.after(card);
     else results.prepend(card);
-    mounted = true;
+    results.dataset.widgetMounted = "1";
   }
 
   window.PriEcoWidgets = { el, formatNumber, offer };
