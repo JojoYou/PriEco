@@ -101,7 +101,7 @@
 }
 
 .yadore {
-    width: 632px;
+    width: calc(100vw - 17px);
     margin-bottom: 15px;
     display: flex;
     overflow: auto hidden;
