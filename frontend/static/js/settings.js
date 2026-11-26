@@ -189,6 +189,19 @@ if (check_dec) {
   };
 }
 
+// Safe Search
+const check_safe = document.getElementById("check_safe");
+if (check_safe) {
+  check_safe.checked = !/(?:^|;\s*)safe=0/.test(document.cookie);
+
+  check_safe.onchange = async () => {
+    document.cookie = `safe=${check_safe.checked ? ";max-age=0" : "0;max-age=31536000"};path=/;SameSite=Lax;Secure`;
+
+    await clearPriecoCache();
+    location.reload();
+  };
+}
+
 document.addEventListener("click", async (e) => {
   const button = e.target.closest(".copy_btn");
   if (!button || button.classList.contains("copied")) return;

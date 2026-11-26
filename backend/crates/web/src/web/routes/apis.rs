@@ -152,6 +152,7 @@ pub async fn api(
         active_goggles,
         false,
         decentralized,
+        true,
         PRIECO_INDEX.clone(),
         None,
         20,

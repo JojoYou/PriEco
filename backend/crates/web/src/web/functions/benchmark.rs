@@ -78,6 +78,7 @@ pub async fn run(embedding_service: &EmbeddingService) {
                 Vec::new(),
                 false,
                 false,
+                true,
                 index.clone(),
                 None,
                 20,

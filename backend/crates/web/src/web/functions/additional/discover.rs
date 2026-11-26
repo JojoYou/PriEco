@@ -129,7 +129,7 @@ pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
                     favicon: favicon_url(&url),
                     image: String::new(),
                     keywords: String::new(),
-                    safe_s: true,
+                    safe_s: false,
                     html: String::new(),
                     lang: String::new(),
                     loc: String::new(),

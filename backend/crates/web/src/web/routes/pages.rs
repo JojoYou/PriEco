@@ -331,6 +331,7 @@ pub async fn search(
 
     let active_goggle_ids = get_goggle_ids(None, Some(cookie_jar));
     let decentralize = cookie_jar.get("dec").map(|c| c.value()) != Some("0");
+    let safe_search = cookie_jar.get("safe").map(|c| c.value()) != Some("0");
 
     let mut context: HashMap<String, Value> = HashMap::from([
         // File versions
@@ -443,6 +444,7 @@ pub async fn search(
             user_qt_prefs: &user_qt_prefs,
             mobile,
             decentralize,
+            safe_search,
         })
         .await;
 
@@ -571,6 +573,7 @@ pub async fn results_htmls(
         user_qt_prefs: &user_qt_prefs,
         mobile,
         decentralize: params.dec,
+        safe_search: cookie_jar.get("safe").map(|c| c.value()) != Some("0"),
     })
     .await;
 
@@ -682,9 +685,6 @@ fn today_yesterday(series: &[(String, u64)]) -> (u64, u64) {
     let yesterday = if n >= 2 { series[n - 2].1 } else { 0 };
     (today, yesterday)
 }
-
-// ---------- chart geometry (all SVG attributes, so no inline CSS / CSP trouble) ----------
-// Every chart uses viewBox="0 0 300 100" with preserveAspectRatio="none".
 
 fn bar_series(data: &[(String, u64)]) -> Vec<Value> {
     let n = data.len().max(1) as f64;
@@ -1143,6 +1143,7 @@ pub struct SettingsForm<'r> {
     loc: Option<&'r str>,
     js: Option<&'r str>,
     post: Option<&'r str>,
+    safe: Option<&'r str>,
 }
 #[post("/settings_update", data = "<form>")]
 pub fn settings_update(form: Form<SettingsForm<'_>>, cookie_jar: &CookieJar<'_>) -> Redirect {
@@ -1202,6 +1203,12 @@ pub fn settings_update(form: Form<SettingsForm<'_>>, cookie_jar: &CookieJar<'_>)
         add_cookie("post", "1");
     } else {
         remove_cookie("post");
+    }
+
+    if form.safe.is_some() {
+        remove_cookie("safe");
+    } else {
+        add_cookie("safe", "0");
     }
 
     Redirect::to(uri!("/"))

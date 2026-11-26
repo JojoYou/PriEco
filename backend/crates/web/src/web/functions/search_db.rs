@@ -112,6 +112,7 @@ pub struct SearchDBParams<'r> {
     pub goggles: Vec<Arc<GoggleRules>>,
     pub mobile: bool,
     pub decentralize: bool,
+    pub safe_search: bool,
     pub intent: QueryIntent,
     pub limit: usize,
 }
@@ -125,6 +126,7 @@ pub async fn run(params: SearchDBParams<'_>) {
         params.goggles,
         params.mobile,
         params.decentralize,
+        params.safe_search,
         PRIECO_INDEX.clone(),
         Some(params.intent),
         params.limit,
@@ -310,6 +312,7 @@ pub async fn run_json(
     goggles: Vec<Arc<GoggleRules>>,
     mobile: bool,
     decentralize: bool,
+    safe_search: bool,
     index: Arc<PriecoIndex>,
     intent: Option<QueryIntent>,
     limit: usize,
@@ -317,7 +320,7 @@ pub async fn run_json(
     let official_index = Arc::ptr_eq(&index, &PRIECO_INDEX);
     let decentralize = decentralize && official_index;
 
-    let cache_key = format!("{}_{}_{}", query, lang, loc);
+    let cache_key = format!("{}_{}_{}_{}", query, lang, loc, safe_search);
     let cached_data = if official_index {
         let cache = QUERY_CACHE.read();
         cache.get(&cache_key).cloned()
@@ -493,18 +496,23 @@ pub async fn run_json(
         });
 
         // Temp remove blocked terms
-        let blocked_terms: &[&str] = &["porn", "sex", "dick", "fap"];
-        rrf_results.retain(|doc| {
-            let haystack = format!(
-                "{} {} {} {} {}",
-                doc.title.to_lowercase(),
-                doc.description.to_lowercase(),
-                doc.url.to_lowercase(),
-                doc.content.to_lowercase(),
-                doc.keywords.to_lowercase()
-            );
-            !blocked_terms.iter().any(|term| haystack.contains(term))
-        });
+        if safe_search {
+            let blocked_terms: &[&str] = &["porn", "sex", "dick", "fap"];
+            rrf_results.retain(|doc| {
+                if doc.safe_s {
+                    return false;
+                }
+                let haystack = format!(
+                    "{} {} {} {} {}",
+                    doc.title.to_lowercase(),
+                    doc.description.to_lowercase(),
+                    doc.url.to_lowercase(),
+                    doc.content.to_lowercase(),
+                    doc.keywords.to_lowercase()
+                );
+                !blocked_terms.iter().any(|term| haystack.contains(term))
+            });
+        }
 
         if official_index {
             let mut cache = QUERY_CACHE.write();

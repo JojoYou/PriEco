@@ -340,6 +340,16 @@
           <input type="radio" id="theme_dark" name="theme" aria-label="theme dark" value="dark" {{#if (eq selected_theme "dark")}}selected{{/if}}>
         </div>
       </div>
+      <br>
+      <div class="settings-item">
+        <label for="check_safe" title="Filter explicit results">Safe Search:</label>
+        <div class="checkbox_cute">
+          <div class="check">
+            <input id="check_safe" name="safe" type="checkbox" {{#unless check_safe_off}}checked{{/unless}}>
+            <label for="check_safe"></label>
+          </div>
+        </div>
+      </div>
     </div>
 
       <div class="settings-group">

@@ -48,6 +48,7 @@ pub struct EndParams<'r> {
     pub user_qt_prefs: &'r UserQtPrefs,
     pub mobile: bool,
     pub decentralize: bool,
+    pub safe_search: bool,
 }
 pub async fn run(params: EndParams<'_>) -> HashMap<String, Value> {
     // Don't perform a search on bang
@@ -98,6 +99,7 @@ pub async fn run(params: EndParams<'_>) -> HashMap<String, Value> {
                 user_qt_prefs: params.user_qt_prefs,
                 mobile: params.mobile,
                 decentralize: params.decentralize,
+                safe_search: params.safe_search,
             })
             .await;
         }
@@ -186,6 +188,7 @@ pub struct AllParams<'r> {
     pub user_qt_prefs: &'r UserQtPrefs,
     pub mobile: bool,
     pub decentralize: bool,
+    pub safe_search: bool,
 }
 async fn all_search(mut params: AllParams<'_>) {
     // Spell check
@@ -228,6 +231,7 @@ async fn all_search(mut params: AllParams<'_>) {
             goggles: params.goggles,
             mobile: params.mobile,
             decentralize: params.decentralize,
+            safe_search: params.safe_search,
             intent: query_intent,
             limit: 40,
         }), // Search database: Modify results + return confidence score
