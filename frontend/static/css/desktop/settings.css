@@ -1,14 +1,18 @@
 .btn_settings {
-  margin-left: auto !important;
-  padding-right: 10px !important;
+  position: absolute;
+  top: 25px;
+  right: 30px;
+}
+
+.btn_settings .open-settings-btn {
+  margin-top: 0;
 }
 
 .open-settings-btn {
   cursor: pointer;
   display: flex;
   opacity: 0.7;
-  height: 13px;
-  margin-top: -16px;
+  height: 17px;
 }
 
 #open-settings:checked~.settings {
@@ -272,12 +276,12 @@
 
 .settings-save {
   margin-bottom: 10px;
-  width: 100%;
+  width: calc(100% - 20px);
   border: none;
   background: #3edce2;
   padding: 10px;
   border-radius: 10px;
-  cursor: pointer;
+  cursor: pointer;    margin-left: 10px;
 }
 
 .settings {
