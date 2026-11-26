@@ -375,6 +375,42 @@
   </div>
 </div>
       </div>
+
+    <div class="settings-group">
+      <h3>Donate</h3>
+      <br>
+      <div class="donate_row">
+        <a class="donate_icon" href="https://paypal.me/JojoYou" target="_blank" title="PayPal"><img src="static/img/icon/donate/paypal.svg" alt="PayPal"></a>
+        <a class="donate_icon" href="https://buy.polar.sh/polar_cl_WFWzUsbGbOQELSX5NPxtJU1T6LH7latyEynAO2qUETR" target="_blank" title="Card one-time donation"><img src="static/img/icon/donate/card.svg" alt="Card one-time donation"></a>
+        <a class="donate_icon" href="https://buy.polar.sh/polar_cl_Wgv24IMNOThkkSs4FjyHe2ZTAsgy3QDAvkV8x1EYKkg" target="_blank" title="Card recurring donation"><img src="static/img/icon/donate/card_recurring.svg" alt="Card recurring donation"></a>
+      </div>
+      <div class="donate_row">
+      {{#if no_js}}
+        <input type="radio" name="donate_addr" id="donate_none" class="donate_toggle" checked hidden>
+        <input type="radio" name="donate_addr" id="donate_btc" class="donate_toggle" hidden>
+        <input type="radio" name="donate_addr" id="donate_eth" class="donate_toggle" hidden>
+        <input type="radio" name="donate_addr" id="donate_sol" class="donate_toggle" hidden>
+        <input type="radio" name="donate_addr" id="donate_xmr" class="donate_toggle" hidden>
+        <label class="donate_icon donate_open_btc" for="donate_btc" title="Bitcoin"><img src="static/img/icon/donate/bitcoin.svg" alt="Bitcoin"></label>
+        <label class="donate_icon donate_close donate_close_btc" for="donate_none" title="Bitcoin"><img src="static/img/icon/donate/bitcoin.svg" alt="Bitcoin"></label>
+        <label class="donate_icon donate_open_eth" for="donate_eth" title="Ethereum"><img src="static/img/icon/donate/ethereum.svg" alt="Ethereum"></label>
+        <label class="donate_icon donate_close donate_close_eth" for="donate_none" title="Ethereum"><img src="static/img/icon/donate/ethereum.svg" alt="Ethereum"></label>
+        <label class="donate_icon donate_open_sol" for="donate_sol" title="Solana"><img src="static/img/icon/donate/solana.svg" alt="Solana"></label>
+        <label class="donate_icon donate_close donate_close_sol" for="donate_none" title="Solana"><img src="static/img/icon/donate/solana.svg" alt="Solana"></label>
+        <label class="donate_icon donate_open_xmr" for="donate_xmr" title="Monero"><img src="static/img/icon/donate/monero.svg" alt="Monero"></label>
+        <label class="donate_icon donate_close donate_close_xmr" for="donate_none" title="Monero"><img src="static/img/icon/donate/monero.svg" alt="Monero"></label>
+        <span class="crypto_address donate_btc">bc1q9zs9n28jk4jx2w2659mhzd84skg0mlgkq7g3rr</span>
+        <span class="crypto_address donate_eth">0x61bF924B3E3Cf687D8FbE39d75daea9ACB204fE3</span>
+        <span class="crypto_address donate_sol">DJS1CEu1atr46Tkyg5Vq2fZKqW11gj27TmfQ9VF2fZ6h</span>
+        <span class="crypto_address donate_xmr">43rNgiiG5PRGWaqDtKEuYmQrAGkXBEsJh5RXLagaQeMm9j7dGkAszjPS8T3XyBEviRGcBLFYFrZFyj8xByKVJ4PLSQtd8jE</span>
+      {{else}}
+        <button class="donate_icon copy_btn" type="button" title="Copy Bitcoin address" data-copy="bc1q9zs9n28jk4jx2w2659mhzd84skg0mlgkq7g3rr"><img src="static/img/icon/donate/bitcoin.svg" alt="Bitcoin"></button>
+        <button class="donate_icon copy_btn" type="button" title="Copy Ethereum address" data-copy="0x61bF924B3E3Cf687D8FbE39d75daea9ACB204fE3"><img src="static/img/icon/donate/ethereum.svg" alt="Ethereum"></button>
+        <button class="donate_icon copy_btn" type="button" title="Copy Solana address" data-copy="DJS1CEu1atr46Tkyg5Vq2fZKqW11gj27TmfQ9VF2fZ6h"><img src="static/img/icon/donate/solana.svg" alt="Solana"></button>
+        <button class="donate_icon copy_btn" type="button" title="Copy Monero address" data-copy="43rNgiiG5PRGWaqDtKEuYmQrAGkXBEsJh5RXLagaQeMm9j7dGkAszjPS8T3XyBEviRGcBLFYFrZFyj8xByKVJ4PLSQtd8jE"><img src="static/img/icon/donate/monero.svg" alt="Monero"></button>
+      {{/if}}
+      </div>
+    </div>
   </div>
   </form>
 </section>

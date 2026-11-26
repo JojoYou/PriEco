@@ -258,3 +258,76 @@
   border-radius: 10px;
   cursor: pointer;
 }
+
+.settings {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.donate_row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  padding: 0 20px;
+  margin-bottom: 15px;
+}
+
+.donate_icon {
+  position: relative;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.donate_icon img {
+  display: block;
+  width: 32px;
+  height: 32px;
+  transition: transform 0.2s;
+}
+
+.donate_icon:hover img {
+  transform: scale(1.15);
+}
+
+.copy_btn.copied::after {
+  content: "Copied!";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  color: #03d781;
+}
+
+.crypto_address {
+  display: none;
+  flex-basis: 100%;
+  font: 12px monospace;
+  text-align: center;
+  word-break: break-all;
+  user-select: all;
+}
+
+.donate_close,
+#donate_btc:checked ~ .donate_open_btc,
+#donate_eth:checked ~ .donate_open_eth,
+#donate_sol:checked ~ .donate_open_sol,
+#donate_xmr:checked ~ .donate_open_xmr {
+  display: none;
+}
+
+#donate_btc:checked ~ .donate_btc,
+#donate_eth:checked ~ .donate_eth,
+#donate_sol:checked ~ .donate_sol,
+#donate_xmr:checked ~ .donate_xmr,
+#donate_btc:checked ~ .donate_close_btc,
+#donate_eth:checked ~ .donate_close_eth,
+#donate_sol:checked ~ .donate_close_sol,
+#donate_xmr:checked ~ .donate_close_xmr {
+  display: block;
+}

@@ -188,3 +188,17 @@ if (check_dec) {
     location.reload();
   };
 }
+
+document.addEventListener("click", async (e) => {
+  const button = e.target.closest(".copy_btn");
+  if (!button || button.classList.contains("copied")) return;
+
+  try {
+    await navigator.clipboard.writeText(button.dataset.copy);
+    button.classList.add("copied");
+    setTimeout(() => button.classList.remove("copied"), 1500);
+  } catch (err) {
+    console.error("Failed to copy:", err);
+    alert("Copy failed. Please copy the address manually.");
+  }
+});

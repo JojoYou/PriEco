@@ -13,18 +13,3 @@
 .type_btns button p {
     color: #4b4b4b;
 }
-.donate_box {
-    background:
-        linear-gradient(#eaeaf2, #eaeaf2) padding-box,
-        linear-gradient(#03d781, #3edce2) border-box;
-}
-.donate_box,
-#money:checked ~ .menu label[for="money"],
-#crypto:checked ~ .menu label[for="crypto"] {
-    color: #000;
-}
-.option,
-.copy_btn {
-    background: #f2f4f7;
-    color: #000;
-}

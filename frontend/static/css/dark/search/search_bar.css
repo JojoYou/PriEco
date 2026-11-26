@@ -19,18 +19,3 @@
 .open-settings-btn img {
     filter: brightness(0) invert(1);
 }
-.donate_box {
-    background:
-        linear-gradient(#181a1b, #181a1b) padding-box,
-        linear-gradient(#03d781, #3edce2) border-box;
-}
-.donate_box,
-#money:checked ~ .menu label[for="money"],
-#crypto:checked ~ .menu label[for="crypto"] {
-    color: #fff;
-}
-.option,
-.copy_btn {
-    background: #202124;
-    color: #fff;
-}
