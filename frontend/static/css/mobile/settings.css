@@ -1,13 +1,14 @@
 .open-settings-btn {
-  display: block;
+    display: block;
+    position: fixed;
+    top: 12.5px;
+    right: 20px;
+    z-index: 82;
+    cursor: pointer;
 }
 
-.open-settings-btn {
-  position: fixed;
-  top: 10px;
-  right: 20px;
-  z-index: 82;
-  cursor: pointer;
+.open-settings-btn img{
+    height: 13px;
 }
 
 #open-settings:checked~.settings {
