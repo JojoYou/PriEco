@@ -159,19 +159,19 @@
     max-width: clamp(1px, 715px, 90vw);
 }
 .suggestion_item {
-    padding: 5px 5px 5px 10px;
+    padding: 7.5px 5px 7.5px 15px;
     border-radius: 5px;
 }
 
 form.suggestions-active .search_box {
-    border-radius: 0 30px 0px 0 !important;
+    border-radius: 0 20px 0px 0 !important;
 }
 
 form.suggestions-active .search_button {
-    border-radius: 30px 0 0 0 !important;
+    border-radius: 20px 0 0 0 !important;
 }
 form.suggestions-active .search_button::before {
-    border-radius: 30px 0 0 0 !important;
+    border-radius: 20px 0 0 0 !important;
 }
 
 #search_box {
