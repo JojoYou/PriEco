@@ -1,14 +1,21 @@
-//!  File: web/modules/search_api/news.rs
-//!  Description: Manages PriEco News
+//! # News
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! PriEco news results from AlterLab news API.
 //!
-//!  Date Created: 2026-04-14
-//!  Last Modified: 2026-11-24
+//! * Results are cached in RAM for 15 minutes.
+//! * 2s timeout, errors give no news.
+//! * Images go through the proxy.
 //!
-//!  Usage Call this to get news results
-//!  TODO:
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-04-14
+//! * Last Modified: 2026-11-24
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 /*
   Import system libraries
@@ -35,32 +42,41 @@ use prieco_core::CLIENT;
 /*
   Constants
 */
+/// News API.
 const BASE_URL: &str = "https://api.alterlab.io/api/v1/news";
+/// How long news are cached.
 const CACHE_TTL: Duration = Duration::from_secs(900);
 
+/// 'query_lang_count' → (time, articles). Cleared over 5000 entries.
 static NEWS_CACHE: Lazy<RwLock<HashMap<String, (Instant, Vec<Article>)>>> =
     Lazy::new(|| RwLock::new(HashMap::with_capacity(1_000)));
 
 /*
   Structures
 */
+/// News result.
 #[derive(Serialize, Clone)]
 pub struct Article {
     pub title: String,
     pub url: String,
+    /// Source name, otherwise domain.
     pub domain: String,
     pub favicon: String,
+    /// Proxied image.
     pub image: String,
+    /// '5 min ago', '3 h ago', '2 days ago'.
     pub published: String,
     pub description: String,
 }
 
+/// API response.
 #[derive(Deserialize)]
 pub struct NewsResponse {
     #[serde(default)]
     pub items: Vec<NewsItem>,
 }
 
+/// API news item.
 #[derive(Deserialize)]
 pub struct NewsItem {
     pub headline: String,
@@ -75,6 +91,17 @@ pub struct NewsItem {
     pub snippet: Option<String>,
 }
 
+/// News for query.
+///
+/// # Arguments
+///
+/// * `query` - Query.
+/// * `lang` - Language, 'all' for any.
+/// * `count` - Max articles.
+///
+/// # Returns
+///
+/// Articles, empty without `NEWS_API_KEY` or on error.
 pub async fn run(query: &str, lang: &str, count: usize) -> Vec<Article> {
     let cache_key = format!("{}_{}_{}", query, lang, count);
     if let Some((at, cached)) = NEWS_CACHE.read().get(&cache_key)
@@ -131,6 +158,7 @@ pub async fn run(query: &str, lang: &str, count: usize) -> Vec<Article> {
     news
 }
 
+/// API response to [Article]s, `now` is used for 'time ago'.
 pub fn format_news(response: NewsResponse, now: OffsetDateTime) -> Vec<Article> {
     response
         .items
@@ -155,6 +183,7 @@ pub fn format_news(response: NewsResponse, now: OffsetDateTime) -> Vec<Article> 
         .collect()
 }
 
+/// Time since RFC 3339 date, empty if it can't be parsed.
 fn time_ago(published: &str, now: OffsetDateTime) -> String {
     let Ok(date) = OffsetDateTime::parse(published, &Rfc3339) else {
         return String::new();

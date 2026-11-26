@@ -1,11 +1,17 @@
-//!  File: web/functions/additional/ip_widget.rs
-//!  Description: Public IP address widget
+//! # IP Widget
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! Shows user's public IP address, country and its language for queries like 'what is my ip'.
 //!
-//!  Date Created: 2026-11-25
-//!  Last Modified: 2026-11-25
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-11-25
+//! * Last Modified: 2026-11-25
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 use std::net::IpAddr;
 
@@ -14,6 +20,7 @@ use prieco_core::globals::COUNTRY_TO_LANG;
 use prieco_mini_crawler::meta::GEOIP_READER;
 use serde_json::{Value, json};
 
+/// Queries that show the widget, lowercase.
 const TRIGGERS: [&str; 8] = [
     "ip",
     "my ip",
@@ -25,6 +32,16 @@ const TRIGGERS: [&str; 8] = [
     "what is my ip address",
 ];
 
+/// IP widget data.
+///
+/// # Arguments
+///
+/// * `q` - Query.
+/// * `ip` - User IP.
+///
+/// # Returns
+///
+/// JSON with ip, country, code and lang. `None` for other queries and local IPs.
 pub fn get_ip_widget(q: &str, ip: IpAddr) -> Option<Value> {
     let q = q.trim().to_lowercase();
     if !TRIGGERS.contains(&q.as_str()) {

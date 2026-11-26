@@ -1,14 +1,24 @@
-//!  File: pagerank/import/translate.rs
-//!  Description:
+//! # Translate
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! Import pass C. Turns url id edges into node id edges and adds them to the graph.
 //!
-//!  Date Created:: 2026-02-26
-//!  Last Modified: 2026-03-31
+//! ## Architecture
 //!
-//!  Usage:
-//!  TODO:
+//! 1. **Sort:** Hash pairs into sorted shards.
+//! 2. **Resolve:** Unique url ids are k-way merged with [ID_MAP_FILE], no random access.
+//! 3. **Translate:** Pairs to (from node, to node), [binary search][slice::binary_search] in resolved ids.
+//! 4. [**Merge**:][merge_sort_edges] New edge shards and old [EDGES_SORTED] into a new [EDGES_SORTED].
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-02-26
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 /*
   Import system libraries
@@ -28,10 +38,29 @@ use std::{
 use crate::compute::{BUFFER_SIZE, EDGES_DIR, EDGES_SORTED, read_u64_pair};
 use prieco_core::{ID_MAP_FILE, icons};
 
+/// Translates shards with [ID_MAP_FILE] into [EDGES_SORTED].
+///
+/// Split from [run_with] so tests can use their own paths.
+///
+/// # Errors
+///
+/// Same as [run_with].
 pub fn run(hash_shards: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
     run_with(hash_shards, ID_MAP_FILE, EDGES_SORTED, EDGES_DIR)
 }
 
+/// Translates hash shards into node id edges and merges them into `edges_sorted`.
+///
+/// # Arguments
+///
+/// * `hash_shards` - Shards from [hashing][crate::import::hashing].
+/// * `id_map_file` - Id map from [merge][crate::import::merge].
+/// * `edges_sorted` - Graph file, created when missing.
+/// * `edges_dir` - Directory for temporary shards.
+///
+/// # Errors
+///
+/// If a file can't be read or written.
 pub fn run_with(
     hash_shards: Vec<String>,
     id_map_file: &str,
@@ -261,7 +290,7 @@ pub fn run_with(
     Ok(())
 }
 
-// Sort and flush a chunk of hash pairs to disk
+/// Sorts, dedups and writes hash pairs as 'sorted_hash_shard_N.bin', then clears `buffer`.
 fn flush_sorted(
     buffer: &mut Vec<(u64, u64)>,
     shards: &mut Vec<String>,
@@ -281,7 +310,7 @@ fn flush_sorted(
     Ok(())
 }
 
-// Flush translated (src_id, dst_id) pairs to disk
+/// Sorts, dedups and writes node id pairs as 'inc_edge_shard_N.bin', then clears `buffer`.
 fn flush_chunk_raw(
     buffer: &mut Vec<(u64, u64)>,
     shards: &mut Vec<String>,
@@ -301,6 +330,7 @@ fn flush_chunk_raw(
     Ok(())
 }
 
+/// Sorts, dedups and writes url ids as 'hash_only_shard_N.bin', then clears `buffer`.
 fn flush_hashes(
     buffer: &mut Vec<u64>,
     shards: &mut Vec<String>,
@@ -319,6 +349,7 @@ fn flush_hashes(
     Ok(())
 }
 
+/// Reads one (u64, u64) pair from any reader, `None` at end.
 fn read_u64_pair_raw(
     r: &mut (impl Read + ?Sized),
 ) -> Result<Option<(u64, u64)>, Box<dyn std::error::Error>> {
@@ -334,6 +365,13 @@ fn read_u64_pair_raw(
     }
 }
 
+/// K-way merges sorted edge shards into one zstd file, without duplicates.
+///
+/// '.zst' shards are decompressed while reading.
+///
+/// # Errors
+///
+/// If a file can't be read or written.
 fn merge_sort_edges(shards: &[String], out_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let t_total = Instant::now();
     let t = Instant::now();
@@ -366,6 +404,7 @@ fn merge_sort_edges(shards: &[String], out_path: &str) -> Result<(), Box<dyn std
     let buf_writer = BufWriter::with_capacity(1 << 23, f);
     let mut out = zstd::Encoder::new(buf_writer, 3)?;
 
+    /// Edges buffered before a write.
     const WRITE_BUF_EDGES: usize = 65_536;
     let mut write_buf: Vec<u8> = Vec::with_capacity(WRITE_BUF_EDGES * 16);
     let mut last: Option<(u64, u64)> = None;

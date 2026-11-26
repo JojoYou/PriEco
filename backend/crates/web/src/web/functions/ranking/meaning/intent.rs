@@ -1,5 +1,33 @@
+//! # Intent
+//!
+//! Heuristic query intent from keywords in 'intent.json'.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-07-07
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use prieco_core::{MATCHERS, QueryIntent};
 
+/// Classifies query intent.
+///
+/// First whole word keyword of the language wins, unsupported languages use English.
+/// Without keyword: 5+ words Informational, 1-2 words Navigational, otherwise Unknown.
+///
+/// # Arguments
+///
+/// * `query` - Query.
+/// * `lang` - Language code.
+///
+/// # Returns
+///
+/// Intent.
 pub fn intent(query: &str, lang: &str) -> QueryIntent {
     let lower_query = query.to_lowercase();
     let byte_lower = lower_query.as_bytes();

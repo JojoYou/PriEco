@@ -1,3 +1,26 @@
+//! # Dead Links Update
+//!
+//! [Update] that removes pages which don't respond anymore.
+//!
+//! ## Architecture
+//!
+//! 1. [**Page**:][PingDeadLinksUpdate::ping_with_retries] Pings page URL 3 times.
+//!     * 2xx, 401 and 403 count as alive.
+//! 2. [**Domain**:][PingDeadLinksUpdate::ping_with_retries] If page is dead, pings 'https://domain' 2 times.
+//!     * Dead domain is cached, its other pages are removed without ping.
+//! 3. Dead page is [deleted][UpdateAction::Deleted].
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-09-16
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use std::{thread::sleep, time::Duration};
 
 use dashmap::DashSet;
@@ -7,20 +30,29 @@ use url::Url;
 
 use crate::update::{Update, UpdateAction};
 
+/// Tokio runtime for blocking pings from the sync updater.
 static ASYNC_RUNTIME: Lazy<tokio::runtime::Runtime> =
     Lazy::new(|| tokio::runtime::Runtime::new().expect("Failed to build Tokio runtime"));
 
+/// Removes pages and domains that are offline.
 pub struct PingDeadLinksUpdate {
+    /// Domains found dead during this run.
     dead_domains: DashSet<String>,
 }
 
 impl PingDeadLinksUpdate {
+    /// Update with empty dead domains cache.
     pub fn new() -> Self {
         Self {
             dead_domains: DashSet::new(),
         }
     }
 
+    /// Pings `url` up to `retries` times, 500 ms apart.
+    ///
+    /// # Returns
+    ///
+    /// True on 2xx, 401 or 403 response.
     fn ping_with_retries(&self, url: &str, retries: u8) -> bool {
         for _ in 0..retries {
             if let Ok(response) =

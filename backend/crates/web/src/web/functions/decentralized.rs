@@ -1,3 +1,30 @@
+//! # Decentralization
+//!
+//! PriEco nodes find each other and search each other's index over Iroh.
+//!
+//! ## Architecture
+//!
+//! 1. [**Identity**:][get_iroh_secret] Every node keeps one Iroh secret key.
+//! 2. [**Join**:][Ticket] A ticket holds the gossip topic and known nodes.
+//! 3. [**Profile**:][build_node_profile] What a node has in its index.
+//!     * 20 biggest IVF buckets.
+//!     * [Bloom filter][KeywordBloom] of 5000 rare words (in 5-50 pages).
+//! 4. [**Gossip**:][gossip_sync] Profiles are sent on join, to new peers and every 2 hours.
+//!     * Profiles are kept in [PROFILE_CACHE]. 'offline' message removes a node.
+//! 5. [**Search**:][SearchProtocol] Peers send a [FedQuery], node answers with its top 20 results.
+//!     * Peers are picked by their profile, so not every node is asked.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-09-08
+//! * Last Modified: 2026-11-24
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 /*
   Import system libraries
 */
@@ -42,21 +69,30 @@ use crate::web::functions::{
 /*
   Constants
 */
+/// Iroh endpoint of this node, set on start.
 pub static IROH_ENDPOINT: OnceLock<Endpoint> = OnceLock::new();
+/// Size of [KeywordBloom], 4096 bits.
 const BLOOM_BYTES: usize = 512;
 
 // Ticket
+/// Invitation to the PriEco network.
+///
+/// As text it is lowercase base32 of JSON, set with `PRIECO_TICKET`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Ticket {
+    /// Gossip topic.
     pub topic: TopicId,
+    /// Nodes to connect to first.
     pub endpoints: Vec<EndpointAddr>,
 }
 
 impl Ticket {
+    /// Ticket from JSON.
     fn from_bytes(bytes: &[u8]) -> Result<Self, serde_json::Error> {
         serde_json::from_slice(bytes)
     }
 
+    /// Ticket as JSON.
     pub fn to_bytes(&self) -> Vec<u8> {
         serde_json::to_vec(self).expect("serde_json::to_vec is infallible")
     }
@@ -83,6 +119,7 @@ impl FromStr for Ticket {
 }
 
 // Secret
+/// Secret key from [IROH_SECRET_FILE], new one is generated and saved when missing or broken.
 pub fn get_iroh_secret() -> SecretKey {
     if !file_exists(IROH_SECRET_FILE) {
         return gen_iroh_secret();
@@ -101,6 +138,7 @@ pub fn get_iroh_secret() -> SecretKey {
     gen_iroh_secret()
 }
 
+/// Generates and saves new secret key.
 fn gen_iroh_secret() -> SecretKey {
     let secret = SecretKey::generate();
 
@@ -110,11 +148,16 @@ fn gen_iroh_secret() -> SecretKey {
 }
 
 // Profile
+/// Bloom filter of word hashes, 3 bits per word.
+///
+/// Bits are taken from the 12 bit parts of [url_to_id] of the word.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeywordBloom {
+    /// Exactly [BLOOM_BYTES].
     #[serde(deserialize_with = "exact_bloom_bits")]
     pub bits: Vec<u8>,
 }
+/// Rejects filters of wrong size from peers.
 fn exact_bloom_bits<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
     let bits = Vec::<u8>::deserialize(d)?;
     if bits.len() != BLOOM_BYTES {
@@ -127,12 +170,14 @@ fn exact_bloom_bits<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error
 }
 
 impl KeywordBloom {
+    /// Empty filter.
     pub fn new() -> Self {
         Self {
             bits: vec![0; BLOOM_BYTES],
         }
     }
 
+    /// Adds word hash.
     pub fn insert(&mut self, keyword_hash: u64) {
         let (h1, h2, h3) = Self::derive_hashes(keyword_hash);
         self.set_bit(h1);
@@ -140,11 +185,13 @@ impl KeywordBloom {
         self.set_bit(h3);
     }
 
+    /// True if word hash may be in, false if surely not.
     pub fn contains(&self, keyword_hash: u64) -> bool {
         let (h1, h2, h3) = Self::derive_hashes(keyword_hash);
         self.get_bit(h1) && self.get_bit(h2) && self.get_bit(h3)
     }
 
+    /// 3 bit positions from a hash.
     fn derive_hashes(h: u64) -> (usize, usize, usize) {
         let h1 = (h & 0xFFF) as usize;
         let h2 = ((h >> 12) & 0xFFF) as usize;
@@ -152,12 +199,14 @@ impl KeywordBloom {
         (h1, h2, h3)
     }
 
+    /// Sets bit `i`.
     fn set_bit(&mut self, i: usize) {
         if let Some(b) = self.bits.get_mut(i / 8) {
             *b |= 1 << (i % 8);
         }
     }
 
+    /// Reads bit `i`.
     fn get_bit(&self, i: usize) -> bool {
         self.bits
             .get(i / 8)
@@ -171,13 +220,24 @@ impl Default for KeywordBloom {
     }
 }
 
+/// What a node has in its index, shared over gossip.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeProfile {
+    /// Iroh public key.
     pub node_id: [u8; 32],
+    /// 20 biggest IVF buckets, sorted.
     pub top_centroids: Vec<usize>,
+    /// Rare words in the index.
     pub keyword: KeywordBloom,
 }
 
+/// Builds profile of this node.
+///
+/// Words come from the first Tantivy segment only.
+///
+/// # Arguments
+///
+/// * `node_id` - Iroh public key.
 pub fn build_node_profile(node_id: [u8; 32]) -> NodeProfile {
     // Vector index
     let mut centroid_sizes: Vec<(usize, u64)> = std::fs::read_dir(&PRIECO_CONFIG.vector_path)
@@ -241,18 +301,38 @@ pub fn build_node_profile(node_id: [u8; 32]) -> NodeProfile {
     }
 }
 
+/// Known peers and their profiles.
 pub static PROFILE_CACHE: Lazy<Arc<RwLock<HashMap<PublicKey, NodeProfile>>>> =
     Lazy::new(|| Arc::new(RwLock::new(HashMap::with_capacity(1_000))));
 
+/// Search request sent to a peer.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FedQuery {
+    /// User query.
     pub query: String,
+    /// Language.
     pub lang: String,
+    /// Location.
     pub loc: String,
+    /// 0 means don't search.
     pub depth: u8,
+    /// Query vector, peer doesn't embed it again.
     pub embed: Vec<f32>,
 }
 
+/// Joins gossip topic and keeps [PROFILE_CACHE] up to date. Runs until gossip stops.
+///
+/// # Arguments
+///
+/// * `gossip` - Iroh gossip.
+/// * `topic` - Topic from ticket.
+/// * `bootstrap_peers` - Nodes from ticket.
+/// * `my_profile` - Profile of this node.
+/// * `cache` - Where peer profiles are kept.
+///
+/// # Errors
+///
+/// If topic can't be joined.
 pub async fn gossip_sync(
     gossip: Gossip,
     topic: TopicId,
@@ -357,8 +437,13 @@ pub async fn gossip_sync(
     Ok(())
 }
 
+/// Answers [FedQuery] of other nodes.
+///
+/// Request max 1 MB. Search runs on own index without discovery and other nodes,
+/// results are merged with [RRF][ranking::rrf] (k = 60) and cut to 20.
 #[derive(Debug, Clone)]
 pub struct SearchProtocol {
+    /// Profile of this node.
     pub profile: NodeProfile,
 }
 

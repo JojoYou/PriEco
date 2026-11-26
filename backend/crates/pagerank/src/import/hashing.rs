@@ -1,14 +1,24 @@
-//!  File: pagerank/import/hashing.rs
-//!  Description:
+//! # Hashing
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! Import pass A. Reads link files and turns URLs into ids.
 //!
-//!  Date Created:: 2026-02-26
-//!  Last Modified: 2026-02-27
+//! ## Architecture
 //!
-//!  Usage:
-//!  TODO:
+//! 1. Every line 'from->to' is two [url ids][url_to_id] of [normalized][normalize_url] URLs.
+//!     * Self links are skipped.
+//! 2. Every [BUFFER_SIZE] pairs, a sorted unique shard is [written][flush_hash].
+//! 3. Read files are removed.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-02-26
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 /*
   Import system libraries
@@ -27,20 +37,38 @@ use prieco_core::{
     normalize_url, url_to_id,
 };
 
-/// Description: Classical call, split like this so that the tests could call it with custom paths
+/// Hashes [CONNECTIONS_DIR] into [EDGES_DIR].
 ///
-/// Input: None
-/// Output: Result shards paths
+/// Split from [run_in] so tests can use their own paths.
+///
+/// # Returns
+///
+/// Paths of shards.
+///
+/// # Errors
+///
+/// Same as [run_in].
 pub fn run() -> Result<Vec<String>, Box<dyn std::error::Error>> {
     run_in(CONNECTIONS_DIR, EDGES_DIR)
 }
 
-/*
-  Description: Reads connection files, hashes urls and writes them to disk shards
-
-  Input: None
-  Output: Result shards paths
-*/
+/// Hashes link files of `conn_dir` into shards in `edges_dir`.
+///
+/// Files that can't be opened are skipped.
+///
+/// # Arguments
+///
+/// * `conn_dir` - Link files.
+/// * `edges_dir` - Output directory.
+///
+/// # Returns
+///
+/// Paths of shards.
+///
+/// # Errors
+///
+/// * If `conn_dir` can't be read or is empty.
+/// * If shard can't be written.
 pub fn run_in(conn_dir: &str, edges_dir: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let mut file_buffer: Vec<(u64, u64)> = Vec::with_capacity(BUFFER_SIZE);
     let mut hash_shards_paths: Vec<String> = Vec::with_capacity(1_000);
@@ -109,12 +137,11 @@ pub fn run_in(conn_dir: &str, edges_dir: &str) -> Result<Vec<String>, Box<dyn st
 }
 
 /* Helper functions */
-/*
-  Description: Blocking write url ids to the disk
-
-  Input: Buffer to write, shard paths to insert new shards paths
-  Output: None
-*/
+/// Sorts, dedups and writes `buffer` as 'inc_hash_shard_N.bin', then clears it.
+///
+/// # Errors
+///
+/// If shard can't be written.
 fn flush_hash(
     buffer: &mut Vec<(u64, u64)>,
     shards_paths: &mut Vec<String>,

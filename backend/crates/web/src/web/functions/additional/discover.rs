@@ -1,7 +1,38 @@
+//! # Discovery Search
+//!
+//! Finds root domains PriEco doesn't know yet.
+//!
+//! ## Architecture
+//!
+//! 1. Query without spaces and quotes + every TLD from the list, e.g. 'prieco' → 'prieco.com', 'prieco.net'...
+//!     * Domains already in the index are skipped.
+//! 2. HEAD request to all of them at once, 400 ms timeout each, 450 ms in total.
+//! 3. Domains with 2xx are returned as results and sent to the crawler.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-06-27
+//! * Last Modified: 2026-11-26
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use prieco_core::{CLIENT, PRIECO_META, WebDocument, url_to_id};
 
 use crate::web::functions::general::favicon_url;
 
+/// Pings domains made from query.
+///
+/// # Arguments
+///
+/// * `query` - User query.
+///
+/// # Returns
+///
+/// Placeholder documents with domain as title and 'Adding to PriEco index...' as description.
 pub async fn discover_and_ping_domains(query: &str) -> Vec<WebDocument> {
     let trimmed = query.trim();
 

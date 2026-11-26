@@ -1,14 +1,26 @@
-//!  File: web/routes/apis.rs
-//!  Description: Opens up API endpoints
+//! # APIs
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! JSON and helper endpoints. Call them in browser, your app or curl.
 //!
-//!  Date Created: 2026-01-31
-//!  Last Modified: 2026-02-01
+//! * [**Search API**:][api] `GET /api`, results from PriEco index.
+//!     * Free: 25 searches a day per IP.
+//!     * Paid: API key with credits, bought on Polar, see [manage][crate::web::functions::api::manage].
+//! * [**Proxy**:][proxy_get] `GET`/`POST /proxy`, images and Search Expander files without leaking user IP.
+//! * [**Suggestions**:][om_sug] `GET /api/om_sug`, browser omnibox suggestions.
+//! * [**Analytics**:][pageview] `GET /pv`, anonymous page view.
+//! * [**Feedback**:][send_signal] `POST /submit_msg`, roadmap message to Signal.
+//! * [**Cache version**:][cache_ver] `GET /cache-ver`.
 //!
-//!  Usage: Call these APIs in browser, your app or culr...
-//!  TODO:
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-01-31
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 /*
   Import system libraries
@@ -53,22 +65,46 @@ use prieco_core::{
     local_redirect,
 };
 
+/// Where API credits can be bought.
 const POLAR_URL: &str = "https://buy.polar.sh/polar_cl_oj0yTj0z4isxyAzUEg33xBjerkhrJpIhclrHU484jSE";
 
-/// Description: Opens up API that calls PriEco index and returns results in JSON
-///
-/// Input: API key, language, location, query
-/// Output: JSON
+/// Query of [api].
 #[derive(FromForm)]
 pub struct APIParams<'r> {
+    /// API key. Missing or empty is a free request.
     pub a: Option<&'r str>,
+    /// Language code or 'all'.
     pub lang: &'r str,
+    /// Country code or 'all'.
     pub loc: &'r str,
+    /// Query.
     pub q: &'r str,
+    /// Goggle ids.
     pub goggles: Option<&'r str>,
+    /// Ask other nodes too, default true.
     pub dec: Option<bool>,
+    /// Add page content (first 500 characters), default false.
     pub content: Option<bool>,
 }
+/// Searches PriEco index and returns results in JSON. `GET /api?q=&lang=&loc=`
+///
+/// Every result has url, title, description, lang, loc, safe_s, image and optional content.
+/// Paid requests are billed only when there are results.
+///
+/// # Arguments
+///
+/// * `params` - [APIParams].
+///
+/// # Returns
+///
+/// Max 20 results. Empty when API env keys are missing.
+///
+/// # Errors
+///
+/// * 429 when free limit is reached.
+/// * 402 when API key is invalid or has no credits.
+///
+/// Both with `buy` link.
 #[get("/api?<params..>")]
 pub async fn api(
     params: APIParams<'_>,
@@ -207,12 +243,15 @@ pub async fn api(
     Ok(Json(results))
 }
 
-/*
-  Description: Proxy remote content, handles GET
-
-  Input: URL, Optional width, Optional height
-  Output: Content
-*/
+/// Proxies remote content, `GET /proxy?u=<URL encoded URL>`.
+///
+/// See [proxy_request].
+///
+/// # Errors
+///
+/// * 400 for invalid URL.
+/// * 403 for [local addresses][bad_url].
+/// * 415 for [not allowed type][allowed_type].
 #[get("/proxy?<u>")]
 pub async fn proxy_get(u: &str) -> Result<(ContentType, Vec<u8>), Status> {
     let decoded_url = match urlencoding::decode(u) {
@@ -240,12 +279,9 @@ pub async fn proxy_get(u: &str) -> Result<(ContentType, Vec<u8>), Status> {
     }
 }
 
-/*
-  Description: Proxy remote content, handles POST
-
-  Input: URL, Optional width, Optional height
-  Output: Content
-*/
+/// Proxies remote content with POST body, `POST /proxy?u=<URL encoded URL>`.
+///
+/// Same as [proxy_get].
 #[post("/proxy?<u>", data = "<body>")]
 pub async fn proxy_post(u: &str, body: Vec<u8>) -> Result<(ContentType, Vec<u8>), Status> {
     let decoded_url = match urlencoding::decode(u) {
@@ -274,12 +310,14 @@ pub async fn proxy_post(u: &str, body: Vec<u8>) -> Result<(ContentType, Vec<u8>)
 }
 
 /* Helper functions */
-/*
-  Description: Validates URL for Proxy for security reasons
-
-  Input: URL
-  Output: If URL is internal
-*/
+/// Checks if URL is unsafe to proxy, for security reasons.
+///
+/// Bad are: invalid URLs, URLs with user or password, hosts that don't resolve,
+/// loopback, private, link local and other local IPs.
+///
+/// # Returns
+///
+/// True if URL must not be proxied.
 fn bad_url(url: &Url) -> bool {
     if !is_valid_url(url.as_str()) {
         return true;
@@ -327,12 +365,13 @@ fn bad_url(url: &Url) -> bool {
     }
 }
 
-/*
-  Description: Validates Proxied content, allowed are all images and (CSS,JS) only from SearchExpander
-
-  Input: URL, Content type
-  Output: If type is allowed
-*/
+/// Checks proxied content type.
+///
+/// All images are allowed. CSS, JS and JSON only from Search Expander and DuckDuckGo.
+///
+/// # Returns
+///
+/// True if allowed.
 fn allowed_type(url: &Url, content_type: &ContentType) -> bool {
     let top = content_type.top().as_str(); // "image", "text", "application"
     let sub = content_type.sub().as_str(); // "png", "css", "javascript"
@@ -364,12 +403,26 @@ fn allowed_type(url: &Url, content_type: &ContentType) -> bool {
     }
 }
 
-/*
-  Description: Proxies the contenct based on request type from route
-
-  Input: URL, Optional body (JSON headers in the request), method (GET or POST), Optional width, Optional height
-  Output: Content
-*/
+/// Downloads content for the proxy.
+///
+/// Follows max 2 redirects, each one is checked by [bad_url].
+/// 'width' and 'height' are removed from Search Expander URLs.
+/// Failed responses return the image placeholder SVG.
+///
+/// # Arguments
+///
+/// * `url` - Remote URL.
+/// * `body` - JSON body for POST.
+/// * `method` - 'GET' or 'POST'.
+///
+/// # Returns
+///
+/// (content type, body).
+///
+/// # Errors
+///
+/// * 502 on network error or too many redirects.
+/// * 413 when over 10 MB.
 async fn proxy_request(
     url: &Url,
     body: Option<Vec<u8>>,
@@ -508,12 +561,7 @@ async fn proxy_request(
     Ok((content_type, body))
 }
 
-/*
-  Description: Detects content type from URL
-
-  Input: URL
-  Output: ContentType
-*/
+/// Content type from file extension, Binary when unknown.
 fn detect_content_type_from_url(url: &Url) -> ContentType {
     let path = Path::new(url.as_str());
     match path.extension().and_then(|ext| ext.to_str()) {
@@ -532,12 +580,7 @@ fn detect_content_type_from_url(url: &Url) -> ContentType {
     }
 }
 
-/*
-  Description: PriEco SW Cache version
-
-  Input:
-  Output: PriEco SW cache version
-*/
+/// Service worker cache version, `GET /cache-ver`. 'unknown' when file is missing.
 #[get("/cache-ver")]
 pub fn cache_ver() -> String {
     read_to_string(CACHE_VERSION_FILE)
@@ -545,12 +588,13 @@ pub fn cache_ver() -> String {
         .unwrap_or_else(|_| String::from("unknown"))
 }
 
-/*
-  Description: Increment pageview
-
-  Input:
-  Output: ok
-*/
+/// Counts anonymous page view, `GET /pv`.
+///
+/// See [prieco_core::AnalyticsDb::record_visitor], host is the counted entity.
+///
+/// # Returns
+///
+/// 'ok'
 #[get("/pv")]
 pub fn pageview(
     client_ip: ClientIp,
@@ -567,13 +611,22 @@ pub fn pageview(
     "ok"
 }
 
-// Sends to Roman Láncoš a signal message with message
+/// Roadmap feedback form.
 #[derive(FromForm)]
 pub struct RoadmapFeedback<'r> {
+    /// Message.
     pub message: &'r str,
+    /// Local page to go back to.
     pub return_path: &'r str,
 }
 
+/// Sends roadmap feedback to Roman Láncoš as a Signal message. `POST /submit_msg`
+///
+/// Uses signal-cli REST API on localhost:8071. Errors are only printed.
+///
+/// # Returns
+///
+/// Redirect to `return_path`, only [local][prieco_core::local_redirect].
 #[post("/submit_msg", data = "<feedback>")]
 pub async fn send_signal(feedback: Form<RoadmapFeedback<'_>>) -> Redirect {
     let signal_bot_number = match std::env::var("SIGNAL_BOT_NUMBER") {
@@ -623,11 +676,19 @@ pub async fn send_signal(feedback: Form<RoadmapFeedback<'_>>) -> Redirect {
     Redirect::to(local_redirect(feedback.return_path))
 }
 
+/// One suggestion from DuckDuckGo.
 #[derive(Deserialize)]
 struct DdgSuggestion {
     phrase: String,
 }
 
+/// Search suggestions for browser omnibox, `GET /api/om_sug?q=`.
+///
+/// From DuckDuckGo, empty on error.
+///
+/// # Returns
+///
+/// OpenSearch suggestions JSON: `[query, [suggestions]]`.
 #[get("/api/om_sug?<q>")]
 pub async fn om_sug(q: &str) -> Json<RocketValue> {
     if q.trim().is_empty() {

@@ -1,3 +1,30 @@
+//! # Page Metadata
+//!
+//! Builds [HTMLResultData] from parsed html.
+//!
+//! ## Architecture
+//!
+//! 1. [**Title**:][extract_title] og:site_name, then title, then first h1..h6.
+//!     * Cut to 60 characters.
+//! 2. [**Description**:][extract_description] og:description, then meta description, then first p.
+//!     * Cut to 160 characters.
+//! 3. **Text:** First 500 characters of h2-h6 and p.
+//! 4. **Keywords, favicon, first image.**
+//! 5. [**Language**:][get_language_code] Detected by whatlang from first ~200 characters of text.
+//! 6. [**Country**:][get_website_country] Domain → IP → GeoLite2 country.
+//! 7. [**NSFW**:][nsfw_check] Word lists for URL and text.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-06-16
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] Fallback language from country, as written in docs
+
 use ahash::AHashMap;
 use dashmap::DashMap;
 use maxminddb::geoip2::Country;
@@ -15,13 +42,35 @@ use whatlang::{Lang, detect_lang};
 
 use crate::mini_crawler::{HTMLResultData, PARSER_SELECTORS, is_valid_url};
 
+/// Domain → country code. Cleared when over 1 million entries.
 pub static DOMAIN_COUNTRY_CACHE: Lazy<Arc<DashMap<String, String>>> =
     Lazy::new(|| Arc::new(DashMap::with_capacity(500_000)));
 
+/// GeoLite2 Country database, built in.
 pub static GEOIP_DB: &[u8] = include_bytes!("data/GeoLite2-Country.mmdb");
+/// Reader of [GEOIP_DB].
 pub static GEOIP_READER: Lazy<maxminddb::Reader<&'static [u8]>> =
     Lazy::new(|| maxminddb::Reader::from_source(GEOIP_DB).expect("Failed to load GeoIP DB"));
 
+/// Extracts everything [HTMLResultData] needs from a parsed page.
+///
+/// `points`, `html` and `vector` stay empty.
+/// Country lookup does a blocking DNS request on cache miss.
+///
+/// # Arguments
+///
+/// * `document` - Parsed html.
+/// * `final_url` - URL after redirects.
+/// * `loading_time` - Download time in seconds.
+/// * `tag_data` - Output of [crate::tag_data::extract_tag_data].
+///
+/// # Returns
+///
+/// Page data, title is empty if none was found.
+///
+/// # Panics
+///
+/// Only if system runs out of memory.
 pub fn extract_metadata(
     document: &Html,
     final_url: &str,
@@ -186,10 +235,13 @@ pub fn extract_metadata(
     result
 }
 
-/// Description: Extract title text from html
+/// Gets page title.
 ///
-/// Input: document
-/// Output: title as String
+/// Order: og:site_name, title tag, first h1..h6.
+///
+/// # Returns
+///
+/// Title or empty string.
 fn extract_title(
     document: &Html,
     og_selector: &Selector,
@@ -230,12 +282,14 @@ fn extract_title(
     String::new()
 }
 
-/*
-  Description: Extract description text from html
-
-  Input: document, title
-  Output: description as String
-*/
+/// Gets page description.
+///
+/// Order: og:description, meta description, first p.
+/// Candidates equal to `title` are skipped.
+///
+/// # Returns
+///
+/// Description or empty string.
 fn extract_description(
     document: &Html,
     og_selector: &Selector,
@@ -274,11 +328,14 @@ fn extract_description(
     String::new()
 }
 
-/*
-  Description: Get country from URL
-  Input: URL
-  Output: Country name as String
-*/
+/// Gets country of the server hosting `url`.
+///
+/// Resolves domain on port 443, then 80 and looks the IP up in [GEOIP_READER].
+/// Results are cached in [DOMAIN_COUNTRY_CACHE].
+///
+/// # Returns
+///
+/// Lowercase ISO country code or empty string.
 fn get_website_country(url: &str) -> String {
     // Get domain from URL
     let domain: String = get_domain(url, true);
@@ -338,6 +395,11 @@ fn get_website_country(url: &str) -> String {
     country_code
 }
 
+/// Converts whatlang ISO 639-3 code to ISO 639-1.
+///
+/// # Returns
+///
+/// Code of a supported language or empty string.
 fn get_language_code(lang_info: Option<Lang>) -> String {
     match lang_info {
         Some(info) => match info.code() {
@@ -380,12 +442,15 @@ fn get_language_code(lang_info: Option<Lang>) -> String {
     }
 }
 
-/*
-  Description: Check if web page's content is NSFW
-
-  Input: result
-  Output: answer (True if web page is NSFW, False otherwise)
-*/
+/// Checks if page is NSFW.
+///
+/// 1. URL contains a bad word: NSFW.
+/// 2. Text has 5 or more different science terms: not NSFW.
+/// 3. Text has 3 or more different bad words: NSFW.
+///
+/// # Returns
+///
+/// True if NSFW, false otherwise.
 fn nsfw_check(result: &HTMLResultData) -> bool {
     // List of bad words for URL check
     let bad_words_url = vec![
@@ -625,12 +690,16 @@ fn nsfw_check(result: &HTMLResultData) -> bool {
     false
 }
 
-/*
-  Description: Gets domain from URL
-
-  Input: URL, if remove_www
-  Output: domain
-*/
+/// Gets domain from URL.
+///
+/// # Arguments
+///
+/// * `url` - URL.
+/// * `remove_www` - Strip 'www.'.
+///
+/// # Returns
+///
+/// Domain or empty string, error is printed.
 pub fn get_domain(url: &str, remove_www: bool) -> String {
     if url.is_empty() {
         return String::new();

@@ -1,14 +1,26 @@
-//!  File: pagerank/iter/iterate.rs
-//!  Description:
+//! # Iterate
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! Streaming power iteration over the CSR graph.
 //!
-//!  Date Created:: 2026-02-26
-//!  Last Modified: 2026-02-31
+//! ## Architecture
 //!
-//!  Usage:
-//!  TODO:
+//! 1. Out degrees are loaded to RAM, offsets are memory mapped.
+//! 2. Every iteration streams [CSR_EDGES] once.
+//!     * score = (1 - d) / N + d × dangling / N + d × Σ score(src) / out_degree(src)
+//!     * Score of pages without outgoing links (dangling) is spread over all pages.
+//! 3. Old and new scores switch between [SCORES_A] and [SCORES_B].
+//! 4. Stops when max change is under [EPSILON] or after [MAX_ITER].
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-02-26
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 /*
   Import system libraries
@@ -32,10 +44,20 @@ use prieco_core::globals::icons;
 /*
   Constants
 */
+/// Chance of following a link.
 const DAMPING: f32 = 0.85;
+/// Max score change to stop.
 const EPSILON: f32 = 1e-6;
+/// Max iterations.
 const MAX_ITER: usize = 100;
 
+/// Runs power iteration on default files.
+///
+/// Split from [run_with] so tests can use their own paths.
+///
+/// # Errors
+///
+/// Same as [run_with].
 pub fn run(total_nodes_usize: usize) -> Result<String, Box<dyn std::error::Error>> {
     run_with(
         total_nodes_usize,
@@ -47,6 +69,30 @@ pub fn run(total_nodes_usize: usize) -> Result<String, Box<dyn std::error::Error
     )
 }
 
+/// Runs power iteration.
+///
+/// Starting scores must be in `scores_a_path`.
+///
+/// # Arguments
+///
+/// * `total_nodes_usize` - Number of nodes.
+/// * `csr_offsets_path` - CSR offsets.
+/// * `csr_edges_path` - CSR edges.
+/// * `out_degree_path` - Out degrees.
+/// * `scores_a_path` - Scores A.
+/// * `scores_b_path` - Scores B.
+///
+/// # Returns
+///
+/// Path of the file with final scores, A or B.
+///
+/// # Errors
+///
+/// If a file can't be opened or written.
+///
+/// # Panics
+///
+/// If out degree file is shorter than `total_nodes_usize`.
 pub fn run_with(
     total_nodes_usize: usize,
     csr_offsets_path: &str,

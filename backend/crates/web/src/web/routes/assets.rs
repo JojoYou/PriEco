@@ -1,14 +1,22 @@
-//!  File: web/routes/assets.rs
-//!  Description: Handles PriEco's static assets
+//! # Assets
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! Files that have to be on the root or are built per request.
 //!
-//!  Date Created: 2026-01-31
-//!  Last Modified: 2026-02-01
+//! * [sw_js], [unduck_js] - Service worker and unduck, had to be moved to root.
+//! * [security], [robots] - '.well-known/security.txt' and 'robots.txt'.
+//! * [osd] - OpenSearch description, for Firefox default search engine.
+//! * [script] - JavaScript built from Handlebars templates.
 //!
-//!  Usage: Call routes to get PriEco's static assets
-//!  TODO:
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-01-31
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 /*
   Import system libraries
@@ -35,8 +43,11 @@ use urlencoding::encode;
 /*
 Structures
 */
+/// Image response from memory.
 pub struct DecompressedImage {
+    /// Image bytes.
     data: Vec<u8>,
+    /// Image type.
     content_type: ContentType,
 }
 
@@ -49,10 +60,7 @@ impl<'r> Responder<'r, 'static> for DecompressedImage {
     }
 }
 
-/// Description: PriEco service worker. Had to be moved to root
-///
-/// Input:
-/// Output: Service worker JS
+/// PriEco service worker, `GET /sw.js`. Had to be moved to root.
 #[get("/sw.js")]
 pub async fn sw_js() -> Option<NamedFile> {
     NamedFile::open(Path::new(&format!("{}/js/unduck/sw.js", STATIC_DIR)))
@@ -60,12 +68,7 @@ pub async fn sw_js() -> Option<NamedFile> {
         .ok()
 }
 
-/*
-  Description: PriEco unduck. Had to be moved to root
-
-  Input:
-  Output: Unduck JS
-*/
+/// PriEco unduck, `GET /unduck.js`. Had to be moved to root.
 #[get("/unduck.js")]
 pub async fn unduck_js() -> Option<NamedFile> {
     NamedFile::open(Path::new(&format!("{}/js/unduck/unduck.js", STATIC_DIR)))
@@ -73,12 +76,9 @@ pub async fn unduck_js() -> Option<NamedFile> {
         .ok()
 }
 
-/*
-  Description: Send here any vulnerabilities you find. I don't pay for now but appreciate your help
-
-  Input:
-  Output: Information
-*/
+/// `GET /.well-known/security.txt`
+///
+/// Send here any vulnerabilities you find. I don't pay for now but appreciate your help.
 #[get("/.well-known/security.txt")]
 pub async fn security() -> RawText<&'static str> {
     RawText(
@@ -86,23 +86,16 @@ pub async fn security() -> RawText<&'static str> {
     )
 }
 
-/*
-  Description: Communicate to bots which pages they can access
-
-  Input:
-  Output: Information
-*/
+/// `GET /robots.txt`. Bots can access everything except '/search'.
 #[get("/robots.txt")]
 pub async fn robots() -> RawText<&'static str> {
     RawText("User-agent: *\nDisallow: /search")
 }
 
-/*
-  Description: File required for Firefox to set PriEco as default search engine
-
-  Input:
-  Output: PriEco as your default search engine
-*/
+/// OpenSearch description, `GET /osd.xml`.
+///
+/// File required for Firefox to set PriEco as default search engine.
+/// On '.onion' host it points to the onion address.
 #[get("/osd.xml")]
 pub fn osd(host: &Host) -> RawXml<String> {
     let (short_name, base_url, search_url) = if host.domain().as_str().ends_with(".onion") {
@@ -137,12 +130,22 @@ pub fn osd(host: &Host) -> RawXml<String> {
     RawXml(xml)
 }
 
-/*
-  Description: Assemble JavaScript templates
-
-  Input: JS template name, Optional type, Optional language, Optional location, Optional query
-  Output:
-*/
+/// JavaScript from template 'static/js/hbs/`script_name`'. `GET /static/js/hbs/<script_name>`
+///
+/// Names with '..' or '/' give empty script.
+///
+/// # Arguments
+///
+/// * `script_name` - Template file.
+/// * `t` - Search type.
+/// * `lang` - Language.
+/// * `loc` - Location.
+/// * `q` - Query, URL encoded in output.
+/// * `dec` - Decentralized search, default true.
+///
+/// # Returns
+///
+/// Rendered script, or `console.error` with the reason.
 #[get("/static/js/hbs/<script_name>?<t>&<lang>&<loc>&<q>&<dec>")]
 pub fn script(
     script_name: &str,

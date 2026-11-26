@@ -1,14 +1,26 @@
-//!  File: set_up.rs
-//!  Description: Loads config or questions user
+//! # Set Up
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! Loads node config, or asks the user on first run.
 //!
-//!  Date Created: 2026-01-31
-//!  Last Modified: 2026-02-06
+//! ## Architecture
 //!
-//!  Usage: Run PriEco and complete set up questions
-//!  TODO:
+//! 1. [**Load**:][load_config] [CONFIG_FILE] if it exists.
+//! 2. [**Ask**:][check_env] Otherwise 7 questions, every one can be answered by env variable.
+//!     * `PRIECO_IP`, `PRIECO_PORT`, `PRIECO_TANTIVY`, `PRIECO_META`, `PRIECO_VECTOR`,
+//!       `PRIECO_BLOB`, `PRIECO_WORKERS`.
+//! 3. [**Dirs**:][create_dirs] Creates index directories.
+//! 4. [**Save**:][save_config] Writes [CONFIG_FILE].
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-01-31
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] Ask for `enable_*` services, now all are on
 
 use std::{
     fs::{create_dir_all, read_to_string, write},
@@ -24,8 +36,25 @@ use crate::{
     globals::{PriEcoConfig, colors},
 };
 
+/// Number of set up questions.
 const TOTAL_QUESTIONS: usize = 7;
 
+/// Returns node config, asks for it on first run.
+///
+/// All `enable_*` services are on in a new config.
+///
+/// # Arguments
+///
+/// None
+///
+/// # Returns
+///
+/// Loaded or new config.
+///
+/// # Panics
+///
+/// Exits the process on invalid IP, port or number of workers.
+/// Panics if stdin or stdout fails.
 pub fn set_up_wizard() -> PriEcoConfig {
     let mut conf = PriEcoConfig {
         ip: String::from("0.0.0.0"),
@@ -156,6 +185,7 @@ pub fn set_up_wizard() -> PriEcoConfig {
     conf
 }
 
+/// Value of env variable `env_key`, otherwise [asks][ask] the user.
 fn check_env(env_key: &str, prompt: &str, default: &str) -> String {
     if let Ok(val) = std::env::var(env_key) {
         println!("Loaded {} from environment.", env_key);
@@ -166,6 +196,15 @@ fn check_env(env_key: &str, prompt: &str, default: &str) -> String {
 }
 
 /* Helper functions */
+/// Prints `prompt` and reads a line from stdin.
+///
+/// # Returns
+///
+/// Trimmed answer, `default` when empty.
+///
+/// # Panics
+///
+/// If stdin or stdout fails.
 fn ask(prompt: &str, default: &str) -> String {
     print!("{}", prompt);
     stdout().flush().unwrap();
@@ -180,17 +219,20 @@ fn ask(prompt: &str, default: &str) -> String {
         value.to_string()
     }
 }
+/// Saves config as pretty JSON to [CONFIG_FILE].
 fn save_config(conf: &PriEcoConfig) -> std::io::Result<()> {
     let json = serde_json::to_string_pretty(&conf)?;
     write(CONFIG_FILE, json)?;
     Ok(())
 }
+/// Loads [CONFIG_FILE], `None` if it is missing or broken.
 fn load_config() -> Option<PriEcoConfig> {
     let data = read_to_string(CONFIG_FILE).ok()?;
     let config: PriEcoConfig = serde_json::from_str(&data).ok()?;
     Some(config)
 }
 
+/// Creates index directories and the config directory. Errors are printed.
 fn create_dirs(conf: &PriEcoConfig) {
     let mut paths: Vec<&Path> = vec![
         std::path::Path::new(&conf.tantivy_path),

@@ -1,12 +1,38 @@
+//! # Page Download
+//!
+//! Downloads a single page for [crate::mini_crawler].
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-06-16
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use primp::Client;
 use url::Url;
 
 use std::time::Instant;
 
-/// Description: Download remote file
+/// Downloads remote page.
 ///
-/// Input: Client, URL
-/// Output: body, status_code, downloading_time, final_url
+/// When the request fails and host is an apex domain ('example.com'),
+/// it tries once more with 'www.'. Redirects are followed by `client`.
+///
+/// # Arguments
+///
+/// * `client` - HTTP client.
+/// * `url` - Page URL.
+///
+/// # Returns
+///
+/// (body, status code, download time in seconds, final URL after redirects).
+///
+/// All empty and 0 when request fails. Only body is empty when it can't be read.
 pub async fn download(client: &Client, url: &str) -> (String, u16, f64, String) {
     let start_downloading_time = Instant::now();
     let mut current_url = url.to_string();

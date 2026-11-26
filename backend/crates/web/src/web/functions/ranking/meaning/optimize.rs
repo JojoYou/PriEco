@@ -1,7 +1,32 @@
+//! # Synonyms and Optimization
+//!
+//! Rewrites query into a Tantivy query.
+//!
+//! ## Architecture
+//!
+//! 1. Queries with operators ('"', ':', '-', '|', OR, AND) or 'def' stay as they are.
+//! 2. Stop words are removed.
+//! 3. Every word: `"word"^2.0` OR 2 synonyms with `^1.0`. User's words are worth more.
+//!     * Local words like 'near' get no synonyms.
+//! 4. Entities: exact phrase in title, description or keywords. Business `^3.0`, place and name `^2.5`.
+//! 5. More groups: (all groups required)^3.0 OR (any group).
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-07-07
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use ahash::AHashSet;
 use once_cell::sync::Lazy;
 use prieco_core::{EntityType, LOCAL_NO_EXPAND, QueryIntent, TaggedEntity, get_store};
 
+/// English stop words, removed from query.
 static STOPWORDS: Lazy<AHashSet<&'static str>> = Lazy::new(|| {
     let mut set = AHashSet::new();
     let words = [
@@ -14,6 +39,18 @@ static STOPWORDS: Lazy<AHashSet<&'static str>> = Lazy::new(|| {
     set
 });
 
+/// Adds synonyms and optimizes query for faster full text search.
+///
+/// # Arguments
+///
+/// * `query` - Query, replaced by the Tantivy query.
+/// * `lang` - Language of synonyms.
+/// * `intent` - Query intent.
+/// * `tags` - Entities in query.
+///
+/// # Returns
+///
+/// None
 pub fn synynyms_and_optimize(
     query: &mut String,
     lang: &str,

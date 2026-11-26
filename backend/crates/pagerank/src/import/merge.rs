@@ -1,3 +1,25 @@
+//! # Merge
+//!
+//! Import pass B. Gives every new url id a node id.
+//!
+//! ## Architecture
+//!
+//! 1. Every hash shard becomes a sorted shard of unique url ids.
+//! 2. Url ids not in [ID_MAP_FILE] get new node ids, starting after the old node count.
+//!     * Old ids never change.
+//! 3. Old map and new entries are merged into a new sorted map, which replaces the old one.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-02-26
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 /*
   Import system libraries
 */
@@ -13,20 +35,39 @@ use std::{
 use crate::compute::{BUFFER_SIZE, IdMap, MERGED_DIR, NODES_DIR, TOTAL_NODES, read_u64_pair};
 use prieco_core::ID_MAP_FILE;
 
-/// Description: Classical call, split like this so that the tests could call it with custom paths
+/// Merges hash shards into [ID_MAP_FILE].
 ///
-/// Input: paths of shard files
-/// Output: Total number of nodes after merge
+/// Split from [run_with] so tests can use their own paths.
+///
+/// # Returns
+///
+/// Total number of nodes after merge.
+///
+/// # Errors
+///
+/// Same as [run_with].
 pub fn run(hash_shards: &[String]) -> Result<u64, Box<dyn std::error::Error>> {
     run_with(hash_shards, ID_MAP_FILE, NODES_DIR, MERGED_DIR, TOTAL_NODES)
 }
 
-/*
-  Description: Merge new hash shards into a globalx ID map
-
-  Input: paths of shard files
-  Output: Total number of nodes after merge
-*/
+/// Merges hash shards into id map.
+///
+/// # Arguments
+///
+/// * `hash_shards` - Shards from [hashing][crate::import::hashing].
+/// * `id_map` - Id map file.
+/// * `nodes_dir` - Directory for node shards.
+/// * `merged_dir` - Directory for the new map before rename.
+/// * `total_nodes_path` - File with node count, missing means 0.
+///
+/// # Returns
+///
+/// Total number of nodes after merge.
+///
+/// # Errors
+///
+/// * If a file can't be read or written.
+/// * If `total_nodes_path` isn't a number.
 pub fn run_with(
     hash_shards: &[String],
     id_map: &str,
@@ -179,12 +220,7 @@ pub fn run_with(
 }
 
 /* Helper functions */
-/*
-  Description: Read a single u64 from a Zstd-decoded file
-
-  Input: Zstd decoder
-  Output: Option id
-*/
+/// Reads one little endian u64, `None` at end.
 fn read_u64(r: &mut BufReader<File>) -> Option<u64> {
     let mut buf = [0u8; 8];
     r.read_exact(&mut buf).ok().map(|_| u64::from_le_bytes(buf))

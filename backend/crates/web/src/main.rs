@@ -1,14 +1,32 @@
-//!  File: main.rs
-//!  Description: Sets up configuration for PriEco, starts web server and threads
+//! # PriEco
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! The PriEco node: website, search and background services in one binary.
 //!
-//!  Date Created: 2025-09-20
-//!  Last Modified: 2026-01-31
+//! ## Architecture
 //!
-//!  Usage: Run PriEco and complete set up questions
-//!  TODO:
+//! 1. [**Config**:][prieco_core::set_up] Loads config or asks set up questions.
+//! 2. **Decentralization:** Starts Iroh endpoint and gossip, see [web::functions::decentralized].
+//! 3. [**Threads**:][thread_manager] Background services, each one can be turned off in config.
+//!     * Blob import every minute.
+//!     * Inserter every minute.
+//!     * PageRank every 3 hours.
+//!     * Mini crawler, only with `PRIECO_TICKET`.
+//!     * Index updater every hour.
+//! 4. **Web server:** Rocket with [GlobalHeaders], routes in [web::routes].
+//!     * '/static' assets, '/docs' MkDocs and API docs.
+//!
+//! [Stop file][prieco_core::STOP_FILE] stops background loops.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2025-09-20
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 /*
   Set global allovator
@@ -64,6 +82,7 @@ use tokenizers::{PaddingDirection, PaddingParams, PaddingStrategy, Tokenizer};
 /*
   Import own libraries
 */
+/// Website: routes, search and modules.
 pub mod web;
 use crate::web::{
     functions::{
@@ -95,6 +114,10 @@ use prieco_pagerank as pagerank;
 /*
   Set PriEco web server headers
 */
+/// Fairing for every request and response.
+///
+/// * **Request:** Sets 'lang' and 'loc' cookies from Accept-Language when they are missing. Not on '.onion'.
+/// * **Response:** CORS, CSP, no referrer, no cache. '/docs' gets a CSP that allows inline scripts for MkDocs.
 pub struct GlobalHeaders;
 #[rocket::async_trait]
 impl Fairing for GlobalHeaders {
@@ -174,10 +197,17 @@ impl Fairing for GlobalHeaders {
     }
 }
 
-/// Description: Creates embeder + launches thread manager + launches Rocket web server
+/// Starts PriEco.
 ///
-/// Input: None
-/// Output: None
+/// Launches decentralization, background tasks, [thread_manager] and the Rocket web server.
+///
+/// # Returns
+///
+/// `Err` if Rocket fails to launch.
+///
+/// # Panics
+///
+/// If config, Iroh or embedding model can't be loaded.
 #[main]
 #[allow(clippy::result_large_err)]
 async fn main() -> Result<(), rocket::Error> {
@@ -511,10 +541,17 @@ async fn main() -> Result<(), rocket::Error> {
     Ok(())
 }
 
-/// Description: Manages different PriEco threads like blob storage, database insertion and mini crawler
+/// Runs enabled background services in their own threads and waits for them.
 ///
-/// Input: None
-/// Output: None
+/// Inserter thread gets idle IO priority.
+///
+/// # Arguments
+///
+/// None
+///
+/// # Returns
+///
+/// When all threads stopped.
 fn thread_manager() {
     // Initialize
     let _ = &*PRIECO_META;
@@ -618,7 +655,9 @@ fn thread_manager() {
 }
 
 /* Helper functions */
-// Vector embeder creation
+/// Loads tokenizer of the embedding model with right padding.
+///
+/// Exits the process if it can't be loaded.
 fn create_tokenizer() -> Tokenizer {
     let mut tokenizer: Tokenizer = match Tokenizer::from_bytes(VECTOR_EMBEDDING_TOKENIZER) {
         Ok(tokenizer) => tokenizer,
@@ -644,6 +683,9 @@ fn create_tokenizer() -> Tokenizer {
     tokenizer
 }
 
+/// Loads embedding model, on CUDA when the `cuda` feature is on.
+///
+/// Falls back to CPU if CUDA fails. Exits the process if model can't be loaded.
 fn create_embeder() -> Session {
     let environment: Arc<Environment> = match Environment::builder()
         .with_name("embedder")
@@ -709,15 +751,18 @@ fn create_embeder() -> Session {
     }
 }
 
-/*
-  Description: Checks if stop.txt exists, used for stopping threads
-
-  Input: None
-  Output: true if stop.txt exists, false otherwise
-*/
+/// Unix time of last [stop file][prieco_core::STOP_FILE] check.
 static LAST_CHECK: AtomicU64 = AtomicU64::new(0);
+/// Last result of the check.
 static STOP_FLAG: AtomicBool = AtomicBool::new(false);
 
+/// Checks if [stop file][prieco_core::STOP_FILE] exists, used for stopping threads.
+///
+/// File is checked at most once a second.
+///
+/// # Returns
+///
+/// True if threads should stop.
 pub fn stop_requested() -> bool {
     if STOP_FLAG.load(Ordering::Relaxed) {
         return true;

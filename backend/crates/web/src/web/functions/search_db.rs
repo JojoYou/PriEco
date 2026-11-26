@@ -67,34 +67,61 @@ use prieco_core::{
 /*
   Constants
 */
+/// Max full text results.
 const MAX_FTS: usize = 160;
+/// Max vector results.
 const MAX_IVF: usize = 200;
+/// IVF buckets searched per query.
 const NPROBS: usize = 4;
+/// Top results that get PageRank.
 const PAGERANK_CUTOFF: usize = 100;
+/// Top results that go through reranker.
 const RERANK_CUTOFF: usize = 30;
+/// Max results from one domain.
 const MAX_PER_DOMAIN: usize = 5;
 
 /*
   Structures
 */
+/// 'query_lang_loc...' → ranked results, only for [PRIECO_INDEX].
 pub static QUERY_CACHE: Lazy<RwLock<HashMap<String, Vec<WebDocument>>>> =
     Lazy::new(|| RwLock::new(HashMap::with_capacity(1_000)));
 
+/// Input of [run].
+pub struct SearchDBParams<'r> {
+    /// Where results are pushed.
+    pub results: &'r mut Vec<SearchResult>,
+    /// Search query.
+    pub query: &'r str,
+    /// Prefered language.
+    pub lang: &'r str,
+    /// Prefered location.
+    pub loc: &'r str,
+    /// Query embedder.
+    pub embedding_service: &'r State<EmbeddingService>,
+    /// Filters.
+    pub goggles: Vec<Arc<GoggleRules>>,
+    /// Is user using mobile.
+    pub mobile: bool,
+    /// Ask peers too.
+    pub decentralize: bool,
+    /// Hide NSFW results.
+    pub safe_search: bool,
+    /// Query intent, from [query_intent].
+    pub intent: QueryIntent,
+    /// How many results to return.
+    pub limit: usize,
+}
+
 /// # Calls [run_json]() and creates [SearchResult]
 ///
-/// This funtion calls [run_json]() for JSON results.
+/// This function calls [run_json]() for JSON results.
 /// Generates result info, the 3 dots next to each result.
-/// Formats JSON as a [SearchResult] object and pushes them to a vector.
+/// Formats JSON as a [SearchResult] object and pushes them to `results`.
 ///
 /// # Arguments
 ///
-/// * `results` - Mutable vector of [SearchResult].
-/// * `query` - Search query.
-/// * `lang` - Prefered language.
-/// * `loc` - Prefered location.
-/// * `embedding_manager` - Query embedder.
-/// * `goggles` - Filters.
-/// * `mobile` - Is user using mobile.
+/// * `params` - [SearchDBParams].
 ///
 /// # Returns
 ///
@@ -103,20 +130,6 @@ pub static QUERY_CACHE: Lazy<RwLock<HashMap<String, Vec<WebDocument>>>> =
 /// # Panics
 ///
 /// Only if system runs out of memory.
-pub struct SearchDBParams<'r> {
-    pub results: &'r mut Vec<SearchResult>,
-    pub query: &'r str,
-    pub lang: &'r str,
-    pub loc: &'r str,
-    pub embedding_service: &'r State<EmbeddingService>,
-    pub goggles: Vec<Arc<GoggleRules>>,
-    pub mobile: bool,
-    pub decentralize: bool,
-    pub safe_search: bool,
-    pub intent: QueryIntent,
-    pub limit: usize,
-}
-
 pub async fn run(params: SearchDBParams<'_>) {
     let local_results = run_json(
         params.query,
@@ -240,6 +253,7 @@ pub async fn run(params: SearchDBParams<'_>) {
     }
 }
 
+/// Intent of query, same as [run_json] gets it.
 pub fn query_intent(query: &str, lang: &str, loc: &str) -> QueryIntent {
     let mut fts_query = normalize_search_operators(query);
     ranking::meaning::call::process_query(&mut fts_query, lang, loc).0
@@ -605,6 +619,28 @@ pub async fn run_json(
         .filter_map(|s| serde_json::to_value(s).ok())
         .collect()
 }
+/// # Runs all index searches at the same time
+///
+/// Used by [run_json] and by [peers][crate::web::functions::decentralized::SearchProtocol].
+///
+/// # Arguments
+///
+/// * `query` - Search query.
+/// * `lang` - Prefered language.
+/// * `loc` - Prefered location.
+/// * `intent` - [QueryIntent].
+/// * `embed` - Query vector.
+/// * `_run_discovery` - Discovery search, currently off.
+/// * `goggles` - Filters.
+/// * `index` - Index to search.
+///
+/// # Returns
+///
+/// (direct, full text, vector, discovery) results, each sorted.
+///
+/// # Panics
+///
+/// Only if system runs out of memory.
 #[allow(clippy::too_many_arguments)]
 pub async fn run_core_search(
     query: &str,
@@ -612,7 +648,7 @@ pub async fn run_core_search(
     loc: &str,
     intent: &QueryIntent,
     embed: Vec<f32>,
-    run_discovery: bool,
+    _run_discovery: bool,
     goggles: Vec<Arc<GoggleRules>>,
     index: Arc<PriecoIndex>,
 ) -> (
@@ -624,7 +660,7 @@ pub async fn run_core_search(
     let total_start = std::time::Instant::now();
     let q_clone = query.to_string();
     let q_clone3 = q_clone.clone();
-    let q_clone4 = q_clone.clone();
+    let _q_clone4 = q_clone.clone();
 
     let fts_query = normalize_search_operators(&q_clone);
     let fts_original_query = fts_query.clone();
@@ -779,10 +815,14 @@ pub async fn run_core_search(
 
 /* Index search functions */
 
+/// `site:` operator.
+static SITE_EXTRACT_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)(site|domain):([^\s\(\)]+)").unwrap());
+
 /// # Performs FTS index search.
 ///
-/// This funtion prepares a Tantivy call and performs it.
-/// FOr curation uses [QueryIntent], prefered lang and goggles (discard filter).
+/// This function prepares a Tantivy call and performs it.
+/// For curation uses [QueryIntent], prefered lang and goggles (discard filter).
 ///
 /// # Arguments
 ///
@@ -801,9 +841,6 @@ pub async fn run_core_search(
 /// # Panics
 ///
 /// Only if system runs out of memory.
-static SITE_EXTRACT_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)(site|domain):([^\s\(\)]+)").unwrap());
-
 fn search_tantivy(
     index: &PriecoIndex,
     query_text: &str,
@@ -926,7 +963,7 @@ fn search_tantivy(
 
 /* Helper functions*/
 
-/// # Fetches documents from [PRIECO_FJALL] meta storage.
+/// # Fetches documents from meta storage.
 ///
 /// This funtion takes in batch all IDs needed for fetching.
 /// Deduplicates IDs.
@@ -1040,11 +1077,17 @@ fn fetch_documents(
     final_results
 }
 
+/// Removes `"` and `'` from text.
 fn sanitize_string(s: &str) -> String {
     s.replace(['"', '\''], "")
 }
 
-/// Helper function for discarting results whose path matches discard Goggle filter
+/// Checks if URL matches a goggle path pattern.
+///
+/// * `^/path$` - Exact.
+/// * `^/path` - Starts with.
+/// * `/path$` - Ends with.
+/// * `/path` - Contains.
 pub fn path_matches(url: &str, pattern: &str) -> bool {
     if let Some(rest) = pattern.strip_prefix('^') {
         if let Some(core) = rest.strip_suffix('$') {
@@ -1058,9 +1101,15 @@ pub fn path_matches(url: &str, pattern: &str) -> bool {
     url.contains(pattern)
 }
 
+/// `before:` and `after:` with YYYY-MM-DD.
 static DATE_OPERATOR_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)(before|after):(\d{4}-\d{2}-\d{2})").unwrap());
 
+/// Turns user operators into Tantivy syntax.
+///
+/// * `before:2026-01-02` → `date:{* TO 260102}`, `after:` the other way.
+/// * `intitle:` → `title:`.
+/// * ` | ` → ` OR `.
 fn normalize_search_operators(query: &str) -> String {
     let mut normalized = query.to_string();
 

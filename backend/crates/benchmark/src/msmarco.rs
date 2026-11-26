@@ -45,6 +45,7 @@ use std::{
 */
 use flate2::read::GzDecoder;
 use parking_lot::Mutex;
+use tokio::task::spawn_blocking;
 use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
 /*
@@ -66,6 +67,7 @@ use prieco_insert::db_insert;
 /*
   Constants
 */
+/// Everything downloaded into [MSMARCO_DIR].
 const FILES: &[&str] = &[
     // Corpus: docid \t url \t title \t body
     "https://msmarco.z22.web.core.windows.net/msmarcoranking/msmarco-docs.tsv.gz",
@@ -82,9 +84,15 @@ const FILES: &[&str] = &[
     "https://trec.nist.gov/data/deep/2019qrels-pass.txt",
     "https://trec.nist.gov/data/deep/2020qrels-pass.txt",
 ];
+/// Document corpus: docid, url, title, body.
 const CORPUS_FILE: &str = "msmarco-docs.tsv.gz";
+
+/// Documents per inserter '.zip'.
 const DOCS_PER_ZIP: usize = 100_000;
+/// Body characters used as description.
 const DESCRIPTION_CHARS: usize = 300;
+
+/// Run name in TREC run files.
 const RUN_TAG: &str = "prieco";
 
 /// TREC DL query: name, queries file, qrels file
@@ -120,13 +128,14 @@ pub const QUERY_SETS: &[(&str, &str, &str)] = &[
 ///
 /// Only if system runs out of memory.
 pub async fn prepare() -> Option<Arc<PriecoIndex>> {
-    // Get dataset
+    // Download dataset
+    // May be already cached
     if !download::run(MSMARCO_DIR, FILES).await {
         return None;
     }
 
     // Open index
-    let opened = tokio::task::spawn_blocking(|| -> Result<PriecoIndex, String> {
+    let opened = spawn_blocking(|| -> Result<PriecoIndex, String> {
         let index = PriecoIndex::open(MSMARCO_INDEX_DIR);
         if !file_exists(MSMARCO_INDEXED_FILE) {
             build_index(&index).map_err(|e| e.to_string())?;
@@ -161,6 +170,9 @@ pub async fn prepare() -> Option<Arc<PriecoIndex>> {
 }
 
 /// Loads the queries of a query set that have relevance judgments.
+///
+/// TREC (Text REtrieval Conference) is NIST's yearly search evaluation.
+/// Its Deep Learning (DL) track reuses MS MARCO with human graded judgments.
 ///
 /// TREC DL has 200 test queries per year, but only ~45 are judged.
 /// Unjudged queries can't be scored, so they are skipped.
@@ -197,6 +209,9 @@ pub fn load_queries(queries_file: &str, qrels_file: &str) -> Vec<(String, String
 }
 
 /// Loads the url → docid map written by [convert].
+///
+/// A docid is the MS MARCO id of a document, e.g. 'D1555982'.
+/// Qrels and run files name documents only by docid, never by url.
 ///
 /// Keys are [url_to_id] hashes, smaller than 3.2M url strings.
 ///
@@ -244,6 +259,9 @@ pub fn load_docids() -> HashMap<u64, String> {
 
 /// Writes ranked results as a TREC run file.
 ///
+/// A run file is the standard results format of TREC: the ranking of a system per query.
+/// Tools like 'trec_eval' compare it against qrels to compute nDCG@10 or MRR@10.
+///
 /// One line per result: 'qid Q0 docid rank score prieco'.
 /// Results without a docid are skipped, a docid only counts once per query.
 ///
@@ -290,6 +308,23 @@ pub fn write_run(
 
 /* Helper functions */
 
+/// Reads queries that have judgements.
+///
+/// Qrels (query relevance judgments) are human ratings, 'qid Q0 docid relevance' per line.
+/// TREC DL grades 0 (irrelevant) to 3 (perfect), MS MARCO dev only marks relevant ones.
+///
+/// # Arguments
+///
+/// * `queries_file` - 'qid \t query' '.tsv.gz' in [MSMARCO_DIR].
+/// * `qrels_file` - Qrels in [MSMARCO_DIR], first column is qid.
+///
+/// # Returns
+///
+/// Vector of (qid, query).
+///
+/// # Errors
+///
+/// If a file can't be read.
 fn read_queries(
     queries_file: &str,
     qrels_file: &str,
@@ -316,6 +351,17 @@ fn read_queries(
     Ok(queries)
 }
 
+/// Writes TREC run file, 'qid Q0 docid rank score prieco' per line.
+///
+/// 'Q0' is a fixed legacy column, ignored by scorers.
+/// Scorers sort by score, not rank, so higher score must mean more relevant.
+///
+/// Results without MS MARCO docid are skipped, every docid once per query.
+/// Written to '.tmp' first, then renamed.
+///
+/// # Errors
+///
+/// If file can't be written.
 fn write_run_file(
     path: &str,
     results: &[(String, Vec<(String, f32)>)],
@@ -414,6 +460,7 @@ fn build_index(index: &PriecoIndex) -> Result<(), Box<dyn Error + Send + Sync>> 
 ///
 /// Writes one '.zip' per [DOCS_PER_ZIP] documents into [MSMARCO_IMPORT_DIR]
 /// and a url → docid map into [MSMARCO_DOCIDS_FILE].
+/// PriEco indexes urls, the map translates results back to docids the qrels know.
 /// Fields MS MARCO doesn't have get neutral values, so only text relevance is measured.
 /// A url seen before is skipped, the inserter would drop it anyway.
 ///

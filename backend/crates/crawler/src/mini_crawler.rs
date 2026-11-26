@@ -1,3 +1,31 @@
+//! # Mini Crawler
+//!
+//! Worker loop of a node. Crawls URLs given by main crawler at [MASTER_URL].
+//!
+//! ## Architecture
+//!
+//! 1. [**Fetch**:][run] Asks main crawler for a [WorkerBatchResponse].
+//!     * Waits 5s on error, 10s on empty queue.
+//! 2. [**Download**:][crate::download::download] In parallel, `worker_concurrent` downloads at once.
+//!     * Only 200 responses with body continue.
+//! 3. [**Parse**:][crate::meta::extract_metadata] On blocking threads, 2 per CPU core.
+//!     * Pages without title are dropped.
+//! 4. [**Compress**:][run] Batch is bincode encoded and zstd compressed.
+//! 5. [**Upload**:][UploadTask] Background task sends batch to main crawler.
+//!     * Retries every 5s until accepted.
+//!     * Max 2 batches wait, then crawling waits too.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-06-16
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use ahash::AHashMap;
 use once_cell::sync::Lazy;
 use prieco_core::{ANALYTICS, CLIENT, PRIECO_CONFIG, icons};
@@ -15,40 +43,78 @@ use crate::download::download;
 use crate::meta::extract_metadata;
 use crate::tag_data::extract_tag_data;
 
+/// Parsed page, sent to main crawler.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HTMLResultData {
+    /// Final URL after redirects.
     pub url: String,
+    /// Max 60 characters.
     pub title: String,
+    /// Max 160 characters.
     pub description: String,
+    /// First 500 characters of h2-h6 and p.
     pub text: String,
+    /// Href of icon link, as written in html.
     pub favicon: String,
+    /// First valid image URL.
     pub img: String,
+    /// Meta keywords.
     pub keywords: String,
+    /// True if page is NSFW, see [crate::meta].
     pub safe_search: bool,
+    /// Empty, filled by main crawler.
     pub html: String,
+    /// ISO 639-1 code, empty when unknown.
     pub language: String,
+    /// Lowercase country code of server IP.
     pub location: String,
+    /// Empty, page scores are computed by main crawler.
     pub points: Vec<f32>,
+    /// Download time in seconds.
     pub loading_time: f64,
+    /// 'YYMMDD'.
     pub date_of_crawling: String,
+    /// Empty, embedding is made by main crawler.
     pub vector: String,
+    /// Output of [crate::tag_data::extract_tag_data].
     pub tag_data: AHashMap<String, Vec<String>>,
 }
 
+/// URLs to crawl, from main crawler.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WorkerBatchResponse {
+    /// Id the results are uploaded under.
     pub batch_id: String,
+    /// URLs to crawl.
     pub urls: Vec<String>,
 }
 
+/// Main crawler.
 const MASTER_URL: &str = "https://crawler.prieco.net";
 
+/// Compressed batch waiting for upload.
 struct UploadTask {
+    /// Id from [WorkerBatchResponse].
     batch_id: String,
+    /// zstd compressed bincode of `Vec<HTMLResultData>`.
     compressed_buffer: Vec<u8>,
+    /// Pages in batch, for analytics.
     successful: usize,
 }
 
+/// Runs the mini crawler forever.
+///
+/// # Arguments
+///
+/// None
+///
+/// # Returns
+///
+/// Only if uploader stops.
+///
+/// # Panics
+///
+/// If a semaphore gets closed.
 pub async fn run() {
     // Holds max 2 batches to upload, then blocks
     let (upload_tx, mut upload_rx) = mpsc::channel::<UploadTask>(2);
@@ -289,10 +355,15 @@ pub async fn run() {
 }
 
 /* Helper functions */
-/// Description: Checks if URL is valid
+/// Checks if `input` is an http or https URL.
 ///
-/// Input: URL
-/// Output: true if valid, false otherwise
+/// # Arguments
+///
+/// * `input` - URL.
+///
+/// # Returns
+///
+/// True if valid, false otherwise.
 pub fn is_valid_url(input: &str) -> bool {
     match Url::parse(input) {
         Ok(url) => matches!(url.scheme(), "http" | "https"),
@@ -300,30 +371,52 @@ pub fn is_valid_url(input: &str) -> bool {
     }
 }
 
+/// Selectors compiled once and shared by all parsers.
 pub static PARSER_SELECTORS: Lazy<Arc<CompiledSelectors>> =
     Lazy::new(|| Arc::new(CompiledSelectors::new()));
+/// CSS selectors used by [crate::meta] and [crate::tag_data].
 pub struct CompiledSelectors {
     // Your existing selectors
+    /// h1 to h6, in order.
     pub h_selectors: Vec<Selector>,
+    /// span, p, a, li, label, in order.
     pub text_selectors: Vec<Selector>,
+    /// meta
     pub meta_selector: Selector,
+    /// img
     pub img_selector: Selector,
+    /// a
     pub a_selector: Selector,
 
+    /// title
     pub title_selector: Selector,
+    /// p
     pub p_selector: Selector,
+    /// meta name='keywords'
     pub meta_keywords_selector: Selector,
+    /// meta name='description'
     pub meta_description_selector: Selector,
+    /// meta property='og:site_name'
     pub og_site_name_selector: Selector,
+    /// meta property='og:description'
     pub og_description_selector: Selector,
+    /// h2 to h6 and p, for page text.
     pub content_selectors: Vec<Selector>, // h2-h6, p combined
 
+    /// link rel='icon'
     pub link_icon_selector: Selector,
+    /// link rel='shortcut icon'
     pub link_shortcut_selector: Selector,
+    /// link rel='apple-touch-icon'
     pub link_apple_selector: Selector,
 }
 
 impl CompiledSelectors {
+    /// Compiles all selectors.
+    ///
+    /// # Panics
+    ///
+    /// Never, selectors are constant.
     pub fn new() -> Self {
         Self {
             h_selectors: (1..=6)

@@ -1,3 +1,32 @@
+//! # Blob Decoder
+//!
+//! Turns a stored blob back into text or html.
+//!
+//! ## Blob Format
+//!
+//! 1. First byte: 1 if the rest is zstd compressed.
+//! 2. Then tags, each one is:
+//!     * Tag byte, see [tag_byte_to_name].
+//!     * Tokens: length byte + bytes.
+//!     * End marker `[255, 255, 255, 255]`.
+//! 3. [Token][resolve_token] is a short word written as is, or a word id.
+//!
+//! ## Modes
+//!
+//! * [**Text**:][decode_blob_to_text] `<tag>words</tag>` per line.
+//! * [**Html**:][decode_blob_to_html_rendered] Readable html, images go through a proxy.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-08-12
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] Fill [DICT_CACHE], now nothing inserts to it so word ids decode to empty strings
+
 /*
   Import external libraries
 */
@@ -5,36 +34,59 @@ use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use std::sync::Arc;
 
+/// Output of [decode_blob].
 pub enum DecodeMode<'a> {
+    /// Plain `<tag>words</tag>` lines.
     Text,
+    /// Html for viewing, `proxy_prefix` goes before every image URL.
     Html { proxy_prefix: &'a str },
 }
 
 /* APIs */
+/// Decodes blob to text.
+///
+/// # Arguments
+///
+/// * `raw_db_value` - Blob from storage.
+///
+/// # Returns
+///
+/// `<tag>words</tag>` per line, empty string if blob is empty or broken.
 pub fn decode_blob_to_text(raw_db_value: &[u8]) -> String {
     decode_blob(raw_db_value, DecodeMode::Text)
 }
 
+/// Decodes blob to html for viewing.
+///
+/// Every tag is a div with `[tag]` label. Images are loaded through `proxy_prefix`,
+/// links open in new tab. Empty tags are skipped.
+///
+/// # Arguments
+///
+/// * `raw_db_value` - Blob from storage.
+/// * `proxy_prefix` - Image proxy, URL encoded image URL is added after it.
+///
+/// # Returns
+///
+/// Html, empty string if blob is empty or broken.
 pub fn decode_blob_to_html_rendered(raw_db_value: &[u8], proxy_prefix: &str) -> String {
     decode_blob(raw_db_value, DecodeMode::Html { proxy_prefix })
 }
 
 /* Main function */
 
-/// Finds all subdirectories in [BLOB_IMPORT_DIR].
+/// Decodes blob in given mode.
 ///
-/// This function reads [BLOB_IMPORT_DIR] and filters entries to only directories.
+/// Broken zstd data gives empty string. A token longer than the rest of data ends the tag.
 ///
 /// # Arguments
 ///
-/// None
+/// * `raw_db_value` - Blob from storage.
+/// * `mode` - Output mode.
 ///
 /// # Returns
 ///
-/// A vector of dir paths.
-///
-/// If there is none or the [BLOB_IMPORT_DIR] doesn't even exists,
-/// it cretes it, and returns an empty vector.
+/// Decoded blob.
 ///
 /// # Panics
 ///
@@ -160,11 +212,24 @@ fn decode_blob(raw_db_value: &[u8], mode: DecodeMode) -> String {
 /* Helper functions */
 
 /* Decoder */
+/// Word from a token.
 pub enum ResolvedToken<'a> {
+    /// Short word stored as is.
     Raw(&'a str),
+    /// Word found by id in [DICT_CACHE].
     Cached(Arc<String>),
 }
 
+/// Turns token bytes into a word.
+///
+/// * Longer than 8 bytes: empty.
+/// * 4 to 8 bytes: little endian word id.
+/// * Up to 3 bytes of letters, digits or `.,-!?'`: the word itself.
+/// * Other 1 to 3 bytes: word id.
+///
+/// # Returns
+///
+/// (word, true if found).
 fn resolve_token<'a>(slice: &'a [u8]) -> (ResolvedToken<'a>, bool) {
     if slice.len() > 8 {
         return (ResolvedToken::Raw(""), false);
@@ -204,6 +269,7 @@ fn resolve_token<'a>(slice: &'a [u8]) -> (ResolvedToken<'a>, bool) {
     }
 }
 
+/// Tag byte → tag name. Unknown bytes are 'div'.
 fn tag_byte_to_name(tag_byte: u8) -> &'static str {
     match tag_byte {
         b'1' => "h1",
@@ -224,10 +290,19 @@ fn tag_byte_to_name(tag_byte: u8) -> &'static str {
     }
 }
 
+/// Word id → word.
 static DICT_CACHE: Lazy<DashMap<usize, Arc<String>>> =
     Lazy::new(|| DashMap::with_capacity(MAX_CACHE_ITEMS + 1_000));
+/// Max words in [DICT_CACHE].
 const MAX_CACHE_ITEMS: usize = 1_000_000;
 
+/// Finds word by id.
+///
+/// Ids under 256 are empty words.
+///
+/// # Returns
+///
+/// (word, true if found). Not found gives empty word.
 pub fn search_word_by_id(id: usize) -> (Arc<String>, bool) {
     if id < 256 {
         return (Arc::new(String::new()), true);

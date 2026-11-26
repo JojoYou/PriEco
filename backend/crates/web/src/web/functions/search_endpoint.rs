@@ -1,14 +1,39 @@
-//!  File: web/modules/search_endpoint.rs
-//!  Description: Decided what to do with the search query
+//! # Search Endpoint
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! Decides what to do with the search query.
+//! Returns results in Rocket template format (context that gets inserted to the template).
 //!
-//!  Date Created: 2025-09-20
-//!  Last Modified: 2026-02-06
+//! ## Architecture
 //!
-//!  Usage Call this to get results in Rocket template format (context that gets inserted to the template)
-//!  TODO:
+//! 1. Query with a bang isn't searched, the bang redirect handles it.
+//! 2. By search type:
+//!     * **img:** [Image search][img::run].
+//!     * **new:** [News][news::run], 50 articles.
+//!     * **map:** Nothing, map is loaded on the page.
+//!     * **Anything else:** [Web search][all_search].
+//!
+//! ## Web Search
+//!
+//! 1. [Spell check][spell_check_query], 'did you mean'.
+//! 2. Quick tune choices become one more goggle.
+//! 3. At the same time:
+//!     * [Index search][search_db::run], 40 results.
+//!     * 10 videos, not for Transactional and Local queries.
+//!     * 10 news, only for Informational, Navigational and Unknown queries.
+//! 4. Results of the same domain become [sitelinks][merge_sitelinks], cut to 20.
+//! 5. Videos and news are placed between the first results.
+//! 6. Quick tune domains and [currency widget][get_fx_widget].
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2025-09-20
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 /*
   Import system libraries
@@ -35,21 +60,34 @@ use crate::web::functions::{
 };
 use prieco_core::{EmbeddingService, QueryIntent, SearchResult, Sitelink, url_to_domain_id};
 
-/// Description: Decides what kind of search to perform
-/// Input: Search type, Search query, Language, Location, Embedding service, Cookie jar
-/// Output: Search results in Rocket template format
+/// Input of [run].
 pub struct EndParams<'r> {
+    /// Search type: all, img, new, map...
     pub t: &'r str,
+    /// Query.
     pub q: &'r str,
+    /// Language.
     pub lang: &'r str,
+    /// Location.
     pub loc: &'r str,
+    /// Query embedder.
     pub embedding_service: &'r State<EmbeddingService>,
+    /// Active goggles.
     pub goggles: Vec<Arc<GoggleRules>>,
+    /// Quick tune choices.
     pub user_qt_prefs: &'r UserQtPrefs,
+    /// User on a phone.
     pub mobile: bool,
+    /// Ask other nodes too.
     pub decentralize: bool,
+    /// Hide NSFW results.
     pub safe_search: bool,
 }
+/// Decides what kind of search to perform and runs it.
+///
+/// # Returns
+///
+/// Template context, empty for bang queries.
 pub async fn run(params: EndParams<'_>) -> HashMap<String, Value> {
     // Don't perform a search on bang
     if params.q.contains("!") {
@@ -108,16 +146,21 @@ pub async fn run(params: EndParams<'_>) -> HashMap<String, Value> {
     context
 }
 
+/// Quick tune choices from 'prieco_qt_prefs' cookie, domains.
 #[derive(Deserialize, Serialize, Default)]
 pub struct UserQtPrefs {
+    /// Raised domains.
     #[serde(default)]
     pub boost: Vec<String>,
+    /// Lowered domains.
     #[serde(default)]
     pub downrank: Vec<String>,
+    /// Removed domains.
     #[serde(default)]
     pub discard: Vec<String>,
 }
 
+/// Domain in quick tune menu with its current choice.
 #[derive(Serialize)]
 pub struct QtDomainDisplay {
     pub domain: String,
@@ -126,6 +169,7 @@ pub struct QtDomainDisplay {
     pub is_discard: bool,
 }
 impl UserQtPrefs {
+    /// Quick tune as goggle rules, value 3. Domains without 'www.' count with it too.
     pub fn into_goggle_rules(&self) -> GoggleRules {
         let mut rules = GoggleRules::default();
 
@@ -168,6 +212,7 @@ impl UserQtPrefs {
     }
 }
 
+/// Quick tune choices from cookie, empty when missing or broken.
 pub fn get_user_qt_prefs(cookie_jar: &CookieJar<'_>) -> UserQtPrefs {
     cookie_jar
         .get("prieco_qt_prefs")
@@ -178,7 +223,9 @@ pub fn get_user_qt_prefs(cookie_jar: &CookieJar<'_>) -> UserQtPrefs {
         .unwrap_or_default()
 }
 
+/// Input of [all_search], same as [EndParams] with the context to fill.
 pub struct AllParams<'r> {
+    /// Template context.
     pub context: &'r mut HashMap<String, Value>,
     pub q: &'r str,
     pub lang: &'r str,
@@ -190,6 +237,7 @@ pub struct AllParams<'r> {
     pub decentralize: bool,
     pub safe_search: bool,
 }
+/// Web search, see [module docs][self]. Fills `context`.
 async fn all_search(mut params: AllParams<'_>) {
     // Spell check
     if let Some(suggestion) = spell_check_query(params.q) {
@@ -427,6 +475,9 @@ async fn all_search(mut params: AllParams<'_>) {
     */
 }
 
+/// Turns later results of the same domain into sitelinks of the first one.
+///
+/// Sitelink title is the result title, or the last part of its display URL when the title is empty or the same.
 fn merge_sitelinks(results: Vec<SearchResult>) -> Vec<SearchResult> {
     let mut merged: Vec<SearchResult> = Vec::with_capacity(results.len());
     let mut by_domain: HashMap<String, usize> = HashMap::new();

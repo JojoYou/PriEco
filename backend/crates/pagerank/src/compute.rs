@@ -1,14 +1,30 @@
-//!  File: pagerank/compute.rs
-//!  Description: Import & Calculate pagerank on a new connections
+//! # PageRank Compute
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! Adds new links to the link graph and computes PageRank of all pages.
+//! Works on disk, the graph doesn't have to fit in RAM.
 //!
-//!  Date Created:: 2026-02-26
-//!  Last Modified: 2026-03-31
+//! ## Architecture
 //!
-//!  Usage: Call to process connections in
-//!  TODO:
+//! 1. [**Import**:][import] When [CONNECTIONS_DIR] has new 'url->url' files.
+//!     * [**Hashing**:][hashing::run] URLs to ids, sorted shards.
+//!     * [**Merge**:][merge::run] New ids to id map, every page gets a node id.
+//!     * [**Translate**:][translate::run] Edges to node ids, merged into [EDGES_SORTED].
+//!     * `REBUILD_CSR` env skips import and uses existing graph.
+//!     * Stops here when [IMPORT_ONLY_FILE] exists.
+//! 2. [**CSR**:][crate::nodes::csr::run] Incoming edges per node and out degrees.
+//! 3. [**Iterate**:][crate::iter::iterate::run] Power iteration.
+//! 4. **Save:** Scores to [FINAL_SCORES], [PAGERANK] is reloaded.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-02-26
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] New non-flawed implementation
 
 /*
   Import system libraries
@@ -38,24 +54,39 @@ use prieco_core::{
 /*
   Constants
 */
+/// Root of PageRank files.
 pub const PAGERANK_DIR: &str = "runtime/pagerank";
+/// When this file exists, links are only imported, PageRank isn't computed.
 pub const IMPORT_ONLY_FILE: &str = "runtime/pagerank/skip.txt";
 
+/// New link files, one 'from->to' per line. Removed after import.
 pub const CONNECTIONS_DIR: &str = "runtime/pagerank/connections";
+/// Pairs held in RAM before a shard is written (~500 MB).
 pub const BUFFER_SIZE: usize = 31_250_000;
 
+/// Temporary edge shards.
 pub const EDGES_DIR: &str = "runtime/pagerank/edges";
+/// Temporary node shards.
 pub const NODES_DIR: &str = "runtime/pagerank/nodes";
+/// Temporary merged id map.
 pub const MERGED_DIR: &str = "runtime/pagerank/merged";
 
+/// Whole graph, sorted (from, to) node id pairs.
 pub const EDGES_SORTED: &str = "runtime/pagerank/edges_sorted.bin.zst";
+/// CSR source nodes, grouped by destination.
 pub const CSR_EDGES: &str = "runtime/pagerank/csr_edges.bin.zst";
+/// CSR start of every node in [CSR_EDGES].
 pub const CSR_OFFSETS: &str = "runtime/pagerank/csr_offsets.bin";
+/// Scores, iterations switch between A and B.
 pub const SCORES_A: &str = "runtime/pagerank/scores_a.bin";
+/// Scores, iterations switch between A and B.
 pub const SCORES_B: &str = "runtime/pagerank/scores_b.bin";
+/// Number of nodes.
 pub const TOTAL_NODES: &str = "runtime/pagerank/total_nodes.txt";
+/// Outgoing links per node, u32.
 pub const OUT_DEGREE: &str = "runtime/pagerank/out_degree.bin.zst";
 
+/// Directories created on start.
 pub const DIRS: [&str; 5] = [
     PAGERANK_DIR,
     CONNECTIONS_DIR,
@@ -64,11 +95,18 @@ pub const DIRS: [&str; 5] = [
     MERGED_DIR,
 ];
 
+/// [ID_MAP_FILE] loaded to RAM: sorted (url id, node id) pairs.
 pub struct IdMap {
+    /// Pairs sorted by url id.
     pairs: Vec<(u64, u64)>,
 }
 
 impl IdMap {
+    /// Reads id map file.
+    ///
+    /// # Errors
+    ///
+    /// If file can't be opened.
     pub fn open(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let mut f = BufReader::with_capacity(1 << 20, File::open(path)?);
         let mut pairs = Vec::new();
@@ -83,10 +121,12 @@ impl IdMap {
         Ok(Self { pairs })
     }
 
+    /// All pairs.
     pub fn pairs(&self) -> &[(u64, u64)] {
         &self.pairs
     }
 
+    /// Node id of url id, binary search.
     pub fn lookup(&self, hash: u64) -> Option<u64> {
         self.pairs
             .binary_search_by_key(&hash, |&(h, _)| h)
@@ -95,10 +135,22 @@ impl IdMap {
     }
 }
 
-/// Description: Decide how to proceed and call responsible functions to import connections to the graph and compute pagerank
+/// Imports new links and computes PageRank.
 ///
-/// Input: None
-/// Output: None
+/// Does nothing without new links, unless `REBUILD_CSR` is set.
+/// New links remove old CSR and scores, they are rebuilt.
+///
+/// # Arguments
+///
+/// None
+///
+/// # Returns
+///
+/// None. Errors are printed.
+///
+/// # Panics
+///
+/// If score files can't be created, copied or renamed.
 pub fn run() {
     // Create required directories
     for dir in DIRS {
@@ -267,12 +319,15 @@ pub fn run() {
 }
 
 /* Caller functions */
-/*
-  Description: Import needed to be sharded to 3 files for readability. They are called in this order always together, created a fn for it
-
-  Input: None
-  Output: Result total_nodes
-*/
+/// Runs the 3 import passes in order.
+///
+/// # Returns
+///
+/// Total number of nodes.
+///
+/// # Errors
+///
+/// If a pass fails.
 fn import() -> Result<u64, Box<dyn std::error::Error>> {
     println!("{}: Phase 1: Pass A: Hashing!", icons::PAGERANK_ICON);
     let hash_shards = hashing::run()?;
@@ -290,12 +345,11 @@ fn import() -> Result<u64, Box<dyn std::error::Error>> {
 }
 
 /* Helper functions */
-/*
-  Description: Create zstd writer, we use zstd pagerank files whereever possible to save storage
-
-  Input: None
-  Output: Result zstd encoder/writer
-*/
+/// Creates zstd level 19 writer. PageRank files are zstd wherever possible to save storage.
+///
+/// # Errors
+///
+/// If file can't be created.
 pub fn zstd_writer(
     path: &str,
 ) -> Result<
@@ -310,12 +364,11 @@ pub fn zstd_writer(
     Ok(encoder)
 }
 
-/*
-  Description: Create zstd reader, we use zstd pagerank files whereever possible to save storage
-
-  Input: None
-  Output: Result zstd decoder/reader
-*/
+/// Creates zstd reader.
+///
+/// # Errors
+///
+/// If file can't be opened.
 pub fn zstd_reader(
     path: &str,
 ) -> Result<Decoder<'static, BufReader<File>>, Box<dyn std::error::Error>> {
@@ -325,12 +378,15 @@ pub fn zstd_reader(
     Ok(decoder)
 }
 
-/*
-  Description: Read url->url pairs from the zstd graph
-
-  Input: None
-  Output: Result Option hashed url-hashed url pair
-*/
+/// Reads one (u64, u64) pair from zstd stream.
+///
+/// # Returns
+///
+/// `None` at end of stream.
+///
+/// # Errors
+///
+/// On read error other than end of file.
 pub fn read_u64_pair_zstd(
     r: &mut Decoder<BufReader<File>>,
 ) -> Result<Option<(u64, u64)>, Box<dyn std::error::Error>> {
@@ -352,6 +408,15 @@ pub fn read_u64_pair_zstd(
     }
 }
 
+/// Reads one (u64, u64) little endian pair.
+///
+/// # Returns
+///
+/// `None` at end of file.
+///
+/// # Errors
+///
+/// On read error other than end of file.
 pub fn read_u64_pair(
     r: &mut BufReader<File>,
 ) -> Result<Option<(u64, u64)>, Box<dyn std::error::Error>> {

@@ -1,10 +1,27 @@
+//! # Goggle Parse
+//!
+//! Turns goggle text into [GoggleRules]. Unknown lines are ignored.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-07-12
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use super::types::GoggleRules;
 use prieco_core::url_to_domain_id;
 
+/// Domain id of a bare domain like 'example.com'.
 pub fn domain_str_to_id(domain: &str) -> u64 {
     url_to_domain_id(&format!("https://{}/", domain))
 }
 
+/// Parsed goggle file.
 pub struct GoggleMeta {
     pub name: String,
     pub description: String,
@@ -14,6 +31,7 @@ pub struct GoggleMeta {
     pub rules: GoggleRules,
 }
 
+/// Parses goggle text, see [format][super].
 pub fn parse_goggle(raw: &str) -> GoggleMeta {
     let mut meta = GoggleMeta {
         name: String::new(),
@@ -45,6 +63,7 @@ pub fn parse_goggle(raw: &str) -> GoggleMeta {
     meta
 }
 
+/// Parses '! key: value' line, '!' already removed.
 fn parse_meta_line(line: &str, meta: &mut GoggleMeta) {
     let Some((k, v)) = line.split_once(':') else {
         return;
@@ -60,6 +79,9 @@ fn parse_meta_line(line: &str, meta: &mut GoggleMeta) {
     }
 }
 
+/// Parses 'pattern$modifiers' line.
+///
+/// Modifiers: `boost=N`, `downrank` or `downrank=N` (default 1), `discard`, `important`, `site=domain`.
 fn parse_rule_line(line: &str, rules: &mut GoggleRules) {
     let Some((pattern, modifiers)) = line.split_once('$') else {
         return;

@@ -1,3 +1,31 @@
+//! # Index Updater
+//!
+//! Applies [Update] rules to pages already in the index, for example removing dead links.
+//!
+//! ## Architecture
+//!
+//! 1. [**Ceiling**:][UpdateEngine::run] A new update gets the current max page id as its ceiling.
+//!     * Pages inserted later already follow the rule.
+//! 2. [**Cursor**:][UpdateEngine::run] The unfinished update with the furthest progress drives the scan.
+//!     * Other updates are applied on the same pages, so meta storage is read once.
+//!     * Ranges already processed are skipped.
+//! 3. [**Apply**:][Update::apply] Every page is decoded and passed to all updates.
+//! 4. [**Flush**:][UpdateEngine::flush_batch] Every 1000 scanned pages.
+//!     * Modified pages are rewritten in meta storage and Tantivy.
+//!     * Deleted pages are removed from meta storage, blob storage and Tantivy.
+//! 5. [**State**:][UpdateState] Finished ranges are saved to [INDEX_UPDATES_FILE], so updating continues after restart.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-09-16
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use std::{
     collections::HashMap,
     fs::{read_to_string, write},
@@ -15,19 +43,28 @@ use prieco_core::{
 use tantivy::Term;
 
 // State
+/// Inclusive range of page ids.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Range {
+    /// First id.
     pub start: u64,
+    /// Last id.
     pub end: u64,
 }
 
+/// Progress of all updates, saved as JSON.
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct UpdateState {
+    /// Update id → processed ranges, sorted and merged.
     pub finished_ranges: HashMap<String, Vec<Range>>,
+    /// Update id → max page id the update has to reach.
     pub absolute_ceilings: HashMap<String, u64>,
 }
 
 impl UpdateState {
+    /// Loads state from JSON file.
+    ///
+    /// Missing or broken file gives an empty state.
     pub fn load(path: &Path) -> Self {
         read_to_string(path)
             .ok()
@@ -35,12 +72,16 @@ impl UpdateState {
             .unwrap_or_default()
     }
 
+    /// Saves state as pretty JSON. Errors are ignored.
     pub fn save(&self, path: &Path) {
         if let Ok(data) = serde_json::to_string_pretty(self) {
             let _ = write(path, data);
         }
     }
 
+    /// Marks `start..=end` as processed for update `id`.
+    ///
+    /// Overlapping and touching ranges are merged into one.
     pub fn add(&mut self, id: &str, start: u64, end: u64) {
         let ranges = self.finished_ranges.entry(id.to_string()).or_default();
         ranges.push(Range { start, end });
@@ -60,12 +101,16 @@ impl UpdateState {
         *ranges = merged;
     }
 
+    /// True if `doc_id` is in a processed range of update `id`.
     pub fn processed(&self, id: &str, doc_id: u64) -> bool {
         self.finished_ranges
             .get(id)
             .is_some_and(|ranges| ranges.iter().any(|r| doc_id >= r.start && doc_id <= r.end))
     }
 
+    /// True if update `id` processed everything from 0 to its ceiling.
+    ///
+    /// False when the update has no ceiling yet.
     pub fn finished(&self, id: &str) -> bool {
         let target = match self.absolute_ceilings.get(id) {
             Some(&t) => t,
@@ -80,6 +125,9 @@ impl UpdateState {
         false
     }
 
+    /// First id after the range starting at 0.
+    ///
+    /// 0 when nothing from the start was processed.
     pub fn unprocessed_id(&self, update_id: &str) -> u64 {
         if let Some(ranges) = self.finished_ranges.get(update_id)
             && let Some(first_range) = ranges.first()
@@ -91,6 +139,7 @@ impl UpdateState {
         0
     }
 
+    /// End of the processed range of update `id` that contains `doc_id`.
     pub fn processed_range_end(&self, id: &str, doc_id: u64) -> Option<u64> {
         self.finished_ranges.get(id).and_then(|ranges| {
             for r in ranges {
@@ -104,23 +153,36 @@ impl UpdateState {
 }
 
 // Engine
+/// Result of [Update::apply] on one page.
 pub enum UpdateAction {
+    /// Page stays as it is.
     Unchanged,
+    /// Page was changed and gets saved.
     Modified,
+    /// Page gets removed from the index.
     Deleted,
 }
 
+/// Rule applied to every page in the index.
 pub trait Update: Send + Sync {
+    /// Unique id, the progress is saved under it.
+    ///
+    /// Changing it runs the update again from the start.
     fn id(&self) -> &'static str;
+    /// Applies the rule on `doc`, may change it.
     fn apply(&self, doc: &mut WebDocument) -> UpdateAction;
 }
 
+/// Runs registered updates over the index.
 pub struct UpdateEngine {
+    /// Registered updates.
     updates: Vec<Box<dyn Update>>,
+    /// [UpdateState] file, [INDEX_UPDATES_FILE].
     state_file: PathBuf,
 }
 
 impl UpdateEngine {
+    /// Engine with no updates.
     pub fn new() -> Self {
         Self {
             updates: Vec::new(),
@@ -128,10 +190,27 @@ impl UpdateEngine {
         }
     }
 
+    /// Registers an update.
     pub fn add(&mut self, update: Box<dyn Update>) {
         self.updates.push(update);
     }
 
+    /// Runs updates until the driving update reaches its ceiling.
+    ///
+    /// Does nothing when there are no updates or all are finished.
+    /// Progress is saved every 1000 pages.
+    ///
+    /// # Arguments
+    ///
+    /// None
+    ///
+    /// # Returns
+    ///
+    /// None
+    ///
+    /// # Panics
+    ///
+    /// If a meta storage key is shorter than 8 bytes.
     pub fn run(&self) {
         // No updates to process
         if self.updates.is_empty() {
@@ -351,6 +430,7 @@ impl UpdateEngine {
         }
     }
 
+    /// Marks `start..=end` as processed for all updates and saves state.
     fn update_state(&self, state: &mut UpdateState, start: u64, end: u64) {
         for update in &self.updates {
             state.add(update.id(), start, end);
@@ -358,6 +438,15 @@ impl UpdateEngine {
         state.save(&self.state_file);
     }
 
+    /// Writes modified pages and removes deleted ones.
+    ///
+    /// Modified pages are recompressed, saved to meta storage and reindexed in Tantivy.
+    /// Deleted pages are removed from meta, blob storage and Tantivy.
+    /// Changes in Tantivy are visible after the next commit.
+    ///
+    /// # Panics
+    ///
+    /// If Tantivy schema misses one of the fields or compression fails.
     fn flush_batch(&self, modified: &[(u64, WebDocument)], deleted: &[(u64, String)]) {
         let schema = TANTIVY_INDEX.schema();
         let doc_id_field = schema.get_field("doc_id").unwrap();

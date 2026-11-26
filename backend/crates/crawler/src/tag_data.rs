@@ -1,12 +1,40 @@
+//! # Tag Data
+//!
+//! Extracts text, meta tags and links from html into one map.
+//!
+//! ## Keys
+//!
+//! * **Text:** 'h1'..'h6', 'span', 'p', 'a', 'li', 'label'.
+//! * **Meta:** 'meta', values are 'name=content' and 'property=content'.
+//! * **Links:** 'a_href' (max 20 unique, ending with '/'), 'img_src'.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-06-16
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use ahash::{AHashMap, AHashSet};
 use scraper::{Html, Selector};
 
 use crate::mini_crawler::{PARSER_SELECTORS, is_valid_url};
 
-/// Description: extract data from html documnet and format them to tag_data
+/// Extracts tag data from html.
 ///
-/// Input: document
-/// Output: tag_data
+/// 'a' and 'a_href' are limited to first 20 unique values.
+///
+/// # Arguments
+///
+/// * `document` - Parsed html.
+///
+/// # Returns
+///
+/// Map of key → values, see [module docs][self].
 pub fn extract_tag_data(document: &Html) -> AHashMap<String, Vec<String>> {
     /*
       Description: tag_data is a very important variable. It provides organized, extracted access to important data from the html.
@@ -93,13 +121,23 @@ pub fn extract_tag_data(document: &Html) -> AHashMap<String, Vec<String>> {
     tag_data
 }
 
-/*
-Description: Function to finally extract data to tag_data. Called by extract_tag_data for each tag. Modifies tag_data dirrectly
-
-Input: document, &mut tag_data, tag (tag of element to extract data from),
-keyword (text to extract inner text, meta_name, meta_property, inner tag [href, link] to extract data from it), add_slash
-Output: None
-*/
+/// Extracts one kind of data and adds it to `tag_data`.
+///
+/// # Arguments
+///
+/// * `document` - Parsed html.
+/// * `tag_data` - Map to add to.
+/// * `selector` - Elements to read.
+/// * `tag` - Tag name, used as key.
+/// * `keyword` - What to read.
+///     * 'text' - First text node, key is `tag`.
+///     * 'meta_name' / 'meta_property' - 'name=content', key is `tag`.
+///     * Anything else - Attribute value, only valid URLs, unique, key is '`tag`_`keyword`'.
+/// * `add_slash` - Add '/' to the end of URLs.
+///
+/// # Returns
+///
+/// None
 fn extract_data(
     document: &Html,
     tag_data: &mut AHashMap<String, Vec<String>>,

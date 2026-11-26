@@ -1,14 +1,24 @@
-//!  File: web/modules/settings.rs
-//!  Description: PriEco settings module
+//! # Settings
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! Adds settings to the context of any page. Call [run] on every page.
 //!
-//!  Date Created: 2025-09-20
-//!  Last Modified: 2026-02-06
+//! ## Architecture
 //!
-//!  Usage: Run run() on any page to integrate settings to the page
-//!  TODO:
+//! 1. **Location:** 'loc' cookie, otherwise country of user IP by GeoLite2. Onion users get 'all'.
+//! 2. **Language:** 'lang' cookie, otherwise main language of the location.
+//! 3. **Options:** New tab, theme, no JS, POST, decentralized search, safe search from cookies.
+//! 4. **Goggles:** Public goggles, active ones are checked.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2025-09-20
+//! * Last Modified: 2026-11-26
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 /*
   Import system libraries
@@ -33,6 +43,7 @@ use serde_json::json;
 use crate::web::functions::{general::set_cookie, ranking::goggles::list_public};
 use prieco_core::globals::COUNTRY_TO_LANG;
 
+/// Goggle in settings list.
 #[derive(Serialize)]
 struct GoggleView {
     id: u64,
@@ -41,13 +52,24 @@ struct GoggleView {
     description: String,
     source_url: String,
     avatar: String,
+    /// Goggle is active.
     checked: bool,
 }
 
-/// Description: Integrates settings to the page
+/// Adds settings to the page context.
 ///
-/// Input: Shared context beteween functions, Optional IP address, CookieJar, Host (PriEco URL)
-/// Output: None
+/// Detected location and language are saved to cookies.
+///
+/// # Arguments
+///
+/// * `context` - Template context, shared between functions.
+/// * `maybe_ip` - User IP, for location detection.
+/// * `cookie_jar` - Cookies.
+/// * `prieco_url` - Host, '.onion' turns off location detection.
+///
+/// # Returns
+///
+/// None
 pub fn run(
     context: &mut HashMap<String, serde_json::Value>,
     maybe_ip: &Option<IpAddr>,

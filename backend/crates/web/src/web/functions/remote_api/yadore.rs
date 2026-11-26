@@ -1,3 +1,18 @@
+//! # Shopping
+//!
+//! Product offers from Yadore for shopping queries.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2025-09-20
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use reqwest::Client;
 use serde_json::Value;
 use std::time::Duration;
@@ -5,6 +20,20 @@ use std::time::Duration;
 use crate::web::functions::general::call_api_future_json;
 use prieco_core::{WebScrollResult, colors};
 
+/// Product offers for query, max 20.
+///
+/// # Arguments
+///
+/// * `query` - Query.
+/// * `loc` - Market country.
+///
+/// # Returns
+///
+/// Offers, empty when API fails.
+///
+/// # Errors
+///
+/// If `YADORE_API_KEY` is missing.
 pub async fn run(
     query: &str,
     loc: &str,
@@ -57,6 +86,7 @@ pub async fn run(
     Ok(format_yadore(yadore_json))
 }
 
+/// Yadore offers to [WebScrollResult].
 fn format_yadore(json: Value) -> Vec<WebScrollResult> {
     let mut results = Vec::with_capacity(20);
 

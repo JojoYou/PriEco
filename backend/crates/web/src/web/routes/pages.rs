@@ -1,14 +1,29 @@
-//!  File: web/routes/pages.rs
-//!  Description: PriEco web pages
+//! # Pages
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! PriEco web pages, visit them in a browser.
 //!
-//!  Date Created: 2026-01-31
-//!  Last Modified: 2026-02-01
+//! ## Pages
 //!
-//!  Usage: Visit them in a browser
-//!  TODO:
+//! * [**Home**:][index] `/`, with [shortcuts][handle_shortcuts].
+//! * [**Search**:][search] `/search`, static parts. Results are loaded by JS from [results_htmls].
+//!     * Without JS results are rendered right away, bangs redirect on server.
+//! * [**Settings**:][settings_htmls] `/settings_html`, without JS [settings_update], from extension [set_preferences].
+//! * [**Goggles**:][goggles] `/goggles` store, [load][load_goggle], [apply][apply_goggles].
+//! * [**Quick tune**:][update_qt] Boost, downrank or discard domains, [export][export_quick_tune] as goggle.
+//! * [**Stats**:][stats] `/stats`, index size and anonymous analytics.
+//! * [**Blog**:][blog] `/blog`, [posts][blog_post], [RSS][rss_feed].
+//! * **Other:** [privacy], [ext_privacy], [submit], [roadmap], [thanks], [archive][view_blob].
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-01-31
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 /*
   Import system libraries
@@ -66,10 +81,9 @@ use prieco_core::{
     lat_bucket_ms, local_redirect,
 };
 
-/*
-Know user IP
-Used for location and language auto detection
-*/
+/// User IP, used for location and language auto detection.
+///
+/// Order: CF-Connecting-IP, first X-Forwarded-For, X-Real-IP, socket address.
 pub struct ClientIp(pub IpAddr);
 #[rocket::async_trait]
 impl<'r> FromRequest<'r> for ClientIp {
@@ -98,21 +112,15 @@ impl<'r> FromRequest<'r> for ClientIp {
     }
 }
 
-/// Description: Responds if PriEco is alive
-///
-/// Input:
-/// Output: OK
+/// `HEAD /`, responds if PriEco is alive.
 #[head("/")]
 pub fn index_head() -> &'static str {
     ""
 }
 
-/*
-  Description: PriEco home page
-
-  Input:
-  Output: Home page html
-*/
+/// PriEco home page, `GET /`.
+///
+/// Shortcuts come from 'shortcuts' cookie, icons go through the proxy.
 #[get("/")]
 pub fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     let ip_addr = client_ip.0;
@@ -186,22 +194,36 @@ pub fn index(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host) -> Te
     Template::render("home", &context)
 }
 
+/// Home page shortcut for the template.
 #[derive(Serialize)]
 pub struct ShortcutView {
+    /// Position in 'shortcuts' cookie.
     pub id: usize,
     pub name: String,
+    /// Name cut to 10 characters.
     pub display_name: String,
     pub url: String,
+    /// Proxied favicon URL.
     pub icon: String,
 }
 
+/// Shortcut form.
 #[derive(FromForm)]
 pub struct ShortcutAction<'r> {
+    /// 'add', 'edit' or 'delete'.
     action: &'r str,
+    /// Shortcut to edit or delete.
     shortcut_id: Option<usize>,
     shortcut_name: Option<&'r str>,
     shortcut_url: Option<&'r str>,
 }
+/// Adds, edits or deletes a home page shortcut, `POST /`.
+///
+/// URLs without scheme get 'https://'.
+///
+/// # Returns
+///
+/// Redirect to home page.
 #[post("/", data = "<form>")]
 pub fn handle_shortcuts(form: Form<ShortcutAction<'_>>, cookie_jar: &CookieJar<'_>) -> Redirect {
     let mut items: Vec<String> = Vec::new();
@@ -262,13 +284,7 @@ pub fn handle_shortcuts(form: Form<ShortcutAction<'_>>, cookie_jar: &CookieJar<'
     Redirect::to(uri!(index))
 }
 
-/*
-  Description: PriEco results page, just static parts and JS that loads results
-
-  Input: Search type, Search query
-  Output: Privacy Policy page html
-*/
-// Handle POST request
+/// Search form sent by POST.
 #[derive(FromForm)]
 pub struct SearchForm<'r> {
     t: &'r str,
@@ -276,6 +292,7 @@ pub struct SearchForm<'r> {
     sxprmedia: Option<&'r str>,
     sxprsearchsugg: Option<&'r str>,
 }
+/// `POST /search`, same as [search]. Used when user turned on POST in settings.
 #[allow(clippy::result_large_err)]
 #[post("/search", data = "<form>")]
 pub async fn search_post(
@@ -304,15 +321,33 @@ pub async fn search_post(
     .await
 }
 
+/// Query of [search].
 #[derive(FromForm)]
 pub struct SearchParams<'r> {
+    /// Search type: all, img, vid, new, shop, map.
     pub t: &'r str,
+    /// Query.
     pub q: &'r str,
+    /// Search Expander data, route needs to accept it.
     #[allow(unused_variables)]
-    pub sxprmedia: Option<&'r str>, // Search Expander data, route needs to accept it
+    pub sxprmedia: Option<&'r str>,
+    /// Search Expander data, route needs to accept it.
     #[allow(unused_variables)]
-    pub sxprsearchsugg: Option<&'r str>, // Search Expander data, route needs to accept it
+    pub sxprsearchsugg: Option<&'r str>,
 }
+/// PriEco results page, `GET /search?t=&q=`.
+///
+/// With JS only static parts and placeholders are rendered, JS loads [results_htmls].
+/// Without JS ('js' cookie) results are searched here, bangs redirect right away
+/// and more bangs show the multibang page.
+///
+/// # Returns
+///
+/// Search page.
+///
+/// # Errors
+///
+/// Redirect for a single bang without JS.
 #[allow(clippy::result_large_err)]
 #[get("/search?<params..>")]
 pub async fn search(
@@ -472,14 +507,25 @@ pub async fn search(
     Ok((ContentType::HTML, Template::render("search", &context)))
 }
 
-// Bangs
+/// One bang target.
 #[derive(Serialize, Clone)]
 pub struct BangRedirect {
+    /// Bang trigger.
     pub title: String,
+    /// Bang domain.
     pub domain: String,
+    /// Target URL with query.
     pub url: String,
 }
 
+/// Finds all known bangs in query.
+///
+/// Query without bangs is URL encoded into every bang URL.
+/// Bang without query goes to the bang domain.
+///
+/// # Returns
+///
+/// (query without bangs, redirects). `None` when there is no known bang.
 fn multibangs(query: &str) -> Option<(String, Vec<BangRedirect>)> {
     let words: Vec<&str> = query.split_whitespace().collect();
     let bang_candidates: Vec<&str> = words
@@ -532,20 +578,19 @@ fn multibangs(query: &str) -> Option<(String, Vec<BangRedirect>)> {
     Some((clean_query, redirects))
 }
 
-/*
-  Description: PriEco results html, endpoint to get results as html
-
-  Input: Search type, Search query, Location, Language
-  Output: Results html
-*/
+/// Query of [results_htmls].
 #[derive(FromForm)]
 pub struct ResultsParams<'r> {
     pub t: &'r str,
     pub q: &'r str,
     pub lang: &'r str,
     pub loc: &'r str,
+    /// Ask other nodes too.
     pub dec: bool,
 }
+/// Results as html, `GET /results_html`. Called by search page JS.
+///
+/// Goggles, quick tune and safe search come from cookies.
 #[get("/results_html?<params..>")]
 pub async fn results_htmls(
     params: ResultsParams<'_>,
@@ -595,6 +640,9 @@ pub async fn results_htmls(
     Template::render("search/results", ctx)
 }
 
+/// Stored copy of a page, `GET /archive/<id>`.
+///
+/// Images go through the proxy. `None` (404) when blob doesn't exist.
 #[get("/archive/<id>")]
 pub async fn view_blob(id: u64) -> Option<RawHtml<String>> {
     let raw_blob = match PRIECO_BLOBS.blobs_ks.get(id.to_le_bytes()) {
@@ -627,6 +675,7 @@ pub async fn view_blob(id: u64) -> Option<RawHtml<String>> {
     Analytics (only PriEco purely vibe coded part)
     They don't matter enough, and AI can do a good job in this
 */
+/// Number with thousands separators.
 fn fmt_num(n: u64) -> String {
     let s = n.to_string();
     let mut out = String::with_capacity(s.len() + s.len() / 3);
@@ -639,6 +688,7 @@ fn fmt_num(n: u64) -> String {
     out.chars().rev().collect()
 }
 
+/// Milliseconds for showing, '–' for 0.
 fn fmt_ms(ms: f64) -> String {
     if ms <= 0.0 {
         "–".to_string()
@@ -653,7 +703,9 @@ fn fmt_ms(ms: f64) -> String {
     }
 }
 
+/// Bytes in B, KB, MB, GB or TB.
 fn fmt_bytes(b: u64) -> String {
+    /// Byte units.
     const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
     let mut v = b as f64;
     let mut i = 0;
@@ -686,6 +738,7 @@ fn today_yesterday(series: &[(String, u64)]) -> (u64, u64) {
     (today, yesterday)
 }
 
+/// SVG bars of daily counts, 300 × 100 view box.
 fn bar_series(data: &[(String, u64)]) -> Vec<Value> {
     let n = data.len().max(1) as f64;
     let max = data.iter().map(|(_, c)| *c).max().unwrap_or(0).max(1) as f64;
@@ -708,6 +761,7 @@ fn bar_series(data: &[(String, u64)]) -> Vec<Value> {
         .collect()
 }
 
+/// About 5 'MM-DD' axis labels, the last one always.
 fn x_labels(dates: &[String]) -> Vec<String> {
     let len = dates.len();
     let step = (len / 5).max(1);
@@ -724,10 +778,12 @@ fn x_labels(dates: &[String]) -> Vec<String> {
         .collect()
 }
 
+/// Dates of a series.
 fn dates_of(data: &[(String, u64)]) -> Vec<String> {
     data.iter().map(|(d, _)| d.clone()).collect()
 }
 
+/// SVG polyline points of a latency percentile picked by `pick`. Days without samples are skipped.
 fn line_points(
     daily: &[(String, LatencySummary)],
     max: f64,
@@ -748,16 +804,16 @@ fn line_points(
         .join(" ")
 }
 
-// Latency distribution bins (ms)
+/// Upper bounds of latency distribution bins, ms.
 const DIST_EDGES: [f64; 9] = [5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0];
+/// Labels of latency distribution bins.
 const DIST_LABELS: [&str; 10] = [
     "5", "10", "25", "50", "100", "250", "500", "1k", "2.5k", ">2.5k",
-]; // upper bound of each bin in ms
+];
 
-/*
-  Input:
-  Output: Analytics page html
-*/
+/// Analytics page, `GET /stats`.
+///
+/// Index size, visitors, searches, API requests, mini crawler contributions and latency of every [Stage].
 #[get("/stats")]
 pub async fn stats(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host<'_>) -> Template {
     // Make sure buffered counters / latency samples are visible
@@ -1093,12 +1149,9 @@ pub async fn stats(client_ip: ClientIp, cookie_jar: &CookieJar<'_>, host: &Host<
     Template::render("analytics", context)
 }
 
-/*
-  Description: PriEco page settings html
-
-  Input:
-  Output: Settings html
-*/
+/// Settings html, `GET /settings_html`.
+///
+/// Shows how many searches were done on PriEco, from 'prieco_searches' and 'all_searches' cookies.
 #[get("/settings_html")]
 pub fn settings_htmls(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     let mut context: HashMap<String, RocketValue> = HashMap::new();
@@ -1133,7 +1186,7 @@ pub fn settings_htmls(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     Template::render("settings", &context)
 }
 
-// No JS settings
+/// Settings form without JS. Missing checkbox means off.
 #[derive(FromForm)]
 pub struct SettingsForm<'r> {
     newtab: Option<&'r str>,
@@ -1145,6 +1198,11 @@ pub struct SettingsForm<'r> {
     post: Option<&'r str>,
     safe: Option<&'r str>,
 }
+/// Saves settings without JS, `POST /settings_update`.
+///
+/// # Returns
+///
+/// Redirect to home page.
 #[post("/settings_update", data = "<form>")]
 pub fn settings_update(form: Form<SettingsForm<'_>>, cookie_jar: &CookieJar<'_>) -> Redirect {
     // Helpers
@@ -1214,6 +1272,7 @@ pub fn settings_update(form: Form<SettingsForm<'_>>, cookie_jar: &CookieJar<'_>)
     Redirect::to(uri!("/"))
 }
 
+/// Query of [set_preferences]. 1 turns option on, other numbers off.
 #[derive(FromForm)]
 pub struct SetPrefParams {
     pub lang: Option<String>,
@@ -1223,8 +1282,14 @@ pub struct SetPrefParams {
     pub js: Option<u8>,
     pub index: Option<u8>,
     pub post: Option<u8>,
+    /// Local page to go back to.
     pub return_to: Option<String>,
 }
+/// Saves settings from URL, `GET /set`. Used by browser extension.
+///
+/// # Returns
+///
+/// Redirect to `return_to`, only [local][local_redirect], or home page.
 #[get("/set?<params..>")]
 pub fn set_preferences(params: SetPrefParams, cookie_jar: &CookieJar<'_>) -> Redirect {
     let apply_cookie = |name: &str, value: String| {
@@ -1293,12 +1358,7 @@ pub fn set_preferences(params: SetPrefParams, cookie_jar: &CookieJar<'_>) -> Red
     Redirect::to(redirect_url)
 }
 
-/*
-  Description: PriEco privacy policy
-
-  Input:
-  Output: Privacy Policy page html
-*/
+/// PriEco privacy policy, `GET /privacy`.
 #[get("/privacy")]
 pub fn privacy(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     let mut context: HashMap<String, RocketValue> = HashMap::from([
@@ -1312,12 +1372,7 @@ pub fn privacy(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     Template::render("legal/privacy", context)
 }
 
-/*
-  Description: PriEco Web Discovery privacy policy
-
-  Input:
-  Output: Web Discovery Privacy Policy html
-*/
+/// PriEco Web Discovery privacy policy, `GET /privacy-ext`.
 #[get("/privacy-ext")]
 pub fn ext_privacy(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     let mut context: HashMap<String, RocketValue> = HashMap::from([
@@ -1331,12 +1386,7 @@ pub fn ext_privacy(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     Template::render("ext/privacy", context)
 }
 
-/*
-  Description: PriEco URL submit
-
-  Input:
-  Output: URL submit page html
-*/
+/// URL submit page, `GET /submit`.
 #[get("/submit")]
 pub fn submit(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     let mut context: HashMap<String, RocketValue> = HashMap::from([
@@ -1350,17 +1400,24 @@ pub fn submit(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     Template::render("search/submit", context)
 }
 
+/// Submitted URLs, one per line.
 #[derive(FromForm)]
 pub struct SubmitForm {
     message: String,
 }
 
+/// Payload for the crawler.
 #[derive(Serialize)]
 struct PageDataPayload {
     page_url: String,
     links: Vec<String>,
 }
 
+/// Sends submitted URLs to the crawler on port 8090, `POST /submit`.
+///
+/// # Returns
+///
+/// Text saying if crawler accepted them.
 #[post("/submit", data = "<form>")]
 pub async fn submit_post(form: Form<SubmitForm>) -> String {
     let links: Vec<String> = form
@@ -1395,12 +1452,7 @@ pub async fn submit_post(form: Form<SubmitForm>) -> String {
     }
 }
 
-/*
-  Description: PriEco roadmap
-
-  Input:
-  Output: Roadmap page html
-*/
+/// PriEco roadmap, `GET /roadmap`.
 #[get("/roadmap")]
 pub fn roadmap(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     let mut context: HashMap<String, RocketValue> = HashMap::from([
@@ -1414,12 +1466,18 @@ pub fn roadmap(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     Template::render("roadmap", context)
 }
 
+/// Like or dislike of a roadmap feature.
 #[derive(Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct RoadmapVote {
     pub feature: String,
     pub is_like: bool,
 }
+/// Sends roadmap vote as a Signal message, `POST /roadmap/vote`.
+///
+/// # Returns
+///
+/// 200 when sent, 500 when Signal env is missing or sending failed.
 #[post("/roadmap/vote", format = "json", data = "<vote>")]
 pub async fn submit_roadmap_vote(vote: Json<RoadmapVote>) -> Status {
     let signal_bot_number = match std::env::var("SIGNAL_BOT_NUMBER") {
@@ -1477,12 +1535,7 @@ pub async fn submit_roadmap_vote(vote: Json<RoadmapVote>) -> Status {
     }
 }
 
-/*
-  Description: PriEco Goggles store
-
-  Input:
-  Output: Goggle store html
-*/
+/// Goggles store, `GET /goggles`. Starts refresh of stale goggles in background.
 #[get("/goggles")]
 pub fn goggles(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     tokio::spawn(async {
@@ -1502,6 +1555,11 @@ pub fn goggles(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     Template::render("search/goggles", context)
 }
 
+/// Downloads a goggle and turns it on, `GET /goggles/load?url=`.
+///
+/// # Returns
+///
+/// Redirect to goggles store.
 #[get("/goggles/load?<url>")]
 pub async fn load_goggle(url: String, cookie_jar: &CookieJar<'_>) -> Redirect {
     let goggle = fetch_and_store(url).await;
@@ -1535,6 +1593,11 @@ pub async fn load_goggle(url: String, cookie_jar: &CookieJar<'_>) -> Redirect {
     Redirect::to("/goggles")
 }
 
+/// Sets active goggles, `GET /goggles/apply?ids=`. No ids turns all off.
+///
+/// # Returns
+///
+/// Redirect to goggles store.
 #[get("/goggles/apply?<ids>")]
 pub fn apply_goggles(ids: Option<Vec<u64>>, cookie_jar: &CookieJar<'_>) -> Redirect {
     let ids = ids.unwrap_or_default();
@@ -1558,6 +1621,9 @@ pub fn apply_goggles(ids: Option<Vec<u64>>, cookie_jar: &CookieJar<'_>) -> Redir
     Redirect::to("/goggles")
 }
 
+/// CSS that tints results of a goggle, `GET /static/css/goggles_tint.css.hbs`.
+///
+/// Invalid color is '14141E', class name keeps only letters, digits, '-' and '_'.
 #[get("/static/css/goggles_tint.css.hbs?<tint>&<target>")]
 pub fn goggles_tint(tint: Option<&str>, target: Option<&str>) -> (ContentType, String) {
     let hex = validate_hex(tint.unwrap_or("14141E")).unwrap_or_else(|| String::from("14141E"));
@@ -1571,6 +1637,7 @@ pub fn goggles_tint(tint: Option<&str>, target: Option<&str>) -> (ContentType, S
     (ContentType::CSS, css)
 }
 
+/// 6 digit hex color without '#', `None` if invalid.
 fn validate_hex(hex: &str) -> Option<String> {
     let hex = hex.trim_start_matches('#');
     if hex.len() == 6 && hex.chars().all(|c| c.is_ascii_hexdigit()) {
@@ -1580,12 +1647,20 @@ fn validate_hex(hex: &str) -> Option<String> {
     }
 }
 
+/// Quick tune form.
 #[derive(FromForm)]
 pub struct QtUpdateForm {
+    /// Local page to go back to.
     return_url: String,
+    /// Domain → 'boost', 'downrank', 'discard' or anything else to reset.
     prefs: HashMap<String, String>,
 }
 
+/// Saves quick tune choices to 'prieco_qt_prefs' cookie, `POST /quick_tune_update`.
+///
+/// # Returns
+///
+/// Redirect to `return_url`, only local.
 #[post("/quick_tune_update", data = "<form>")]
 pub fn update_qt(form: Form<QtUpdateForm>, cookie_jar: &CookieJar<'_>) -> Redirect {
     let mut user_prefs = cookie_jar
@@ -1615,6 +1690,7 @@ pub fn update_qt(form: Form<QtUpdateForm>, cookie_jar: &CookieJar<'_>) -> Redire
     Redirect::to(local_redirect(&form.return_url))
 }
 
+/// Goggle file download.
 pub struct QuickTuneExport(String);
 
 impl<'r, 'o: 'r> Responder<'r, 'o> for QuickTuneExport {
@@ -1630,6 +1706,7 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for QuickTuneExport {
     }
 }
 
+/// Quick tune as goggle file 'my_prieco.goggle', `GET /quick_tune/export`.
 #[get("/quick_tune/export")]
 pub fn export_quick_tune(cookie_jar: &CookieJar<'_>) -> QuickTuneExport {
     let user_qt_prefs = get_user_qt_prefs(cookie_jar);
@@ -1652,12 +1729,7 @@ pub fn export_quick_tune(cookie_jar: &CookieJar<'_>) -> QuickTuneExport {
     QuickTuneExport(out)
 }
 
-/*
-  Description: PriEco big thank you for money tranfer, usually donation
-
-  Input:
-  Output: Thank you html
-*/
+/// Big thank you for money transfer, usually donation. `GET /thanks`
 #[get("/thanks")]
 pub fn thanks(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     let mut context: HashMap<String, RocketValue> = HashMap::from([
@@ -1672,6 +1744,11 @@ pub fn thanks(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
 }
 
 /* Helper functions */
+/// Country name and flag of a country code. Case insensitive.
+///
+/// # Returns
+///
+/// ('Unknown', '🏳') for unknown codes.
 pub fn country_info(code: &str) -> (&'static str, &'static str) {
     match code.to_lowercase().as_str() {
         "af" => ("Afghanistan", "🇦🇫"),
@@ -1921,15 +1998,21 @@ pub fn country_info(code: &str) -> (&'static str, &'static str) {
 /*
   Blog
 */
+/// Blog post from a template in [BLOG_POSTS_DIR].
 #[derive(Serialize)]
 pub struct BlogPost {
     pub title: String,
+    /// Description.
     pub desc: String,
+    /// File name without '.html.hbs'.
     pub slug: String,
+    /// 'YYYY-M-D'.
     pub date: String,
+    /// Post content, only for RSS.
     pub html: String,
 }
 
+/// Blog, `GET /blog`. Newest posts first.
 #[get("/blog")]
 pub fn blog(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     let mut posts: Vec<BlogPost> = read_dir(BLOG_POSTS_DIR)
@@ -1971,6 +2054,11 @@ pub fn blog(cookie_jar: &CookieJar<'_>, host: &Host) -> Template {
     Template::render("blog/index", context)
 }
 
+/// Blog post, `GET /blog/<slug>`.
+///
+/// # Errors
+///
+/// 404 when post doesn't exist.
 #[get("/blog/<slug>")]
 pub fn blog_post(
     slug: &str,
@@ -1998,6 +2086,7 @@ pub fn blog_post(
     Ok(Template::render(format!("blog/post/{}", slug), context))
 }
 
+/// Blog RSS with full posts, `GET /blog/rss.xml`.
 #[get("/blog/rss.xml")]
 pub fn rss_feed() -> (ContentType, String) {
     let mut posts: Vec<BlogPost> = read_dir(BLOG_POSTS_DIR)
@@ -2075,6 +2164,11 @@ pub fn rss_feed() -> (ContentType, String) {
     (ContentType::XML, rss_xml)
 }
 
+/// Reads title, date and description from the `{{!-- --}}` comment at the start of a post.
+///
+/// # Returns
+///
+/// (title, date, description), with defaults when missing.
 fn extract_metadata(content: &str) -> (String, String, String) {
     let mut title = String::from("Untitled");
     let mut desc = String::from("Empty description");
@@ -2105,6 +2199,7 @@ fn extract_metadata(content: &str) -> (String, String, String) {
     (title, date, desc)
 }
 
+/// Html inside 'content-main' div of a post, empty if not found.
 fn extract_main_content(content: &str) -> String {
     if let Some(start_idx) = content.find(r#"<div class="content-main">"#)
         && let Some(end_idx) = content[start_idx..].find(r#"<div class="content-sidebar">"#)

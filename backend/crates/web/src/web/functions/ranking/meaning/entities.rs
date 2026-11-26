@@ -1,5 +1,37 @@
+//! # Entities
+//!
+//! Finds entities in query and clarifies intent with them.
+//!
+//! * **Place:** Unknown or Navigational becomes Local, when there is no name or business.
+//! * **Business:** Unknown becomes Navigational.
+//! * **Person name:** Unknown or Navigational becomes Informational.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-07-08
+//! * Last Modified: 2026-11-25
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use prieco_core::{EntityType, QU_PIPELINE, QueryIntent, TaggedEntity};
 
+/// Finds entities and coordinates.
+///
+/// Place in user's country wins, otherwise the first one.
+///
+/// # Arguments
+///
+/// * `query` - Query.
+/// * `final_intent` - Intent from keywords.
+/// * `loc` - User location.
+///
+/// # Returns
+///
+/// (clarified intent, (lat, lon) of last place, found entities).
 pub fn scan_entities(
     query: &mut str,
     mut final_intent: QueryIntent,

@@ -1,3 +1,24 @@
+//! # Currency Widget
+//!
+//! Converts currencies for queries like '100 usd to eur', with a 30 day chart.
+//!
+//! ## Architecture
+//!
+//! 1. [Regex][CURRENCY_REGEX] reads amount and both currencies, [names and symbols][normalize_fx] become ISO codes.
+//! 2. Rates of last 30 days from frankfurter.dev.
+//! 3. Widget is cached in widgets keyspace for 6 hours.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-07-06
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use prieco_core::{CLIENT, PRIECO_META};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -9,6 +30,7 @@ use std::{
 };
 use time::{Duration, OffsetDateTime};
 
+/// '[convert] amount from to|in|= to'.
 static CURRENCY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?i)^(?:convert\s+)?(\d+(?:\.\d+)?)\s*([a-z\$€£¥₹₩₺₴₪฿₱₫₽]+)\s*(?:to|in|=)\s*([a-z\$€£¥₹₩₺₴₪฿₱₫₽]+)$",
@@ -16,6 +38,7 @@ static CURRENCY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap()
 });
 
+/// Supported ISO 4217 codes.
 static VALID_ISO_CODES: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
         "AED", "AFN", "ALL", "AMD", "ANG", "AOA", "ARS", "AUD", "AWG", "AZN", "BAM", "BBD", "BDT",
@@ -36,28 +59,48 @@ static VALID_ISO_CODES: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     .collect()
 });
 
+/// Currency widget data.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct FxWidget {
+    /// Amount to convert.
     pub amount: f64,
+    /// Source ISO code.
     pub from: String,
+    /// Target ISO code.
     pub to: String,
+    /// Latest rate.
     pub rate: f64,
+    /// Amount × rate.
     pub converted: f64,
+    /// Date of latest rate.
     pub date: String,
+    /// Chart path.
     pub svg: String,
+    /// Lowest rate.
     pub min_label: String,
+    /// Highest rate.
     pub max_label: String,
+    /// Middle rate.
     pub mid_label: String,
+    /// First chart day.
     pub start_date: String,
+    /// Daily rates as JSON.
     pub history_json: String,
 }
 
+/// Cached widget.
 #[derive(Serialize, Deserialize)]
 struct CachedFx {
+    /// Unix time of download.
     timestamp: u64,
     data: FxWidget,
 }
 
+/// Currency widget for query.
+///
+/// # Returns
+///
+/// `None` when query isn't a conversion, currencies are the same or API fails.
 pub async fn get_fx_widget(q: &str) -> Option<FxWidget> {
     let caps = CURRENCY_REGEX.captures(q.trim())?;
     let amount: f64 = caps.get(1)?.as_str().parse().ok()?;
@@ -142,6 +185,7 @@ pub async fn get_fx_widget(q: &str) -> Option<FxWidget> {
     Some(widget)
 }
 
+/// ISO code of a currency name, symbol or code. `None` if unknown.
 fn normalize_fx(s: &str) -> Option<&'static str> {
     let upper = s.to_uppercase();
 
@@ -181,6 +225,7 @@ fn normalize_fx(s: &str) -> Option<&'static str> {
     None
 }
 
+/// SVG path of rates in `w` × `h`, flat line when there is nothing to show.
 fn gen_svg(rates: &[f64], min: f64, max: f64, w: f64, h: f64) -> String {
     if rates.len() < 2 || max <= min {
         return format!("M 0,{} L {},{}", h / 2.0, w, h / 2.0);

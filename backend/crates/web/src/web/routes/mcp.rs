@@ -1,14 +1,26 @@
-//!  File: web/routes/mcp.rs
-//!  Description: Opens up MCP endpoint for AI agents
+//! # MCP
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! MCP endpoint for AI agents. One tool, `web_search`, which calls the [search API][api].
 //!
-//!  Date Created: 2026-11-01
-//!  Last Modified: 2026-11-01
+//! ## Usage
 //!
-//!  Usage: claude mcp add --transport http prieco "https://prieco.net/mcp?a=<API key>"
-//!  TODO:
+//! `claude mcp add --transport http prieco "https://prieco.net/mcp?a=<API key>"`
+//!
+//! ## Methods
+//!
+//! * `initialize`, `ping`, `tools/list`, `tools/call`.
+//! * Anything else gets JSON-RPC error -32601.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-11-01
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 /*
   Import external libraries
@@ -25,6 +37,23 @@ use crate::web::routes::{
 };
 use prieco_core::globals::EmbeddingService;
 
+/// MCP JSON-RPC over HTTP. `POST /mcp?a=<API key>`
+///
+/// `tools/call` runs `web_search` with page content, default lang 'en' and loc 'us'.
+/// API errors are returned as tool result with `isError`.
+///
+/// # Arguments
+///
+/// * `a` - API key.
+/// * `body` - JSON-RPC request.
+///
+/// # Returns
+///
+/// JSON-RPC response.
+///
+/// # Errors
+///
+/// 202 Accepted for notifications (requests without id).
 #[post("/mcp?<a>", data = "<body>")]
 pub async fn mcp(
     a: Option<&str>,
@@ -102,6 +131,7 @@ pub async fn mcp(
     ))
 }
 
+/// `GET /mcp`, 405. There is no SSE stream.
 #[get("/mcp")]
 pub fn mcp_get() -> Status {
     Status::MethodNotAllowed

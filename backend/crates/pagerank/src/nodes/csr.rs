@@ -1,14 +1,26 @@
-//!  File: pagerank/nodes/csr.rs
-//!  Description:
+//! # CSR
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! Builds CSR (compressed sparse row) of incoming links from [EDGES_SORTED].
 //!
-//!  Date Created:: 2026-02-26
-//!  Last Modified: 2026-02-31
+//! ## Architecture
 //!
-//!  Usage:
-//!  TODO:
+//! 1. **Degrees:** Streams edges, counts in and out degree, writes dst sorted shards.
+//!     * `REUSE_SHARDS` env reuses shards and saved degrees of a previous run.
+//! 2. **Out degree:** Written to [OUT_DEGREE].
+//! 3. **Offsets:** Prefix sum of in degrees, written to [CSR_OFFSETS].
+//! 4. **Edges:** Shards merged in groups of [GROUP_SIZE] into [CSR_EDGES].
+//!     * Every node's source nodes are next to each other.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-02-26
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 /*
   Import system libraries
@@ -37,10 +49,20 @@ use prieco_core::globals::icons;
 /*
   Tuning constants
 */
+/// Shards merged at once.
 const GROUP_SIZE: usize = 20;
+/// Edges prefetched per shard reader thread.
 const PREFETCH_BUFFER: usize = 32_768;
-const WRITE_BATCH: usize = 1 << 23; // 8 MB
+/// Bytes buffered before a write, 8 MB.
+const WRITE_BATCH: usize = 1 << 23;
 
+/// Builds CSR from default files.
+///
+/// Split from [run_with] so tests can use their own paths.
+///
+/// # Errors
+///
+/// Same as [run_with].
 pub fn run(total_nodes_usize: usize) -> Result<(), Box<dyn std::error::Error>> {
     run_with(
         total_nodes_usize,
@@ -52,6 +74,20 @@ pub fn run(total_nodes_usize: usize) -> Result<(), Box<dyn std::error::Error>> {
     )
 }
 
+/// Builds CSR.
+///
+/// # Arguments
+///
+/// * `total_nodes_usize` - Number of nodes.
+/// * `edges_sorted` - Graph.
+/// * `csr_offsets` - Output offsets.
+/// * `csr_edges` - Output edges.
+/// * `out_degree_path` - Output out degrees.
+/// * `scratch_dir` - Temporary shards and degree cache.
+///
+/// # Errors
+///
+/// If a file can't be read or written.
 pub fn run_with(
     total_nodes_usize: usize,
     edges_sorted: &str,
@@ -461,6 +497,7 @@ pub fn run_with(
     Ok(())
 }
 
+/// Sorts and writes pairs as 'csr_shard_N.bin.zst', then clears `buffer`.
 fn flush(
     buffer: &mut Vec<(u64, u64)>,
     shards: &mut Vec<String>,
@@ -488,6 +525,7 @@ fn flush(
     Ok(())
 }
 
+/// Saves out and in degrees for `REUSE_SHARDS`.
 fn save_degrees(
     out_degree: &[u32],
     in_degree: &[u32],
@@ -517,6 +555,7 @@ fn save_degrees(
     Ok(())
 }
 
+/// zstd level 1 writer.
 fn zstd_writer_fast(
     path: &str,
 ) -> Result<Encoder<'static, BufWriter<File>>, Box<dyn std::error::Error>> {

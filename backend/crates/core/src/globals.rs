@@ -1,14 +1,32 @@
-//!  File: globals.rs
-//!  Description: Manages global variables
+//! # Globals
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! Objects shared by the whole project. Most are [Lazy], created on first use.
 //!
-//!  Date Created: 2025-09-20
-//!  Last Modified: 2026-02-06
+//! ## Parts
 //!
-//!  Usage:
-//!  TODO:
+//! * **Types:** [SearchResult], [ImgResult], [WebDocument], [PriEcoConfig].
+//! * **Config:** [PRIECO_CONFIG], loaded or asked for by [set_up].
+//! * **HTTP:** [CLIENT], [PROXY_CLIENT], [PING_CLIENT].
+//! * **Storage:** [PRIECO_META] meta storage, [PRIECO_BLOBS] blob storage.
+//! * **Index:** [PRIECO_INDEX] = Tantivy ([TANTIVY_INDEX]) + meta + IVF vectors ([VECTOR_CENTROPOIDS]).
+//! * **Models:** [EmbeddingService] for query vectors, [RERANKER] (BGE).
+//! * **Query understanding:** [get_store] synonyms, [MATCHERS] intent, [QU_PIPELINE] entities,
+//!   [SPELL_CHECKER], [BANGS].
+//! * **Ranking:** [PAGERANK].
+//! * **Analytics:** [ANALYTICS], anonymous daily counters, see [AnalyticsDb].
+//! * **Terminal:** [colors], [icons].
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2025-09-20
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] Spell checker in more languages than English
+//! - [ ] New PageRank
 
 /*
   Import system libraries
@@ -104,12 +122,16 @@ use crate::{
 /*
   Constants
 */
+/// Added to CSS URLs, change it to refresh browser caches.
 pub const CSS_VERSION: &str = "0.2.0";
+/// Added to JS URLs, change it to refresh browser caches.
 pub const JS_VERSION: &str = "0.2.0";
 
 // Terminal print colors
+/// ANSI colors for terminal prints.
 pub mod colors {
-    pub const RESET: &str = "\x1b[0m"; // Must be used after every print message
+    /// Must be used after every colored print.
+    pub const RESET: &str = "\x1b[0m";
     pub const BLACK: &str = "\x1b[30m";
     pub const RED: &str = "\x1b[31m";
     pub const GREEN: &str = "\x1b[32m";
@@ -120,27 +142,37 @@ pub mod colors {
     pub const WHITE: &str = "\x1b[37m";
 }
 
+/// Prefixes of terminal prints, one per service.
 pub mod icons {
+    /// Blob storage.
     pub const BLOB: &str = "🪼";
+    /// Inserter.
     pub const DB_INSERT: &str = "💾";
+    /// PageRank.
     pub const PAGERANK_ICON: &str = "📋";
+    /// Mini crawler.
     pub const MINI_CRAWLER_ICON: &str = "👾";
+    /// Index updater.
     pub const INDEX_UPDATER: &str = "📚";
+    /// Benchmark.
     pub const BENCHMARK: &str = "📏";
 }
 
 /*
   PriEco structures
 */
+/// Sub page shown under a result.
 #[derive(Serialize)]
 pub struct Sitelink {
     pub title: String,
     pub url: String,
 }
 
+/// One web result, as the search template gets it.
 #[derive(Serialize)]
 pub struct SearchResult {
     pub url: String,
+    /// URL shortened for showing.
     pub display_url: String,
     pub domain: String,
 
@@ -150,28 +182,38 @@ pub struct SearchResult {
     pub image: String,
     pub favicon: String,
 
+    /// Blob id, when the page has cached html.
     pub html_id: Option<String>,
 
+    /// Page text start.
     pub content: String,
+    /// Label from Flesch Reading Ease.
     pub reading_level: String,
+    /// Loading time for showing.
     pub formatted_load: String,
+    /// Page intent label.
     pub intent: String,
+    /// Where the result came from, e.g. 'PriEco Index'.
     pub source_engine: String,
 
     pub sitelinks: Vec<Sitelink>,
 }
 
+/// One image result.
 #[derive(Serialize, Clone)]
 pub struct ImgResult {
+    /// Small image.
     pub thumbnail: String,
     pub image: String,
 
     pub title: String,
 
+    /// Page with the image.
     pub site_url: String,
     pub site_domain: String,
     pub favicon: String,
 }
+/// Product card result.
 #[derive(Serialize)]
 pub struct WebScrollResult {
     pub url: String,
@@ -182,55 +224,84 @@ pub struct WebScrollResult {
     pub price: String,
 }
 // Index documents
+/// [QueryIntent::Unknown] as u8, for documents saved before intent existed.
 fn default_unknown_intent() -> u8 {
     5
 }
+/// One indexed page, stored as zstd compressed JSON in meta storage.
+///
+/// Key is [url_to_id] of `url`.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WebDocument {
     pub url: String,
 
+    /// Max 60 characters.
     pub title: String,
+    /// Max 160 characters.
     pub description: String,
+    /// First 500 characters of page text.
     pub content: String,
     pub favicon: String,
     pub image: String,
+    /// Meta keywords.
     pub keywords: String,
 
+    /// True if page is NSFW.
     pub safe_s: bool,
+    /// ISO 639-1 language code.
     pub lang: String,
+    /// Country code of server.
     pub loc: String,
 
-    pub html: String, // Html blob id
+    /// Html blob id.
+    pub html: String,
 
+    /// Not counted yet.
     pub impressions: u32,
+    /// Not counted yet.
     pub clicks: u32,
-    pub confidence: f32, // Flesch Reading Ease and Text Image Ratio
-    pub effort: f32,     // Text effort
-    pub qna: f32,        // Quality score
+    /// Flesch Reading Ease and text to image ratio.
+    pub confidence: f32,
+    /// Text effort.
+    pub effort: f32,
+    /// Quality score.
+    pub qna: f32,
+    /// Fourth crawler page score.
     pub sts: f32,
 
-    pub load: f64, // Loading time
-    pub date: i64, // Date of crawling
+    /// Loading time in seconds.
+    pub load: f64,
+    /// Date of crawling.
+    pub date: i64,
 
+    /// Page intent, [QueryIntent] as u8.
     #[serde(default = "default_unknown_intent")]
     pub intent: u8,
 
+    /// Page has mobile viewport.
     #[serde(default)]
     pub is_mobile: bool,
+    /// Page has at least 500 words.
     #[serde(default)]
     pub has_500_words: bool,
 
     // Dynamic data
+    /// Score during search, not stored.
     #[serde(default)]
     pub search_score: f32,
+    /// Search engines that found it during search, not stored.
     #[serde(default)]
     pub source: String,
 }
 
+/// Paths being written, see [crate::acquire_file_lock].
 pub struct FileLocks {
+    /// Locked paths.
     pub set: Mutex<DashSet<String>>,
+    /// Wakes threads waiting for a path.
     pub condvar: Condvar,
 }
+/// Process wide [FileLocks].
 pub static FILE_LOCKS: Lazy<Arc<FileLocks>> = Lazy::new(|| {
     Arc::new(FileLocks {
         set: Mutex::new(DashSet::new()),
@@ -238,6 +309,7 @@ pub static FILE_LOCKS: Lazy<Arc<FileLocks>> = Lazy::new(|| {
     })
 });
 
+/// Request guard with the User-Agent header, 'unknown' when missing.
 pub struct UserAgent<'r>(pub &'r str);
 #[rocket::async_trait]
 impl<'r> FromRequest<'r> for UserAgent<'r> {
@@ -252,32 +324,48 @@ impl<'r> FromRequest<'r> for UserAgent<'r> {
 /*
 PriEco config
 */
+/// Node config, see [set_up::set_up_wizard].
 pub static PRIECO_CONFIG: Lazy<PriEcoConfig> = Lazy::new(set_up::set_up_wizard);
+/// Default of `enable_*` fields missing in old configs.
 fn default_true() -> bool {
     true
 }
+/// Node config saved in [crate::CONFIG_FILE].
 #[derive(Serialize, Deserialize)]
 pub struct PriEcoConfig {
+    /// Address the web server binds to.
     pub ip: String,
+    /// Port of the web server.
     pub port: i32,
 
+    /// Tantivy index directory.
     pub tantivy_path: String,
+    /// Meta storage directory.
     pub meta_path: String,
+    /// IVF buckets directory.
     pub vector_path: String,
+    /// Blob storage directory.
     pub blob_path: String,
 
+    /// Parallel downloads of the mini crawler.
     pub worker_concurrent: u32,
 
+    /// Run blob importer.
     #[serde(default = "default_true")]
     pub enable_blob_storage: bool,
+    /// Run inserter.
     #[serde(default = "default_true")]
     pub enable_db_inserter: bool,
+    /// Run PageRank.
     #[serde(default = "default_true")]
     pub enable_pagerank: bool,
+    /// Run mini crawler.
     #[serde(default = "default_true")]
     pub enable_mini_crawler: bool,
+    /// Run index updater.
     #[serde(default = "default_true")]
     pub enable_index_updater: bool,
+    /// Run website and search.
     #[serde(default = "default_true")]
     pub enable_web_server: bool,
 }
@@ -285,6 +373,7 @@ pub struct PriEcoConfig {
 /*
  Request Client
 */
+/// HTTP client that looks like Chrome on Windows. 15s timeout.
 pub static CLIENT: Lazy<PIMP_CLIENT> = Lazy::new(|| {
     println!("Created primp client!");
 
@@ -297,6 +386,7 @@ pub static CLIENT: Lazy<PIMP_CLIENT> = Lazy::new(|| {
         .expect("Failed to create primp client")
 });
 
+/// Same as [CLIENT] but doesn't follow redirects, for the image proxy.
 pub static PROXY_CLIENT: Lazy<PIMP_CLIENT> = Lazy::new(|| {
     println!("Created primp proxy client!");
 
@@ -310,6 +400,7 @@ pub static PROXY_CLIENT: Lazy<PIMP_CLIENT> = Lazy::new(|| {
         .expect("Failed to create primp proxy client")
 });
 
+/// Plain HTTP client with 5s timeout, for checking if pages are alive.
 pub static PING_CLIENT: Lazy<PIMP_CLIENT> = Lazy::new(|| {
     println!("Created simple primp ping client!");
 
@@ -322,13 +413,32 @@ pub static PING_CLIENT: Lazy<PIMP_CLIENT> = Lazy::new(|| {
 /*
  Vector embeder
 */
+/// Tokenizer of [crate::EMBED_MODEL].
 pub static VECTOR_EMBEDDING_TOKENIZER: &[u8] = include_bytes!("../../../data/tokenizer.json");
+/// Turns text into a vector with [crate::EMBED_MODEL].
 #[derive(Clone)]
 pub struct EmbeddingService {
+    /// Text tokenizer.
     pub tokenizer: Arc<tokio::sync::Mutex<Tokenizer>>,
+    /// ONNX session.
     pub model: Arc<tokio::sync::Mutex<Session>>,
 }
 impl EmbeddingService {
+    /// Embeds query.
+    ///
+    /// Runs on a blocking thread. Vector is mean of token vectors, not normalized.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - Text.
+    ///
+    /// # Returns
+    ///
+    /// Vector of [crate::VECTOR_DIM] values.
+    ///
+    /// # Errors
+    ///
+    /// If tokenization or model fails.
     pub async fn embed_query(
         &self,
         query: &str,
@@ -426,6 +536,7 @@ impl EmbeddingService {
     }
 }
 
+/// Country code → main language code. Default language for a location.
 pub static COUNTRY_TO_LANG: Lazy<Arc<AHashMap<&'static str, &'static str>>> = Lazy::new(|| {
     let mut map = AHashMap::with_capacity(200);
 
@@ -507,10 +618,9 @@ pub static COUNTRY_TO_LANG: Lazy<Arc<AHashMap<&'static str, &'static str>>> = La
     Arc::new(map)
 });
 
-/*
-  PriEco Storage
-  Description: FJALL key-value storage. Stores results meta data and html blobs
-*/
+/// zstd dictionary for [WebDocument] compression.
+///
+/// Path is `PRIECO_ZSTD_DICT` or [crate::ZSTD_DICT]. `None` uses plain zstd.
 pub static META_DICTIONARY: Lazy<Option<Vec<u8>>> = Lazy::new(|| {
     let path = std::env::var("PRIECO_ZSTD_DICT").unwrap_or_else(|_| ZSTD_DICT.to_string());
 
@@ -526,38 +636,51 @@ pub static META_DICTIONARY: Lazy<Option<Vec<u8>>> = Lazy::new(|| {
     }
 });
 
+/// Prepared decoder of [META_DICTIONARY].
 pub static META_DECODER: Lazy<Option<DecoderDictionary<'static>>> = Lazy::new(|| {
     META_DICTIONARY
         .as_ref()
         .map(|dict_bytes| DecoderDictionary::copy(dict_bytes))
 });
 
+/// Directory with '.tar.gz' files for [blob storage][PRIECO_BLOBS].
 pub const BLOB_IMPORT_DIR: &str = "/mnt/hdd/imp_blob/";
 
+/// Fjall database with result meta data and small site data.
 pub struct PriecoMetaStorage {
     // Meta data: Titles, Descriptions, URLs...
+    /// Database.
     pub meta_db: FJALL_DATABASE,
+    /// Page id → zstd [WebDocument].
     pub meta_ks: Keyspace,
 
     // Goggles
+    /// Goggles.
     pub goggles_ks: Keyspace,
 
     // Widgets
+    /// Widget caches.
     pub widgets_ks: Keyspace,
 
     // Analytics
+    /// Analytics counters, see [AnalyticsDb].
     pub analytics_ks: Keyspace,
 
     // API
+    /// API keys and usage.
     pub api_ks: Keyspace,
 }
 
+/// Fjall database with compressed page text and links.
 pub struct PriecoBlobStorage {
     // Blob storage: Compressed web page data
+    /// Database.
     pub blob_db: FJALL_DATABASE,
+    /// Blob id → blob, see [prieco_blob](../prieco_blob/index.html).
     pub blobs_ks: Keyspace,
 }
 
+/// Meta storage of this node.
 pub static PRIECO_META: Lazy<Arc<PriecoMetaStorage>> = Lazy::new(|| {
     let meta_db = load_meta_db(&PRIECO_CONFIG.meta_path);
     let meta_ks = load_meta_ks(&meta_db);
@@ -644,6 +767,7 @@ fn load_meta_ks(meta_db: &FJALL_DATABASE) -> Keyspace {
         .expect("Failed to open Meta keyspace")
 }
 
+/// Blob storage of this node. Large values are stored apart from the tree.
 pub static PRIECO_BLOBS: Lazy<Arc<PriecoBlobStorage>> = Lazy::new(|| {
     let blob_db = FJALL_DATABASE::builder(Path::new(&PRIECO_CONFIG.blob_path))
         .worker_threads(2)
@@ -671,8 +795,11 @@ pub static PRIECO_BLOBS: Lazy<Arc<PriecoBlobStorage>> = Lazy::new(|| {
 /*
   Index
 */
+/// Memory of Tantivy writer, in bytes.
 pub const TANTIVY_HEAP_SIZE: usize = 512_000_000;
+/// Threads of Tantivy writer.
 pub const TANTIVY_WRITER_THREADS: usize = 2;
+/// Tantivy index of this node.
 pub static TANTIVY_INDEX: Lazy<Arc<Index>> =
     Lazy::new(|| Arc::new(load_tantivy(&PRIECO_CONFIG.tantivy_path)));
 
@@ -732,6 +859,7 @@ fn load_tantivy(path: &str) -> Index {
     index
 }
 
+/// Reader of [TANTIVY_INDEX].
 pub static TANTIVY_READER: Lazy<Arc<IndexReader>> =
     Lazy::new(|| Arc::new(load_tantivy_reader(&TANTIVY_INDEX)));
 
@@ -756,6 +884,7 @@ fn load_tantivy_reader(index: &Index) -> IndexReader {
         .expect("Failed to create Tantivy reader")
 }
 
+/// The only writer of [TANTIVY_INDEX].
 pub static TANTIVY_WRITER: Lazy<Arc<Mutex<IndexWriter>>> = Lazy::new(|| {
     Arc::new(Mutex::new(
         TANTIVY_INDEX
@@ -764,6 +893,7 @@ pub static TANTIVY_WRITER: Lazy<Arc<Mutex<IndexWriter>>> = Lazy::new(|| {
     ))
 });
 
+/// Query parser of [TANTIVY_INDEX].
 pub static TANTIVY_QUERY_PARSER: Lazy<QueryParser> =
     Lazy::new(|| load_query_parser(&TANTIVY_INDEX));
 
@@ -809,13 +939,19 @@ fn load_query_parser(index: &Index) -> QueryParser {
 /// Search and the inserter take it as an argument, so they can run
 /// on the official index ([PRIECO_INDEX]) or on a benchmark index.
 pub struct PriecoIndex {
+    /// Tantivy index.
     pub tantivy: Arc<Index>,
+    /// Reader of `tantivy`.
     pub reader: Arc<IndexReader>,
+    /// Query parser of `tantivy`.
     pub query_parser: QueryParser,
 
+    /// Meta database.
     pub meta_db: FJALL_DATABASE,
+    /// Page id → zstd [WebDocument].
     pub meta_ks: Keyspace,
 
+    /// IVF buckets directory.
     pub vector_path: String,
 }
 impl PriecoIndex {
@@ -865,6 +1001,7 @@ impl PriecoIndex {
     }
 }
 
+/// Official index of this node, made of the globals above.
 pub static PRIECO_INDEX: Lazy<Arc<PriecoIndex>> = Lazy::new(|| {
     Arc::new(PriecoIndex {
         tantivy: TANTIVY_INDEX.clone(),
@@ -879,10 +1016,12 @@ pub static PRIECO_INDEX: Lazy<Arc<PriecoIndex>> = Lazy::new(|| {
 });
 
 // Multilang tokenization
+/// Tantivy tokenizer for all languages, uses charabia. Tokens are lemmas of words.
 #[derive(Clone)]
 pub struct Multilingual(Arc<CHARABIA_TOKENIZER<'static>>);
 
 impl Multilingual {
+    /// Creates tokenizer. Leaks one builder, call it once per index.
     pub fn new() -> Self {
         let builder: &'static mut TokenizerBuilder<Vec<u8>> =
             Box::leak(Box::new(TokenizerBuilder::default()));
@@ -896,6 +1035,7 @@ impl Default for Multilingual {
     }
 }
 
+/// Token stream of [Multilingual]: tokens and the current one.
 pub struct MultiStream(std::vec::IntoIter<Token>, Option<Token>);
 
 impl TokenStream for MultiStream {
@@ -935,11 +1075,17 @@ impl TANTIVY_TOKENIZER for Multilingual {
 /*
   Inserter
 */
+/// Directory with '.zip' files for the inserter.
 pub const INSERTER_IMPORT_DIR: &str = "/tmp/res_imp";
+/// IVF centroids: count (u32), dims (u32), then f32 values.
 pub static CENTROPOIDS_BIN: &[u8] = include_bytes!("../../../data/ivf/centroids.bin");
 
+/// IVF centroids on GPU.
 pub static VECTOR_CENTROPOIDS: Lazy<Arc<CentroidIndex>> =
     Lazy::new(|| Arc::new(CentroidIndex::new(CENTROPOIDS_BIN).unwrap()));
+/// IVF centroids loaded on GPU, with CUDA kernels.
+///
+/// Assigns vectors to buckets and searches buckets.
 #[cfg(feature = "cuda")]
 pub struct CentroidIndex {
     ctx: Arc<CudaContext>,
@@ -955,6 +1101,11 @@ pub struct CentroidIndex {
 
 #[cfg(feature = "cuda")]
 impl CentroidIndex {
+    /// Loads centroids to GPU and compiles kernels.
+    ///
+    /// # Errors
+    ///
+    /// If data is short or CUDA fails.
     fn new(data: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
         let mut cursor = Cursor::new(data);
         let mut buf = [0u8; 4];
@@ -1068,6 +1219,19 @@ extern "C" __global__ void topk_argmax(
         })
     }
 
+    /// Bucket of every vector: the centroid with highest cosine similarity.
+    ///
+    /// # Arguments
+    ///
+    /// * `vectors` - Vectors of [crate::VECTOR_DIM].
+    ///
+    /// # Returns
+    ///
+    /// Bucket id per vector, same order.
+    ///
+    /// # Errors
+    ///
+    /// If CUDA fails.
     pub fn assign_batch(
         &self,
         vectors: &[Vec<f32>],
@@ -1151,6 +1315,30 @@ extern "C" __global__ void topk_argmax(
         Ok(result)
     }
 
+    /// Searches vector index.
+    ///
+    /// Finds `t` closest centroids on GPU, then reads their '.bin.zst' buckets
+    /// in parallel and scores every vector by cosine similarity on CPU.
+    /// Same id in more buckets keeps its best score.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - Query vector.
+    /// * `n` - Max results, 0 means all.
+    /// * `t` - Buckets to read, max 32.
+    /// * `vector_path` - Directory with buckets.
+    ///
+    /// # Returns
+    ///
+    /// (page id, similarity), best first.
+    ///
+    /// # Errors
+    ///
+    /// If CUDA fails.
+    ///
+    /// # Panics
+    ///
+    /// If `t` is over 32.
     pub fn search(
         &self,
         query: &[f32],
@@ -1294,21 +1482,25 @@ extern "C" __global__ void topk_argmax(
         Ok(candidates)
     }
 }
+/// Placeholder without `cuda` feature. Vector search is off.
 #[cfg(not(feature = "cuda"))]
 pub struct CentroidIndex;
 
 #[cfg(not(feature = "cuda"))]
 impl CentroidIndex {
+    /// Prints that CUDA is off.
     pub fn new(_: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
         println!("CUDA feature not enabled");
         Ok(Self)
     }
 
+    /// Returns no buckets.
     pub fn assign_batch(&self, _: &[Vec<f32>]) -> Result<Vec<usize>, Box<dyn Error + Send + Sync>> {
         println!("CUDA feature not enabled");
         Ok(Vec::new())
     }
 
+    /// Always an error.
     pub fn search(
         &self,
         _: &[f32],
@@ -1323,14 +1515,24 @@ impl CentroidIndex {
 /*
   PageRank
 */
+/// PageRank scores, `None` when files are missing. Can be swapped at runtime.
 pub static PAGERANK: Lazy<RwLock<Option<Arc<PageRank>>>> =
     Lazy::new(|| RwLock::new(PageRank::open(ID_MAP_FILE, FINAL_SCORES).ok().map(Arc::new)));
 
+/// Memory mapped PageRank files.
+///
+/// * [crate::ID_MAP_FILE] - Sorted (url id, node id) pairs.
+/// * [crate::FINAL_SCORES] - f32 score per node id.
 pub struct PageRank {
+    /// Keeps id map mapped.
     _id_mmap: Mmap,
+    /// Start of id map.
     ptr: *const (u64, u64),
+    /// Number of pairs.
     len: usize,
+    /// Keeps scores mapped.
     _scores_mmap: Mmap,
+    /// Start of scores.
     scores_ptr: *const f32,
 }
 
@@ -1338,6 +1540,11 @@ unsafe impl Send for PageRank {}
 unsafe impl Sync for PageRank {}
 
 impl PageRank {
+    /// Maps both files.
+    ///
+    /// # Errors
+    ///
+    /// If a file can't be opened or mapped.
     pub fn open(id_map_path: &str, scores_path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let id_file = File::open(id_map_path)?;
         let id_mmap = unsafe { MmapOptions::new().map(&id_file)? };
@@ -1361,10 +1568,12 @@ impl PageRank {
         })
     }
 
+    /// All (url id, node id) pairs.
     pub fn pairs(&self) -> &[(u64, u64)] {
         unsafe { std::slice::from_raw_parts(self.ptr, self.len) }
     }
 
+    /// Node id of url id, binary search.
     pub fn lookup(&self, hash: u64) -> Option<u64> {
         let pairs = self.pairs();
         pairs
@@ -1373,6 +1582,7 @@ impl PageRank {
             .map(|i| pairs[i].1)
     }
 
+    /// PageRank of URL, normalized by [crate::normalize_url]. 0 when unknown.
     pub fn get_score(&self, url: &str) -> f32 {
         let hash = url_to_id(&normalize_url(url.trim()));
         let node_id = match self.lookup(hash) {
@@ -1387,15 +1597,25 @@ impl PageRank {
 /*
   Reranker
 */
+/// Tokenizer of [crate::BGE_MODEL].
 pub static BGE_TOKENIZER: &[u8] = include_bytes!("../../../data/bge/tokenizer.json");
+/// BGE reranker.
 pub static RERANKER: Lazy<Reranker> = Lazy::new(Reranker::new);
 
+/// Cross encoder scoring how well a passage answers a query.
 pub struct Reranker {
+    /// ONNX session on CUDA.
     pub session: Arc<Session>,
+    /// Tokenizer, max 512 tokens.
     pub tokenizer: Arc<Tokenizer>,
 }
 
 impl Reranker {
+    /// Loads [crate::BGE_MODEL] on CUDA.
+    ///
+    /// # Panics
+    ///
+    /// If model or tokenizer can't be loaded.
     pub fn new() -> Self {
         let environment = Environment::builder()
             .with_name("reranker")
@@ -1444,6 +1664,20 @@ impl Reranker {
         }
     }
 
+    /// Scores passages for a query in one batch.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - Query.
+    /// * `passages` - Texts to score.
+    ///
+    /// # Returns
+    ///
+    /// Score per passage, same order. Higher is better.
+    ///
+    /// # Errors
+    ///
+    /// If model fails.
     pub async fn score_batch(
         &self,
         query: &str,
@@ -1527,11 +1761,15 @@ impl Default for Reranker {
 /*
   Synonyms
 */
+/// Synonyms of one language.
 pub struct LangSynonyms {
+    /// Word → row.
     index: FstMap<&'static [u8]>,
+    /// Synonyms per row.
     rows: Vec<Box<[Box<str>]>>,
 }
 
+/// Built in synonym files of a language: (fst, rows).
 fn get_synonym_bytes(lang: &str) -> Option<(&'static [u8], &'static [u8])> {
     match lang {
         "ar" => Some((
@@ -1622,6 +1860,7 @@ fn get_synonym_bytes(lang: &str) -> Option<(&'static [u8], &'static [u8])> {
     }
 }
 
+/// Words like 'near' in all languages. They are not expanded with synonyms.
 pub static LOCAL_NO_EXPAND: Lazy<AHashSet<&'static str>> = Lazy::new(|| {
     let words = vec![
         // 🇬🇧English (en)
@@ -1915,6 +2154,7 @@ pub static LOCAL_NO_EXPAND: Lazy<AHashSet<&'static str>> = Lazy::new(|| {
 });
 
 impl LangSynonyms {
+    /// Loads synonyms of `lang`, `None` if there are none.
     fn load(lang: &str) -> Option<Arc<LangSynonyms>> {
         let (fst_bytes, rows_bytes) = get_synonym_bytes(lang)?;
 
@@ -1926,14 +2166,17 @@ impl LangSynonyms {
         Some(Arc::new(LangSynonyms { index, rows }))
     }
 
+    /// Synonyms of `term`.
     pub fn lookup(&self, term: &str) -> Option<&[Box<str>]> {
         let id = self.index.get(term)?;
         self.rows.get(id as usize).map(|r| r.as_ref())
     }
 }
 
+/// Loaded synonyms per language.
 static SYNONYM_STORES: Lazy<RwLock<std::collections::HashMap<String, Option<Arc<LangSynonyms>>>>> =
     Lazy::new(|| RwLock::new(std::collections::HashMap::new()));
+/// Synonyms of `lang`, loaded on first use. `None` for unsupported languages.
 pub fn get_store(lang: &str) -> Option<Arc<LangSynonyms>> {
     if let Some(entry) = SYNONYM_STORES.read().get(lang) {
         return entry.clone();
@@ -1950,21 +2193,32 @@ pub fn get_store(lang: &str) -> Option<Arc<LangSynonyms>> {
 /*
   Intent
 */
+/// Query intent, the same categories as Google uses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QueryIntent {
-    Informational,           // Learn information
-    Transactional,           // Action purchase, download, sign up
-    CommercialInvestigation, // Research, comparing options
-    Navigational,            // Reach a known domain, page
-    Local,                   // Near me businesses
-    Unknown,                 // Failed to determine
+    /// Learn information.
+    Informational,
+    /// Action: purchase, download, sign up.
+    Transactional,
+    /// Research, comparing options.
+    CommercialInvestigation,
+    /// Reach a known domain or page.
+    Navigational,
+    /// Near me businesses.
+    Local,
+    /// Failed to determine.
+    Unknown,
 }
 
+/// Intent keywords of one language.
 pub struct LangMatcher {
+    /// Keyword matcher.
     pub automaton: AhoCorasick,
+    /// Intent per keyword.
     pub intent_map: Vec<QueryIntent>,
 }
 
+/// Keywords of one language in 'intent.json'.
 #[derive(Deserialize)]
 struct LanguageKeywords {
     #[serde(default)]
@@ -1979,12 +2233,14 @@ struct LanguageKeywords {
     navigational_keywords: Vec<String>,
 }
 
+/// 'intent.json', language code → keywords.
 #[derive(Deserialize)]
 struct IntentConfig {
     #[serde(flatten)]
     languages: AHashMap<String, LanguageKeywords>,
 }
 
+/// Language code → [LangMatcher], from 'intent.json'.
 pub static MATCHERS: Lazy<AHashMap<String, LangMatcher>> = Lazy::new(|| {
     let mut matchers = AHashMap::new();
 
@@ -2047,6 +2303,7 @@ pub static MATCHERS: Lazy<AHashMap<String, LangMatcher>> = Lazy::new(|| {
 /*
   Entities
 */
+/// Kind of entity found in query.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntityType {
     PersonName,
@@ -2054,13 +2311,18 @@ pub enum EntityType {
     Place,
 }
 
+/// Entity found in query.
 #[derive(Debug, Clone)]
 pub struct TaggedEntity {
+    /// Byte range in lowercase query.
     pub range: Range<usize>,
+    /// Kind.
     pub entity_type: EntityType,
+    /// Matched name.
     pub matched_text: String,
 }
 
+/// Place location.
 #[derive(Archive, Deserialize, Serialize, RkyvSerialize, RkyvDeserialize, Debug, Clone)]
 pub struct GeoCoords {
     pub country: String,
@@ -2068,17 +2330,23 @@ pub struct GeoCoords {
     pub lat: f32,
 }
 
+/// Place name → locations, built in as rkyv.
 #[derive(Archive, Deserialize, Serialize, RkyvSerialize, RkyvDeserialize, Debug, Clone)]
 pub struct EntityRegistry {
     pub places: HashMap<String, Vec<GeoCoords>>,
 }
 
+/// Finds places, businesses and person names in query.
 pub struct QueryUnderstandingPipeline {
+    /// Matcher of all names.
     pub automaton: AhoCorasick,
+    /// Kind and name per pattern.
     pub metadata_map: Vec<(EntityType, String)>,
+    /// Places with coordinates.
     pub archived_places: &'static rkyv::Archived<EntityRegistry>,
 }
 
+/// Entity finder, from built in places and 'keywords_automaton.txt'.
 pub static QU_PIPELINE: Lazy<QueryUnderstandingPipeline> = Lazy::new(|| {
     macro_rules! include_bytes_aligned {
         ($path:expr) => {{
@@ -2135,6 +2403,9 @@ pub static QU_PIPELINE: Lazy<QueryUnderstandingPipeline> = Lazy::new(|| {
     }
 });
 impl QueryUnderstandingPipeline {
+    /// Finds entities in query. Matches must be whole words.
+    ///
+    /// Longest match wins when names overlap.
     pub fn get_tags(&self, query: &str) -> Vec<TaggedEntity> {
         let query_lower = query.to_lowercase();
         let query_bytes = query_lower.as_bytes();
@@ -2168,12 +2439,17 @@ impl QueryUnderstandingPipeline {
 /*
   Server-side bangs
 */
+/// Bang, read from unduck 'bangs.js'.
 #[derive(Deserialize, Debug, Clone)]
 pub struct Bang {
+    /// Domain.
     pub d: String,
+    /// Trigger, e.g. 'g' for !g.
     pub t: String,
+    /// URL template, query goes to '{{{s}}}'.
     pub u: String,
 }
+/// Trigger → [Bang], for redirects without JavaScript.
 pub static BANGS: Lazy<AHashMap<String, Bang>> = Lazy::new(|| {
     let content = read_file(&format!("{}/js/unduck/bangs.js", STATIC_DIR));
     let mut map = AHashMap::new();
@@ -2203,18 +2479,21 @@ pub static BANGS: Lazy<AHashMap<String, Bang>> = Lazy::new(|| {
 
     map
 });
+/// Value of `key"..."` in a 'bangs.js' block.
 fn extract_val(block: &str, key: &str) -> Option<String> {
     let start = block.find(key)? + key.len();
     let end = block[start..].find('"')?;
     Some(block[start..start + end].to_string())
 }
 
+/// Known popular domains from 'domains.txt'.
 pub static TOP_DOMAINS: Lazy<AHashSet<&'static str>> =
     Lazy::new(|| include_str!("../../../data/domains.txt").lines().collect());
 
 /*
   Spell checker
 */
+/// SymSpell with English words and bigrams.
 pub static SPELL_CHECKER: Lazy<Arc<SymSpell<UnicodeStringStrategy>>> = Lazy::new(|| {
     let mut symspell: SymSpell<UnicodeStringStrategy> = SymSpell::default();
 
@@ -2256,6 +2535,7 @@ pub static SPELL_CHECKER: Lazy<Arc<SymSpell<UnicodeStringStrategy>>> = Lazy::new
   Analytics (only PriEco purely vibe coded part)
   They don't matter enough, and AI can do a good job in this
 */
+/// Anonymous analytics of this node.
 pub static ANALYTICS: Lazy<AnalyticsDb> = Lazy::new(|| {
     let date = OffsetDateTime::now_utc().date();
 
@@ -2276,6 +2556,7 @@ pub static ANALYTICS: Lazy<AnalyticsDb> = Lazy::new(|| {
 /*
   Latency stages
 */
+/// Measured part of search.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Stage {
     /// Whole run_core_search (concurrent engines + fetch + sort)
@@ -2295,6 +2576,7 @@ pub enum Stage {
 }
 
 impl Stage {
+    /// All stages, in showing order.
     pub const ALL: [Stage; 7] = [
         Stage::Core,
         Stage::Fts,
@@ -2305,6 +2587,7 @@ impl Stage {
         Stage::PeerRtt,
     ];
 
+    /// Key used in storage.
     pub fn key(self) -> &'static str {
         match self {
             Stage::Core => "core",
@@ -2317,6 +2600,7 @@ impl Stage {
         }
     }
 
+    /// Name for stats page.
     pub fn label(self) -> &'static str {
         match self {
             Stage::Core => "End to end",
@@ -2329,6 +2613,7 @@ impl Stage {
         }
     }
 
+    /// Description for stats page.
     pub fn desc(self) -> &'static str {
         match self {
             Stage::Core => "All engines, fetch and sort",
@@ -2346,9 +2631,12 @@ impl Stage {
   Log-scale histogram: 16 buckets per e-fold -> ~6.5% relative error on every percentile.
   Bucket b covers [e^(b/16), e^((b+1)/16)) microseconds.
 */
+/// Buckets per e-fold of latency histogram, ~6.5% error.
 const LAT_RES: f64 = 16.0;
+/// Last bucket.
 const LAT_MAX_BUCKET: u16 = 400;
 
+/// Histogram bucket of latency in microseconds.
 fn lat_bucket(micros: u64) -> u16 {
     ((micros.max(1) as f64).ln() * LAT_RES)
         .floor()
@@ -2360,14 +2648,20 @@ pub fn lat_bucket_ms(bucket: u16) -> f64 {
     (((bucket as f64) + 0.5) / LAT_RES).exp() / 1000.0
 }
 
+/// Percentiles in milliseconds.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct LatencySummary {
+    /// Samples.
     pub count: u64,
+    /// Median.
     pub p50: f64,
+    /// 95th percentile.
     pub p95: f64,
+    /// 99th percentile.
     pub p99: f64,
 }
 
+/// Percentile `q` (0..1) of histogram in ms, nearest rank. 0 when empty.
 pub fn percentile(hist: &BTreeMap<u16, u64>, q: f64) -> f64 {
     let total: u64 = hist.values().sum();
     if total == 0 {
@@ -2391,6 +2685,7 @@ pub fn percentile(hist: &BTreeMap<u16, u64>, q: f64) -> f64 {
         .unwrap_or(0.0)
 }
 
+/// [LatencySummary] of histogram.
 pub fn summarize(hist: &BTreeMap<u16, u64>) -> LatencySummary {
     LatencySummary {
         count: hist.values().sum(),
@@ -2400,24 +2695,49 @@ pub fn summarize(hist: &BTreeMap<u16, u64>) -> LatencySummary {
     }
 }
 
+/// Daily counters in the analytics keyspace.
+///
+/// No IPs or user agents are stored. Unique visitors are counted by a hash with a salt
+/// that changes every day, so they can't be linked between days.
+/// Everything older than 30 days is removed.
 pub struct AnalyticsDb {
+    /// Meta database.
     db: FJALL_DATABASE,
+    /// Analytics keyspace.
     ks: Keyspace,
+    /// Salt of today.
     salt: RwLock<(Date, [u8; 32])>,
 
+    /// Buffered counter increments.
     pending: Mutex<HashMap<String, u64>>,
+    /// One flush at a time.
     flush_lock: Mutex<()>,
+    /// Unix time of last flush.
     last_flush: AtomicI64,
 
+    /// One direct increment at a time.
     inc_lock: Mutex<()>,
 }
 
 impl AnalyticsDb {
     // Write
+    /// Counts one search.
     pub fn record_query(&self) {
         self.inc(&format!("queries:{}", self.today()), 1);
     }
 
+    /// Counts a page view and, once per day, a unique visitor and their country.
+    ///
+    /// # Arguments
+    ///
+    /// * `ip` - Visitor IP, only hashed.
+    /// * `user_agent` - Only hashed.
+    /// * `entity_id` - Counted thing, visitor is unique per entity.
+    /// * `country_code` - Country from settings, 'all' is skipped.
+    ///
+    /// # Panics
+    ///
+    /// If write fails.
     pub fn record_visitor(
         &self,
         ip: &str,
@@ -2466,6 +2786,7 @@ impl AnalyticsDb {
         batch.commit().expect("Analytics visitor write failed");
     }
 
+    /// Counts one API request.
     pub fn record_api_request(&self) {
         let date = self.today();
         let mut batch = self.db.batch();
@@ -2495,6 +2816,7 @@ impl AnalyticsDb {
         self.count_by(name, 1);
     }
 
+    /// Adds `n` to daily counter `name`. Buffered.
     pub fn count_by(&self, name: &str, n: u64) {
         if n == 0 {
             return;
@@ -2527,6 +2849,7 @@ impl AnalyticsDb {
     }
 
     // Read
+    /// Searches per day, oldest first.
     pub fn daily_queries(&self, days: u32) -> Vec<(String, u64)> {
         let today = self.today();
         (0..days)
@@ -2538,6 +2861,7 @@ impl AnalyticsDb {
             .collect()
     }
 
+    /// Unique visitors per day, oldest first.
     pub fn daily_visitors(&self, days: u32) -> Vec<(String, u64)> {
         let today = self.today();
         (0..days)
@@ -2552,6 +2876,7 @@ impl AnalyticsDb {
             .collect()
     }
 
+    /// (visitors today, visitors yesterday, page views today, page views yesterday).
     pub fn visitor_stats(&self) -> (u64, u64, u64, u64) {
         let today = self.today();
         let yesterday = today - Duration::days(1);
@@ -2563,6 +2888,7 @@ impl AnalyticsDb {
         )
     }
 
+    /// Visitors per country today, most first.
     pub fn top_countries(&self) -> Vec<(String, u64)> {
         let prefix = format!("country:{}:", self.today());
         let mut results: Vec<(String, u64)> = self
@@ -2589,6 +2915,7 @@ impl AnalyticsDb {
         results
     }
 
+    /// API requests per day, oldest first.
     pub fn daily_api_requests(&self, days: u32) -> Vec<(String, u64)> {
         let today = self.today();
         (0..days)
@@ -2603,6 +2930,7 @@ impl AnalyticsDb {
             .collect()
     }
 
+    /// (API requests today, yesterday).
     pub fn api_stats_today_yesterday(&self) -> (u64, u64) {
         let today = self.today();
         let yesterday = today - Duration::days(1);
@@ -2644,6 +2972,7 @@ impl AnalyticsDb {
         merged
     }
 
+    /// [LatencySummary] of last `days` days.
     pub fn latency_summary(&self, stage: Stage, days: u32) -> LatencySummary {
         summarize(&self.latency_hist(stage, days))
     }
@@ -2662,6 +2991,11 @@ impl AnalyticsDb {
     }
 
     // Purge
+    /// Removes counters older than 30 days.
+    ///
+    /// # Panics
+    ///
+    /// If write fails.
     pub fn purge_expired(&self) {
         let cutoff = self.today() - Duration::days(30);
         let mut batch = self.db.batch();
@@ -2701,6 +3035,7 @@ impl AnalyticsDb {
         batch.commit().expect("Analytics purge failed");
     }
 
+    /// Purges now and every midnight UTC. Never returns.
     pub async fn background_purge_task(&self) {
         self.purge_expired();
         loop {
@@ -2743,6 +3078,7 @@ impl AnalyticsDb {
         }
     }
 
+    /// Flushes when last flush is 30s old.
     fn maybe_flush(&self) {
         let now = OffsetDateTime::now_utc().unix_timestamp();
         let last = self.last_flush.load(Ordering::Relaxed);
@@ -2757,6 +3093,7 @@ impl AnalyticsDb {
         }
     }
 
+    /// Latency histogram of one day.
     fn day_hist(&self, date: Date, stage: Stage) -> BTreeMap<u16, u64> {
         let prefix = format!("lat:{}:{}:", date, stage.key());
         let mut hist = BTreeMap::new();
@@ -2780,10 +3117,12 @@ impl AnalyticsDb {
     }
 
     // Helpers
+    /// Today in UTC.
     fn today(&self) -> Date {
         OffsetDateTime::now_utc().date()
     }
 
+    /// Counter value, 0 when missing.
     fn get_u64(&self, key: &str) -> u64 {
         self.ks
             .get(key.as_bytes())
@@ -2793,6 +3132,11 @@ impl AnalyticsDb {
             .unwrap_or(0)
     }
 
+    /// Adds to counter directly, without buffer.
+    ///
+    /// # Panics
+    ///
+    /// If write fails.
     fn inc(&self, key: &str, delta: u64) {
         let _guard = self.inc_lock.lock();
         let current = self.get_u64(key);
@@ -2801,6 +3145,7 @@ impl AnalyticsDb {
             .expect("Analytics write failed");
     }
 
+    /// Salt of `today`, new one when day changed.
     fn get_daily_salt(&self, today: Date) -> [u8; 32] {
         {
             let guard = self.salt.read();
@@ -2822,6 +3167,7 @@ impl AnalyticsDb {
         new_salt
     }
 
+    /// Hash of salt, IP, user agent, date and entity. 16 hex characters.
     fn fingerprint(&self, ip: &str, user_agent: &str, entity_id: &str, date: Date) -> String {
         let mut hasher = XxHash3_64::default();
         self.get_daily_salt(date).hash(&mut hasher);
@@ -2833,6 +3179,11 @@ impl AnalyticsDb {
     }
 }
 
+/// Salt of `date` from [crate::DAILY_SALT_FILE], new random one if the file is from a different day.
+///
+/// # Panics
+///
+/// If the file can't be written.
 fn generate_analytics_salt(date: Date) -> [u8; 32] {
     let data = read_file(DAILY_SALT_FILE);
 

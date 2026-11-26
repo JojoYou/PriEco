@@ -1,14 +1,21 @@
-//!  File: lib.rs
-//!  Description: Joins whole project & Holds universal functions
+//! # Helpers
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! Small functions used across the whole project.
 //!
-//!  Date Created: 2025-09-20
-//!  Last Modified: 2026-02-06
+//! * **Files:** [file_exists], [read_file], [write_file], [get_dir_size].
+//! * **Locks:** [acquire_file_lock], [release_file_lock] for writes from more threads.
+//! * **URLs:** [url_to_id], [url_to_domain_id], [normalize_url], [local_redirect].
 //!
-//!  Usage: Call these functions to develop faster
-//!  TODO:
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2025-09-20
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 /*
   Import system libraries
@@ -25,30 +32,48 @@ use url::Url;
 
 use crate::globals::{FILE_LOCKS, colors};
 
-/// Description: I find it more intuitive than Path exists
+/// Checks if file or directory exists.
 ///
-/// Input: file path
-/// Output: true if file exists, false otherwise
+/// I find it more intuitive than `Path::exists`.
+///
+/// # Arguments
+///
+/// * `file_path` - Path.
+///
+/// # Returns
+///
+/// True if it exists, false otherwise.
 pub fn file_exists<P: AsRef<Path>>(file_path: P) -> bool {
     file_path.as_ref().exists()
 }
 
-/*
-  Description: Simpler function with error handling, if failed to load file I expect empty string
-
-  Input: file path
-  Output: file contents as a string
-*/
+/// Reads whole file to string.
+///
+/// # Arguments
+///
+/// * `file_path` - Path.
+///
+/// # Returns
+///
+/// File content, empty string if it can't be read.
 pub fn read_file(file_path: &str) -> String {
     read_to_string(file_path).unwrap_or_default()
 }
 
-/*
-  Description: Safe, thread resistent write to a file
-
-  Input: file path, content, should append the file (if false it removes all already written content)
-  Output: None
-*/
+/// Writes to file, safe when more threads write the same file.
+///
+/// Creates parent directories. Holds a [file lock][acquire_file_lock] while writing.
+/// Errors are printed.
+///
+/// # Arguments
+///
+/// * `file_path` - Path.
+/// * `content` - Data to write.
+/// * `append` - Append to file, otherwise old content is removed.
+///
+/// # Returns
+///
+/// None
 pub fn write_file<C: AsRef<[u8]>>(file_path: &str, content: C, append: bool) {
     acquire_file_lock(file_path);
 
@@ -95,6 +120,9 @@ pub fn write_file<C: AsRef<[u8]>>(file_path: &str, content: C, append: bool) {
     release_file_lock(file_path);
 }
 
+/// Blocks until no other thread holds the lock for `path`, then takes it.
+///
+/// Lock is per path string, only in this process. Release with [release_file_lock].
 pub fn acquire_file_lock(path: &str) {
     let mut set = FILE_LOCKS.set.lock();
 
@@ -105,18 +133,27 @@ pub fn acquire_file_lock(path: &str) {
     set.insert(path.to_string());
 }
 
+/// Releases lock taken by [acquire_file_lock] and wakes waiting threads.
 pub fn release_file_lock(path: &str) {
     let set = FILE_LOCKS.set.lock();
     set.remove(path);
     FILE_LOCKS.condvar.notify_all();
 }
 
+/// Page id of `url`. xxHash3 64 with seed 0 of the whole URL.
+///
+/// Used as key in meta storage and Tantivy `doc_id`.
 pub fn url_to_id(url: &str) -> u64 {
     let mut h = XxHash3_64::with_seed(0);
     h.write(url.as_bytes());
     h.finish()
 }
 
+/// Domain id of `url`. xxHash3 64 with seed 0 of the domain.
+///
+/// # Returns
+///
+/// Domain id, 0 if URL can't be parsed or has no domain (e.g. IP address).
 pub fn url_to_domain_id(url: &str) -> u64 {
     let pased_url = match Url::parse(url) {
         Ok(u) => u,
@@ -142,6 +179,14 @@ pub fn url_to_domain_id(url: &str) -> u64 {
     h.finish()
 }
 
+/// Normalizes URL for comparing.
+///
+/// Adds 'http://' when scheme is missing, removes query, fragment and trailing '/'.
+/// Host gets lowercase by URL parser.
+///
+/// # Returns
+///
+/// Normalized URL, `raw` if it can't be parsed.
 pub fn normalize_url(raw: &str) -> String {
     let url_str = if raw.to_ascii_lowercase().starts_with("http://")
         || raw.to_ascii_lowercase().starts_with("https://")
@@ -165,6 +210,9 @@ pub fn normalize_url(raw: &str) -> String {
         .unwrap_or_else(|| raw.to_string())
 }
 
+/// Size of all files in directory and subdirectories, in bytes.
+///
+/// Unreadable entries are skipped.
 pub fn get_dir_size(path: impl AsRef<Path>) -> u64 {
     let mut size = 0;
     if let Ok(entries) = read_dir(path) {
@@ -181,7 +229,14 @@ pub fn get_dir_size(path: impl AsRef<Path>) -> u64 {
     size
 }
 
-/// Enforce local redirects only
+/// Allows only local redirects.
+///
+/// `target` must start with a single '/' and have no control characters,
+/// so it can't redirect to a different site.
+///
+/// # Returns
+///
+/// `target` if it is local, '/' otherwise.
 pub fn local_redirect(target: &str) -> String {
     if target.starts_with('/')
         && !target.starts_with("//")

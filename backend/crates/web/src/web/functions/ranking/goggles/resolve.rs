@@ -1,8 +1,26 @@
+//! # Goggle Resolve
+//!
+//! Finds active goggles of a request.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-07-12
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use super::storage::get;
 use super::types::GoggleRules;
 use rocket::http::CookieJar;
 use std::sync::Arc;
 
+/// Active goggle ids from `param`, otherwise from 'active_goggles' cookie.
+///
+/// Comma separated, invalid ids are skipped.
 pub fn get_goggle_ids(param: Option<&str>, cookie_jar: Option<&CookieJar<'_>>) -> Vec<u64> {
     let raw = param.map(str::to_string).or_else(|| {
         cookie_jar
@@ -13,6 +31,7 @@ pub fn get_goggle_ids(param: Option<&str>, cookie_jar: Option<&CookieJar<'_>>) -
         .unwrap_or_default()
 }
 
+/// Rules of stored goggles, unknown ids are skipped.
 pub fn load_goggles(ids: &[u64]) -> Vec<Arc<GoggleRules>> {
     ids.iter()
         .filter_map(|&id| get(id))

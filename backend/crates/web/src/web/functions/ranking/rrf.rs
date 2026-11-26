@@ -1,24 +1,67 @@
-// reciprocal_rank_fusion
+//! # Reciprocal Rank Fusion
+//!
+//! Merges sorted results of all searches into one list.
+//!
+//! ## Architecture
+//!
+//! 1. Every result gets weight / (k + rank + 1), scores of the same URL are added.
+//!     * Weights: direct 3.0, discovery 0.5, other nodes 0.9, full text and vector by [adjust_weights].
+//!     * Full text and vector results in a different language: ×0.7 for Navigational, otherwise ×0.1.
+//!     * Page intent same as query intent: ×1.3.
+//! 2. `site:` or `domain:` in query keeps only that domain and its subdomains.
+//! 3. HTTP results with an HTTPS twin are removed.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-03-05
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use std::collections::{HashMap, HashSet};
 
 use crate::web::functions::general::get_domain;
 use prieco_core::{QueryIntent, WebDocument};
 
+/// Input of [run]. Every result list is sorted, best first.
 pub struct RRFParams<'r> {
+    /// User query.
     pub query: &'r str,
+    /// User language.
     pub lang: &'r str,
+    /// Query intent.
     pub intent: &'r QueryIntent,
+    /// Direct search.
     pub dir_results: Vec<WebDocument>,
+    /// Full text search.
     pub fts_results: Vec<WebDocument>,
+    /// Vector search.
     pub ivf_results: Vec<WebDocument>,
+    /// Discovery search.
     pub dis_results: Vec<WebDocument>,
+    /// Results from other nodes.
     pub dec_results: Vec<WebDocument>,
+    /// RRF constant, higher makes rank matter less.
     pub k: f32,
 }
+/// Merges results.
+///
+/// `search_score` is the RRF score, `source` lists searches that found it, e.g. 'FTS + IVF'.
+///
+/// # Returns
+///
+/// Merged results, best first.
 pub fn run(params: RRFParams<'_>) -> Vec<WebDocument> {
     // Custom searching WEIGHTs
+    /// Direct search weight.
     const DIR_WEIGHT: f32 = 3.0;
+    /// Discovery search weight.
     const DIS_WEIGHT: f32 = 0.5;
+    /// Other nodes weight.
     const FED_WEIGHT: f32 = 0.9;
 
     let (fts_weight, ivf_weight) = adjust_weights(params.query);
@@ -96,6 +139,7 @@ pub fn run(params: RRFParams<'_>) -> Vec<WebDocument> {
     merged.sort_unstable_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
     let mut result: Vec<WebDocument> = merged.into_iter().map(|(_, doc)| doc).collect();
 
+    /// `site:` and `domain:` operators.
     static RRF_DOMAIN_RE: once_cell::sync::Lazy<regex::Regex> = once_cell::sync::Lazy::new(|| {
         regex::Regex::new(r"(?i)(site|domain):([^\s\(\)]+)").unwrap()
     });
@@ -140,7 +184,18 @@ pub fn run(params: RRFParams<'_>) -> Vec<WebDocument> {
     result
 }
 
+/// Full text and vector weights from query shape. Both start at 1.0, max 2.0.
+///
+/// * 1-2 words: full text +0.7. 6+ words: vector +0.7.
+/// * Quotes: full text +0.8.
+/// * Question word: vector +0.6.
+/// * Over 30% words longer than 7 characters: full text +0.4.
+///
+/// # Returns
+///
+/// (full text weight, vector weight).
 fn adjust_weights(query: &str) -> (f32, f32) {
+    /// Words that make a query a question.
     const QUESTION_WORDS: [&str; 21] = [
         "what",
         "why",

@@ -1,3 +1,26 @@
+//! # Image Search
+//!
+//! 3rd party image search with 0 knowledge cache.
+//!
+//! ## Architecture
+//!
+//! 1. **Cache:** Query is hashed, the hash is the file name in [IMG_CACHE_DIR].
+//!     * File is AES-256-GCM encrypted with a key [derived][derive_key] from the original query.
+//!     * Disk only stores encrypted files with hashed names, the query can't be read from them.
+//! 2. **API:** Image search through proxy.prieco.net, saved to cache.
+//! 3. [**Format**:][format_bing] To [ImgResult], images through proxy.prieco.net.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2025-09-20
+//! * Last Modified: 2026-11-24
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use aes_gcm::{
     Aes256Gcm, Key, Nonce,
     aead::{Aead, KeyInit},
@@ -13,12 +36,11 @@ use twox_hash::XxHash64;
 use crate::web::functions::general::{favicon_url, get_domain};
 use prieco_core::{CLIENT, IMG_CACHE_DIR, ImgResult, colors, url_to_id};
 
-/// Description: 3rd party image search with 0 knowledge cache
-/// Query is hashed: used to find JSON blob
-/// Original query is used to decrypt the blob
-/// Disk stores encrypted files with hashed names
-/// Input: Query
-/// Output: Image results
+/// Image results for query, from cache or API.
+///
+/// # Returns
+///
+/// Image results, empty on error.
 pub async fn run(query: &str) -> Vec<ImgResult> {
     ////
     // Cache
@@ -114,6 +136,7 @@ pub async fn run(query: &str) -> Vec<ImgResult> {
     format_bing(bing_json)
 }
 
+/// API JSON to [ImgResult].
 fn format_bing(json: Value) -> Vec<ImgResult> {
     let mut remote_results: Vec<ImgResult> = Vec::with_capacity(50);
 
@@ -156,10 +179,12 @@ fn format_bing(json: Value) -> Vec<ImgResult> {
 }
 
 /* Helper functions */
+/// Image URL through proxy.prieco.net.
 fn replace_resulti(url: &str) -> String {
     url.replace("https://api.resulti.org", "https://proxy.prieco.net")
 }
 
+/// Encrypts with query key. Output: 12 byte nonce + ciphertext.
 fn encrypt_cache(query: &str, plaintext: &str) -> Result<Vec<u8>, aes_gcm::Error> {
     let key_bytes = derive_key(query);
     let key = Key::<Aes256Gcm>::try_from(&key_bytes[..]).unwrap();
@@ -178,6 +203,7 @@ fn encrypt_cache(query: &str, plaintext: &str) -> Result<Vec<u8>, aes_gcm::Error
     Ok(final_data)
 }
 
+/// Decrypts [encrypt_cache] output.
 fn decrypt_cache(query: &str, encrypted_data: &[u8]) -> Result<String, aes_gcm::Error> {
     if encrypted_data.len() < 12 {
         return Err(aes_gcm::Error);
@@ -196,6 +222,7 @@ fn decrypt_cache(query: &str, encrypted_data: &[u8]) -> Result<String, aes_gcm::
     Ok(String::from_utf8_lossy(&plaintext_bytes).into_owned())
 }
 
+/// 256 bit key: 4 × xxHash64 of query with seeds 0-3.
 fn derive_key(query: &str) -> [u8; 32] {
     let mut key = [0u8; 32];
     let bytes = query.as_bytes();

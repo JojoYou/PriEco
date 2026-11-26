@@ -39,6 +39,7 @@ use prieco_core::{CLIENT, colors, file_exists, globals::icons};
 /*
   Constants
 */
+/// Max time of one download, the corpus is big.
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_hours(12);
 
 /// Downloads every url into a directory.

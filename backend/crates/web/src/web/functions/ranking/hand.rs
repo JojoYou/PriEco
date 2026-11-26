@@ -1,3 +1,33 @@
+//! # Hand Ranking
+//!
+//! It's called this way as it's a hand picked set of ranking factors.
+//! Every factor multiplies the RRF score of a result, then results are sorted again.
+//!
+//! ## Factors
+//!
+//! * **Domain:** Query is the domain name, homepage.
+//! * **Intent:** Shops for shopping, Wikipedia, gov and edu for learning.
+//! * **Language and location:** Page language, server country, country TLD.
+//! * **URL:** HTTPS, TLD, bad patterns, path depth.
+//! * **Page:** Load speed, query in title, crawler quality scores, 500+ words, mobile.
+//! * **Goggles:** Boost, downrank, important, paths.
+//!
+//! ## Training
+//!
+//! Weights are tuned with a Mwmbl NDCG test. An outside script writes [WEIGHTS_JSON] and
+//! creates [WEIGHTS_READY], the next search [loads them][check_for_updated_weights].
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-03-05
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -9,29 +39,52 @@ use prieco_core::{QueryIntent, WEIGHTS_JSON, WEIGHTS_READY, WebDocument, url_to_
 use crate::web::functions::ranking::goggles::GoggleRules;
 use crate::web::functions::search_db::path_matches;
 
+/// Multipliers of ranking factors. Over 1 raises, under 1 lowers.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub struct RankingWeights {
+    /// Query is the domain name.
     pub domain_match_boost: f64,
+    /// Homepage of that domain.
     pub homepage_boost: f64,
+    /// Page in user language.
     pub lang_boost: f64,
+    /// Server in user country.
     pub loc_boost: f64,
+    /// TLD of user country.
     pub tld_loc_boost: f64,
+    /// Wikipedia.
     pub wiki_boost: f64,
+    /// HTTPS.
     pub https_boost: f64,
+    /// .dev and .com.
     pub dev_com_boost: f64,
+    /// .org and .net.
     pub org_net_boost: f64,
+    /// Spammy URL patterns.
     pub bad_url_penalty: f64,
+    /// Deep URL paths.
     pub path_depth_penalty: f64,
+    /// Reading ease weight.
     pub confidence_multi: f64,
+    /// Text effort weight.
     pub effort_multi: f64,
+    /// Page has 500+ words.
     pub has_500_words_boost: f64,
+    /// Mobile friendly page for mobile users.
     pub is_mobile_boost: f64,
+    /// Not mobile friendly page for mobile users.
     pub mobile_unfriendly_penalty: f64,
+    /// Product page for shopping queries.
     pub shopping_product_boost: f64,
+    /// Shop domain for shopping queries.
     pub shopping_domain_boost: f64,
+    /// Wiki for learning queries.
     pub info_wiki_boost: f64,
+    /// gov and edu for learning queries.
     pub info_gov_edu_boost: f64,
+    /// Shop for learning queries.
     pub info_shop_penalty: f64,
+    /// Query in title.
     pub title_match_boost: f64,
 }
 
@@ -64,9 +117,25 @@ impl Default for RankingWeights {
     }
 }
 
+/// Weights in use, swapped by [check_for_updated_weights].
 static ACTIVE_WEIGHTS: Lazy<RwLock<RankingWeights>> =
     Lazy::new(|| RwLock::new(RankingWeights::default()));
 
+/// Applies hand ranking and sorts results.
+///
+/// # Arguments
+///
+/// * `results` - Results with RRF score in `search_score`.
+/// * `query` - User query.
+/// * `lang` - User language.
+/// * `loc` - User location.
+/// * `intent` - Query intent.
+/// * `goggles` - Active goggles.
+/// * `user_is_mobile` - User on a phone.
+///
+/// # Returns
+///
+/// None, `results` are changed and sorted.
 pub fn run(
     results: &mut [WebDocument],
     query: &str,
@@ -335,6 +404,7 @@ pub fn run(
 }
 
 /* Training */
+/// Loads [WEIGHTS_JSON] when [WEIGHTS_READY] exists, then removes [WEIGHTS_READY] to signal the script to go on.
 fn check_for_updated_weights() {
     let ready_path = Path::new(WEIGHTS_READY);
     let json_path = Path::new(WEIGHTS_JSON);
@@ -355,12 +425,14 @@ fn check_for_updated_weights() {
     }
 }
 /* Helper functions */
+/// URL without query and fragment.
 fn strip_url_noise(url: &str) -> &str {
     let url = url.split('?').next().unwrap_or(url);
 
     (url.split('#').next().unwrap_or(url)) as _
 }
 
+/// True for domain root and single locale paths like '/en/' or '/en-CA/'.
 fn is_effectively_homepage(url: &str) -> bool {
     let path = url
         .split("://")

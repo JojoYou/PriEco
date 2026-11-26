@@ -1,6 +1,37 @@
+//! # Spell Checker
+//!
+//! Suggests corrected query. The original query is still searched.
+//!
+//! ## Architecture
+//!
+//! 1. Every word is looked up in [SPELL_CHECKER], English only.
+//! 2. Words that are entities (places, names, businesses) stay,
+//!    unless the best correction is 1 edit away and very common.
+//! 3. Best correction: lowest edit distance, then most common, then longest same start.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-06-29
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] More languages
+
 use prieco_core::{QU_PIPELINE, SPELL_CHECKER};
 use symspell::{Suggestion, Verbosity};
 
+/// Corrects query.
+///
+/// # Arguments
+///
+/// * `q` - Query.
+///
+/// # Returns
+///
+/// Corrected query, `None` when nothing changed.
 pub fn spell_check_query(q: &str) -> Option<String> {
     let tags = QU_PIPELINE.get_tags(q);
 
@@ -30,6 +61,7 @@ pub fn spell_check_query(q: &str) -> Option<String> {
     changed.then(|| corrected_words.join(" "))
 }
 
+/// Correction of one word, `None` when it is fine or the correction isn't good enough.
 fn correct_word(word: &str) -> Option<String> {
     let best = best_correction(word)?;
 
@@ -40,6 +72,7 @@ fn correct_word(word: &str) -> Option<String> {
     (best.term.to_lowercase() != word.to_lowercase()).then_some(best.term)
 }
 
+/// Best dictionary match of a word.
 fn best_correction(word: &str) -> Option<Suggestion> {
     let max_dist = max_edit_distance_for(word);
     let candidates: Vec<Suggestion> = SPELL_CHECKER.lookup(word, Verbosity::All, max_dist);
@@ -56,6 +89,7 @@ fn best_correction(word: &str) -> Option<Suggestion> {
 }
 
 /* Helper functions */
+/// Max edits: 1 for words up to 4 characters, otherwise 2.
 fn max_edit_distance_for(word: &str) -> i64 {
     match word.chars().count() {
         0..=4 => 1,
@@ -64,6 +98,7 @@ fn max_edit_distance_for(word: &str) -> i64 {
     }
 }
 
+/// False for same word or more than 1 edit on short words.
 fn should_suggest(original: &str, candidate: &Suggestion) -> bool {
     if candidate.term.to_lowercase() == original.to_lowercase() {
         return false;

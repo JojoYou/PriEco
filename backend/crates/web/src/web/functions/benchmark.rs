@@ -24,7 +24,7 @@
 /*
   Import system libraries
 */
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 /*
   Import own libraries
@@ -36,7 +36,9 @@ use prieco_core::{EmbeddingService, colors, globals::icons};
 /*
   Constants
 */
+/// Language of benchmark queries.
 const LANG: &str = "en";
+/// No location.
 const LOC: &str = "";
 
 /// Runs every benchmark once.
@@ -61,7 +63,7 @@ pub async fn run(embedding_service: &EmbeddingService) {
         Some(index) => index,
         None => return,
     };
-    let docids = msmarco::load_docids();
+    let docids: HashMap<u64, String> = msmarco::load_docids();
 
     for (name, queries_file, qrels_file) in msmarco::QUERY_SETS {
         let set_start = Instant::now();

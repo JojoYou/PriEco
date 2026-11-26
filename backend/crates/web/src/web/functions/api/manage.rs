@@ -1,14 +1,32 @@
-//!  File: web/functions/api/manage.rs
-//!  Description: Manages API access free tier per IP, Polar.sh usage billing
+//! # API Access
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! Decides who can use the search API and bills paid requests on Polar.sh.
 //!
-//!  Date Created: 2026-11-01
-//!  Last Modified: 2026-11-01
+//! ## Architecture
 //!
-//!  Usage: Call free() or paid() before search, push customer ID to API_BILLING_QUEUE after it
-//!  TODO:
+//! 1. [**Free**:][free] [MAX_IP_CALLS] requests a day per IP, counted in api keyspace.
+//!     * IPv6 is counted per /64.
+//! 2. [**Paid**:][paid] License key validated on Polar.sh, then customer state.
+//!     * Access with subscription or credits left.
+//!     * Results cached for [CACHE_EXPIRE] seconds, invalid keys too.
+//!     * When Polar.sh is down, [cached keys][stale] keep working.
+//! 3. [**Billing**:][flush_loop] Every 10s queued customer ids are sent as usage events.
+//!     * 5xx, 401, 403, 429 and network errors are retried.
+//!
+//! ## Usage
+//!
+//! Call [free] or [paid] before search, push customer id to [API_BILLING_QUEUE] after it.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-11-01
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 /*
   Import system libraries
@@ -32,11 +50,18 @@ use tokio::time::sleep;
 /*
   Constants
 */
+/// Free requests a day per IP.
 const MAX_IP_CALLS: u8 = 25;
+/// Seconds before a key is checked on Polar.sh again.
 const CACHE_EXPIRE: i64 = 300;
+/// Polar.sh product of unlimited subscription.
 const SUBSCRIPTION_ID: &str = "cd67ac3a-ad1c-4dd0-ab89-984698787e57";
 
-// Manages free requests
+/// Manages free requests. Counts one request of `ip` for today.
+///
+/// # Returns
+///
+/// True if the request is allowed.
 pub fn free(ip: IpAddr) -> bool {
     // Generate FJALL key
     let mut key = b"f:".to_vec();
@@ -75,15 +100,26 @@ pub fn free(ip: IpAddr) -> bool {
     true
 }
 
-// Manages paid requests
+/// Cached API key.
 pub struct Customer {
+    /// Polar.sh customer id, `None` for invalid key.
     pub id: Option<String>,
+    /// Has subscription.
     pub subscribed: bool,
+    /// Credits left, counted down locally.
     pub balance: i64,
+    /// Unix time of last check.
     pub checked: i64,
 }
+/// API key → [Customer]. Cleared over 100 000 keys.
 static CACHE: Lazy<Mutex<HashMap<String, Customer>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-// If POLAR is down, keep serving Cached keys
+/// If Polar.sh is down, keep serving cached keys.
+///
+/// Uses one credit and checks the key again in a minute.
+///
+/// # Returns
+///
+/// Customer id if the cached key has access.
 fn stale(key: &str) -> Option<String> {
     let mut cache = CACHE.lock();
     if let Some(customer) = cache.get_mut(key)
@@ -96,6 +132,15 @@ fn stale(key: &str) -> Option<String> {
     }
     None
 }
+/// Manages paid requests. Checks API key and uses one credit.
+///
+/// # Arguments
+///
+/// * `key` - Polar.sh license key.
+///
+/// # Returns
+///
+/// Customer id to bill, `None` without access.
 pub async fn paid(key: &str) -> Option<String> {
     let now = OffsetDateTime::now_utc().unix_timestamp();
 
@@ -287,14 +332,18 @@ pub async fn paid(key: &str) -> Option<String> {
     if allowed { Some(id) } else { None }
 }
 
-// Reports billing to POLAR.sh
+/// Customer ids waiting to be billed, one per request.
 pub static API_BILLING_QUEUE: Lazy<Mutex<Vec<String>>> = Lazy::new(|| Mutex::new(Vec::new()));
+/// Calls [flush] every 10 seconds. Never returns.
 pub async fn flush_loop() {
     loop {
         sleep(Duration::from_secs(10)).await;
         flush().await;
     }
 }
+/// Reports queued requests to Polar.sh as 'api_call' events, 1000 per request.
+///
+/// Failed chunks are requeued when the error may go away, otherwise dropped.
 pub async fn flush() {
     let api_key = match std::env::var("POLAR_API_KEY") {
         Ok(key) => key,

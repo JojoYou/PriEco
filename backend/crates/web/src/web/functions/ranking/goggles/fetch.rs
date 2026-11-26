@@ -1,3 +1,26 @@
+//! # Goggle Fetch
+//!
+//! Downloads goggles and keeps them up to date.
+//!
+//! ## Architecture
+//!
+//! 1. [**Fetch**:][fetch_and_store] URL is [checked][is_safe_goggle_url], text is parsed and stored.
+//! 2. [**Refresh**:][refresh_stale_goggles] Goggles older than a day are downloaded again.
+//!     * 404 or 410 removes the goggle.
+//!     * Same text only updates download time.
+//!     * Other errors keep it as it is.
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-07-12
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 use crate::web::functions::ranking::goggles::parse_goggle;
 
 use super::storage::{delete, list_all, put, touch_fetched_at};
@@ -5,6 +28,11 @@ use super::types::Goggle;
 use prieco_core::{CLIENT, colors, url_to_id};
 use time::OffsetDateTime;
 
+/// Downloads goggle from `url` and stores it.
+///
+/// # Returns
+///
+/// Stored goggle. On error [Goggle::default], its id is 0.
 pub async fn fetch_and_store(url: String) -> Goggle {
     if !is_safe_goggle_url(&url) {
         println!(
@@ -49,12 +77,10 @@ pub async fn fetch_and_store(url: String) -> Goggle {
     store_goggle(text, url)
 }
 
-/// Description: Cache Goggle for 1 day and then recheck if it's still online
-///
-/// Input: None
-/// Output: None
+/// Goggles are cached for 1 day and then rechecked if they're still online.
 pub async fn refresh_stale_goggles() {
-    const STALE_AFTER_SECS: i64 = 86_400; // 1 day
+    /// 1 day.
+    const STALE_AFTER_SECS: i64 = 86_400;
 
     for stored in list_all() {
         if stored.url.is_empty() {
@@ -70,6 +96,7 @@ pub async fn refresh_stale_goggles() {
     }
 }
 
+/// Downloads one goggle again.
 async fn refresh_one(stored: Goggle) {
     match CLIENT.get(&stored.url).send().await {
         Ok(resp)
@@ -99,12 +126,9 @@ async fn refresh_one(stored: Goggle) {
 }
 
 /* Helper functions */
-/*
-  Description: Checks if Goggle URL is safe and not suspicious
-
-  Input: url
-  Output: is safe
-*/
+/// Checks if goggle URL is safe and not suspicious.
+///
+/// http or https, has host, isn't localhost or a local IP address. Hostnames aren't resolved.
 fn is_safe_goggle_url(url: &str) -> bool {
     // Is url valid?
     let Ok(parsed) = url::Url::parse(url) else {
@@ -138,6 +162,7 @@ fn is_safe_goggle_url(url: &str) -> bool {
     host != "localhost" && !internal_ip
 }
 
+/// Parses and stores goggle, id is hash of `url`.
 fn store_goggle(text: String, url: String) -> Goggle {
     let meta = parse_goggle(&text);
     let goggle = Goggle {

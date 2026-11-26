@@ -1,3 +1,39 @@
+//! # Index Inserter
+//!
+//! Inserts crawled pages from '.zip' files in [INSERTER_IMPORT_DIR] to [PRIECO_INDEX].
+//!
+//! ## Architecture
+//!
+//! 1. [**Scan**:][run_in] Collects '.zip' files, checks `PRIECO_MAX_STORAGE` disk limit.
+//! 2. [**Parse**:][run_in] Every '.txt' line is one page, 18 fields split by `<-->`.
+//!     * Skips pages already in meta storage.
+//!     * Skips lines with wrong vector or points length.
+//! 3. [**Insert**:][run_in] One page goes to 3 places.
+//!     * Meta storage: zstd compressed [WebDocument] JSON, key is [url_to_id].
+//!     * Tantivy: searchable fields.
+//!     * Vectors: buffered, then [vector_process] writes them to IVF staging files.
+//! 4. [**Merge**:][merge_tantivy] Unless [SKIP_MERGE_FILE] exists.
+//!     * Tantivy segments into one.
+//!     * Meta major compaction.
+//!     * [Staging files][merge_bucket] into '.bin.zst' buckets.
+//!
+//! ## Line Format
+//!
+//! `url <--> title <--> description <--> content <--> favicon <--> image <--> keywords <--> safe_s
+//! <--> html <--> lang <--> loc <--> [confidence, effort, qna, sts] <--> load <--> date <--> intent
+//! <--> is_mobile <--> has_500_words <--> vector`
+//!
+//! ## Metadata
+//!
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2026-03-05
+//! * Last Modified: 2026-11-24
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
+
 /*
   Import system libraries
 */
@@ -32,20 +68,35 @@ use prieco_core::{
 /*
   Constants
 */
+/// Vectors held in RAM before they are written to staging files.
 pub const MAX_VECTORS_IN_RAM: usize = 250_000;
+/// Vectors sent to [VECTOR_CENTROPOIDS] in one assign call.
 const BATCH_SIZE_FOR_GPU: usize = 1_500;
+/// Threads merging staging files into buckets.
 const MERGE_THREADS: usize = 2;
+/// Compression level of '.bin.zst' buckets.
 const ZSTD_LEVEL: i32 = 3;
 
 /*
   Structs
 */
+/// File written to '.tmp' and renamed on [commit][AtomicFile::commit].
+///
+/// A crash during write never leaves a half written bucket.
 struct AtomicFile {
+    /// Path data is written to.
     tmp_path: PathBuf,
+    /// Path it gets renamed to.
     final_path: PathBuf,
+    /// 1 MB buffered writer of `tmp_path`.
     writer: BufWriter<File>,
 }
 impl AtomicFile {
+    /// Creates '.tmp' file next to `final_path`.
+    ///
+    /// # Errors
+    ///
+    /// If the '.tmp' file can't be created.
     fn new(final_path: impl AsRef<Path>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let final_path = final_path.as_ref().to_path_buf();
         let tmp_path = final_path.with_extension("tmp");
@@ -56,6 +107,11 @@ impl AtomicFile {
             writer,
         })
     }
+    /// Flushes and renames '.tmp' to final path.
+    ///
+    /// # Errors
+    ///
+    /// If flush or rename fails.
     fn commit(mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         self.writer.flush()?;
         std::fs::rename(&self.tmp_path, &self.final_path)?;
@@ -71,10 +127,58 @@ impl Write for AtomicFile {
     }
 }
 
+/// Inserts files from [INSERTER_IMPORT_DIR] to the main [PRIECO_INDEX].
+///
+/// Calls [run_in] with global index and [TANTIVY_WRITER].
+///
+/// # Arguments
+///
+/// None
+///
+/// # Returns
+///
+/// A `Result` of the insertion.
+///
+/// # Errors
+///
+/// Same as [run_in].
+///
+/// # Panics
+///
+/// Same as [run_in].
 pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     run_in(INSERTER_IMPORT_DIR, &PRIECO_INDEX, &TANTIVY_WRITER)
 }
 
+/// Inserts all '.zip' files from `import_dir` to `index`.
+///
+/// Every processed '.zip' file is removed. When `PRIECO_MAX_STORAGE` (GB) is set
+/// and index is bigger, pending files are removed without insertion.
+///
+/// # Arguments
+///
+/// * `import_dir` - Directory with '.zip' files.
+/// * `index` - Index to insert to.
+/// * `writer` - Tantivy writer of `index`.
+///
+/// # Returns
+///
+/// A `Result` of the insertion.
+///
+/// `Ok` when there are no files too.
+///
+/// # Errors
+///
+/// * If `import_dir` can't be created or read.
+/// * If '.zip' archive or its entry can't be read.
+/// * If meta storage insert, Tantivy insert or commit fails.
+/// * If [vector_process] fails.
+///
+/// # Panics
+///
+/// * If Tantivy schema misses one of the fields.
+/// * If meta storage read or major compaction fails.
+/// * If `index.vector_path` can't be read.
 pub fn run_in(
     import_dir: &str,
     index: &PriecoIndex,
@@ -347,6 +451,24 @@ pub fn run_in(
     Ok(())
 }
 
+/// Assigns buffered vectors to IVF buckets and appends them to staging files.
+///
+/// Assigning is done on GPU in batches of [BATCH_SIZE_FOR_GPU].
+/// `chunk_buffer` is empty afterwards.
+///
+/// # Arguments
+///
+/// * `chunk_buffer` - Map of page id and its vector.
+/// * `vector_path` - Directory with vector buckets.
+///
+/// # Returns
+///
+/// A `Result` of the processing.
+///
+/// # Errors
+///
+/// * If [VECTOR_CENTROPOIDS] fails or returns different number of buckets than vectors.
+/// * If [append_to_bucket] fails.
 pub fn vector_process(
     chunk_buffer: &mut HashMap<u64, Vec<f32>>,
     vector_path: &str,
@@ -391,6 +513,24 @@ pub fn vector_process(
     Ok(())
 }
 
+/// Appends records to 'staging_<bucket_id>.bin'.
+///
+/// Record is id (u64 LE) followed by [VECTOR_DIM] f32 values.
+/// File is synced and dropped from page cache.
+///
+/// # Arguments
+///
+/// * `bucket_id` - IVF bucket.
+/// * `items` - (id, vector) pairs.
+/// * `vector_path` - Directory with vector buckets.
+///
+/// # Returns
+///
+/// A `Result` of the write.
+///
+/// # Errors
+///
+/// If staging file can't be opened, written or synced.
 fn append_to_bucket(
     bucket_id: usize,
     items: &[(u64, Vec<f32>)],
@@ -417,6 +557,22 @@ fn append_to_bucket(
 }
 
 /* Merge functions */
+/// Commits pending documents and merges all Tantivy segments into one.
+///
+/// Merge failure is only printed.
+///
+/// # Arguments
+///
+/// * `index` - Index to merge.
+/// * `writer` - Tantivy writer of `index`.
+///
+/// # Returns
+///
+/// None
+///
+/// # Panics
+///
+/// If commit fails or segment ids can't be read.
 pub fn merge_tantivy(index: &PriecoIndex, writer: &Mutex<IndexWriter>) {
     let mut writer = writer.lock();
 
@@ -439,6 +595,32 @@ pub fn merge_tantivy(index: &PriecoIndex, writer: &Mutex<IndexWriter>) {
     }
 }
 
+/// Merges 'staging_<bucket_id>.bin' into 'bucket_<bucket_id>.bin.zst'.
+///
+/// Newer staging records replace old records with the same id,
+/// when staging has one id more times, the last one wins.
+/// A broken tail of staging file is cut off.
+/// Staging file is removed after a successful merge.
+///
+/// # Arguments
+///
+/// * `bucket_id` - IVF bucket.
+/// * `vector_path` - Directory with vector buckets.
+///
+/// # Returns
+///
+/// A `Result` of the merge.
+///
+/// `Ok` when there is no staging file.
+///
+/// # Errors
+///
+/// * If staging or bucket file can't be read or written.
+/// * If existing bucket isn't valid zstd.
+///
+/// # Panics
+///
+/// Only if system runs out of memory.
 pub fn merge_bucket(
     bucket_id: usize,
     vector_path: &str,
@@ -524,11 +706,24 @@ pub fn merge_bucket(
 }
 
 /* Helper functions */
+/// Removes `"` and `'` from text.
 fn sanitize_string(s: &str) -> String {
     s.replace(['"', '\''], "")
 }
 
 /* Insert Decentralized results */
+/// Writes documents received from other nodes as a '.zip' file to [INSERTER_IMPORT_DIR].
+///
+/// The next [run] inserts them. Vectors are zero, so pages go only to meta storage and Tantivy.
+/// Errors are ignored.
+///
+/// # Arguments
+///
+/// * `docs` - Documents from a peer.
+///
+/// # Returns
+///
+/// None
 pub async fn ingest_peer_documents(docs: Vec<WebDocument>) {
     tokio::task::spawn_blocking(move || {
         let timestamp = std::time::SystemTime::now()

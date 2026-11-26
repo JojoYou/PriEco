@@ -1,14 +1,17 @@
-//!  File: web/functions/general.rs
-//!  Description: PriEco settings module
+//! # General
 //!
-//!  Author: Roman Lancos <support@prieco.net>
-//!  License: AGPL v3.0
+//! Small functions used by many pages: URLs, cookies, hashing, remote JSON.
 //!
-//!  Date Created: 2025-09-20
-//!  Last Modified: 2026-02-06
+//! ## Metadata
 //!
-//!  Usage: Call these usually used functions for website
-//!  TODO:
+//! * **Author:** Roman Láncoš (<support@prieco.net>)
+//! * **License:** AGPL-3.0
+//! * Date Created: 2025-09-20
+//! * Last Modified: 2026-11-21
+//!
+//! ## Planned Improvements
+//!
+//! - [ ] None
 
 /*
   Import system libraries
@@ -28,10 +31,11 @@ use url::Url;
 
 use prieco_core::globals::colors;
 
-/// Description: Checks if URL is valid
+/// Checks if URL is valid http or https URL.
 ///
-/// Input: URL
-/// Output: true if valid, false otherwise
+/// # Returns
+///
+/// True if valid, false otherwise.
 pub fn is_valid_url(input: &str) -> bool {
     match Url::parse(input) {
         Ok(url) => matches!(url.scheme(), "http" | "https"),
@@ -39,12 +43,16 @@ pub fn is_valid_url(input: &str) -> bool {
     }
 }
 
-/*
-  Description: Gets domain from URL
-
-  Input: URL, if remove www
-  Output: domain
-*/
+/// Gets domain from URL.
+///
+/// # Arguments
+///
+/// * `url` - URL.
+/// * `remove_www` - Strip 'www.'.
+///
+/// # Returns
+///
+/// Domain or empty string, error is printed.
 pub fn get_domain(url: &str, remove_www: bool) -> String {
     if url.is_empty() {
         return String::new();
@@ -67,12 +75,16 @@ pub fn get_domain(url: &str, remove_www: bool) -> String {
     String::new()
 }
 
-/*
-  Description: Simple call to create a browser cookie
-
-  Input: Name, Value, 7 days or 1 year, HTTP-ONLY
-  Output:
-*/
+/// Simple call to create a browser cookie. SameSite Lax, path '/'.
+///
+/// # Arguments
+///
+/// * `cookie_jar` - Cookies.
+/// * `cookie_name` - Name.
+/// * `cookie_value` - Value.
+/// * `cookie_long_life` - 1 year, otherwise 7 days.
+/// * `js` - JavaScript can read it, otherwise HTTP only.
+/// * `secure` - Only over HTTPS.
 pub fn set_cookie(
     cookie_jar: &CookieJar<'_>,
     cookie_name: String,
@@ -101,24 +113,18 @@ pub fn set_cookie(
     cookie_jar.add(cookie);
 }
 
-/*
-  Description: Hash URL to a number
-
-  Input: URL
-  Output: Hash
-*/
+/// Hashes text to a number, xxHash64.
 pub fn hash_node(node: &str) -> u64 {
     let mut hasher = XxHash64::default();
     hasher.write(node.as_bytes());
     hasher.finish()
 }
 
-/*
-  Description:  Safely calls external URL for data
-
-  Input: Request
-  Output: JSON
-*/
+/// Safely calls external URL for JSON.
+///
+/// # Returns
+///
+/// Parsed JSON, `None` on error, the error is printed.
 pub async fn call_api_future_json(req: reqwest::RequestBuilder) -> Option<Value> {
     match req.send().await {
         Ok(resp) => match resp.text().await {
@@ -140,6 +146,7 @@ pub async fn call_api_future_json(req: reqwest::RequestBuilder) -> Option<Value>
     }
 }
 
+/// Proxied DuckDuckGo favicon of URL's domain. Empty string without domain.
 pub fn favicon_url(url: &str) -> String {
     let domain = get_domain(url, false);
     if domain.is_empty() {
