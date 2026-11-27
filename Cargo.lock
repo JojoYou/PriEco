@@ -4585,6 +4585,7 @@ dependencies = [
  "prieco_insert",
  "serde",
  "serde_json",
+ "tantivy",
  "tokenizers",
  "tokio",
  "zip",

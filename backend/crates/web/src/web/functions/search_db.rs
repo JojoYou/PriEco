@@ -1023,8 +1023,14 @@ fn fetch_documents(
                     };
 
                     // Decompress
+                    let capacity =
+                        zstd::zstd_safe::get_frame_content_size(compressed_data.as_ref())
+                            .ok()
+                            .flatten()
+                            .map_or(5 * 1024 * 1024, |size| size as usize)
+                            .min(64 * 1024 * 1024);
                     let decompressed_buf =
-                        match decompressor.decompress(compressed_data.as_ref(), 1024 * 1024) {
+                        match decompressor.decompress(compressed_data.as_ref(), capacity) {
                             Ok(buf) => buf,
                             Err(e) => {
                                 println!(

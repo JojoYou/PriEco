@@ -11,6 +11,7 @@
 //!     * [**Index**:][build_index] Once, until [MSMARCO_INDEXED_FILE] exists.
 //!     * [**Convert**:][convert] Streams 'msmarco-docs.tsv.gz' into inserter '.zip' files.
 //!     * [**Embed**:][embed_batch] Document vectors, same model and recipe.
+//!     * [**Merge**:][merge_index] Tantivy segments and IVF buckets, ignores 'dont_merge.txt'.
 //! 2. [**Queries**:][load_queries] Judged queries of each [QUERY_SETS] entry.
 //! 3. [**Docids**:][load_docids] Result url → MS MARCO docid.
 //! 4. [**Run file**:][write_run] Ranked docids in TREC format for scoring.
@@ -33,7 +34,7 @@
 use std::{
     collections::{HashMap, HashSet},
     error::Error,
-    fs::{File, create_dir_all, read_to_string, remove_dir_all, write},
+    fs::{File, create_dir_all, read_dir, read_to_string, remove_dir_all, write},
     io::{BufRead, BufReader, BufWriter, Read, Write},
     path::Path,
     sync::Arc,
@@ -47,6 +48,7 @@ use flate2::read::GzDecoder;
 use ndarray::{Array, CowArray, IxDyn, s};
 use ort::{Session, Value, tensor::OrtOwnedTensor};
 use parking_lot::Mutex;
+use tantivy::merge_policy::NoMergePolicy;
 use tokenizers::{Encoding, Tokenizer, TruncationParams};
 use tokio::task::spawn_blocking;
 use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
@@ -156,6 +158,7 @@ pub async fn prepare(service: &EmbeddingService) -> Option<Arc<PriecoIndex>> {
         if !file_exists(MSMARCO_INDEXED_FILE) {
             build_index(&index, &service).map_err(|e| e.to_string())?;
         }
+        merge_index(&index).map_err(|e| e.to_string())?;
         Ok(index)
     })
     .await;
@@ -484,6 +487,81 @@ fn build_index(
     Ok(())
 }
 
+/// Merges the benchmark index, even when the official index skips merging.
+///
+/// The inserter only merges when 'dont_merge.txt' is missing, that switch is for the official index.
+/// IVF search reads only merged 'bucket_*.bin.zst', so 'staging_*.bin' left unmerged are never searched.
+/// Runs on every [prepare], does nothing when there is one segment and no staging file.
+///
+/// # Arguments
+///
+/// * `index` - Opened benchmark index.
+///
+/// # Returns
+///
+/// `Ok(())` when Tantivy has one segment and every staging file is merged.
+///
+/// # Errors
+///
+/// * Vector dir can't be read.
+/// * Tantivy writer can't be created or segments can't be read.
+/// * A bucket merge failed.
+///
+/// # Panics
+///
+/// If the Tantivy commit fails.
+fn merge_index(index: &PriecoIndex) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let start = Instant::now();
+
+    // Tantivy
+    if index.tantivy.searchable_segment_ids()?.len() > 1 {
+        let writer = index
+            .tantivy
+            .writer_with_num_threads(TANTIVY_WRITER_THREADS, TANTIVY_HEAP_SIZE)?;
+        writer.set_merge_policy(Box::new(NoMergePolicy));
+
+        let writer = Mutex::new(writer);
+        db_insert::merge_tantivy(index, &writer);
+        writer.into_inner().wait_merging_threads()?;
+    }
+
+    // Vector buckets
+    let mut staging: Vec<usize> = Vec::new();
+    for entry in read_dir(&index.vector_path)? {
+        let name = entry?.file_name();
+        if let Some(bucket_id) = name
+            .to_string_lossy()
+            .strip_prefix("staging_")
+            .and_then(|rest| rest.strip_suffix(".bin"))
+            .and_then(|id| id.parse::<usize>().ok())
+        {
+            staging.push(bucket_id);
+        }
+    }
+
+    for (done, bucket_id) in staging.iter().enumerate() {
+        db_insert::merge_bucket(*bucket_id, &index.vector_path)?;
+        if (done + 1).is_multiple_of(100) || done + 1 == staging.len() {
+            println!(
+                "{}: Merged {}/{} buckets",
+                icons::BENCHMARK,
+                done + 1,
+                staging.len()
+            );
+        }
+    }
+
+    println!(
+        "{}{}: MS MARCO index merged in {:.3}s!{}",
+        icons::BENCHMARK,
+        colors::GREEN,
+        start.elapsed().as_secs_f64(),
+        colors::RESET,
+    );
+
+    Ok(())
+}
+
 /// Streams 'msmarco-docs.tsv.gz' into inserter '.zip' files.
 ///
 /// Writes one '.zip' per [DOCS_PER_ZIP] documents into [MSMARCO_IMPORT_DIR]
@@ -662,7 +740,7 @@ fn write_batch(
         let description: String = body.chars().take(DESCRIPTION_CHARS).collect();
         let has_500_words = body.split_whitespace().count() >= 500;
         let record = format!(
-            "{}<-->{}<-->{}<-->{}<--><--><--><-->true<--><-->en<--><-->[0, 0, 0, 0]<-->0<-->0<-->5<-->false<-->{}<-->{}\n",
+            "{}<-->{}<-->{}<-->{}<--><--><--><-->false<--><-->en<--><-->[0, 0, 0, 0]<-->0<-->0<-->5<-->false<-->{}<-->{}\n",
             url, title, description, body, has_500_words, vector
         );
 
