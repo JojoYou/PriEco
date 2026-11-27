@@ -48,6 +48,9 @@ pub struct RRFParams<'r> {
     /// RRF constant, higher makes rank matter less.
     pub k: f32,
 }
+
+const IVF_WEIGHT: f32 = 0.25;
+
 /// Merges results.
 ///
 /// `search_score` is the RRF score, `source` lists searches that found it, e.g. 'FTS + IVF'.
@@ -64,7 +67,7 @@ pub fn run(params: RRFParams<'_>) -> Vec<WebDocument> {
     /// Other nodes weight.
     const FED_WEIGHT: f32 = 0.9;
 
-    let (fts_weight, ivf_weight) = adjust_weights(params.query);
+    let fts_weight = adjust_weights(params.query);
 
     let mut scores: HashMap<String, (f32, WebDocument)> = HashMap::with_capacity(
         params.dir_results.len()
@@ -77,7 +80,7 @@ pub fn run(params: RRFParams<'_>) -> Vec<WebDocument> {
     let sources = [
         (params.dir_results, DIR_WEIGHT, "DIR"),
         (params.fts_results, fts_weight, "FTS"),
-        (params.ivf_results, ivf_weight, "IVF"),
+        (params.ivf_results, IVF_WEIGHT, "IVF"),
         (params.dis_results, DIS_WEIGHT, "DIS"),
         (params.dec_results, FED_WEIGHT, "DEC"),
     ];
@@ -194,7 +197,7 @@ pub fn run(params: RRFParams<'_>) -> Vec<WebDocument> {
 /// # Returns
 ///
 /// (full text weight, vector weight).
-fn adjust_weights(query: &str) -> (f32, f32) {
+fn adjust_weights(query: &str) -> f32 {
     /// Words that make a query a question.
     const QUESTION_WORDS: [&str; 21] = [
         "what",
@@ -225,25 +228,20 @@ fn adjust_weights(query: &str) -> (f32, f32) {
     let len = tokens.len() as f32;
     let has_quotes = query.contains('"');
 
-    let has_question = tokens
-        .iter()
-        .any(|t| QUESTION_WORDS.contains(&t.to_lowercase().as_str()));
-
     // rare term heuristic = long tokens
     let rare_ratio = tokens.iter().filter(|t| t.len() > 7).count() as f32 / len.max(1.0);
 
     //base weights
     let mut fts_weight: f32 = 1.0;
-    let mut ivf_weight: f32 = 1.0;
 
     //heuristics
 
     // query length
     if len <= 2.0 {
         fts_weight += 0.7;
-    } else if len >= 6.0 {
-        ivf_weight += 0.7;
-    }
+    } /*else if len >= 6.0 {
+    ivf_weight += 0.7;
+    }*/
 
     // quotes → lexical intent
     if has_quotes {
@@ -251,9 +249,9 @@ fn adjust_weights(query: &str) -> (f32, f32) {
     }
 
     // questions → semantic intent
-    if has_question {
+    /* if has_question {
         ivf_weight += 0.6;
-    }
+    }*/
 
     // rare tokens → exact match matters
     if rare_ratio > 0.3 {
@@ -262,7 +260,8 @@ fn adjust_weights(query: &str) -> (f32, f32) {
 
     // clamp to max 2.0
     fts_weight = fts_weight.min(2.0);
-    ivf_weight = ivf_weight.min(2.0);
+    //ivf_weight = ivf_weight.min(2.0);
 
-    (fts_weight, ivf_weight)
+    //(fts_weight, ivf_weight)
+    fts_weight
 }

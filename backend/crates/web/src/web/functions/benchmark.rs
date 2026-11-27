@@ -7,6 +7,7 @@
 //!
 //! 1. [**Prepare**:][msmarco::prepare] Download MS MARCO, build its own index once.
 //! 2. [**Search**:][search_db::run_json] Every judged query of each query set on that index.
+//!     * Only sets listed in [SETS_FILE], read on every run, all when it's empty.
 //!     * No cache, peers or discovery, the official index is never touched.
 //!     * Ranking after every pipeline stage is recorded too.
 //! 3. [**Run file**:][msmarco::write_run] TREC run file per query set for scoring.
@@ -26,7 +27,7 @@
 /*
   Import system libraries
 */
-use std::{collections::HashMap, time::Instant};
+use std::{collections::HashMap, fs::read_to_string, time::Instant};
 
 /*
   Import own libraries
@@ -42,6 +43,9 @@ use prieco_core::{EmbeddingService, colors, globals::icons};
 const LANG: &str = "en";
 /// No location.
 const LOC: &str = "";
+/// Query sets to run, one name per line, written by `make benchmark SETS="..."`.
+/// Empty or missing runs all [msmarco::QUERY_SETS].
+const SETS_FILE: &str = "runtime/benchmarks/sets.txt";
 
 /// Runs every benchmark once.
 ///
@@ -67,7 +71,27 @@ pub async fn run(embedding_service: &EmbeddingService) {
     };
     let docids: HashMap<u64, String> = msmarco::load_docids();
 
+    let selected: Vec<String> = read_to_string(SETS_FILE)
+        .map(|text| text.split_whitespace().map(String::from).collect())
+        .unwrap_or_default();
+    for unknown in selected
+        .iter()
+        .filter(|set| !msmarco::QUERY_SETS.iter().any(|(name, _, _)| name == set))
+    {
+        println!(
+            "{}{}: Unknown query set {}{}",
+            icons::BENCHMARK,
+            colors::YELLOW,
+            unknown,
+            colors::RESET,
+        );
+    }
+
     for (name, queries_file, qrels_file) in msmarco::QUERY_SETS {
+        if !selected.is_empty() && !selected.iter().any(|set| set == name) {
+            continue;
+        }
+
         let set_start = Instant::now();
         let queries = msmarco::load_queries(queries_file, qrels_file);
 

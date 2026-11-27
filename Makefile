@@ -91,7 +91,7 @@ demo-reset: ## Wipe the demo index
 ###
 # Benchmark
 ###
-benchmark: ## The running PriEco to run all benchmarks
+benchmark: ## The running PriEco to run all benchmarks, or only SETS="trec_dl_2019 trec_dl_2020"
 	@set -e; \
 	bin=target/release/prieco_web; \
 	systemctl is-active --quiet prieco || { echo "✗ prieco is not running, start it with: make restart"; exit 1; }; \
@@ -100,6 +100,8 @@ benchmark: ## The running PriEco to run all benchmarks
 	if [ $$(stat -c %Y $$bin) -gt $$started ]; then \
 	  echo "✗ prieco runs an older build than $$bin, run: make restart"; exit 1; \
 	fi; \
+	mkdir -p runtime/benchmarks; \
+	printf '%s\n' $(SETS) > runtime/benchmarks/sets.txt; \
 	systemctl kill --signal=SIGUSR1 --kill-whom=main prieco; \
 	echo "📏 Benchmark started, follow it with: make logs"
 

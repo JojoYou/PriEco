@@ -70,7 +70,7 @@ use prieco_core::{
 /// Max full text results.
 const MAX_FTS: usize = 160;
 /// Max vector results.
-const MAX_IVF: usize = 200;
+const MAX_IVF: usize = 20;
 /// IVF buckets searched per query.
 const NPROBS: usize = 4;
 /// Top results that get PageRank.
@@ -279,7 +279,7 @@ pub type StageTrace = Vec<(&'static str, Vec<String>)>;
 ///     * Checks for domain results of .com, .net, .org where domain is trimmed query.
 ///     * Helpful for root domain searches such as YouTube.
 /// * Discovery search
-///     * Pings a lot of domains matching query. And waits (max 1s) for 200 response code.
+///     * Pings a lot of domains matching query. And waits (max 1s) for 20 response code.
 ///     * Useful for root domain searches that PriEco doesn't yet know.
 ///     * Successful findings are sent to PriEco web crawler.
 /// * Full-text search
@@ -524,7 +524,7 @@ pub async fn run_json(
             ivf_results: vector_results,
             dis_results: discovery_results,
             dec_results: decentralized_results,
-            k: 60.0,
+            k: 10.0,
         });
 
         if let Some(stages) = trace.as_mut() {
@@ -761,7 +761,7 @@ pub async fn run_core_search(
         let start = std::time::Instant::now();
         if (matches!(lang_clone.as_str(), "zh" | "ja" | "ko" | "th")
             && fts_original_query.chars().count() >= 15)
-            || fts_original_query.split_whitespace().count() >= 8
+        //|| fts_original_query.split_whitespace().count() >= 8
         {
             return Vec::new();
         }
@@ -925,12 +925,7 @@ fn search_tantivy(
         .replace_all(&clean_query_text, "")
         .to_string();
 
-    let parsed_query = match index.query_parser.parse_query(&clean_query_text) {
-        Ok(q) => q,
-        Err(_) => {
-            return None;
-        }
-    };
+    let (parsed_query, _) = index.query_parser.parse_query_lenient(&clean_query_text);
 
     let mut clauses: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Must, parsed_query)];
 

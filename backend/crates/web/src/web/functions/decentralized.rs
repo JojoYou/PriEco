@@ -492,7 +492,7 @@ impl ProtocolHandler for SearchProtocol {
                     ivf_results: vector_results,
                     dis_results,
                     dec_results: Vec::new(),
-                    k: 60.0,
+                    k: 10.0,
                 });
 
                 results.truncate(20);

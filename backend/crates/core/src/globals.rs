@@ -919,7 +919,7 @@ fn load_query_parser(index: &Index) -> QueryParser {
     let content_field = schema.get_field("content").unwrap();
     let keywords_field = schema.get_field("keywords").unwrap();
 
-    let mut parser = QueryParser::for_index(
+    let parser = QueryParser::for_index(
         index,
         vec![
             title_field,
@@ -929,7 +929,7 @@ fn load_query_parser(index: &Index) -> QueryParser {
         ],
     );
 
-    parser.set_conjunction_by_default();
+    // parser.set_conjunction_by_default();// AND
 
     parser
 }
