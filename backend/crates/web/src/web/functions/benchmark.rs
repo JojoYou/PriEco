@@ -15,7 +15,7 @@
 //! * **Author:** Roman Láncoš (<support@prieco.net>)
 //! * **License:** AGPL-3.0
 //! * Date Created: 2026-11-23
-//! * Last Modified: 2026-11-23
+//! * Last Modified: 2026-11-27
 //!
 //! ## Planned Improvements
 //!
@@ -59,7 +59,7 @@ pub async fn run(embedding_service: &EmbeddingService) {
     println!("{}: Benchmark started!", icons::BENCHMARK);
 
     /* MS MARCO */
-    let index = match msmarco::prepare().await {
+    let index = match msmarco::prepare(embedding_service).await {
         Some(index) => index,
         None => return,
     };

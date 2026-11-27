@@ -4578,11 +4578,14 @@ name = "prieco_benchmark"
 version = "3.0.0"
 dependencies = [
  "flate2",
+ "ndarray",
+ "ort",
  "parking_lot",
  "prieco_core",
  "prieco_insert",
  "serde",
  "serde_json",
+ "tokenizers",
  "tokio",
  "zip",
 ]

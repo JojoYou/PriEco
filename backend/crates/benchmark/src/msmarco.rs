@@ -10,6 +10,7 @@
 //!     * [**Download**:][download::run] Corpus, queries and qrels into [MSMARCO_DIR].
 //!     * [**Index**:][build_index] Once, until [MSMARCO_INDEXED_FILE] exists.
 //!     * [**Convert**:][convert] Streams 'msmarco-docs.tsv.gz' into inserter '.zip' files.
+//!     * [**Embed**:][embed_batch] Document vectors, same model and recipe.
 //! 2. [**Queries**:][load_queries] Judged queries of each [QUERY_SETS] entry.
 //! 3. [**Docids**:][load_docids] Result url → MS MARCO docid.
 //! 4. [**Run file**:][write_run] Ranked docids in TREC format for scoring.
@@ -19,11 +20,10 @@
 //! * **Author:** Roman Láncoš (<support@prieco.net>)
 //! * **License:** AGPL-3.0
 //! * Date Created: 2026-11-22
-//! * Last Modified: 2026-11-23
+//! * Last Modified: 2026-11-27
 //!
 //! ## Planned Improvements
 //!
-//! - [ ] Document vectors (now Tantivy only, vectors are zero and skipped)
 //! - [ ] nDCG@10, MRR@10, Recall
 //! - [ ] MS MARCO Passage
 
@@ -34,7 +34,7 @@ use std::{
     collections::{HashMap, HashSet},
     error::Error,
     fs::{File, create_dir_all, read_to_string, remove_dir_all, write},
-    io::{BufRead, BufReader, BufWriter, Write},
+    io::{BufRead, BufReader, BufWriter, Read, Write},
     path::Path,
     sync::Arc,
     time::Instant,
@@ -44,7 +44,10 @@ use std::{
   Import external libraries
 */
 use flate2::read::GzDecoder;
+use ndarray::{Array, CowArray, IxDyn, s};
+use ort::{Session, Value, tensor::OrtOwnedTensor};
 use parking_lot::Mutex;
+use tokenizers::{Encoding, Tokenizer, TruncationParams};
 use tokio::task::spawn_blocking;
 use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
@@ -59,8 +62,8 @@ use crate::{
     download,
 };
 use prieco_core::{
-    PriecoIndex, TANTIVY_HEAP_SIZE, TANTIVY_WRITER_THREADS, VECTOR_DIM, colors, file_exists,
-    globals::icons, url_to_id,
+    EmbeddingService, PriecoIndex, TANTIVY_HEAP_SIZE, TANTIVY_WRITER_THREADS, VECTOR_DIM, colors,
+    file_exists, globals::icons, url_to_id,
 };
 use prieco_insert::db_insert;
 
@@ -92,6 +95,13 @@ const DOCS_PER_ZIP: usize = 100_000;
 /// Body characters used as description.
 const DESCRIPTION_CHARS: usize = 300;
 
+/// Documents embedded in one model run.
+const EMBED_BATCH: usize = 128;
+/// Characters of 'title body' that are embedded.
+const EMBED_CHARS: usize = 500;
+/// Tokens the embedded text is truncated to.
+const EMBED_TOKENS: usize = 64;
+
 /// Run name in TREC run files.
 const RUN_TAG: &str = "prieco";
 
@@ -107,6 +117,11 @@ pub const QUERY_SETS: &[(&str, &str, &str)] = &[
         "msmarco-test2020-queries.tsv.gz",
         "2020qrels-docs.txt",
     ),
+    (
+        "msmarco_dev",
+        "msmarco-docdev-queries.tsv.gz",
+        "msmarco-docdev-qrels.tsv.gz",
+    ),
 ];
 
 /// Downloads MS MARCO and opens its index, building it on the first run.
@@ -116,7 +131,7 @@ pub const QUERY_SETS: &[(&str, &str, &str)] = &[
 ///
 /// # Arguments
 ///
-/// None
+/// * `service` - Embedder of the running PriEco, used for document vectors.
 ///
 /// # Returns
 ///
@@ -127,7 +142,7 @@ pub const QUERY_SETS: &[(&str, &str, &str)] = &[
 /// # Panics
 ///
 /// Only if system runs out of memory.
-pub async fn prepare() -> Option<Arc<PriecoIndex>> {
+pub async fn prepare(service: &EmbeddingService) -> Option<Arc<PriecoIndex>> {
     // Download dataset
     // May be already cached
     if !download::run(MSMARCO_DIR, FILES).await {
@@ -135,10 +150,11 @@ pub async fn prepare() -> Option<Arc<PriecoIndex>> {
     }
 
     // Open index
-    let opened = spawn_blocking(|| -> Result<PriecoIndex, String> {
+    let service = service.clone();
+    let opened = spawn_blocking(move || -> Result<PriecoIndex, String> {
         let index = PriecoIndex::open(MSMARCO_INDEX_DIR);
         if !file_exists(MSMARCO_INDEXED_FILE) {
-            build_index(&index).map_err(|e| e.to_string())?;
+            build_index(&index, &service).map_err(|e| e.to_string())?;
         }
         Ok(index)
     })
@@ -330,7 +346,15 @@ fn read_queries(
     qrels_file: &str,
 ) -> Result<Vec<(String, String)>, Box<dyn Error + Send + Sync>> {
     // Judged query ids
-    let qrels = read_to_string(Path::new(MSMARCO_DIR).join(qrels_file))?;
+    let qrels_path = Path::new(MSMARCO_DIR).join(qrels_file);
+    let qrels = if qrels_file.ends_with(".gz") {
+        let mut text = String::new();
+        GzDecoder::new(File::open(&qrels_path)?).read_to_string(&mut text)?;
+        text
+    } else {
+        read_to_string(&qrels_path)?
+    };
+
     let judged: HashSet<&str> = qrels
         .lines()
         .filter_map(|line| line.split_whitespace().next())
@@ -401,6 +425,7 @@ fn write_run_file(
 /// # Arguments
 ///
 /// * `index` - Opened benchmark index.
+/// * `service` - Embedder for document vectors.
 ///
 /// # Returns
 ///
@@ -415,11 +440,14 @@ fn write_run_file(
 /// # Panics
 ///
 /// If the index can't be opened. Start-up only.
-fn build_index(index: &PriecoIndex) -> Result<(), Box<dyn Error + Send + Sync>> {
+fn build_index(
+    index: &PriecoIndex,
+    service: &EmbeddingService,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     let start = Instant::now();
 
     // Convert corpus to inserter format
-    let converted = convert()?;
+    let converted = convert(service)?;
 
     if converted == 0 {
         return Err(format!("No documents converted from {}", CORPUS_FILE).into());
@@ -463,10 +491,11 @@ fn build_index(index: &PriecoIndex) -> Result<(), Box<dyn Error + Send + Sync>> 
 /// PriEco indexes urls, the map translates results back to docids the qrels know.
 /// Fields MS MARCO doesn't have get neutral values, so only text relevance is measured.
 /// A url seen before is skipped, the inserter would drop it anyway.
+/// Documents are buffered and embedded per [EMBED_BATCH], see [write_batch].
 ///
 /// # Arguments
 ///
-/// None
+/// * `service` - Embedder for document vectors.
 ///
 /// # Returns
 ///
@@ -476,11 +505,12 @@ fn build_index(index: &PriecoIndex) -> Result<(), Box<dyn Error + Send + Sync>> 
 ///
 /// * Corpus is missing or not valid gzip.
 /// * Import dir or a '.zip' can't be written.
+/// * Tokenizer truncation can't be set or embedding failed.
 ///
 /// # Panics
 ///
 /// Only if system runs out of memory.
-fn convert() -> Result<usize, Box<dyn Error + Send + Sync>> {
+fn convert(service: &EmbeddingService) -> Result<usize, Box<dyn Error + Send + Sync>> {
     if Path::new(MSMARCO_IMPORT_DIR).exists() {
         remove_dir_all(MSMARCO_IMPORT_DIR)?;
     }
@@ -491,9 +521,13 @@ fn convert() -> Result<usize, Box<dyn Error + Send + Sync>> {
     let reader = BufReader::with_capacity(1 << 20, GzDecoder::new(corpus));
     let mut docids = BufWriter::new(File::create(MSMARCO_DOCIDS_FILE)?);
 
-    // No embeddings yet, the inserter skips zero vectors
-    let vector = vec!["0"; VECTOR_DIM].join(" ");
+    let mut tokenizer: Tokenizer = service.tokenizer.blocking_lock().clone();
+    tokenizer.with_truncation(Some(TruncationParams {
+        max_length: EMBED_TOKENS,
+        ..Default::default()
+    }))?;
 
+    let mut batch: Vec<(String, String, String, String)> = Vec::with_capacity(EMBED_BATCH);
     let mut seen_urls: HashSet<u64> = HashSet::with_capacity(3_300_000);
     let mut zip: Option<ZipWriter<File>> = None;
     let mut converted: usize = 0;
@@ -516,43 +550,28 @@ fn convert() -> Result<usize, Box<dyn Error + Send + Sync>> {
             continue;
         }
 
-        if converted.is_multiple_of(DOCS_PER_ZIP) {
-            if let Some(full_zip) = zip.take() {
-                full_zip.finish()?;
-            }
-
-            let zip_path = format!(
-                "{}/msmarco_{:04}.zip",
-                MSMARCO_IMPORT_DIR,
-                converted / DOCS_PER_ZIP
-            );
-            let mut new_zip = ZipWriter::new(File::create(zip_path)?);
-            new_zip.start_file(
-                "docs.txt",
-                SimpleFileOptions::default()
-                    .compression_method(CompressionMethod::Deflated)
-                    .large_file(true),
+        batch.push((url.to_string(), docid.to_string(), title, body));
+        if batch.len() == EMBED_BATCH {
+            write_batch(
+                service,
+                &tokenizer,
+                &mut batch,
+                &mut zip,
+                &mut docids,
+                &mut converted,
             )?;
-            zip = Some(new_zip);
         }
+    }
 
-        let description: String = body.chars().take(DESCRIPTION_CHARS).collect();
-        let has_500_words = body.split_whitespace().count() >= 500;
-        let record = format!(
-            "{}<-->{}<-->{}<-->{}<--><--><--><-->true<--><-->en<--><-->[0, 0, 0, 0]<-->0<-->0<-->5<-->false<-->{}<-->{}\n",
-            url, title, description, body, has_500_words, vector
-        );
-
-        // Write
-        if let Some(current_zip) = zip.as_mut() {
-            current_zip.write_all(record.as_bytes())?;
-        }
-        writeln!(docids, "{}\t{}", url, docid)?;
-
-        converted += 1;
-        if converted.is_multiple_of(100_000) {
-            println!("{}: Converted {}", icons::BENCHMARK, converted);
-        }
+    if !batch.is_empty() {
+        write_batch(
+            service,
+            &tokenizer,
+            &mut batch,
+            &mut zip,
+            &mut docids,
+            &mut converted,
+        )?;
     }
 
     if let Some(last_zip) = zip.take() {
@@ -571,4 +590,171 @@ fn convert() -> Result<usize, Box<dyn Error + Send + Sync>> {
     }
 
     Ok(converted)
+}
+
+/// Embeds buffered documents and writes them as inserter records.
+///
+/// A new '.zip' is started every [DOCS_PER_ZIP] documents.
+/// Embedded text is 'title body', cut to [EMBED_CHARS] characters.
+/// The model is locked only for one batch, so user queries can still be embedded.
+///
+/// # Arguments
+///
+/// * `service` - Embedder, only its model is used.
+/// * `tokenizer` - Tokenizer truncated to [EMBED_TOKENS].
+/// * `batch` - (url, docid, title, body) per document, empty afterwards.
+/// * `zip` - Current '.zip', replaced when full.
+/// * `docids` - Writer of the url → docid map.
+/// * `converted` - Documents written so far, increased per document.
+///
+/// # Returns
+///
+/// `Ok(())` when every document of the batch is written.
+///
+/// # Errors
+///
+/// * Embedding failed.
+/// * A '.zip' or the docid map can't be written.
+fn write_batch(
+    service: &EmbeddingService,
+    tokenizer: &Tokenizer,
+    batch: &mut Vec<(String, String, String, String)>,
+    zip: &mut Option<ZipWriter<File>>,
+    docids: &mut BufWriter<File>,
+    converted: &mut usize,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let texts: Vec<String> = batch
+        .iter()
+        .map(|(_, _, title, body)| {
+            format!("{} {}", title, body)
+                .chars()
+                .take(EMBED_CHARS)
+                .collect()
+        })
+        .collect();
+
+    let vectors = {
+        let model = service.model.blocking_lock();
+        embed_batch(tokenizer, &model, texts)?
+    };
+
+    for ((url, docid, title, body), vector) in batch.drain(..).zip(vectors) {
+        if converted.is_multiple_of(DOCS_PER_ZIP) {
+            if let Some(full_zip) = zip.take() {
+                full_zip.finish()?;
+            }
+
+            let zip_path = format!(
+                "{}/msmarco_{:04}.zip",
+                MSMARCO_IMPORT_DIR,
+                *converted / DOCS_PER_ZIP
+            );
+            let mut new_zip = ZipWriter::new(File::create(zip_path)?);
+            new_zip.start_file(
+                "docs.txt",
+                SimpleFileOptions::default()
+                    .compression_method(CompressionMethod::Deflated)
+                    .large_file(true),
+            )?;
+            *zip = Some(new_zip);
+        }
+
+        let description: String = body.chars().take(DESCRIPTION_CHARS).collect();
+        let has_500_words = body.split_whitespace().count() >= 500;
+        let record = format!(
+            "{}<-->{}<-->{}<-->{}<--><--><--><-->true<--><-->en<--><-->[0, 0, 0, 0]<-->0<-->0<-->5<-->false<-->{}<-->{}\n",
+            url, title, description, body, has_500_words, vector
+        );
+
+        // Write
+        if let Some(current_zip) = zip.as_mut() {
+            current_zip.write_all(record.as_bytes())?;
+        }
+        writeln!(docids, "{}\t{}", url, docid)?;
+
+        *converted += 1;
+        if converted.is_multiple_of(100_000) {
+            println!("{}: Converted {}", icons::BENCHMARK, converted);
+        }
+    }
+
+    Ok(())
+}
+
+/// Embeds texts in one model run.
+///
+/// Vector is the mean of unpadded token vectors, L2 normalized for cosine search.
+///
+/// # Arguments
+///
+/// * `tokenizer` - Tokenizer of [prieco_core::EMBED_MODEL], with padding and truncation.
+/// * `model` - Loaded [prieco_core::EMBED_MODEL].
+/// * `texts` - Texts to embed, not empty.
+///
+/// # Returns
+///
+/// One vector of [VECTOR_DIM] values per text, as space separated string.
+///
+/// # Errors
+///
+/// If tokenization, tensor creation or the model fails.
+fn embed_batch(
+    tokenizer: &Tokenizer,
+    model: &Session,
+    texts: Vec<String>,
+) -> Result<Vec<String>, Box<dyn Error + Send + Sync>> {
+    let encodings = tokenizer.encode_batch(texts, true)?;
+    let (batch, seq) = (encodings.len(), encodings[0].len());
+    let flat = |field: fn(&Encoding) -> &[u32]| -> Vec<i64> {
+        encodings
+            .iter()
+            .flat_map(|encoding| field(encoding).iter().map(|&v| v as i64))
+            .collect()
+    };
+
+    let mask = flat(Encoding::get_attention_mask);
+    let ids = CowArray::from(Array::from_shape_vec(
+        IxDyn(&[batch, seq]),
+        flat(Encoding::get_ids),
+    )?);
+    let mask_array = CowArray::from(Array::from_shape_vec(IxDyn(&[batch, seq]), mask.clone())?);
+    let type_ids = CowArray::from(Array::from_shape_vec(
+        IxDyn(&[batch, seq]),
+        flat(Encoding::get_type_ids),
+    )?);
+
+    let outputs = model.run(vec![
+        Value::from_array(model.allocator(), &ids)?,
+        Value::from_array(model.allocator(), &mask_array)?,
+        Value::from_array(model.allocator(), &type_ids)?,
+    ])?;
+    let tensor: OrtOwnedTensor<f32, _> = outputs[0].try_extract()?;
+    let view = tensor.view();
+
+    let mut vectors: Vec<String> = Vec::with_capacity(batch);
+    for i in 0..batch {
+        // Mean pooling
+        let mut sum = vec![0f32; VECTOR_DIM];
+        let mut count = 0f32;
+        for j in 0..seq {
+            if mask[i * seq + j] == 1 {
+                for (s, &t) in sum.iter_mut().zip(view.slice(s![i, j, ..]).iter()) {
+                    *s += t;
+                }
+                count += 1.0;
+            }
+        }
+        let mean: Vec<f32> = sum.iter().map(|v| v / count.max(1.0)).collect();
+
+        // L2 normalize
+        let norm = mean.iter().map(|v| v * v).sum::<f32>().sqrt().max(1e-12);
+        vectors.push(
+            mean.iter()
+                .map(|v| (v / norm).to_string())
+                .collect::<Vec<String>>()
+                .join(" "),
+        );
+    }
+
+    Ok(vectors)
 }
