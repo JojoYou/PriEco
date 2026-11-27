@@ -6,9 +6,11 @@
 //! ## Architecture
 //!
 //! 1. [**Prepare**:][msmarco::prepare] Download MS MARCO, build its own index once.
-//! 2. [**Search**:][search_db::run_json] Every judged TREC DL query on that index.
+//! 2. [**Search**:][search_db::run_json] Every judged query of each query set on that index.
 //!     * No cache, peers or discovery, the official index is never touched.
+//!     * Ranking after every pipeline stage is recorded too.
 //! 3. [**Run file**:][msmarco::write_run] TREC run file per query set for scoring.
+//!     * 'run_<set>.trec' is the final ranking, 'run_<set>.<stage>.trec' one per stage.
 //!
 //! ## Metadata
 //!
@@ -29,7 +31,7 @@ use std::{collections::HashMap, time::Instant};
 /*
   Import own libraries
 */
-use crate::web::functions::search_db;
+use crate::web::functions::search_db::{self, StageTrace};
 use prieco_benchmark::msmarco;
 use prieco_core::{EmbeddingService, colors, globals::icons};
 
@@ -71,7 +73,10 @@ pub async fn run(embedding_service: &EmbeddingService) {
 
         // Search every query
         let mut results: Vec<(String, Vec<(String, f32)>)> = Vec::with_capacity(queries.len());
+        let mut stage_results: HashMap<&'static str, Vec<(String, Vec<(String, f32)>)>> =
+            HashMap::new();
         for (qid, query) in queries {
+            let mut trace: StageTrace = Vec::new();
             let docs = search_db::run_json(
                 &query,
                 LANG,
@@ -84,8 +89,23 @@ pub async fn run(embedding_service: &EmbeddingService) {
                 index.clone(),
                 None,
                 20,
+                Some(&mut trace),
             )
             .await;
+
+            // Ranked (url, score) per stage
+            for (stage, urls) in trace {
+                let count = urls.len() as f32;
+                let ranked: Vec<(String, f32)> = urls
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, url)| (url, count - i as f32))
+                    .collect();
+                stage_results
+                    .entry(stage)
+                    .or_default()
+                    .push((qid.clone(), ranked));
+            }
 
             // Ranked (url, score)
             let ranked: Vec<(String, f32)> = docs
@@ -101,6 +121,10 @@ pub async fn run(embedding_service: &EmbeddingService) {
         }
 
         msmarco::write_run(name, &results, &docids);
+        for (stage, ranked) in &stage_results {
+            msmarco::write_run(&format!("{}.{}", name, stage), ranked, &docids);
+        }
+
         println!(
             "{}: {} took {:.3}s for {} queries",
             icons::BENCHMARK,

@@ -192,6 +192,7 @@ pub async fn api(
         PRIECO_INDEX.clone(),
         None,
         20,
+        None,
     )
     .await;
 

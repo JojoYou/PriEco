@@ -5,14 +5,14 @@
 //! ## Architecture
 //!
 //! 1. [**run()**:][run] Calls [run_json]() and creates search results.
-//! 2. [**run_json()**:][run_json] Performs search indexes pipeline.
+//! 2. [**run_json()**:][run_json] Performs search indexes pipeline, optionally records every stage.
 //!
 //! ## Metadata
 //!
 //! * **Author:** Roman Láncoš (<support@prieco.net>)
 //! * **License:** AGPL-3.0
 //! * Date Created: 2025-09-20
-//! * Last Modified: 2026-08-11
+//! * Last Modified: 2026-11-27
 //!
 //! ## Planned Improvements
 //!
@@ -143,6 +143,7 @@ pub async fn run(params: SearchDBParams<'_>) {
         PRIECO_INDEX.clone(),
         Some(params.intent),
         params.limit,
+        None,
     )
     .await;
 
@@ -259,6 +260,9 @@ pub fn query_intent(query: &str, lang: &str, loc: &str) -> QueryIntent {
     ranking::meaning::call::process_query(&mut fts_query, lang, loc).0
 }
 
+/// Ranking of every pipeline stage: (stage name, urls best first).
+pub type StageTrace = Vec<(&'static str, Vec<String>)>;
+
 /// # Search Index Pipeline
 ///
 /// This function checks if results for the same query + lang + loc are already in RAM cache.
@@ -306,6 +310,8 @@ pub fn query_intent(query: &str, lang: &str, loc: &str) -> QueryIntent {
 /// * `mobile` - Is user using mobile.
 /// * `decentralize` - Ask peers too.
 /// * `index` - Index to search, [PRIECO_INDEX] or a benchmark index.
+/// * `trace` - Ranking after every stage for the benchmark, `None` records nothing.
+///     * Stages: 'tantivy', 'ivf', 'rrf', 'hand', 'pagerank', 'rerank'.
 ///
 /// Any other index than [PRIECO_INDEX] skips [QUERY_CACHE], peers and discovery,
 /// so benchmark results never reach users, peers or the official index.
@@ -330,6 +336,7 @@ pub async fn run_json(
     index: Arc<PriecoIndex>,
     intent: Option<QueryIntent>,
     limit: usize,
+    mut trace: Option<&mut StageTrace>,
 ) -> Vec<Json_Value> {
     let official_index = Arc::ptr_eq(&index, &PRIECO_INDEX);
     let decentralize = decentralize && official_index;
@@ -489,6 +496,17 @@ pub async fn run_json(
         let (dir_results, tantivy_results, vector_results, discovery_results) = local_res.unwrap();
         let decentralized_results = dec_res.unwrap();
 
+        if let Some(stages) = trace.as_mut() {
+            stages.push((
+                "tantivy",
+                tantivy_results.iter().map(|doc| doc.url.clone()).collect(),
+            ));
+            stages.push((
+                "ivf",
+                vector_results.iter().map(|doc| doc.url.clone()).collect(),
+            ));
+        }
+
         // Local save
         if !decentralized_results.is_empty() {
             let docs_to_ingest = decentralized_results.clone();
@@ -508,6 +526,13 @@ pub async fn run_json(
             dec_results: decentralized_results,
             k: 60.0,
         });
+
+        if let Some(stages) = trace.as_mut() {
+            stages.push((
+                "rrf",
+                rrf_results.iter().map(|doc| doc.url.clone()).collect(),
+            ));
+        }
 
         // Temp remove blocked terms
         if safe_search {
@@ -562,6 +587,10 @@ pub async fn run_json(
     ranking::hand::run(&mut results, query, lang, loc, &intent, &goggles, mobile);
     results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
 
+    if let Some(stages) = trace.as_mut() {
+        stages.push(("hand", results.iter().map(|doc| doc.url.clone()).collect()));
+    }
+
     // PageRank
     let pr_candidates = results.len().min(PAGERANK_CUTOFF);
     if pr_candidates > 0 {
@@ -577,6 +606,13 @@ pub async fn run_json(
         drop(pr_guard);
         results[..pr_candidates]
             .sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+    }
+
+    if let Some(stages) = trace.as_mut() {
+        stages.push((
+            "pagerank",
+            results.iter().map(|doc| doc.url.clone()).collect(),
+        ));
     }
 
     // RERANKER
@@ -596,6 +632,13 @@ pub async fn run_json(
         }
         results[..nn_candidates]
             .sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+    }
+
+    if let Some(stages) = trace.as_mut() {
+        stages.push((
+            "rerank",
+            results.iter().map(|doc| doc.url.clone()).collect(),
+        ));
     }
 
     // Cap result count from a single domain
