@@ -77,6 +77,8 @@ const NPROBS: usize = 4;
 const PAGERANK_CUTOFF: usize = 100;
 /// Top results that go through reranker.
 const RERANK_CUTOFF: usize = 30;
+/// Characters of a passage given to the reranker, more than its 512 tokens hold.
+const RERANK_CHARS: usize = 2_500;
 /// Max results from one domain.
 const MAX_PER_DOMAIN: usize = 5;
 
@@ -294,9 +296,9 @@ pub type StageTrace = Vec<(&'static str, Vec<String>)>;
 ///
 /// * Goggle discard filter.
 ///
-/// * [Hand ranking][ranking::hand::run] (Weights calculated using genetic algorith on NDCG test).
+/// * Reranker on the top [RERANK_CUTOFF], its score replaces the RRF score.
 ///
-/// * Reranker + PageRank.
+/// * PageRank.
 ///
 /// * Caps results from single domain.
 ///
@@ -584,8 +586,51 @@ pub async fn run_json(
         return Vec::new();
     }
 
-    ranking::hand::run(&mut results, query, lang, loc, &intent, &goggles, mobile);
-    results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+    // RERANKER
+    let nn_candidates = results.len().min(RERANK_CUTOFF);
+    if nn_candidates > 0 {
+        let rerank_start = Instant::now();
+        let passages: Vec<String> = results[..nn_candidates]
+            .iter()
+            .map(|d| {
+                let passage = if d.content.starts_with(&d.description) {
+                    format!("{} {}", d.title, d.content)
+                } else {
+                    format!("{} {} {}", d.title, d.description, d.content)
+                };
+                passage.chars().take(RERANK_CHARS).collect()
+            })
+            .collect();
+        let scores = RERANKER
+            .score_batch(query, &passages)
+            .await
+            .unwrap_or_else(|e| {
+                println!("{}Reranker failed: {}{}", colors::RED, e, colors::RESET);
+                vec![0.0; nn_candidates]
+            });
+        for (i, doc) in results[..nn_candidates].iter_mut().enumerate() {
+            let neural_relevance = 1.0 / (1.0 + (-scores[i]).exp());
+            doc.search_score = 1.0 + neural_relevance;
+        }
+        results[..nn_candidates]
+            .sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+
+        if official_index {
+            ANALYTICS.record_latency(Stage::Rerank, rerank_start.elapsed());
+        }
+    }
+
+    if let Some(stages) = trace.as_mut() {
+        stages.push((
+            "rerank",
+            results.iter().map(|doc| doc.url.clone()).collect(),
+        ));
+    }
+
+    if false {
+        ranking::hand::run(&mut results, query, lang, loc, &intent, &goggles, mobile);
+        results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+    }
 
     if let Some(stages) = trace.as_mut() {
         stages.push(("hand", results.iter().map(|doc| doc.url.clone()).collect()));
@@ -611,32 +656,6 @@ pub async fn run_json(
     if let Some(stages) = trace.as_mut() {
         stages.push((
             "pagerank",
-            results.iter().map(|doc| doc.url.clone()).collect(),
-        ));
-    }
-
-    // RERANKER
-    let nn_candidates = results.len().min(RERANK_CUTOFF);
-    if nn_candidates > 0 {
-        let passages: Vec<String> = results[..nn_candidates]
-            .iter()
-            .map(|d| format!("{} {} {}", d.title, d.description, d.content))
-            .collect();
-        let scores = RERANKER
-            .score_batch(query, &passages)
-            .await
-            .unwrap_or_else(|_| vec![0.0; nn_candidates]);
-        for (i, doc) in results[..nn_candidates].iter_mut().enumerate() {
-            let neural_relevance = 1.0 / (1.0 + (-scores[i]).exp());
-            doc.search_score *= neural_relevance;
-        }
-        results[..nn_candidates]
-            .sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
-    }
-
-    if let Some(stages) = trace.as_mut() {
-        stages.push((
-            "rerank",
             results.iter().map(|doc| doc.url.clone()).collect(),
         ));
     }
@@ -701,6 +720,7 @@ pub async fn run_core_search(
     Vec<WebDocument>,
 ) {
     let total_start = std::time::Instant::now();
+    let record = Arc::ptr_eq(&index, &PRIECO_INDEX);
     let q_clone = query.to_string();
     let q_clone3 = q_clone.clone();
     let _q_clone4 = q_clone.clone();
@@ -730,7 +750,9 @@ pub async fn run_core_search(
                 id_score_vec.push((url_to_id(&format!("{}{}/", prefix, domain)), 0.0));
             }
             println!("DIR lookup took {:.3}s", start.elapsed().as_secs_f32());
-            ANALYTICS.record_latency(Stage::Dir, start.elapsed());
+            if record {
+                ANALYTICS.record_latency(Stage::Dir, start.elapsed());
+            }
 
             return id_score_vec;
         }
@@ -749,7 +771,9 @@ pub async fn run_core_search(
         }
 
         println!("DIR lookup took {:.3}s", start.elapsed().as_secs_f32());
-        ANALYTICS.record_latency(Stage::Dir, start.elapsed());
+        if record {
+            ANALYTICS.record_latency(Stage::Dir, start.elapsed());
+        }
 
         id_score_vec
     });
@@ -782,7 +806,9 @@ pub async fn run_core_search(
             start.elapsed().as_secs_f32(),
             index_clone.reader.searcher().segment_readers().len()
         );
-        ANALYTICS.record_latency(Stage::Fts, start.elapsed());
+        if record {
+            ANALYTICS.record_latency(Stage::Fts, start.elapsed());
+        }
 
         res
     });
@@ -804,7 +830,9 @@ pub async fn run_core_search(
 
         let final_res: Vec<(u64, f32)> = res.into_iter().take(MAX_IVF).collect();
         println!("Vector search took {:.3}s", start.elapsed().as_secs_f32());
-        ANALYTICS.record_latency(Stage::Vector, start.elapsed());
+        if record {
+            ANALYTICS.record_latency(Stage::Vector, start.elapsed());
+        }
 
         final_res
     });
@@ -834,7 +862,9 @@ pub async fn run_core_search(
     let fetch_start = std::time::Instant::now();
     let mut fetched_results = fetch_documents(&index, engines_map);
     println!("Fetch took {:.3}s", fetch_start.elapsed().as_secs_f32());
-    ANALYTICS.record_latency(Stage::Fetch, fetch_start.elapsed());
+    if record {
+        ANALYTICS.record_latency(Stage::Fetch, fetch_start.elapsed());
+    }
 
     let mut dir_results: Vec<WebDocument> = fetched_results.remove("DIR").unwrap_or_default();
     let mut tantivy_results: Vec<WebDocument> = fetched_results.remove("FTS").unwrap_or_default();
@@ -851,7 +881,9 @@ pub async fn run_core_search(
     println!("IVF: {}", vector_results.len());
     println!("DIS: {}", dis_results.len());
 
-    ANALYTICS.record_latency(Stage::Core, total_start.elapsed());
+    if record {
+        ANALYTICS.record_latency(Stage::Core, total_start.elapsed());
+    }
 
     (dir_results, tantivy_results, vector_results, dis_results)
 }

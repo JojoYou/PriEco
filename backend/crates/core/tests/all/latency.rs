@@ -12,7 +12,7 @@ fn hist(pairs: &[(u16, u64)]) -> BTreeMap<u16, u64> {
 
 #[test]
 fn stage_all_contains_every_stage_once() {
-    assert_eq!(Stage::ALL.len(), 7);
+    assert_eq!(Stage::ALL.len(), 8);
     for (i, a) in Stage::ALL.iter().enumerate() {
         for (j, b) in Stage::ALL.iter().enumerate() {
             assert_eq!(i == j, a == b);
@@ -40,6 +40,7 @@ fn stage_specific_keys() {
     assert_eq!(Stage::Vector.key(), "ivf");
     assert_eq!(Stage::Dir.key(), "dir");
     assert_eq!(Stage::Fetch.key(), "fetch");
+    assert_eq!(Stage::Rerank.key(), "rerank");
     assert_eq!(Stage::PeerServe.key(), "peer_serve");
     assert_eq!(Stage::PeerRtt.key(), "peer_rtt");
 }
@@ -60,8 +61,8 @@ fn stage_no_key_is_prefix_of_another_with_colon() {
 fn stage_labels_and_descriptions_are_unique_and_non_empty() {
     let labels: HashSet<&str> = Stage::ALL.iter().map(|s| s.label()).collect();
     let descs: HashSet<&str> = Stage::ALL.iter().map(|s| s.desc()).collect();
-    assert_eq!(labels.len(), 7);
-    assert_eq!(descs.len(), 7);
+    assert_eq!(labels.len(), 8);
+    assert_eq!(descs.len(), 8);
     for s in Stage::ALL {
         assert!(!s.label().trim().is_empty());
         assert!(!s.desc().trim().is_empty());

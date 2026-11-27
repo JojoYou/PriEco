@@ -71,8 +71,8 @@ use memmap2::{Mmap, MmapOptions};
 use ndarray::{Array, Array2, CowArray, IxDyn};
 use once_cell::sync::Lazy;
 use ort::{
-    Environment, ExecutionProvider, GraphOptimizationLevel, Session, SessionBuilder, Value,
-    tensor::OrtOwnedTensor,
+    Environment, ExecutionProvider, GraphOptimizationLevel, LoggingLevel, Session, SessionBuilder,
+    Value, tensor::OrtOwnedTensor,
 };
 use parking_lot::{Condvar, Mutex, RwLock};
 use primp::{Client as PIMP_CLIENT, Impersonate, ImpersonateOS, redirect::Policy};
@@ -1619,7 +1619,7 @@ impl Reranker {
     pub fn new() -> Self {
         let environment = Environment::builder()
             .with_name("reranker")
-            .with_log_level(ort::LoggingLevel::Verbose)
+            .with_log_level(LoggingLevel::Warning)
             .build()
             .unwrap()
             .into_arc();
@@ -1647,7 +1647,7 @@ impl Reranker {
         }));
 
         if let Err(e) = tokenizer.with_truncation(Some(TruncationParams {
-            max_length: 512,
+            max_length: 256,
             ..Default::default()
         })) {
             println!(
@@ -1712,8 +1712,8 @@ impl Reranker {
                 let mut mask = Vec::with_capacity(batch_size * seq_len);
 
                 for enc in &encodings {
-                    ids.extend(enc.get_ids().iter().map(|&x| x as i32));
-                    mask.extend(enc.get_attention_mask().iter().map(|&x| x as i32));
+                    ids.extend(enc.get_ids().iter().map(|&x| x as i64));
+                    mask.extend(enc.get_attention_mask().iter().map(|&x| x as i64));
                 }
 
                 let input_ids_arr = Array2::from_shape_vec((batch_size, seq_len), ids).unwrap();
@@ -2569,6 +2569,8 @@ pub enum Stage {
     Dir,
     /// Document fetch from the KV store
     Fetch,
+    /// Reranker on the top results
+    Rerank,
     /// Handling an inbound federated query from a peer
     PeerServe,
     /// Round trip of an outbound federated query
@@ -2577,12 +2579,13 @@ pub enum Stage {
 
 impl Stage {
     /// All stages, in showing order.
-    pub const ALL: [Stage; 7] = [
+    pub const ALL: [Stage; 8] = [
         Stage::Core,
         Stage::Fts,
         Stage::Vector,
         Stage::Dir,
         Stage::Fetch,
+        Stage::Rerank,
         Stage::PeerServe,
         Stage::PeerRtt,
     ];
@@ -2595,6 +2598,7 @@ impl Stage {
             Stage::Vector => "ivf",
             Stage::Dir => "dir",
             Stage::Fetch => "fetch",
+            Stage::Rerank => "rerank",
             Stage::PeerServe => "peer_serve",
             Stage::PeerRtt => "peer_rtt",
         }
@@ -2608,6 +2612,7 @@ impl Stage {
             Stage::Vector => "Vector",
             Stage::Dir => "Direct lookup",
             Stage::Fetch => "Doc fetch",
+            Stage::Rerank => "Reranker",
             Stage::PeerServe => "Peer serve",
             Stage::PeerRtt => "Peer round trip",
         }
@@ -2621,6 +2626,7 @@ impl Stage {
             Stage::Vector => "IVF centroid search",
             Stage::Dir => "Domain guess lookup",
             Stage::Fetch => "Metadata read from storage",
+            Stage::Rerank => "BGE scoring of the top results",
             Stage::PeerServe => "Answering other nodes",
             Stage::PeerRtt => "Asking other nodes",
         }

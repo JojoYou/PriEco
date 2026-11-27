@@ -1,0 +1,26 @@
+[Unit]
+Description=PriEco Web Search Engine
+
+[Service]
+Type=simple
+NoNewPrivileges=yes
+WorkingDirectory=@DIR@
+
+# ONNX Runtime + cuDNN (was run.sh)
+Environment=ORT_DYLIB_PATH=@ORT_LIBS@/libonnxruntime.so
+Environment=LD_LIBRARY_PATH=@LD_PATH@
+LimitNOFILE=65535
+
+ExecStartPre=/bin/rm -f @DIR@/runtime/stop.txt
+ExecStart=@BIN@
+
+# Graceful stop: stop.txt
+ExecStop=/bin/bash -c 'touch @DIR@/runtime/stop.txt; for i in $(seq 15); do kill -0 $MAINPID 2>/dev/null || exit 0; sleep 1; done'
+TimeoutStopSec=120
+
+Restart=always
+RestartSec=5
+MemoryMax=9G
+
+[Install]
+WantedBy=default.target

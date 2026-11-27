@@ -16,7 +16,7 @@ DOC_SRC := frontend/mkdocs.yml $(shell find frontend/docs backend/crates \
 GEOIP := backend/crates/crawler/src/data/GeoLite2-Country.mmdb
 GEOIP_MAX_DAYS := 30
 
-.PHONY: all help check check-release docs release run demo demo-reset benchmark restart logs clean clean-docs clean-full geoip-check geoip-update
+.PHONY: all help check check-release docs release run demo demo-reset benchmark restart logs clean clean-docs clean-full geoip-check geoip-update release-dev restart-dev
 
 all: check docs release
 
@@ -51,8 +51,14 @@ $(DOCS_STAMP): $(DOC_SRC)
 	rm -rf $(SITE)/api && cp -a target/doc $(SITE)/api
 	touch $@
 
+PROFILE := release
+BIN = target/$(PROFILE)/prieco_web
+
 release: geoip-check ## Optimised build
 	cargo build --release -p prieco_web --features $(FEATURES)
+
+release-dev: geoip-check ## Faster-compiling build
+	cargo build --profile release-dev -p prieco_web --features $(FEATURES)
 
 run: release docs ## Start PriEco
 	@ulimit -n 65535 || echo "⚠  could not raise open file limit"; \
@@ -60,7 +66,7 @@ run: release docs ## Start PriEco
 	  export ORT_DYLIB_PATH="$(ORT_LIBS)/libonnxruntime.so"; \
 	  export LD_LIBRARY_PATH="$(ORT_LIBS)$(if $(CUDNN_LIBS),:$(CUDNN_LIBS))$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}"; \
 	fi; \
-	exec ./target/release/prieco_web
+	exec ./$(BIN)
 
 ###
 # Demo
@@ -93,26 +99,38 @@ demo-reset: ## Wipe the demo index
 ###
 benchmark: ## The running PriEco to run all benchmarks, or only SETS="trec_dl_2019 trec_dl_2020"
 	@set -e; \
-	bin=target/release/prieco_web; \
-	systemctl is-active --quiet prieco || { echo "✗ prieco is not running, start it with: make restart"; exit 1; }; \
+	systemctl --user is-active --quiet prieco || { echo "✗ prieco is not running, start it with: make restart"; exit 1; }; \
+	bin=$$(systemctl --user show -p ExecStart --value prieco | sed -n 's/.*path=\([^ ;]*\).*/\1/p'); \
 	grep -qa "Failed to listen for SIGUSR1" $$bin || { echo "✗ $$bin has no benchmark listener, run: make restart"; exit 1; }; \
-	started=$$(date -d "$$(systemctl show -p ExecMainStartTimestamp --value prieco)" +%s); \
+	started=$$(date -d "$$(systemctl --user show -p ExecMainStartTimestamp --value prieco)" +%s); \
 	if [ $$(stat -c %Y $$bin) -gt $$started ]; then \
 	  echo "✗ prieco runs an older build than $$bin, run: make restart"; exit 1; \
 	fi; \
 	mkdir -p runtime/benchmarks; \
 	printf '%s\n' $(SETS) > runtime/benchmarks/sets.txt; \
-	systemctl kill --signal=SIGUSR1 --kill-whom=main prieco; \
+	systemctl --user kill --signal=SIGUSR1 --kill-whom=main prieco; \
 	echo "📏 Benchmark started, follow it with: make logs"
 
 ###
-# Server (systemd service "prieco")
+# Server (systemd user service "prieco")
 ###
-restart: release docs ## Build while the old version runs
-	systemctl restart prieco
+SERVICE := $(HOME)/.config/systemd/user/prieco.service
+
+restart: release ## Build while the old version runs, deploy the service, restart
+restart-dev: release-dev ## Same, with the faster-compiling release-dev build
+restart-dev: PROFILE := release-dev
+restart restart-dev: docs
+	mkdir -p $(dir $(SERVICE))
+	sed -e 's|@DIR@|$(CURDIR)|g' -e 's|@BIN@|$(CURDIR)/$(BIN)|g' \
+	    -e 's|@ORT_LIBS@|$(ORT_LIBS)|g' -e 's|@LD_PATH@|$(ORT_LIBS)$(if $(CUDNN_LIBS),:$(CUDNN_LIBS))|g' \
+	    container/prieco.service > $(SERVICE)
+	loginctl show-user $(USER) -p Linger --value | grep -q yes || loginctl enable-linger
+	systemctl --user daemon-reload
+	systemctl --user enable prieco
+	systemctl --user restart prieco
 
 logs: ## Follow the service log
-	journalctl -u prieco -f
+	journalctl --user -u prieco -f
 
 ###
 # Cleanup
