@@ -549,6 +549,13 @@ pub async fn run_json(
 
         // Temp remove blocked terms
         if safe_search {
+            let blocked_prefixes: &[&str] = &["https://mail.proton.me/u/"];
+            rrf_results.retain(|doc| {
+                !blocked_prefixes
+                    .iter()
+                    .any(|prefix| doc.url.starts_with(prefix))
+            });
+
             let blocked_terms: &[&str] = &["porn", "sex", "dick", "fap"];
             rrf_results.retain(|doc| {
                 if doc.safe_s {
