@@ -618,3 +618,73 @@ fn goggle_path_rules_boost_matching_urls() {
     let f = goggle(base("http://a.xyz/shop"), &[Arc::new(g)]);
     assert_factor(f, 1.0);
 }
+
+/* ───────────────────────────── logits ───────────────────────────── */
+
+fn logit_score(d: WebDocument, goggles: &[Arc<GoggleRules>]) -> f64 {
+    init();
+    let mut v = vec![d];
+    hand::run_logits(
+        &mut v,
+        "q",
+        "en",
+        "zz",
+        &QueryIntent::Unknown,
+        goggles,
+        false,
+    );
+    v[0].search_score as f64
+}
+
+#[test]
+fn logits_baseline_is_unchanged() {
+    let mut d = base("http://a.xyz");
+    d.search_score = 3.0;
+    assert!((logit_score(d, &[]) - 3.0).abs() < 1e-6);
+}
+
+#[test]
+fn logits_add_log_of_bounded_quality() {
+    let mut d = base("https://a.com/");
+    d.search_score = 3.0;
+    let expected = 3.0 + (1.0 + hand::QUALITY_BOUND).ln();
+    assert!((logit_score(d, &[]) - expected).abs() < 1e-5);
+}
+
+#[test]
+fn logits_work_for_negative_scores() {
+    let mut d = base("http://a.xyz");
+    d.search_score = -4.0;
+    d.load = 10.0;
+    let expected = -4.0 - (1.0 + hand::QUALITY_BOUND).ln();
+    assert!((logit_score(d, &[]) - expected).abs() < 1e-5);
+}
+
+#[test]
+fn logits_add_log_of_goggles() {
+    let id = url_to_domain_id("http://a.xyz");
+    let mut g = rules();
+    g.downrank.insert(id, 3.0);
+    let mut d = base("http://a.xyz");
+    d.search_score = 2.0;
+    let expected = 2.0 + 0.25f64.ln();
+    assert!((logit_score(d, &[Arc::new(g)]) - expected).abs() < 1e-5);
+}
+
+#[test]
+fn logits_quality_only_breaks_near_ties() {
+    init();
+    let good_site = {
+        let mut d = base("https://a.com");
+        d.search_score = 1.0;
+        d
+    };
+    let relevant = {
+        let mut d = base("http://b.xyz/x/y/z");
+        d.search_score = 2.0;
+        d
+    };
+    let mut v = vec![good_site, relevant];
+    hand::run_logits(&mut v, "q", "en", "zz", &QueryIntent::Unknown, &[], false);
+    assert_eq!(v[0].url, "http://b.xyz/x/y/z");
+}

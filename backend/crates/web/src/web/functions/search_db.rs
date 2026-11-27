@@ -16,7 +16,8 @@
 //!
 //! ## Planned Improvements
 //!
-//! - [ ] None
+//! - [ ] Learn to rank
+//! - [ ] Better vector index recall
 
 /*
   Import system libraries
@@ -76,9 +77,11 @@ const NPROBS: usize = 4;
 /// Top results that get PageRank.
 const PAGERANK_CUTOFF: usize = 100;
 /// Top results that go through reranker.
-const RERANK_CUTOFF: usize = 30;
+const RERANK_CUTOFF: usize = 50;
 /// Characters of a passage given to the reranker, more than its 512 tokens hold.
 const RERANK_CHARS: usize = 2_500;
+/// Reranked score is this + reranker logit, so it's always above RRF scores, which are under 1.
+const RERANK_TIER: f32 = 1_000.0;
 /// Max results from one domain.
 const MAX_PER_DOMAIN: usize = 5;
 
@@ -298,12 +301,13 @@ pub type StageTrace = Vec<(&'static str, Vec<String>)>;
 ///
 /// * Results in user language first.
 ///
-/// * Reranker on the top [RERANK_CUTOFF], its score replaces the RRF score.
+/// * Reranker on the top [RERANK_CUTOFF], score becomes [RERANK_TIER] + reranker logit.
 ///
-/// * [Hand ranking][ranking::hand::run], bounded quality factors and goggles.
-///     * Reranked and other results separately, reranked always stay on top.
+/// * Hand ranking, bounded quality factors and goggles, reranked always stay on top.
+///     * Reranked: [ranking::hand::run_logits] adds logarithm of the boost to the logit.
+///     * Others: [ranking::hand::run] multiplies the RRF score by the boost.
 ///
-/// * PageRank.
+/// * PageRank, added as logarithm for reranked results, multiplied for others.
 ///
 /// * Results in user language first again, homepage of the queried domain first for navigational queries.
 ///
@@ -621,9 +625,8 @@ pub async fn run_json(
                 println!("{}Reranker failed: {}{}", colors::RED, e, colors::RESET);
                 vec![0.0; nn_candidates]
             });
-        for (i, doc) in results[..nn_candidates].iter_mut().enumerate() {
-            let neural_relevance = 1.0 / (1.0 + (-scores[i]).exp());
-            doc.search_score = 1.0 + neural_relevance;
+        for (doc, logit) in results[..nn_candidates].iter_mut().zip(scores) {
+            doc.search_score = RERANK_TIER + logit;
         }
         results[..nn_candidates]
             .sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
@@ -640,15 +643,9 @@ pub async fn run_json(
         ));
     }
 
-    for doc in results[..nn_candidates].iter_mut() {
-        doc.search_score -= 1.0;
-    }
     let (reranked, rest) = results.split_at_mut(nn_candidates);
-    ranking::hand::run(reranked, query, lang, loc, &intent, &goggles, mobile);
+    ranking::hand::run_logits(reranked, query, lang, loc, &intent, &goggles, mobile);
     ranking::hand::run(rest, query, lang, loc, &intent, &goggles, mobile);
-    for doc in results[..nn_candidates].iter_mut() {
-        doc.search_score += 1.0;
-    }
 
     if let Some(stages) = trace.as_mut() {
         stages.push(("hand", results.iter().map(|doc| doc.url.clone()).collect()));
@@ -658,13 +655,17 @@ pub async fn run_json(
     let pr_candidates = results.len().min(PAGERANK_CUTOFF);
     if pr_candidates > 0 {
         let pr_guard = PAGERANK.read();
-        for doc in results[..pr_candidates].iter_mut() {
+        for (rank, doc) in results[..pr_candidates].iter_mut().enumerate() {
             let pr_score = if let Some(pr) = pr_guard.as_ref() {
                 pr.get_score(&doc.url)
             } else {
                 0.0
             };
-            doc.search_score *= 1.0 + pr_score;
+            if rank < nn_candidates {
+                doc.search_score += (1.0 + pr_score).ln();
+            } else {
+                doc.search_score *= 1.0 + pr_score;
+            }
         }
         drop(pr_guard);
         results[..pr_candidates]

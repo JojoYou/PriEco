@@ -2,6 +2,7 @@
 //!
 //! It's called this way as it's a hand picked set of ranking factors.
 //! Quality factors multiply the score of a result, all together by at most [QUALITY_BOUND].
+//! For reranked results [run_logits] adds their logarithm to the reranker logit instead.
 //! Goggles aren't bounded. Language and navigational queries are hard rules in
 //! [run_json][crate::web::functions::search_db::run_json].
 //!
@@ -125,13 +126,13 @@ pub const QUALITY_BOUND: f64 = 0.2;
 static ACTIVE_WEIGHTS: Lazy<RwLock<RankingWeights>> =
     Lazy::new(|| RwLock::new(RankingWeights::default()));
 
-/// Applies hand ranking and sorts results.
+/// Applies hand ranking by multiplying scores and sorts results.
 ///
 /// Score is multiplied by [quality], bounded by [QUALITY_BOUND], and by [goggle_factor], unbounded.
 ///
 /// # Arguments
 ///
-/// * `results` - Results with RRF or reranker relevance in `search_score`.
+/// * `results` - Results with RRF score in `search_score`.
 /// * `query` - User query.
 /// * `lang` - User language.
 /// * `loc` - User location.
@@ -151,6 +152,57 @@ pub fn run(
     goggles: &[Arc<GoggleRules>],
     user_is_mobile: bool,
 ) {
+    let boosts = boosts(results, query, lang, loc, intent, goggles, user_is_mobile);
+    for (doc, boost) in results.iter_mut().zip(boosts) {
+        doc.search_score = (doc.search_score as f64 * boost) as f32;
+    }
+
+    sort(results);
+}
+
+/// Applies hand ranking to reranker logits and sorts results.
+///
+/// Logarithm of the same boost as [run] is added, so ×1.2 is +0.18 logits.
+///
+/// # Arguments
+///
+/// * `results` - Results with reranker logit, plus any constant, in `search_score`.
+/// * `query` - User query.
+/// * `lang` - User language.
+/// * `loc` - User location.
+/// * `intent` - Query intent.
+/// * `goggles` - Active goggles.
+/// * `user_is_mobile` - User on a phone.
+///
+/// # Returns
+///
+/// None, `results` are changed and sorted.
+pub fn run_logits(
+    results: &mut [WebDocument],
+    query: &str,
+    lang: &str,
+    loc: &str,
+    intent: &QueryIntent,
+    goggles: &[Arc<GoggleRules>],
+    user_is_mobile: bool,
+) {
+    let boosts = boosts(results, query, lang, loc, intent, goggles, user_is_mobile);
+    for (doc, boost) in results.iter_mut().zip(boosts) {
+        doc.search_score = (doc.search_score as f64 + boost.ln()) as f32;
+    }
+
+    sort(results);
+}
+
+fn boosts(
+    results: &[WebDocument],
+    query: &str,
+    lang: &str,
+    loc: &str,
+    intent: &QueryIntent,
+    goggles: &[Arc<GoggleRules>],
+    user_is_mobile: bool,
+) -> Vec<f64> {
     // Training
     check_for_updated_weights(); // PHP might have generated new weights to be tested
     let weights = {
@@ -158,13 +210,18 @@ pub fn run(
         *w
     };
 
-    for doc in results.iter_mut() {
-        let quality = quality(doc, query, lang, loc, intent, &weights, user_is_mobile)
-            .clamp(1.0 / (1.0 + QUALITY_BOUND), 1.0 + QUALITY_BOUND);
-        let boost = quality * goggle_factor(doc, goggles);
-        doc.search_score = (doc.search_score as f64 * boost) as f32;
-    }
+    results
+        .iter()
+        .map(|doc| {
+            let quality = quality(doc, query, lang, loc, intent, &weights, user_is_mobile)
+                .clamp(1.0 / (1.0 + QUALITY_BOUND), 1.0 + QUALITY_BOUND);
+            quality * goggle_factor(doc, goggles)
+        })
+        .collect()
+}
 
+/// Sorts by score, best first.
+fn sort(results: &mut [WebDocument]) {
     results.sort_by(|a, b| {
         b.search_score
             .partial_cmp(&a.search_score)
