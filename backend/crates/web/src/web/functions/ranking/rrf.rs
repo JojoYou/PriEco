@@ -5,7 +5,7 @@
 //! ## Architecture
 //!
 //! 1. Every result gets weight / (k + rank + 1), scores of the same URL are added.
-//!     * Weights: direct 3.0, discovery 0.5, other nodes 0.9, full text and vector by [adjust_weights].
+//!     * Weights: direct 3.0, discovery 0.5, other nodes 0.9, vector [IVF_WEIGHT], full text by [adjust_weights].
 //!     * Full text and vector results in a different language: ×0.7 for Navigational, otherwise ×0.1.
 //!     * Page intent same as query intent: ×1.3.
 //! 2. `site:` or `domain:` in query keeps only that domain and its subdomains.
@@ -16,7 +16,7 @@
 //! * **Author:** Roman Láncoš (<support@prieco.net>)
 //! * **License:** AGPL-3.0
 //! * Date Created: 2026-03-05
-//! * Last Modified: 2026-11-21
+//! * Last Modified: 2026-11-27
 //!
 //! ## Planned Improvements
 //!
@@ -49,6 +49,7 @@ pub struct RRFParams<'r> {
     pub k: f32,
 }
 
+/// Vector search weight, tuned offline on MS MARCO dev.
 const IVF_WEIGHT: f32 = 0.25;
 
 /// Merges results.
@@ -187,18 +188,17 @@ pub fn run(params: RRFParams<'_>) -> Vec<WebDocument> {
     result
 }
 
-/// Full text and vector weights from query shape. Both start at 1.0, max 2.0.
+/// Full text weight from query shape. Starts at 1.0, max 2.0.
 ///
-/// * 1-2 words: full text +0.7. 6+ words: vector +0.7.
-/// * Quotes: full text +0.8.
-/// * Question word: vector +0.6.
-/// * Over 30% words longer than 7 characters: full text +0.4.
+/// * 1-2 words: +0.7.
+/// * Quotes: +0.8.
+/// * Over 30% words longer than 7 characters: +0.4.
 ///
 /// # Returns
 ///
-/// (full text weight, vector weight).
+/// Full text weight.
 fn adjust_weights(query: &str) -> f32 {
-    /// Words that make a query a question.
+    /*/// Words that make a query a question.
     const QUESTION_WORDS: [&str; 21] = [
         "what",
         "why",
@@ -221,8 +221,7 @@ fn adjust_weights(query: &str) -> f32 {
         "between",
         "versus",
         "vs",
-    ];
-
+    ];*/
     //query analysis
     let tokens: Vec<&str> = query.split_whitespace().collect();
     let len = tokens.len() as f32;

@@ -296,9 +296,16 @@ pub type StageTrace = Vec<(&'static str, Vec<String>)>;
 ///
 /// * Goggle discard filter.
 ///
+/// * Results in user language first.
+///
 /// * Reranker on the top [RERANK_CUTOFF], its score replaces the RRF score.
 ///
+/// * [Hand ranking][ranking::hand::run], bounded quality factors and goggles.
+///     * Reranked and other results separately, reranked always stay on top.
+///
 /// * PageRank.
+///
+/// * Results in user language first again, homepage of the queried domain first for navigational queries.
 ///
 /// * Caps results from single domain.
 ///
@@ -586,6 +593,12 @@ pub async fn run_json(
         return Vec::new();
     }
 
+    // User language
+    let other_lang = |doc: &WebDocument| {
+        lang != "all" && !lang.is_empty() && !doc.lang.is_empty() && doc.lang != lang
+    };
+    results.sort_by_key(other_lang);
+
     // RERANKER
     let nn_candidates = results.len().min(RERANK_CUTOFF);
     if nn_candidates > 0 {
@@ -627,9 +640,14 @@ pub async fn run_json(
         ));
     }
 
-    if false {
-        ranking::hand::run(&mut results, query, lang, loc, &intent, &goggles, mobile);
-        results.sort_by(|a, b| b.search_score.partial_cmp(&a.search_score).unwrap());
+    for doc in results[..nn_candidates].iter_mut() {
+        doc.search_score -= 1.0;
+    }
+    let (reranked, rest) = results.split_at_mut(nn_candidates);
+    ranking::hand::run(reranked, query, lang, loc, &intent, &goggles, mobile);
+    ranking::hand::run(rest, query, lang, loc, &intent, &goggles, mobile);
+    for doc in results[..nn_candidates].iter_mut() {
+        doc.search_score += 1.0;
     }
 
     if let Some(stages) = trace.as_mut() {
@@ -658,6 +676,17 @@ pub async fn run_json(
             "pagerank",
             results.iter().map(|doc| doc.url.clone()).collect(),
         ));
+    }
+
+    results.sort_by_key(other_lang);
+
+    if intent == QueryIntent::Navigational
+        && let Some(pos) = results
+            .iter()
+            .position(|doc| ranking::hand::navigational_match(&doc.url, query))
+    {
+        let homepage = results.remove(pos);
+        results.insert(0, homepage);
     }
 
     // Cap result count from a single domain

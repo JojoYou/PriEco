@@ -6,6 +6,8 @@ use crate::support::{doc, init};
 use crate::web::functions::ranking::rrf::{self, RRFParams};
 
 const K: f32 = 60.0;
+/// Fixed vector weight, tuned offline on MS MARCO dev.
+const IVF: f32 = 0.25;
 
 fn lang_doc(url: &str, lang: &str) -> WebDocument {
     let mut d = doc(url);
@@ -115,7 +117,7 @@ fn incoming_source_field_is_overwritten() {
 
 #[test]
 fn source_weights_order_first_ranked_results() {
-    // DIR 3.0 > FTS 1.0 == IVF 1.0 > FED 0.9 > DIS 0.5 for rank 0
+    // DIR 3.0 > FTS 1.0 > FED 0.9 > DIS 0.5 > IVF 0.25 for rank 0
     let out = run(
         NEUTRAL,
         docs(&["https://dir.com"]),
@@ -150,7 +152,7 @@ fn same_url_from_several_sources_is_merged_and_summed() {
     );
     assert_eq!(out.len(), 2);
     let x = out.iter().find(|d| d.url == "https://x.com").unwrap();
-    assert!(close(x.search_score, 1.0 / (K + 1.0) + 1.0 / (K + 2.0)));
+    assert!(close(x.search_score, 1.0 / (K + 1.0) + IVF / (K + 2.0)));
     assert_eq!(x.source, "FTS + IVF");
     assert_eq!(out[0].url, "https://x.com");
 }
@@ -250,29 +252,29 @@ fn fts_ivf_scores(query: &str) -> (f32, f32) {
 #[test]
 fn neutral_query_has_equal_weights() {
     let (f, i) = fts_ivf_scores(NEUTRAL);
-    assert!(close(f, 1.0) && close(i, 1.0), "{} {}", f, i);
+    assert!(close(f, 1.0) && close(i, IVF), "{} {}", f, i);
 }
 
 #[test]
 fn short_query_boosts_full_text() {
     let (f, i) = fts_ivf_scores("rust");
-    assert!(close(f, 1.7) && close(i, 1.0), "{} {}", f, i);
+    assert!(close(f, 1.7) && close(i, IVF), "{} {}", f, i);
     let (f, _) = fts_ivf_scores("rust lang");
     assert!(close(f, 1.7));
 }
 
 #[test]
-fn long_query_boosts_vector() {
+fn long_query_keeps_fixed_weights() {
     let (f, i) = fts_ivf_scores("a b c d e f");
-    assert!(close(f, 1.0) && close(i, 1.7), "{} {}", f, i);
+    assert!(close(f, 1.0) && close(i, IVF), "{} {}", f, i);
 }
 
 #[test]
-fn question_word_boosts_vector() {
+fn question_word_keeps_fixed_weights() {
     let (f, i) = fts_ivf_scores("what rust does");
-    assert!(close(f, 1.0) && close(i, 1.6), "{} {}", f, i);
+    assert!(close(f, 1.0) && close(i, IVF), "{} {}", f, i);
     let (_, i) = fts_ivf_scores("WHY rust is");
-    assert!(close(i, 1.6), "question words are case insensitive");
+    assert!(close(i, IVF), "{}", i);
 }
 
 #[test]
@@ -292,15 +294,12 @@ fn weights_are_clamped_to_two() {
     // 1 token (+0.7), quotes (+0.8), rare (+0.4) = 2.9 -> 2.0
     let (f, _) = fts_ivf_scores("\"supercalifragilistic\"");
     assert!(close(f, 2.0), "{}", f);
-    // >= 6 tokens (+0.7) + question (+0.6) = 2.3 -> 2.0
-    let (_, i) = fts_ivf_scores("what is the difference between these two");
-    assert!(close(i, 2.0), "{}", i);
 }
 
 #[test]
 fn empty_query_counts_as_short() {
     let (f, i) = fts_ivf_scores("");
-    assert!(close(f, 1.7) && close(i, 1.0), "{} {}", f, i);
+    assert!(close(f, 1.7) && close(i, IVF), "{} {}", f, i);
 }
 
 /* ───────────────────────────── vector language enforcement ───────────────────────────── */
@@ -332,11 +331,11 @@ fn ivf_score(lang: &str, doc_lang: &str, intent: QueryIntent, source: &str) -> f
 fn foreign_vector_results_are_penalised() {
     assert!(close(
         ivf_score("en", "de", QueryIntent::Unknown, "IVF"),
-        0.1
+        IVF * 0.1
     ));
     assert!(close(
         ivf_score("en", "de", QueryIntent::Informational, "IVF"),
-        0.1
+        IVF * 0.1
     ));
 }
 
@@ -344,7 +343,7 @@ fn foreign_vector_results_are_penalised() {
 fn foreign_vector_results_penalised_less_for_navigational() {
     assert!(close(
         ivf_score("en", "de", QueryIntent::Navigational, "IVF"),
-        0.7
+        IVF * 0.7
     ));
 }
 
@@ -352,7 +351,7 @@ fn foreign_vector_results_penalised_less_for_navigational() {
 fn matching_language_is_not_penalised() {
     assert!(close(
         ivf_score("en", "en", QueryIntent::Unknown, "IVF"),
-        1.0
+        IVF
     ));
 }
 
@@ -360,9 +359,9 @@ fn matching_language_is_not_penalised() {
 fn all_or_empty_language_disables_penalty() {
     assert!(close(
         ivf_score("all", "de", QueryIntent::Unknown, "IVF"),
-        1.0
+        IVF
     ));
-    assert!(close(ivf_score("", "de", QueryIntent::Unknown, "IVF"), 1.0));
+    assert!(close(ivf_score("", "de", QueryIntent::Unknown, "IVF"), IVF));
 }
 
 /// Score of a foreign-language doc divided by the score of the same doc in the user's

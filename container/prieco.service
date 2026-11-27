@@ -6,7 +6,7 @@ Type=simple
 NoNewPrivileges=yes
 WorkingDirectory=@DIR@
 
-# ONNX Runtime + cuDNN (was run.sh)
+# ONNX Runtime + cuDNN
 Environment=ORT_DYLIB_PATH=@ORT_LIBS@/libonnxruntime.so
 Environment=LD_LIBRARY_PATH=@LD_PATH@
 LimitNOFILE=65535

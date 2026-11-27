@@ -1,13 +1,14 @@
 //! # Hand Ranking
 //!
 //! It's called this way as it's a hand picked set of ranking factors.
-//! Every factor multiplies the RRF score of a result, then results are sorted again.
+//! Quality factors multiply the score of a result, all together by at most [QUALITY_BOUND].
+//! Goggles aren't bounded. Language and navigational queries are hard rules in
+//! [run_json][crate::web::functions::search_db::run_json].
 //!
 //! ## Factors
 //!
-//! * **Domain:** Query is the domain name, homepage.
 //! * **Intent:** Shops for shopping, Wikipedia, gov and edu for learning.
-//! * **Language and location:** Page language, server country, country TLD.
+//! * **Location:** Server country, country TLD.
 //! * **URL:** HTTPS, TLD, bad patterns, path depth.
 //! * **Page:** Load speed, query in title, crawler quality scores, 500+ words, mobile.
 //! * **Goggles:** Boost, downrank, important, paths.
@@ -22,7 +23,7 @@
 //! * **Author:** Roman Láncoš (<support@prieco.net>)
 //! * **License:** AGPL-3.0
 //! * Date Created: 2026-03-05
-//! * Last Modified: 2026-11-21
+//! * Last Modified: 2026-11-27
 //!
 //! ## Planned Improvements
 //!
@@ -117,15 +118,20 @@ impl Default for RankingWeights {
     }
 }
 
+/// Max share all [quality] factors together raise or lower a score by.
+pub const QUALITY_BOUND: f64 = 0.2;
+
 /// Weights in use, swapped by [check_for_updated_weights].
 static ACTIVE_WEIGHTS: Lazy<RwLock<RankingWeights>> =
     Lazy::new(|| RwLock::new(RankingWeights::default()));
 
 /// Applies hand ranking and sorts results.
 ///
+/// Score is multiplied by [quality], bounded by [QUALITY_BOUND], and by [goggle_factor], unbounded.
+///
 /// # Arguments
 ///
-/// * `results` - Results with RRF score in `search_score`.
+/// * `results` - Results with RRF or reranker relevance in `search_score`.
 /// * `query` - User query.
 /// * `lang` - User language.
 /// * `loc` - User location.
@@ -152,247 +158,10 @@ pub fn run(
         *w
     };
 
-    // Calculate custom ranking boost
     for doc in results.iter_mut() {
-        let clean_url = strip_url_noise(&doc.url);
-
-        let mut boost: f64 = 1.0; // Multiplicative base
-
-        // (https://www/)query(.tld/)
-        if *intent == QueryIntent::Navigational {
-            // Extract the core domain name (e.g., "facebook" from "https://www.facebook.com/login")
-            let domain_root = clean_url
-                .split("://")
-                .nth(1)
-                .and_then(|s| s.split('/').next())
-                .and_then(|d| d.strip_prefix("www.").or(Some(d)))
-                .and_then(|d| d.split('.').next())
-                .unwrap_or("");
-
-            if domain_root.eq_ignore_ascii_case(query) {
-                boost *= weights.domain_match_boost;
-            }
-
-            // Homepage
-            if is_effectively_homepage(clean_url) {
-                boost *= weights.homepage_boost;
-            }
-        }
-
-        // Shopping intent
-        if *intent == QueryIntent::CommercialInvestigation {
-            if clean_url.contains("/product/")
-                || clean_url.contains("/item/")
-                || clean_url.contains("review")
-            {
-                boost *= weights.shopping_product_boost;
-            }
-
-            if clean_url.contains(".com")
-                || clean_url.contains(".shop")
-                || clean_url.contains(".store")
-            {
-                boost *= weights.shopping_domain_boost;
-            }
-        }
-
-        // Informational: learning
-        if *intent == QueryIntent::Informational {
-            if clean_url.contains(".wikipedia.org") {
-                boost *= weights.info_wiki_boost;
-            }
-
-            if clean_url.contains(".org")
-                || clean_url.contains(".edu")
-                || clean_url.contains(".gov")
-            {
-                boost *= weights.info_gov_edu_boost;
-            }
-
-            if clean_url.contains(".shop") || clean_url.contains("/product/") {
-                boost *= weights.info_shop_penalty;
-            }
-        }
-
-        // Language
-        if doc.lang == lang {
-            boost *= weights.lang_boost;
-        }
-
-        // Location
-        if *intent == QueryIntent::Local && doc.loc == loc {
-            boost *= weights.loc_boost;
-        }
-
-        let tld_matches_loc = clean_url
-            .split("://")
-            .nth(1)
-            .and_then(|s| s.trim_end_matches('/').split('.').next_back())
-            .is_some_and(|tld| tld.eq_ignore_ascii_case(loc));
-        if tld_matches_loc {
-            boost *= weights.tld_loc_boost;
-        }
-
-        // Wikipedia authority signal
-        if clean_url.contains(".wikipedia.org/wiki/") {
-            let wiki_lang = clean_url
-                .split("://")
-                .nth(1)
-                .and_then(|s| s.split('.').next())
-                .unwrap_or("");
-
-            if wiki_lang == lang {
-                boost *= weights.wiki_boost;
-            } else if lang != "all" {
-                boost *= 0.1;
-            }
-        }
-
-        // SSL
-        if clean_url.starts_with("https://") {
-            boost *= weights.https_boost;
-        }
-
-        // TLD quality
-        if clean_url.contains(".dev") || clean_url.contains(".com") {
-            boost *= weights.dev_com_boost;
-        } else if clean_url.contains(".org") || clean_url.contains(".net") {
-            boost *= weights.org_net_boost;
-        }
-
-        // Load speed
-        boost *= match doc.load {
-            // Fast Boosts
-            l if l < 0.2 => 1.08,
-            l if l < 0.3 => 1.05,
-            l if l < 0.5 => 1.02,
-
-            // Baseline
-            l if l < 1.2 => 1.00,
-
-            // Penalties
-            l if l < 2.0 => 0.90,
-            l if l < 3.5 => 0.70,
-            l if l < 5.0 => 0.40,
-
-            _ => 0.10, // > 5s
-        };
-
-        // Bad URL patterns
-        let url_body = clean_url.split("://").nth(1).unwrap_or(clean_url);
-        if url_body.contains('_') || url_body.contains(",,") || url_body.contains(':') {
-            boost *= weights.bad_url_penalty;
-        }
-
-        // Deep url
-        let path_depth = clean_url.trim_end_matches('/').matches('/').count();
-        if path_depth > 2 {
-            let extra_slashes = (path_depth - 2) as i32;
-            boost *= weights.path_depth_penalty.powi(extra_slashes);
-        }
-
-        // Query in title
-        if doc.title.to_lowercase().contains(&query.to_lowercase()) {
-            boost *= weights.title_match_boost;
-        }
-
-        // Quality score
-        boost *= 1.0 + (doc.qna as f64 / 2400.0).clamp(-0.20, 0.25);
-
-        // Relevance
-        match intent {
-            QueryIntent::Informational => {
-                // Query complexity (Avg word len)
-                let words: Vec<&str> = query.split_whitespace().collect();
-                let avg_word_len = if !words.is_empty() {
-                    words.iter().map(|w| w.len()).sum::<usize>() as f64 / words.len() as f64
-                } else {
-                    5.0
-                };
-
-                let normalized_readability = (doc.confidence as f64 / 100.0).clamp(0.0, 1.0);
-
-                if avg_word_len > 7.0 {
-                    // Complex query: prioritize low readability
-                    let technical_boost = 1.0 - normalized_readability;
-                    boost *= 1.0 + (technical_boost * weights.confidence_multi * 1.4);
-                } else {
-                    // Simple query: prioritize high readability
-                    boost *= 1.0 + (normalized_readability * weights.confidence_multi * 1.4);
-                }
-            }
-            QueryIntent::CommercialInvestigation | QueryIntent::Transactional => {
-                // Quality
-                if doc.qna > 0.0 {
-                    boost *= 1.0 + (doc.qna as f64 / 1200.0).clamp(0.0, 0.20);
-                }
-
-                // Penalize too long unstructured pages
-                if doc.effort > 500.0 {
-                    boost *= 0.85;
-                }
-            }
-            QueryIntent::Navigational => {}
-            _ => {
-                if doc.confidence > 0.0 {
-                    boost *= 1.0
-                        + (doc.confidence as f64 / 100.0).clamp(0.0, 1.0)
-                            * weights.confidence_multi
-                            * 10.0;
-                }
-
-                boost *= 1.0 + (doc.effort as f64 / 1000.0).clamp(0.0, 0.5) * weights.effort_multi;
-            }
-        }
-
-        // Goggles
-        if !goggles.is_empty() {
-            let domain_id = url_to_domain_id(&doc.url);
-            let important_goggle = goggles.iter().find(|g| g.important.contains(&domain_id));
-
-            if let Some(g) = important_goggle {
-                if let Some(b) = g.boost.get(&domain_id) {
-                    boost = 1.0 + (b.min(3.0) * 0.15);
-                } else if let Some(d) = g.downrank.get(&domain_id) {
-                    boost = 1.0 / (1.0 + d.min(3.0));
-                }
-            } else {
-                for g in goggles {
-                    if let Some(b) = g.boost.get(&domain_id) {
-                        boost *= 1.0 + (b.min(3.0) * 0.15);
-                    }
-                    if let Some(d) = g.downrank.get(&domain_id) {
-                        boost *= 1.0 / (1.0 + d.min(3.0));
-                    }
-                }
-            }
-            for (pattern, b) in goggles.iter().flat_map(|g| &g.path) {
-                if path_matches(clean_url, pattern) {
-                    boost *= 1.0 + (b.min(3.0) * 0.15);
-                }
-            }
-        }
-
-        // Usability
-        if user_is_mobile {
-            if doc.is_mobile {
-                boost *= weights.is_mobile_boost;
-            } else {
-                boost *= weights.mobile_unfriendly_penalty;
-            }
-        }
-        if doc.has_500_words {
-            if *intent == QueryIntent::Informational
-                || *intent == QueryIntent::CommercialInvestigation
-            {
-                boost *= weights.has_500_words_boost * 1.1;
-            } else {
-                boost *= weights.has_500_words_boost;
-            }
-        } else if *intent == QueryIntent::Informational {
-            boost *= 0.9;
-        }
-
+        let quality = quality(doc, query, lang, loc, intent, &weights, user_is_mobile)
+            .clamp(1.0 / (1.0 + QUALITY_BOUND), 1.0 + QUALITY_BOUND);
+        let boost = quality * goggle_factor(doc, goggles);
         doc.search_score = (doc.search_score as f64 * boost) as f32;
     }
 
@@ -401,6 +170,254 @@ pub fn run(
             .partial_cmp(&a.search_score)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
+}
+
+/// Product of all hand picked quality factors, before bounding.
+///
+/// # Arguments
+///
+/// * `doc` - Result.
+/// * `query` - User query.
+/// * `lang` - User language.
+/// * `loc` - User location.
+/// * `intent` - Query intent.
+/// * `weights` - Factor weights.
+/// * `user_is_mobile` - User on a phone.
+///
+/// # Returns
+///
+/// Multiplier, over 1 raises, under 1 lowers.
+pub fn quality(
+    doc: &WebDocument,
+    query: &str,
+    lang: &str,
+    loc: &str,
+    intent: &QueryIntent,
+    weights: &RankingWeights,
+    user_is_mobile: bool,
+) -> f64 {
+    let clean_url = strip_url_noise(&doc.url);
+
+    let mut boost: f64 = 1.0; // Multiplicative base
+
+    // Shopping intent
+    if *intent == QueryIntent::CommercialInvestigation {
+        if clean_url.contains("/product/")
+            || clean_url.contains("/item/")
+            || clean_url.contains("review")
+        {
+            boost *= weights.shopping_product_boost;
+        }
+
+        if clean_url.contains(".com") || clean_url.contains(".shop") || clean_url.contains(".store")
+        {
+            boost *= weights.shopping_domain_boost;
+        }
+    }
+
+    // Informational: learning
+    if *intent == QueryIntent::Informational {
+        if clean_url.contains(".wikipedia.org") {
+            boost *= weights.info_wiki_boost;
+        }
+
+        if clean_url.contains(".org") || clean_url.contains(".edu") || clean_url.contains(".gov") {
+            boost *= weights.info_gov_edu_boost;
+        }
+
+        if clean_url.contains(".shop") || clean_url.contains("/product/") {
+            boost *= weights.info_shop_penalty;
+        }
+    }
+
+    // Location
+    if *intent == QueryIntent::Local && doc.loc == loc {
+        boost *= weights.loc_boost;
+    }
+
+    let tld_matches_loc = clean_url
+        .split("://")
+        .nth(1)
+        .and_then(|s| s.trim_end_matches('/').split('.').next_back())
+        .is_some_and(|tld| tld.eq_ignore_ascii_case(loc));
+    if tld_matches_loc {
+        boost *= weights.tld_loc_boost;
+    }
+
+    // Wikipedia authority signal
+    if clean_url.contains(".wikipedia.org/wiki/") {
+        let wiki_lang = clean_url
+            .split("://")
+            .nth(1)
+            .and_then(|s| s.split('.').next())
+            .unwrap_or("");
+
+        if wiki_lang == lang {
+            boost *= weights.wiki_boost;
+        }
+    }
+
+    // SSL
+    if clean_url.starts_with("https://") {
+        boost *= weights.https_boost;
+    }
+
+    // TLD quality
+    if clean_url.contains(".dev") || clean_url.contains(".com") {
+        boost *= weights.dev_com_boost;
+    } else if clean_url.contains(".org") || clean_url.contains(".net") {
+        boost *= weights.org_net_boost;
+    }
+
+    // Load speed
+    boost *= match doc.load {
+        // Fast Boosts
+        l if l < 0.2 => 1.08,
+        l if l < 0.3 => 1.05,
+        l if l < 0.5 => 1.02,
+
+        // Baseline
+        l if l < 1.2 => 1.00,
+
+        // Penalties
+        l if l < 2.0 => 0.90,
+        l if l < 3.5 => 0.70,
+        l if l < 5.0 => 0.40,
+
+        _ => 0.10, // > 5s
+    };
+
+    // Bad URL patterns
+    let url_body = clean_url.split("://").nth(1).unwrap_or(clean_url);
+    if url_body.contains('_') || url_body.contains(",,") || url_body.contains(':') {
+        boost *= weights.bad_url_penalty;
+    }
+
+    // Deep url
+    let path_depth = clean_url.trim_end_matches('/').matches('/').count();
+    if path_depth > 2 {
+        let extra_slashes = (path_depth - 2) as i32;
+        boost *= weights.path_depth_penalty.powi(extra_slashes);
+    }
+
+    // Query in title
+    if doc.title.to_lowercase().contains(&query.to_lowercase()) {
+        boost *= weights.title_match_boost;
+    }
+
+    // Quality score
+    boost *= 1.0 + (doc.qna as f64 / 2400.0).clamp(-0.20, 0.25);
+
+    // Relevance
+    match intent {
+        QueryIntent::Informational => {
+            // Query complexity (Avg word len)
+            let words: Vec<&str> = query.split_whitespace().collect();
+            let avg_word_len = if !words.is_empty() {
+                words.iter().map(|w| w.len()).sum::<usize>() as f64 / words.len() as f64
+            } else {
+                5.0
+            };
+
+            let normalized_readability = (doc.confidence as f64 / 100.0).clamp(0.0, 1.0);
+
+            if avg_word_len > 7.0 {
+                // Complex query: prioritize low readability
+                let technical_boost = 1.0 - normalized_readability;
+                boost *= 1.0 + (technical_boost * weights.confidence_multi * 1.4);
+            } else {
+                // Simple query: prioritize high readability
+                boost *= 1.0 + (normalized_readability * weights.confidence_multi * 1.4);
+            }
+        }
+        QueryIntent::CommercialInvestigation | QueryIntent::Transactional => {
+            // Quality
+            if doc.qna > 0.0 {
+                boost *= 1.0 + (doc.qna as f64 / 1200.0).clamp(0.0, 0.20);
+            }
+
+            // Penalize too long unstructured pages
+            if doc.effort > 500.0 {
+                boost *= 0.85;
+            }
+        }
+        QueryIntent::Navigational => {}
+        _ => {
+            if doc.confidence > 0.0 {
+                boost *= 1.0
+                    + (doc.confidence as f64 / 100.0).clamp(0.0, 1.0)
+                        * weights.confidence_multi
+                        * 10.0;
+            }
+
+            boost *= 1.0 + (doc.effort as f64 / 1000.0).clamp(0.0, 0.5) * weights.effort_multi;
+        }
+    }
+
+    // Usability
+    if user_is_mobile {
+        if doc.is_mobile {
+            boost *= weights.is_mobile_boost;
+        } else {
+            boost *= weights.mobile_unfriendly_penalty;
+        }
+    }
+    if doc.has_500_words {
+        if *intent == QueryIntent::Informational || *intent == QueryIntent::CommercialInvestigation
+        {
+            boost *= weights.has_500_words_boost * 1.1;
+        } else {
+            boost *= weights.has_500_words_boost;
+        }
+    } else if *intent == QueryIntent::Informational {
+        boost *= 0.9;
+    }
+
+    boost
+}
+
+/// Goggle boosts, downranks and paths, not bounded as they're the user's choice.
+///
+/// # Arguments
+///
+/// * `doc` - Result.
+/// * `goggles` - Active goggles.
+///
+/// # Returns
+///
+/// Multiplier, an important goggle replaces the other goggles.
+pub fn goggle_factor(doc: &WebDocument, goggles: &[Arc<GoggleRules>]) -> f64 {
+    let clean_url = strip_url_noise(&doc.url);
+    let mut factor: f64 = 1.0;
+
+    if !goggles.is_empty() {
+        let domain_id = url_to_domain_id(&doc.url);
+        let important_goggle = goggles.iter().find(|g| g.important.contains(&domain_id));
+
+        if let Some(g) = important_goggle {
+            if let Some(b) = g.boost.get(&domain_id) {
+                factor = 1.0 + (b.min(3.0) * 0.15);
+            } else if let Some(d) = g.downrank.get(&domain_id) {
+                factor = 1.0 / (1.0 + d.min(3.0));
+            }
+        } else {
+            for g in goggles {
+                if let Some(b) = g.boost.get(&domain_id) {
+                    factor *= 1.0 + (b.min(3.0) * 0.15);
+                }
+                if let Some(d) = g.downrank.get(&domain_id) {
+                    factor *= 1.0 / (1.0 + d.min(3.0));
+                }
+            }
+        }
+        for (pattern, b) in goggles.iter().flat_map(|g| &g.path) {
+            if path_matches(clean_url, pattern) {
+                factor *= 1.0 + (b.min(3.0) * 0.15);
+            }
+        }
+    }
+
+    factor
 }
 
 /* Training */
@@ -432,8 +449,31 @@ fn strip_url_noise(url: &str) -> &str {
     (url.split('#').next().unwrap_or(url)) as _
 }
 
+/// Homepage of the domain the query names, 'github' matches 'https://www.github.com/en/'.
+///
+/// # Arguments
+///
+/// * `url` - Result URL.
+/// * `query` - User query.
+///
+/// # Returns
+///
+/// True for the homepage of the queried domain.
+pub fn navigational_match(url: &str, query: &str) -> bool {
+    let clean_url = strip_url_noise(url);
+    let domain_root = clean_url
+        .split("://")
+        .nth(1)
+        .and_then(|s| s.split('/').next())
+        .and_then(|d| d.strip_prefix("www.").or(Some(d)))
+        .and_then(|d| d.split('.').next())
+        .unwrap_or("");
+
+    domain_root.eq_ignore_ascii_case(query.trim()) && effectively_homepage(clean_url)
+}
+
 /// True for domain root and single locale paths like '/en/' or '/en-CA/'.
-fn is_effectively_homepage(url: &str) -> bool {
+fn effectively_homepage(url: &str) -> bool {
     let path = url
         .split("://")
         .nth(1)
